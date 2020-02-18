@@ -12,13 +12,13 @@ suite =
             \_ ->
                 Expect.equal
                     { ast =
-                        [ Def "add"
-                            [ "a", "b" ]
-                            [ Symbol "a"
-                            , Symbol "+"
-                            , Symbol "b"
+                        [ Def "inc"
+                            [ "a" ]
+                            [ Symbol "builtin_plus"
+                            , Symbol "a"
+                            , Integer 1
                             ]
                         ]
                     }
-                    (parse "def add a b = a + b")
+                    (parse "def inc a = builtin_plus a 1")
         ]
