@@ -11,6 +11,7 @@ import Parser
         , (|=)
         , Parser
         , Step(..)
+        , end
         , int
         , keyword
         , loop
@@ -37,9 +38,9 @@ type Node
 
 parse : String -> Result (List Parser.DeadEnd) Module
 parse source =
-    case Parser.run defParser source of
+    case Parser.run astParser source of
         Ok ast ->
-            Ok { ast = [ ast ] }
+            Ok { ast = ast }
 
         Err errors ->
             Err errors
@@ -59,10 +60,29 @@ identifier =
         }
 
 
+astParser : Parser (List TopLevelDefinition)
+astParser =
+    succeed identity
+        |. spaces
+        |= loop [] astHelp
+        |. spaces
+        |. end
+
+
+astHelp : List TopLevelDefinition -> Parser (Step (List TopLevelDefinition) (List TopLevelDefinition))
+astHelp revDefs =
+    Parser.oneOf
+        [ succeed (\def -> Loop (def :: revDefs))
+            |= defParser
+            |. spaces
+        , succeed ()
+            |> map (\_ -> Done (List.reverse revDefs))
+        ]
+
+
 defParser : Parser TopLevelDefinition
 defParser =
     succeed Def
-        |. spaces
         |. keyword "def"
         |. spaces
         |= identifier
