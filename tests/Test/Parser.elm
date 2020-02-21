@@ -12,7 +12,6 @@ suite =
         [ test "const value" <|
             \_ ->
                 Expect.equal
-                    (parse "def num = 10")
                     (Ok
                         { ast =
                             Dict.fromList
@@ -24,10 +23,10 @@ suite =
                                 ]
                         }
                     )
+                    (parse "def num = 10")
         , test "Simple inc function" <|
             \_ ->
                 Expect.equal
-                    (parse "def inc a = builtin_plus a 1")
                     (Ok
                         { ast =
                             Dict.fromList
@@ -42,10 +41,10 @@ suite =
                                 ]
                         }
                     )
+                    (parse "def inc a = builtin_plus a 1")
         , test "Multiple defs" <|
             \_ ->
                 Expect.equal
-                    (parse "def inc a = builtin_plus a 1 def dec a = builtin_sub a 1")
                     (Ok
                         { ast =
                             Dict.fromList
@@ -68,4 +67,5 @@ suite =
                                 ]
                         }
                     )
+                    (parse "def inc a = builtin_plus a 1 def dec a = builtin_sub a 1")
         ]
