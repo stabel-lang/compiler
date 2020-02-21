@@ -1,10 +1,11 @@
 module Play.Parser exposing
     ( Module
     , Node(..)
-    , TopLevelDefinition(..)
+    , TopLevel(..)
     , parse
     )
 
+import Dict exposing (Dict)
 import Parser
     exposing
         ( (|.)
@@ -24,10 +25,10 @@ import Set exposing (Set)
 
 
 type alias Module =
-    { ast : List TopLevelDefinition }
+    { ast : Dict String TopLevel }
 
 
-type TopLevelDefinition
+type TopLevel
     = Def String (List String) (List Node)
 
 
@@ -60,27 +61,34 @@ identifier =
         }
 
 
-astParser : Parser (List TopLevelDefinition)
+astParser : Parser (Dict String TopLevel)
 astParser =
     succeed identity
         |. spaces
-        |= loop [] astHelp
+        |= loop Dict.empty astHelp
         |. spaces
         |. end
 
 
-astHelp : List TopLevelDefinition -> Parser (Step (List TopLevelDefinition) (List TopLevelDefinition))
-astHelp revDefs =
+astHelp : Dict String TopLevel -> Parser (Step (Dict String TopLevel) (Dict String TopLevel))
+astHelp defs =
     Parser.oneOf
-        [ succeed (\def -> Loop (def :: revDefs))
+        [ succeed (\def -> Loop (Dict.insert (defName def) def defs))
             |= defParser
             |. spaces
         , succeed ()
-            |> map (\_ -> Done (List.reverse revDefs))
+            |> map (\_ -> Done defs)
         ]
 
 
-defParser : Parser TopLevelDefinition
+defName : TopLevel -> String
+defName def =
+    case def of
+        Def name _ _ ->
+            name
+
+
+defParser : Parser TopLevel
 defParser =
     succeed Def
         |. keyword "def"
