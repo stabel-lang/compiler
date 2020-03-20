@@ -1,132 +1,159 @@
-module Play.Parser exposing
-    ( Module
-    , Node(..)
-    , TopLevel(..)
-    , parse
-    )
+module Play.Parser exposing (..)
 
-import Dict exposing (Dict)
-import Parser
-    exposing
-        ( (|.)
-        , (|=)
-        , Parser
-        , Step(..)
-        , end
-        , int
-        , keyword
-        , loop
-        , map
-        , spaces
-        , succeed
-        , symbol
-        )
-import Set exposing (Set)
+import List.Extra as List
+import Play.Tokenizer as Token exposing (Token)
 
 
-type alias Module =
-    { ast : Dict String TopLevel }
+type alias Definition =
+    { name : String
+    , metadata : List ( String, List AstNode )
+    , implementation : List AstNode
+    }
 
 
-type TopLevel
-    = Def String (List String) (List Node)
+type AstNode
+    = Integer Int
+    | Word String
 
 
-type Node
-    = Symbol String
-    | Integer Int
+parse : List Token -> Result () (List Definition)
+parse tokens =
+    tokens
+        |> gather isDefinition
+        |> List.map parseDefinition
+        |> listOrError
 
 
-parse : String -> Result (List Parser.DeadEnd) Module
-parse source =
-    case Parser.run astParser source of
-        Ok ast ->
-            Ok { ast = ast }
-
-        Err errors ->
-            Err errors
+gather : (a -> Bool) -> List a -> List (List a)
+gather pred tokens =
+    gatherHelp pred tokens []
 
 
-keywords : Set String
-keywords =
-    Set.fromList [ "def" ]
+gatherHelp : (a -> Bool) -> List a -> List (List a) -> List (List a)
+gatherHelp pred tokens acc =
+    case tokens of
+        [] ->
+            List.reverse acc
+
+        first :: rest ->
+            let
+                tilNextDefinition =
+                    if pred first then
+                        first :: List.takeWhile (not << pred) rest
+
+                    else
+                        List.takeWhile (not << pred) tokens
+
+                remainingTokens =
+                    List.drop (List.length tilNextDefinition) tokens
+            in
+            gatherHelp pred remainingTokens (tilNextDefinition :: acc)
 
 
-identifier : Parser String
-identifier =
-    Parser.variable
-        { start = Char.isAlpha
-        , inner = \c -> Char.isAlphaNum c || c == '_'
-        , reserved = keywords
-        }
+isDefinition : Token -> Bool
+isDefinition token =
+    case token of
+        Token.Metadata "def" ->
+            True
+
+        _ ->
+            False
 
 
-astParser : Parser (Dict String TopLevel)
-astParser =
-    succeed identity
-        |. spaces
-        |= loop Dict.empty astHelp
-        |. spaces
-        |. end
+parseDefinition : List Token -> Result () Definition
+parseDefinition tokens =
+    case tokens of
+        (Token.Metadata "def") :: (Token.Symbol wordName) :: rest ->
+            case List.splitWhen (\token -> token == Token.Metadata "") rest of
+                Nothing ->
+                    Err ()
+
+                Just ( meta, impl ) ->
+                    let
+                        parsedMeta =
+                            meta
+                                |> gather isMeta
+                                |> List.map parseMeta
+                                |> listOrError
+
+                        parsedImpl =
+                            impl
+                                |> List.drop 1
+                                |> List.map parseAstNode
+                                |> listOrError
+                    in
+                    case ( parsedMeta, parsedImpl ) of
+                        ( Ok meta_, Ok ast ) ->
+                            Ok
+                                { name = wordName
+                                , metadata = meta_
+                                , implementation = ast
+                                }
+
+                        _ ->
+                            Err ()
+
+        _ ->
+            Err ()
 
 
-astHelp : Dict String TopLevel -> Parser (Step (Dict String TopLevel) (Dict String TopLevel))
-astHelp defs =
-    Parser.oneOf
-        [ succeed (\def -> Loop (Dict.insert (defName def) def defs))
-            |= defParser
-            |. spaces
-        , succeed ()
-            |> map (\_ -> Done defs)
-        ]
+isMeta : Token -> Bool
+isMeta token =
+    case token of
+        Token.Metadata _ ->
+            True
+
+        _ ->
+            False
 
 
-defName : TopLevel -> String
-defName def =
-    case def of
-        Def name _ _ ->
-            name
+parseMeta : List Token -> Result () ( String, List AstNode )
+parseMeta tokens =
+    case tokens of
+        (Token.Metadata keyName) :: rest ->
+            let
+                parsedValues =
+                    rest
+                        |> List.map parseAstNode
+                        |> listOrError
+            in
+            case parsedValues of
+                Err () ->
+                    Err ()
+
+                Ok values ->
+                    Ok ( keyName, values )
+
+        _ ->
+            Err ()
 
 
-defParser : Parser TopLevel
-defParser =
-    succeed Def
-        |. keyword "def"
-        |. spaces
-        |= identifier
-        |. spaces
-        |= loop [] argsHelp
-        |. spaces
-        |= loop [] nodesHelp
+parseAstNode : Token -> Result () AstNode
+parseAstNode token =
+    case token of
+        Token.Integer value ->
+            Ok (Integer value)
+
+        Token.Symbol value ->
+            Ok (Word value)
+
+        _ ->
+            Err ()
 
 
-argsHelp : List String -> Parser (Step (List String) (List String))
-argsHelp revArgs =
-    Parser.oneOf
-        [ succeed (\arg -> Loop (arg :: revArgs))
-            |= identifier
-            |. spaces
-        , symbol "="
-            |> map (\_ -> Done (List.reverse revArgs))
-        ]
+listOrError : List (Result () a) -> Result () (List a)
+listOrError list =
+    listOrErrorHelper list []
 
 
-nodesHelp : List Node -> Parser (Step (List Node) (List Node))
-nodesHelp revNodes =
-    Parser.oneOf
-        [ succeed (\node -> Loop (node :: revNodes))
-            |= nodeParser
-            |. spaces
-        , succeed ()
-            |> map (\_ -> Done (List.reverse revNodes))
-        ]
+listOrErrorHelper : List (Result () a) -> List a -> Result () (List a)
+listOrErrorHelper potentialTokens tokens =
+    case potentialTokens of
+        [] ->
+            Ok (List.reverse tokens)
 
+        (Err ()) :: _ ->
+            Err ()
 
-nodeParser : Parser Node
-nodeParser =
-    Parser.oneOf
-        [ identifier
-            |> map Symbol
-        , int
-            |> map Integer
-        ]
+        (Ok token) :: remaining ->
+            listOrErrorHelper remaining (token :: tokens)

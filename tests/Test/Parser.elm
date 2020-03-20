@@ -1,71 +1,80 @@
 module Test.Parser exposing (..)
 
-import Dict
 import Expect
-import Play.Parser exposing (..)
+import Play.Parser as AST exposing (..)
+import Play.Tokenizer as Token exposing (Token(..))
 import Test exposing (Test, describe, test)
 
 
 suite : Test
 suite =
-    describe "Parsing source code"
-        [ test "const value" <|
+    describe "Parser"
+        [ test "Sample program" <|
             \_ ->
-                Expect.equal
-                    (Ok
-                        { ast =
-                            Dict.fromList
-                                [ ( "num"
-                                  , Def "num"
-                                        []
-                                        [ Integer 10 ]
-                                  )
+                let
+                    source =
+                        [ -- inc function
+                          Metadata "def"
+                        , Symbol "inc"
+                        , Metadata ""
+                        , Token.Integer 1
+                        , Symbol "+"
+
+                        -- dec function
+                        , Metadata "def"
+                        , Symbol "dec"
+                        , Metadata ""
+                        , Token.Integer 1
+                        , Symbol "-"
+                        , Metadata "def"
+
+                        -- main function
+                        , Symbol "main"
+                        , Metadata "entry"
+                        , Symbol "true"
+                        , Metadata ""
+                        , Token.Integer 1
+                        , Symbol "inc"
+                        , Symbol "inc"
+                        , Symbol "dec"
+                        , Token.Integer 2
+                        , Symbol "="
+                        ]
+
+                    expectedDefinitions =
+                        [ { name = "inc"
+                          , metadata = []
+                          , implementation =
+                                [ AST.Integer 1
+                                , AST.Word "+"
                                 ]
-                        }
-                    )
-                    (parse "def num = 10")
-        , test "Simple inc function" <|
-            \_ ->
-                Expect.equal
-                    (Ok
-                        { ast =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , Def "inc"
-                                        [ "a" ]
-                                        [ Symbol "builtin_plus"
-                                        , Symbol "a"
-                                        , Integer 1
-                                        ]
-                                  )
+                          }
+                        , { name = "dec"
+                          , metadata = []
+                          , implementation =
+                                [ AST.Integer 1
+                                , AST.Word "-"
                                 ]
-                        }
-                    )
-                    (parse "def inc a = builtin_plus a 1")
-        , test "Multiple defs" <|
-            \_ ->
-                Expect.equal
-                    (Ok
-                        { ast =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , Def "inc"
-                                        [ "a" ]
-                                        [ Symbol "builtin_plus"
-                                        , Symbol "a"
-                                        , Integer 1
-                                        ]
-                                  )
-                                , ( "dec"
-                                  , Def "dec"
-                                        [ "a" ]
-                                        [ Symbol "builtin_sub"
-                                        , Symbol "a"
-                                        , Integer 1
-                                        ]
-                                  )
+                          }
+                        , { name = "main"
+                          , metadata =
+                                [ ( "entry", [ AST.Word "true" ] )
                                 ]
-                        }
-                    )
-                    (parse "def inc a = builtin_plus a 1 def dec a = builtin_sub a 1")
+                          , implementation =
+                                [ AST.Integer 1
+                                , AST.Word "inc"
+                                , AST.Word "inc"
+                                , AST.Word "dec"
+                                , AST.Integer 2
+                                , AST.Word "="
+                                ]
+                          }
+                        ]
+                in
+                case parse source of
+                    Err () ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok definitions ->
+                        Expect.equalLists expectedDefinitions definitions
         ]
