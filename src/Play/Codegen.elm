@@ -18,6 +18,26 @@ stackPopFn =
     "__stack_pop"
 
 
+pushIntfn : String
+pushIntfn =
+    "__push_i32"
+
+
+addIntFn : String
+addIntFn =
+    "__add_i32"
+
+
+subIntFn : String
+subIntFn =
+    "__sub_i32"
+
+
+eqIntFn : String
+eqIntFn =
+    "__eq_i32"
+
+
 
 -- Base module
 
@@ -48,6 +68,38 @@ baseModule =
                 [ Wasm.I32_Const 0
                 ]
             }
+        |> Wasm.withFunction
+            { name = pushIntfn
+            , args = [ Wasm.Int32, Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.I32_Const 0
+                ]
+            }
+        |> Wasm.withFunction
+            { name = addIntFn
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.I32_Const 0
+                ]
+            }
+        |> Wasm.withFunction
+            { name = subIntFn
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.I32_Const 0
+                ]
+            }
+        |> Wasm.withFunction
+            { name = eqIntFn
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.I32_Const 0
+                ]
+            }
 
 
 codegen : List AST.Definition -> Result () Wasm.Module
@@ -73,16 +125,19 @@ nodeToInstruction : AST.Node -> Wasm.Instruction
 nodeToInstruction node =
     case node of
         AST.Integer value ->
-            Wasm.I32_Const value
+            Wasm.Batch
+                [ Wasm.I32_Const value
+                , Wasm.Call pushIntfn
+                ]
 
         AST.Word value ->
             Wasm.Call value
 
         AST.BuiltinPlus ->
-            Wasm.I32_Add
+            Wasm.Call addIntFn
 
         AST.BuiltinMinus ->
-            Wasm.I32_Sub
+            Wasm.Call subIntFn
 
         AST.BuiltinEqual ->
-            Wasm.I32_Eq
+            Wasm.Call eqIntFn

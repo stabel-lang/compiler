@@ -38,6 +38,7 @@ typeToString type_ =
 
 type Instruction
     = NoOp
+    | Batch (List Instruction)
     | Call String
     | I32_Const Int
     | I32_Add
@@ -46,10 +47,15 @@ type Instruction
 
 
 instructionToString : Module -> Instruction -> String
-instructionToString (Module module_) ins =
+instructionToString ((Module module_) as fullModule) ins =
     case ins of
         NoOp ->
             "nop"
+
+        Batch insList ->
+            insList
+                |> List.map (instructionToString fullModule)
+                |> String.join " "
 
         Call word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
