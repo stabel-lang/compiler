@@ -60,7 +60,7 @@ instructionToString ((Module module_) as fullModule) ins =
         Call word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
-                    "(call " ++ String.fromInt idx ++ ") ;; call $" ++ word
+                    "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
 
                 Nothing ->
                     "(call $" ++ word ++ ")"
@@ -90,6 +90,7 @@ initModule =
 
 type alias FunctionDef =
     { name : String
+    , exported : Bool
     , args : List Type
     , results : List Type
     , instructions : List Instruction
@@ -123,7 +124,15 @@ withFunction funcDef (Module module_) =
             }
     in
     Module <|
-        { updatedModule | functions = updatedModule.functions ++ [ newFunction ] }
+        { updatedModule
+            | functions = updatedModule.functions ++ [ newFunction ]
+            , exports =
+                if funcDef.exported then
+                    updatedModule.exports ++ [ List.length updatedModule.functions ]
+
+                else
+                    updatedModule.exports
+        }
 
 
 withStartFunction : FunctionDef -> Module -> Module
@@ -146,7 +155,7 @@ toString ((Module module_) as fullModule) =
         |> Indent
     , List.concatMap (formatFunction fullModule) module_.functions
         |> Indent
-    , List.concatMap formatExport module_.exports
+    , List.concatMap (formatExport fullModule) module_.exports
         |> Indent
     , formatStartFunction module_.start
     , Str ")"
@@ -202,9 +211,14 @@ formatFunction module_ function =
     ]
 
 
-formatExport : Int -> List FormatHint
-formatExport idx =
-    Debug.todo "formatExport"
+formatExport : Module -> Int -> List FormatHint
+formatExport (Module module_) idx =
+    case List.getAt idx module_.functions of
+        Just func ->
+            [ Str <| "(export \"" ++ func.name ++ "\" (func " ++ String.fromInt idx ++ "))" ]
+
+        Nothing ->
+            Debug.todo "Did not expect this..."
 
 
 formatStartFunction : Maybe Int -> FormatHint

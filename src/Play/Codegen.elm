@@ -1,5 +1,6 @@
 module Play.Codegen exposing (..)
 
+import List.Extra as List
 import Play.Qualifier as AST
 import Wasm
 
@@ -47,6 +48,7 @@ baseModule =
     Wasm.initModule
         |> Wasm.withStartFunction
             { name = "__initialize"
+            , exported = False
             , args = []
             , results = []
             , instructions =
@@ -54,6 +56,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = stackPushFn
+            , exported = False
             , args = [ Wasm.Int32 ]
             , results = []
             , instructions =
@@ -62,6 +65,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = stackPopFn
+            , exported = False
             , args = []
             , results = [ Wasm.Int32 ]
             , instructions =
@@ -70,6 +74,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = pushIntfn
+            , exported = False
             , args = [ Wasm.Int32, Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , instructions =
@@ -78,6 +83,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = addIntFn
+            , exported = False
             , args = [ Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , instructions =
@@ -86,6 +92,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = subIntFn
+            , exported = False
             , args = [ Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , instructions =
@@ -94,6 +101,7 @@ baseModule =
             }
         |> Wasm.withFunction
             { name = eqIntFn
+            , exported = False
             , args = [ Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , instructions =
@@ -104,20 +112,31 @@ baseModule =
 
 codegen : List AST.Definition -> Result () Wasm.Module
 codegen ast =
-    let
-        funcDefs =
-            List.map toWasmFuncDef ast
-    in
-    List.foldl Wasm.withFunction baseModule funcDefs
+    ast
+        |> List.map toWasmFuncDef
+        |> List.foldl Wasm.withFunction baseModule
         |> Ok
 
 
 toWasmFuncDef : AST.Definition -> Wasm.FunctionDef
 toWasmFuncDef def =
+    let
+        isEntryPoint =
+            case List.find (\( mKey, _ ) -> mKey == "entry") def.metadata of
+                Just _ ->
+                    True
+
+                Nothing ->
+                    False
+
+        wasmImplementation =
+            List.map nodeToInstruction def.implementation
+    in
     { name = def.name
-    , args = []
-    , results = []
-    , instructions = List.map nodeToInstruction def.implementation
+    , exported = isEntryPoint
+    , args = [ Wasm.Int32 ]
+    , results = [ Wasm.Int32 ]
+    , instructions = wasmImplementation
     }
 
 
