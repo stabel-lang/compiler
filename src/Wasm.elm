@@ -45,14 +45,19 @@ type Instruction
     | I32_Eq
 
 
-instructionToString : Instruction -> String
-instructionToString ins =
+instructionToString : Module -> Instruction -> String
+instructionToString (Module module_) ins =
     case ins of
         NoOp ->
             "nop"
 
         Call word ->
-            "(call $" ++ word ++ ")"
+            case List.findIndex (\f -> f.name == word) module_.functions of
+                Just idx ->
+                    "(call " ++ String.fromInt idx ++ ") ;; call $" ++ word
+
+                Nothing ->
+                    "(call $" ++ word ++ ")"
 
         I32_Const num ->
             "(i32.const " ++ String.fromInt num ++ ")"
@@ -129,11 +134,11 @@ withStartFunction funcDef module_ =
 
 
 toString : Module -> String
-toString (Module module_) =
+toString ((Module module_) as fullModule) =
     [ Str "(module"
     , List.concatMap formatTypeSignature module_.typeSignatures
         |> Indent
-    , List.concatMap formatFunction module_.functions
+    , List.concatMap (formatFunction fullModule) module_.functions
         |> Indent
     , List.concatMap formatExport module_.exports
         |> Indent
@@ -175,8 +180,8 @@ formatTypeSignature typeSignature =
     [ Str formattedSignature ]
 
 
-formatFunction : Function -> List FormatHint
-formatFunction function =
+formatFunction : Module -> Function -> List FormatHint
+formatFunction module_ function =
     let
         fullFuncDef =
             String.join " "
@@ -186,7 +191,7 @@ formatFunction function =
                 ]
     in
     [ Str fullFuncDef
-    , Indent <| List.map (Str << instructionToString) function.instructions
+    , Indent <| List.map (Str << instructionToString module_) function.instructions
     , Str ")"
     ]
 
