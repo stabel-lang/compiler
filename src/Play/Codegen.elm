@@ -6,6 +6,15 @@ import Wasm
 
 
 
+-- Constants
+
+
+wasmPtrSize : Int
+wasmPtrSize =
+    4
+
+
+
 -- Bultin function names
 
 
@@ -17,11 +26,6 @@ stackPushFn =
 stackPopFn : String
 stackPopFn =
     "__stack_pop"
-
-
-pushIntfn : String
-pushIntfn =
-    "__push_i32"
 
 
 addIntFn : String
@@ -39,6 +43,11 @@ eqIntFn =
     "__eq_i32"
 
 
+swapFn : String
+swapFn =
+    "__swap"
+
+
 
 -- Base module
 
@@ -52,16 +61,31 @@ baseModule =
             , exported = False
             , args = []
             , results = []
+            , locals = []
             , instructions =
-                [ Wasm.NoOp ]
+                [ Wasm.I32_Const 0
+                , Wasm.I32_Const 0
+                , Wasm.I32_Store
+                ]
             }
         |> Wasm.withFunction
             { name = stackPushFn
             , exported = False
             , args = [ Wasm.Int32 ]
             , results = []
+            , locals = [ Wasm.Int32 ]
             , instructions =
-                [ Wasm.NoOp
+                [ Wasm.I32_Const 0
+                , Wasm.I32_Load -- Get current stack position
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Add -- Bump stack size
+                , Wasm.Local_Set 1 -- Store new stack size
+                , Wasm.I32_Const 0
+                , Wasm.Local_Get 1
+                , Wasm.I32_Store -- Store new stack size
+                , Wasm.Local_Get 1
+                , Wasm.Local_Get 0
+                , Wasm.I32_Store -- Store input value in new stack position
                 ]
             }
         |> Wasm.withFunction
@@ -69,44 +93,77 @@ baseModule =
             , exported = False
             , args = []
             , results = [ Wasm.Int32 ]
+            , locals = [ Wasm.Int32, Wasm.Int32 ]
             , instructions =
                 [ Wasm.I32_Const 0
+                , Wasm.I32_Load -- Get current stack position
+                , Wasm.Local_Tee 0
+                , Wasm.I32_Load
+                , Wasm.Local_Set 1 -- Store item at top of stack in local 1
+                , Wasm.Local_Get 0 -- Get stack position again
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Sub
+                , Wasm.Local_Set 0 -- Store decreased stack position
+                , Wasm.I32_Const 0
+                , Wasm.Local_Get 0
+                , Wasm.I32_Store
+                , Wasm.Local_Get 1
                 ]
             }
         |> Wasm.withFunction
-            { name = pushIntfn
+            { name = swapFn
             , exported = False
-            , args = [ Wasm.Int32, Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
+            , args = []
+            , results = []
+            , locals = [ Wasm.Int32 ]
             , instructions =
-                [ Wasm.I32_Const 0
+                [ Wasm.Call stackPopFn
+                , Wasm.Local_Set 0
+                , Wasm.Call stackPopFn
+                , Wasm.Local_Get 0
+                , Wasm.Call stackPushFn
+                , Wasm.Call stackPushFn
                 ]
             }
         |> Wasm.withFunction
             { name = addIntFn
             , exported = False
-            , args = [ Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
+            , args = []
+            , results = []
+            , locals = []
             , instructions =
-                [ Wasm.I32_Const 0
+                [ Wasm.Call swapFn
+                , Wasm.Call stackPopFn
+                , Wasm.Call stackPopFn
+                , Wasm.I32_Add
+                , Wasm.Call stackPushFn
                 ]
             }
         |> Wasm.withFunction
             { name = subIntFn
             , exported = False
-            , args = [ Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
+            , args = []
+            , locals = []
+            , results = []
             , instructions =
-                [ Wasm.I32_Const 0
+                [ Wasm.Call swapFn
+                , Wasm.Call stackPopFn
+                , Wasm.Call stackPopFn
+                , Wasm.I32_Sub
+                , Wasm.Call stackPushFn
                 ]
             }
         |> Wasm.withFunction
             { name = eqIntFn
             , exported = False
-            , args = [ Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
+            , args = []
+            , locals = []
+            , results = []
             , instructions =
-                [ Wasm.I32_Const 0
+                [ Wasm.Call stackPopFn
+                , Wasm.Call stackPopFn
+                , Wasm.I32_Eq
+                , Wasm.Call stackPushFn
                 ]
             }
 
@@ -135,8 +192,9 @@ toWasmFuncDef def =
     in
     { name = def.name
     , exported = isEntryPoint
-    , args = [ Wasm.Int32 ]
-    , results = [ Wasm.Int32 ]
+    , args = []
+    , results = []
+    , locals = []
     , instructions = wasmImplementation
     }
 
@@ -147,7 +205,7 @@ nodeToInstruction node =
         AST.Integer value ->
             Wasm.Batch
                 [ Wasm.I32_Const value
-                , Wasm.Call pushIntfn
+                , Wasm.Call stackPushFn
                 ]
 
         AST.Word value ->

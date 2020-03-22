@@ -16,6 +16,7 @@ type Module
 type alias Function =
     { name : String
     , typeSignatureIndex : Int
+    , locals : List Type
     , instructions : List Instruction
     }
 
@@ -62,10 +63,15 @@ type Instruction
     = NoOp
     | Batch (List Instruction)
     | Call String
+    | Local_Get Int
+    | Local_Set Int
+    | Local_Tee Int
     | I32_Const Int
     | I32_Add
     | I32_Sub
     | I32_Eq
+    | I32_Store
+    | I32_Load
 
 
 instructionToString : Module -> Instruction -> String
@@ -85,7 +91,16 @@ instructionToString ((Module module_) as fullModule) ins =
                     "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
 
                 Nothing ->
-                    "(call $" ++ word ++ ")"
+                    Debug.todo "Did not expect this"
+
+        Local_Get idx ->
+            "(local.get " ++ String.fromInt idx ++ ")"
+
+        Local_Set idx ->
+            "(local.set " ++ String.fromInt idx ++ ")"
+
+        Local_Tee idx ->
+            "(local.tee " ++ String.fromInt idx ++ ")"
 
         I32_Const num ->
             "(i32.const " ++ String.fromInt num ++ ")"
@@ -98,6 +113,12 @@ instructionToString ((Module module_) as fullModule) ins =
 
         I32_Eq ->
             "i32.eq"
+
+        I32_Store ->
+            "i32.store"
+
+        I32_Load ->
+            "i32.load"
 
 
 initModule : Module
@@ -116,6 +137,7 @@ type alias FunctionDef =
     , exported : Bool
     , args : List Type
     , results : List Type
+    , locals : List Type
     , instructions : List Instruction
     }
 
@@ -143,6 +165,7 @@ withFunction funcDef (Module module_) =
         newFunction =
             { name = funcDef.name
             , typeSignatureIndex = tsIndex
+            , locals = funcDef.locals
             , instructions = funcDef.instructions
             }
     in
@@ -242,11 +265,19 @@ formatTypeSignature typeSignature =
 formatFunction : Module -> Function -> List FormatHint
 formatFunction module_ function =
     let
+        locals =
+            if List.isEmpty function.locals then
+                ""
+
+            else
+                "(local " ++ (String.join " " <| List.map typeToString function.locals) ++ ")"
+
         fullFuncDef =
             String.join " "
                 [ "(func"
                 , "$" ++ function.name
                 , "(type " ++ String.fromInt function.typeSignatureIndex ++ ")"
+                , locals
                 ]
     in
     [ Str fullFuncDef
