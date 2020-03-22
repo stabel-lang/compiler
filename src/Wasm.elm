@@ -7,6 +7,7 @@ type Module
     = Module
         { typeSignatures : List TypeSignature
         , functions : List Function
+        , imports : List Import
         , exports : List Int
         , start : Maybe Int
         }
@@ -23,6 +24,27 @@ type alias TypeSignature =
     { inputs : List Type
     , outputs : List Type
     }
+
+
+type alias Import =
+    { moduleName : String
+    , entityName : String
+    , type_ : ModuleType
+    }
+
+
+type ModuleType
+    = Memory Int (Maybe Int)
+
+
+moduleTypeToString : ModuleType -> String
+moduleTypeToString moduleType =
+    case moduleType of
+        Memory lower Nothing ->
+            "(memory " ++ String.fromInt lower ++ ")"
+
+        Memory lower (Just upper) ->
+            "(memory " ++ String.fromInt lower ++ " " ++ String.fromInt upper ++ ")"
 
 
 type Type
@@ -83,6 +105,7 @@ initModule =
     Module
         { typeSignatures = []
         , functions = []
+        , imports = []
         , exports = []
         , start = Nothing
         }
@@ -148,9 +171,25 @@ withStartFunction funcDef module_ =
         { moduleWithFunction | start = Just startIdx }
 
 
+withImport : String -> String -> ModuleType -> Module -> Module
+withImport importModule entityName typeToImport (Module module_) =
+    Module
+        { module_
+            | imports =
+                module_.imports
+                    ++ [ { moduleName = importModule
+                         , entityName = entityName
+                         , type_ = typeToImport
+                         }
+                       ]
+        }
+
+
 toString : Module -> String
 toString ((Module module_) as fullModule) =
     [ Str "(module"
+    , List.concatMap formatImports module_.imports
+        |> Indent
     , List.concatMap formatTypeSignature module_.typeSignatures
         |> Indent
     , List.concatMap (formatFunction fullModule) module_.functions
@@ -163,6 +202,11 @@ toString ((Module module_) as fullModule) =
         |> List.map format
         |> List.filter (not << String.isEmpty)
         |> String.join "\n"
+
+
+formatImports : Import -> List FormatHint
+formatImports importType =
+    [ Str <| "(import \"" ++ importType.moduleName ++ "\" \"" ++ importType.entityName ++ "\" " ++ moduleTypeToString importType.type_ ++ ")" ]
 
 
 formatTypeSignature : TypeSignature -> List FormatHint

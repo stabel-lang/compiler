@@ -46,6 +46,7 @@ eqIntFn =
 baseModule : Wasm.Module
 baseModule =
     Wasm.initModule
+        |> Wasm.withImport "host" "memory" (Wasm.Memory 1 Nothing)
         |> Wasm.withStartFunction
             { name = "__initialize"
             , exported = False
