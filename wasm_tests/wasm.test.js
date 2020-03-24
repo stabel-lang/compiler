@@ -1,12 +1,32 @@
 const Compiler = require('./compiler.js');
 const wabt = require('wabt')();
 
-test('todo', async () => {
-    const wat = await compileToWat("def: main entry: true : 1 1 +");
-    const result = await runCode(wat);
+test('Simple expression', async () => {
+    const wat = await compileToWat(`
+        def: main
+        entry: true
+        : 1 1 +
+    `);
+    const result = await runCode(wat, 'main');
 
     expect(result).toBe(2);
 });
+
+test('Function calls', async () => {
+    const wat = await compileToWat(`
+        def: main
+        entry: true
+        : 1 inc inc
+
+        def: inc
+        : 1 +
+    `);
+    const result = await runCode(wat, 'main');
+
+    expect(result).toBe(3);
+});
+
+// Helpers
 
 function compileToWat(sourceCode) {
     return new Promise((resolve, reject) => {
@@ -24,7 +44,7 @@ function compileToWat(sourceCode) {
     });
 }
 
-async function runCode(wat) {
+async function runCode(wat, functionName) {
     const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;
 
     const memory = new WebAssembly.Memory({
@@ -38,7 +58,7 @@ async function runCode(wat) {
     };
 
     const program = await WebAssembly.instantiate(wasmModule, imports);
-    program.instance.exports.main();
+    program.instance.exports[functionName]();
 
     const memoryView = new Uint32Array(memory.buffer, 0, 20);
     return memoryView[1];

@@ -11,8 +11,8 @@
     "wabt": "^1.0.13"
   },
   "scripts": {
-    "test": "elm-test",
-    "auto-test": "elm-test --watch",
+    "test": "elm-test && npm run wasm-test",
+    "auto-elm-test": "elm-test --watch",
     "wasm-test": "elm make src/Main.elm --output wasm_tests/compiler.js && jest"
   },
   "author": "Robin Heggelund Hansen",
