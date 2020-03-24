@@ -61,7 +61,7 @@ suite =
                                 ]
                           }
                         , { name = "main"
-                          , type_ = { input = [], output = [] }
+                          , type_ = { input = [], output = [ IntType ] }
                           , metadata =
                                 [ ( "entry", [ PAST.Word "true" ] )
                                 ]
@@ -75,6 +75,7 @@ suite =
                                 ]
                           }
                         ]
+                            |> List.sortBy .name
                 in
                 case typeCheck input of
                     Err () ->
