@@ -5,6 +5,7 @@ import Play.Codegen as Codegen
 import Play.Parser as Parser
 import Play.Qualifier as Qualifier
 import Play.Tokenizer as Tokenizer
+import Play.TypeChecker as TypeChecker
 import Wasm
 
 
@@ -54,6 +55,7 @@ compile sourceCode =
         |> Tokenizer.tokenize
         |> Result.andThen Parser.parse
         |> Result.andThen Qualifier.qualify
+        |> Result.andThen TypeChecker.typeCheck
         |> Result.andThen Codegen.codegen
 
 

@@ -1,7 +1,7 @@
 module Play.Codegen exposing (..)
 
 import List.Extra as List
-import Play.Qualifier as AST
+import Play.TypeChecker as AST
 import Wasm
 
 
@@ -168,7 +168,11 @@ baseModule =
             }
 
 
-codegen : List AST.Definition -> Result () Wasm.Module
+
+-- Codegen
+
+
+codegen : List AST.TypedDefinition -> Result () Wasm.Module
 codegen ast =
     ast
         |> List.map toWasmFuncDef
@@ -176,7 +180,7 @@ codegen ast =
         |> Ok
 
 
-toWasmFuncDef : AST.Definition -> Wasm.FunctionDef
+toWasmFuncDef : AST.TypedDefinition -> Wasm.FunctionDef
 toWasmFuncDef def =
     let
         isEntryPoint =
@@ -199,16 +203,16 @@ toWasmFuncDef def =
     }
 
 
-nodeToInstruction : AST.Node -> Wasm.Instruction
+nodeToInstruction : AST.AstNode -> Wasm.Instruction
 nodeToInstruction node =
     case node of
-        AST.Integer value ->
+        AST.IntLiteral value ->
             Wasm.Batch
                 [ Wasm.I32_Const value
                 , Wasm.Call stackPushFn
                 ]
 
-        AST.Word value ->
+        AST.Word value _ ->
             Wasm.Call value
 
         AST.BuiltinPlus ->
