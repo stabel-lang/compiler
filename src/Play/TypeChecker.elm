@@ -83,23 +83,22 @@ typeCheckDefinition untypedDef context =
 
         Nothing ->
             let
-                -- Todo resulting stack effects is reversed
-                -- Todo this doesn't actually check that the types match
                 contextWithStackEffects =
                     List.foldl typeCheckNode cleanContext untypedDef.implementation
+                        |> (\ctx -> { ctx | stackEffects = List.reverse ctx.stackEffects })
 
-                wordType =
-                    wordTypeFromStackEffects contextWithStackEffects.stackEffects
+                ( contextAfterWordTypeInduction, wordType ) =
+                    wordTypeFromStackEffects contextWithStackEffects
             in
-            { contextWithStackEffects
+            { contextAfterWordTypeInduction
                 | typedWords =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
                         , type_ = wordType
                         , metadata = untypedDef.metadata
-                        , implementation = List.map (untypedToTypedNode contextWithStackEffects) untypedDef.implementation
+                        , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) untypedDef.implementation
                         }
-                        contextWithStackEffects.typedWords
+                        contextAfterWordTypeInduction.typedWords
                 , stackEffects = []
             }
 
@@ -156,24 +155,34 @@ wordTypeToStackEffects wordType =
         |> List.reverse
 
 
-wordTypeFromStackEffects : List StackEffect -> WordType
-wordTypeFromStackEffects effects =
-    List.foldr wordTypeFromStackEffectsHelper { input = [], output = [] } effects
+wordTypeFromStackEffects : Context -> ( Context, WordType )
+wordTypeFromStackEffects context =
+    wordTypeFromStackEffectsHelper context.stackEffects ( context, { input = [], output = [] } )
 
 
-wordTypeFromStackEffectsHelper : StackEffect -> WordType -> WordType
-wordTypeFromStackEffectsHelper effect wordType =
-    case effect of
-        Pop IntType ->
+wordTypeFromStackEffectsHelper : List StackEffect -> ( Context, WordType ) -> ( Context, WordType )
+wordTypeFromStackEffectsHelper effects ( context, wordType ) =
+    case effects of
+        [] ->
+            ( context, wordType )
+
+        (Pop type_) :: remainingEffects ->
             case wordType.output of
                 [] ->
-                    { wordType | input = IntType :: wordType.input }
+                    wordTypeFromStackEffectsHelper remainingEffects <|
+                        ( context, { wordType | input = type_ :: wordType.input } )
 
-                IntType :: remainingOutput ->
-                    { wordType | output = remainingOutput }
+                availableType :: remainingOutput ->
+                    if availableType /= type_ then
+                        ( { context | errors = () :: context.errors }, wordType )
 
-        Push IntType ->
-            { wordType | output = IntType :: wordType.output }
+                    else
+                        wordTypeFromStackEffectsHelper remainingEffects <|
+                            ( context, { wordType | output = remainingOutput } )
+
+        (Push type_) :: remainingEffects ->
+            wordTypeFromStackEffectsHelper remainingEffects <|
+                ( context, { wordType | output = type_ :: wordType.output } )
 
 
 untypedToTypedNode : Context -> Qualifier.Node -> AstNode
