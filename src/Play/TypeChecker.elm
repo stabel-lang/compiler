@@ -55,7 +55,7 @@ typeCheckHelper context ast =
         updatedContext =
             List.foldl typeCheckDefinition context ast
     in
-    if List.isEmpty context.errors then
+    if List.isEmpty updatedContext.errors then
         Ok <| Dict.values updatedContext.typedWords
 
     else
@@ -80,18 +80,30 @@ typeCheckDefinition untypedDef context =
 
                 ( contextAfterWordTypeInduction, wordType ) =
                     wordTypeFromStackEffects contextWithStackEffects
+
+                finalContext =
+                    { contextAfterWordTypeInduction
+                        | typedWords =
+                            Dict.insert untypedDef.name
+                                { name = untypedDef.name
+                                , type_ = wordType
+                                , metadata = untypedDef.metadata
+                                , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) untypedDef.implementation
+                                }
+                                contextAfterWordTypeInduction.typedWords
+                        , stackEffects = []
+                    }
             in
-            { contextAfterWordTypeInduction
-                | typedWords =
-                    Dict.insert untypedDef.name
-                        { name = untypedDef.name
-                        , type_ = wordType
-                        , metadata = untypedDef.metadata
-                        , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) untypedDef.implementation
-                        }
-                        contextAfterWordTypeInduction.typedWords
-                , stackEffects = []
-            }
+            case untypedDef.metadata.type_ of
+                Just annotatedType ->
+                    if annotatedType /= wordType then
+                        { finalContext | errors = () :: finalContext.errors }
+
+                    else
+                        finalContext
+
+                Nothing ->
+                    finalContext
 
 
 typeCheckNode : Qualifier.Node -> Context -> Context

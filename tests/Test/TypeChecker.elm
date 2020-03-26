@@ -1,11 +1,16 @@
 module Test.TypeChecker exposing (..)
 
 import Expect
-import Play.Data.Metadata as Metadata
+import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
+
+
+defaultMeta : Metadata
+defaultMeta =
+    Metadata.default
 
 
 suite : Test
@@ -14,9 +19,6 @@ suite =
         [ test "Simple program" <|
             \_ ->
                 let
-                    defaultMeta =
-                        Metadata.default
-
                     entryMeta =
                         { defaultMeta | isEntryPoint = True }
 
@@ -86,4 +88,24 @@ suite =
 
                     Ok typedAst ->
                         Expect.equalLists expectedResult typedAst
+        , test "Bad type annotation" <|
+            \_ ->
+                let
+                    input =
+                        [ { name = "main"
+                          , metadata = { defaultMeta | type_ = Just { input = [ Type.Int ], output = [] } }
+                          , implementation =
+                                [ QAST.Integer 1
+                                , QAST.Integer 2
+                                , QAST.BuiltinEqual
+                                ]
+                          }
+                        ]
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.pass
+
+                    Ok _ ->
+                        Expect.fail "Did not expect type check to succeed."
         ]
