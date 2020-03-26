@@ -2,6 +2,7 @@ module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
 import Play.Data.Metadata exposing (Metadata)
+import Play.Data.Type exposing (Type(..), WordType)
 import Play.Qualifier as Qualifier
 
 
@@ -10,16 +11,6 @@ type alias TypedDefinition =
     , type_ : WordType
     , metadata : Metadata
     , implementation : List AstNode
-    }
-
-
-type Type
-    = IntType
-
-
-type alias WordType =
-    { input : List Type
-    , output : List Type
     }
 
 

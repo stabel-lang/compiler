@@ -2,6 +2,7 @@ module Test.TypeChecker exposing (..)
 
 import Expect
 import Play.Data.Metadata as Metadata
+import Play.Data.Type exposing (Type(..))
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
