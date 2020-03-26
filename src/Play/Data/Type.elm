@@ -2,7 +2,7 @@ module Play.Data.Type exposing (..)
 
 
 type Type
-    = IntType
+    = Int
 
 
 type alias WordType =

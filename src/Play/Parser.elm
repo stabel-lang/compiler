@@ -2,6 +2,7 @@ module Play.Parser exposing (..)
 
 import List.Extra as List
 import Play.Data.Metadata as Metadata exposing (Metadata)
+import Play.Data.Type as Type exposing (Type)
 import Play.Tokenizer as Token exposing (Token)
 import Result.Extra as Result
 
@@ -122,6 +123,37 @@ parseMeta tokens ( errors, metadata ) =
                 , { metadata | isEntryPoint = True }
                 )
 
+        (Token.Metadata "type") :: values ->
+            case List.splitWhen (\token -> token == Token.TypeSeperator) values of
+                Just ( inputs, outputs ) ->
+                    let
+                        possibleInputTypes =
+                            inputs
+                                |> List.map parseType
+                                |> Result.combine
+
+                        possibleOutputTypes =
+                            outputs
+                                |> List.drop 1
+                                |> List.map parseType
+                                |> Result.combine
+                    in
+                    case ( possibleInputTypes, possibleOutputTypes ) of
+                        ( Ok inputTypes, Ok outputTypes ) ->
+                            ( errors
+                            , { metadata | type_ = Just { input = inputTypes, output = outputTypes } }
+                            )
+
+                        _ ->
+                            ( () :: errors
+                            , metadata
+                            )
+
+                Nothing ->
+                    ( () :: errors
+                    , metadata
+                    )
+
         _ ->
             ( () :: errors
             , metadata
@@ -136,6 +168,16 @@ parseAstNode token =
 
         Token.Symbol value ->
             Ok (Word value)
+
+        _ ->
+            Err ()
+
+
+parseType : Token -> Result () Type
+parseType token =
+    case token of
+        Token.Type "Int" ->
+            Ok Type.Int
 
         _ ->
             Err ()

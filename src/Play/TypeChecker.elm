@@ -2,7 +2,7 @@ module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
 import Play.Data.Metadata exposing (Metadata)
-import Play.Data.Type exposing (Type(..), WordType)
+import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Qualifier as Qualifier
 
 
@@ -102,7 +102,7 @@ typeCheckNode node context =
     in
     case node of
         Qualifier.Integer _ ->
-            addStackEffect context [ Push IntType ]
+            addStackEffect context [ Push Type.Int ]
 
         Qualifier.Word name ->
             case Dict.get name context.typedWords of
@@ -130,13 +130,13 @@ typeCheckNode node context =
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
         Qualifier.BuiltinPlus ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ IntType, IntType ], output = [ IntType ] }
+            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
 
         Qualifier.BuiltinMinus ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ IntType, IntType ], output = [ IntType ] }
+            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
 
         Qualifier.BuiltinEqual ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ IntType, IntType ], output = [ IntType ] }
+            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
 
 
 wordTypeToStackEffects : WordType -> List StackEffect

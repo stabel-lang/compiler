@@ -2,7 +2,7 @@ module Test.TypeChecker exposing (..)
 
 import Expect
 import Play.Data.Metadata as Metadata
-import Play.Data.Type exposing (Type(..))
+import Play.Data.Type as Type
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
@@ -50,7 +50,7 @@ suite =
 
                     expectedResult =
                         [ { name = "inc"
-                          , type_ = { input = [ IntType ], output = [ IntType ] }
+                          , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
                           , metadata = defaultMeta
                           , implementation =
                                 [ IntLiteral 1
@@ -58,7 +58,7 @@ suite =
                                 ]
                           }
                         , { name = "dec"
-                          , type_ = { input = [ IntType ], output = [ IntType ] }
+                          , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
                           , metadata = defaultMeta
                           , implementation =
                                 [ IntLiteral 1
@@ -66,13 +66,13 @@ suite =
                                 ]
                           }
                         , { name = "main"
-                          , type_ = { input = [], output = [ IntType ] }
+                          , type_ = { input = [], output = [ Type.Int ] }
                           , metadata = entryMeta
                           , implementation =
                                 [ IntLiteral 1
-                                , Word "inc" { input = [ IntType ], output = [ IntType ] }
-                                , Word "inc" { input = [ IntType ], output = [ IntType ] }
-                                , Word "dec" { input = [ IntType ], output = [ IntType ] }
+                                , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
                                 , IntLiteral 2
                                 , BuiltinEqual
                                 ]

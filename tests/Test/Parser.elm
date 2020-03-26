@@ -2,6 +2,7 @@ module Test.Parser exposing (..)
 
 import Expect
 import Play.Data.Metadata as Metadata
+import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Play.Tokenizer as Token exposing (Token(..))
 import Test exposing (Test, describe, test)
@@ -27,6 +28,10 @@ suite =
                         -- dec function
                         , Metadata "def"
                         , Symbol "dec"
+                        , Metadata "type"
+                        , Type "Int"
+                        , TypeSeperator
+                        , Type "Int"
                         , Metadata ""
                         , Token.Integer 1
                         , Symbol "-"
@@ -54,7 +59,7 @@ suite =
                                 ]
                           }
                         , { name = "dec"
-                          , metadata = Metadata.default
+                          , metadata = { defaultMeta | type_ = Just { input = [ Type.Int ], output = [ Type.Int ] } }
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "-"
