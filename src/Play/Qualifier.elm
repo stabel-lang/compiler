@@ -2,6 +2,7 @@ module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
 import Play.Parser as AST
+import Result.Extra as Result
 import Set exposing (Set)
 
 
@@ -39,7 +40,7 @@ qualify ast =
     in
     ast
         |> List.map (qualifyDefinition knownUserDefinitions)
-        |> listOrError
+        |> Result.combine
 
 
 qualifyDefinition : Set String -> AST.Definition -> Result () Definition
@@ -48,7 +49,7 @@ qualifyDefinition knownUserDefinitions definition =
         qualifiedImplementationResult =
             definition.implementation
                 |> List.map (qualifyNode knownUserDefinitions)
-                |> listOrError
+                |> Result.combine
     in
     case qualifiedImplementationResult of
         Err () ->
@@ -79,21 +80,3 @@ qualifyNode knownUserDefinitions node =
 
                     Nothing ->
                         Err ()
-
-
-listOrError : List (Result () a) -> Result () (List a)
-listOrError list =
-    listOrErrorHelper list []
-
-
-listOrErrorHelper : List (Result () a) -> List a -> Result () (List a)
-listOrErrorHelper potentialTokens tokens =
-    case potentialTokens of
-        [] ->
-            Ok (List.reverse tokens)
-
-        (Err ()) :: _ ->
-            Err ()
-
-        (Ok token) :: remaining ->
-            listOrErrorHelper remaining (token :: tokens)

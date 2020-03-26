@@ -2,6 +2,7 @@ module Play.Parser exposing (..)
 
 import List.Extra as List
 import Play.Tokenizer as Token exposing (Token)
+import Result.Extra as Result
 
 
 type alias Definition =
@@ -21,7 +22,7 @@ parse tokens =
     tokens
         |> gather isDefinition
         |> List.map parseDefinition
-        |> listOrError
+        |> Result.combine
 
 
 gather : (a -> Bool) -> List a -> List (List a)
@@ -74,13 +75,13 @@ parseDefinition tokens =
                             meta
                                 |> gather isMeta
                                 |> List.map parseMeta
-                                |> listOrError
+                                |> Result.combine
 
                         parsedImpl =
                             impl
                                 |> List.drop 1
                                 |> List.map parseAstNode
-                                |> listOrError
+                                |> Result.combine
                     in
                     case ( parsedMeta, parsedImpl ) of
                         ( Ok meta_, Ok ast ) ->
@@ -115,7 +116,7 @@ parseMeta tokens =
                 parsedValues =
                     rest
                         |> List.map parseAstNode
-                        |> listOrError
+                        |> Result.combine
             in
             case parsedValues of
                 Err () ->
@@ -139,21 +140,3 @@ parseAstNode token =
 
         _ ->
             Err ()
-
-
-listOrError : List (Result () a) -> Result () (List a)
-listOrError list =
-    listOrErrorHelper list []
-
-
-listOrErrorHelper : List (Result () a) -> List a -> Result () (List a)
-listOrErrorHelper potentialTokens tokens =
-    case potentialTokens of
-        [] ->
-            Ok (List.reverse tokens)
-
-        (Err ()) :: _ ->
-            Err ()
-
-        (Ok token) :: remaining ->
-            listOrErrorHelper remaining (token :: tokens)

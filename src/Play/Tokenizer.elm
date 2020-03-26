@@ -1,5 +1,7 @@
 module Play.Tokenizer exposing (..)
 
+import Result.Extra as Result
+
 
 type Token
     = Integer Int
@@ -12,7 +14,7 @@ tokenize sourceCode =
     sourceCode
         |> String.words
         |> List.map recognizeToken
-        |> tokenListOrError
+        |> Result.combine
 
 
 recognizeToken : String -> Result () Token
@@ -30,21 +32,3 @@ recognizeToken word =
 
             else
                 Ok (Symbol word)
-
-
-tokenListOrError : List (Result () Token) -> Result () (List Token)
-tokenListOrError potentialTokens =
-    tokenListOrErrorHelper potentialTokens []
-
-
-tokenListOrErrorHelper : List (Result () Token) -> List Token -> Result () (List Token)
-tokenListOrErrorHelper potentialTokens tokens =
-    case potentialTokens of
-        [] ->
-            Ok (List.reverse tokens)
-
-        (Err ()) :: _ ->
-            Err ()
-
-        (Ok token) :: remaining ->
-            tokenListOrErrorHelper remaining (token :: tokens)
