@@ -17,6 +17,7 @@ suite =
                         : 1 +
 
                         def: dec
+                        type: Int -- Int
                         : 1 -
 
                         def: main
@@ -35,6 +36,10 @@ suite =
                         -- dec function
                         , Metadata "def"
                         , Symbol "dec"
+                        , Metadata "type"
+                        , Type "Int"
+                        , TypeSeperator
+                        , Type "Int"
                         , Metadata ""
                         , Integer 1
                         , Symbol "-"

@@ -7,6 +7,8 @@ type Token
     = Integer Int
     | Symbol String
     | Metadata String
+    | Type String
+    | TypeSeperator
 
 
 tokenize : String -> Result () (List Token)
@@ -24,11 +26,27 @@ recognizeToken word =
             Ok (Integer value)
 
         Nothing ->
-            if String.endsWith ":" word then
+            if stringStartsWithUpper word then
+                Ok (Type word)
+
+            else if String.endsWith ":" word then
                 word
                     |> String.dropRight 1
                     |> Metadata
                     |> Ok
 
+            else if word == "--" then
+                Ok TypeSeperator
+
             else
                 Ok (Symbol word)
+
+
+stringStartsWithUpper : String -> Bool
+stringStartsWithUpper str =
+    case String.uncons str of
+        Just ( firstLetter, _ ) ->
+            Char.isUpper firstLetter
+
+        Nothing ->
+            False
