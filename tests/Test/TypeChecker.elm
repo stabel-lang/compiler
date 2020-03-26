@@ -1,7 +1,7 @@
 module Test.TypeChecker exposing (..)
 
 import Expect
-import Play.Parser as PAST
+import Play.Data.Metadata as Metadata
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
@@ -13,25 +13,29 @@ suite =
         [ test "Simple program" <|
             \_ ->
                 let
+                    defaultMeta =
+                        Metadata.default
+
+                    entryMeta =
+                        { defaultMeta | isEntryPoint = True }
+
                     input =
                         [ { name = "inc"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ QAST.Integer 1
                                 , QAST.BuiltinPlus
                                 ]
                           }
                         , { name = "dec"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ QAST.Integer 1
                                 , QAST.BuiltinMinus
                                 ]
                           }
                         , { name = "main"
-                          , metadata =
-                                [ ( "entry", [ PAST.Word "true" ] )
-                                ]
+                          , metadata = entryMeta
                           , implementation =
                                 [ QAST.Integer 1
                                 , QAST.Word "inc"
@@ -46,7 +50,7 @@ suite =
                     expectedResult =
                         [ { name = "inc"
                           , type_ = { input = [ IntType ], output = [ IntType ] }
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ IntLiteral 1
                                 , BuiltinPlus
@@ -54,7 +58,7 @@ suite =
                           }
                         , { name = "dec"
                           , type_ = { input = [ IntType ], output = [ IntType ] }
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ IntLiteral 1
                                 , BuiltinMinus
@@ -62,9 +66,7 @@ suite =
                           }
                         , { name = "main"
                           , type_ = { input = [], output = [ IntType ] }
-                          , metadata =
-                                [ ( "entry", [ PAST.Word "true" ] )
-                                ]
+                          , metadata = entryMeta
                           , implementation =
                                 [ IntLiteral 1
                                 , Word "inc" { input = [ IntType ], output = [ IntType ] }

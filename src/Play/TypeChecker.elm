@@ -1,14 +1,14 @@
 module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
-import Play.Parser as PAST
+import Play.Data.Metadata exposing (Metadata)
 import Play.Qualifier as Qualifier
 
 
 type alias TypedDefinition =
     { name : String
     , type_ : WordType
-    , metadata : List ( String, List PAST.AstNode )
+    , metadata : Metadata
     , implementation : List AstNode
     }
 

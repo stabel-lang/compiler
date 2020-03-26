@@ -1,6 +1,7 @@
 module Test.Parser exposing (..)
 
 import Expect
+import Play.Data.Metadata as Metadata
 import Play.Parser as AST exposing (..)
 import Play.Tokenizer as Token exposing (Token(..))
 import Test exposing (Test, describe, test)
@@ -12,6 +13,9 @@ suite =
         [ test "Sample program" <|
             \_ ->
                 let
+                    defaultMeta =
+                        Metadata.default
+
                     source =
                         [ -- inc function
                           Metadata "def"
@@ -43,23 +47,21 @@ suite =
 
                     expectedDefinitions =
                         [ { name = "inc"
-                          , metadata = []
+                          , metadata = Metadata.default
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "+"
                                 ]
                           }
                         , { name = "dec"
-                          , metadata = []
+                          , metadata = Metadata.default
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "-"
                                 ]
                           }
                         , { name = "main"
-                          , metadata =
-                                [ ( "entry", [ AST.Word "true" ] )
-                                ]
+                          , metadata = { defaultMeta | isEntryPoint = True }
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "inc"

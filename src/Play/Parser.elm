@@ -1,13 +1,14 @@
 module Play.Parser exposing (..)
 
 import List.Extra as List
+import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Tokenizer as Token exposing (Token)
 import Result.Extra as Result
 
 
 type alias Definition =
     { name : String
-    , metadata : List ( String, List AstNode )
+    , metadata : Metadata
     , implementation : List AstNode
     }
 
@@ -71,11 +72,10 @@ parseDefinition tokens =
 
                 Just ( meta, impl ) ->
                     let
-                        parsedMeta =
+                        ( metaParseErrors, metadata ) =
                             meta
                                 |> gather isMeta
-                                |> List.map parseMeta
-                                |> Result.combine
+                                |> List.foldl parseMeta ( [], Metadata.default )
 
                         parsedImpl =
                             impl
@@ -83,11 +83,11 @@ parseDefinition tokens =
                                 |> List.map parseAstNode
                                 |> Result.combine
                     in
-                    case ( parsedMeta, parsedImpl ) of
-                        ( Ok meta_, Ok ast ) ->
+                    case ( metaParseErrors, parsedImpl ) of
+                        ( [], Ok ast ) ->
                             Ok
                                 { name = wordName
-                                , metadata = meta_
+                                , metadata = metadata
                                 , implementation = ast
                                 }
 
@@ -108,25 +108,24 @@ isMeta token =
             False
 
 
-parseMeta : List Token -> Result () ( String, List AstNode )
-parseMeta tokens =
+parseMeta : List Token -> ( List (), Metadata ) -> ( List (), Metadata )
+parseMeta tokens ( errors, metadata ) =
     case tokens of
-        (Token.Metadata keyName) :: rest ->
-            let
-                parsedValues =
-                    rest
-                        |> List.map parseAstNode
-                        |> Result.combine
-            in
-            case parsedValues of
-                Err () ->
-                    Err ()
+        [ Token.Metadata "entry", value ] ->
+            if value /= Token.Symbol "true" then
+                ( () :: errors
+                , metadata
+                )
 
-                Ok values ->
-                    Ok ( keyName, values )
+            else
+                ( errors
+                , { metadata | isEntryPoint = True }
+                )
 
         _ ->
-            Err ()
+            ( () :: errors
+            , metadata
+            )
 
 
 parseAstNode : Token -> Result () AstNode

@@ -1,6 +1,7 @@
 module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
+import Play.Data.Metadata exposing (Metadata)
 import Play.Parser as AST
 import Result.Extra as Result
 import Set exposing (Set)
@@ -8,7 +9,7 @@ import Set exposing (Set)
 
 type alias Definition =
     { name : String
-    , metadata : List ( String, List AST.AstNode )
+    , metadata : Metadata
     , implementation : List Node
     }
 

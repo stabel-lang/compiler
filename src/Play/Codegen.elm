@@ -183,19 +183,11 @@ codegen ast =
 toWasmFuncDef : AST.TypedDefinition -> Wasm.FunctionDef
 toWasmFuncDef def =
     let
-        isEntryPoint =
-            case List.find (\( mKey, _ ) -> mKey == "entry") def.metadata of
-                Just _ ->
-                    True
-
-                Nothing ->
-                    False
-
         wasmImplementation =
             List.map nodeToInstruction def.implementation
     in
     { name = def.name
-    , exported = isEntryPoint
+    , exported = def.metadata.isEntryPoint
     , args = []
     , results = []
     , locals = []

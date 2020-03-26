@@ -1,9 +1,10 @@
 module Test.Qualifier exposing (..)
 
 import Expect
+import Play.Data.Metadata as Metadata
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
-import Test exposing (Test, describe, test, todo)
+import Test exposing (Test, describe, test)
 
 
 suite : Test
@@ -12,25 +13,29 @@ suite =
         [ test "Simple program" <|
             \_ ->
                 let
+                    defaultMeta =
+                        Metadata.default
+
+                    entryMeta =
+                        { defaultMeta | isEntryPoint = True }
+
                     sourceDefinitions =
                         [ { name = "inc"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "+"
                                 ]
                           }
                         , { name = "dec"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "-"
                                 ]
                           }
                         , { name = "main"
-                          , metadata =
-                                [ ( "entry", [ AST.Word "true" ] )
-                                ]
+                          , metadata = entryMeta
                           , implementation =
                                 [ AST.Integer 1
                                 , AST.Word "inc"
@@ -44,23 +49,21 @@ suite =
 
                     expectedDefinitions =
                         [ { name = "inc"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ Integer 1
                                 , BuiltinPlus
                                 ]
                           }
                         , { name = "dec"
-                          , metadata = []
+                          , metadata = defaultMeta
                           , implementation =
                                 [ Integer 1
                                 , BuiltinMinus
                                 ]
                           }
                         , { name = "main"
-                          , metadata =
-                                [ ( "entry", [ AST.Word "true" ] )
-                                ]
+                          , metadata = entryMeta
                           , implementation =
                                 [ Integer 1
                                 , Word "inc"
