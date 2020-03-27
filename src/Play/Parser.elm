@@ -1,13 +1,26 @@
 module Play.Parser exposing (..)
 
+import Dict exposing (Dict)
 import List.Extra as List
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type)
 import Play.Tokenizer as Token exposing (Token)
 import Result.Extra as Result
+import Set exposing (Set)
 
 
-type alias Definition =
+type alias Ast =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
+type alias TypeDefinition =
+    { name : String
+    }
+
+
+type alias WordDefinition =
     { name : String
     , metadata : Metadata
     , implementation : List AstNode
@@ -17,14 +30,28 @@ type alias Definition =
 type AstNode
     = Integer Int
     | Word String
+    | ConstructType String
 
 
-parse : List Token -> Result () (List Definition)
+parse : List Token -> Result () Ast
 parse tokens =
-    tokens
-        |> gather isDefinition
-        |> List.map parseDefinition
-        |> Result.combine
+    let
+        ( errors, ast ) =
+            tokens
+                |> gather isDefinition
+                |> List.foldl parseDefinition
+                    ( []
+                    , { types = Dict.empty
+                      , words = Dict.empty
+                      }
+                    )
+    in
+    case errors of
+        [] ->
+            Ok ast
+
+        _ ->
+            Err ()
 
 
 gather : (a -> Bool) -> List a -> List (List a)
@@ -53,23 +80,30 @@ gatherHelp pred tokens acc =
             gatherHelp pred remainingTokens (tilNextDefinition :: acc)
 
 
+definitionKeywords : Set String
+definitionKeywords =
+    Set.fromList [ "def", "deftype" ]
+
+
 isDefinition : Token -> Bool
 isDefinition token =
     case token of
-        Token.Metadata "def" ->
-            True
+        Token.Metadata value ->
+            Set.member value definitionKeywords
 
         _ ->
             False
 
 
-parseDefinition : List Token -> Result () Definition
-parseDefinition tokens =
+parseDefinition : List Token -> ( List (), Ast ) -> ( List (), Ast )
+parseDefinition tokens ( errors, ast ) =
     case tokens of
         (Token.Metadata "def") :: (Token.Symbol wordName) :: rest ->
             case List.splitWhen (\token -> token == Token.Metadata "") rest of
                 Nothing ->
-                    Err ()
+                    ( () :: errors
+                    , ast
+                    )
 
                 Just ( meta, impl ) ->
                     let
@@ -85,18 +119,49 @@ parseDefinition tokens =
                                 |> Result.combine
                     in
                     case ( metaParseErrors, parsedImpl ) of
-                        ( [], Ok ast ) ->
-                            Ok
-                                { name = wordName
-                                , metadata = metadata
-                                , implementation = ast
-                                }
+                        ( [], Ok wordImpl ) ->
+                            ( errors
+                            , { ast
+                                | words =
+                                    Dict.insert wordName
+                                        { name = wordName
+                                        , metadata = metadata
+                                        , implementation = wordImpl
+                                        }
+                                        ast.words
+                              }
+                            )
 
                         _ ->
-                            Err ()
+                            ( () :: errors
+                            , ast
+                            )
+
+        (Token.Metadata "deftype") :: (Token.Type typeName) :: [] ->
+            let
+                typeDef =
+                    { name = typeName }
+
+                defaultMeta =
+                    Metadata.default
+
+                ctorDef =
+                    { name = ">" ++ typeName
+                    , metadata = { defaultMeta | type_ = Just { input = [], output = [ Type.Custom typeName ] } }
+                    , implementation = [ ConstructType typeName ]
+                    }
+            in
+            ( errors
+            , { ast
+                | types = Dict.insert typeName typeDef ast.types
+                , words = Dict.insert ctorDef.name ctorDef ast.words
+              }
+            )
 
         _ ->
-            Err ()
+            ( () :: errors
+            , ast
+            )
 
 
 isMeta : Token -> Bool
@@ -178,6 +243,9 @@ parseType token =
     case token of
         Token.Type "Int" ->
             Ok Type.Int
+
+        Token.Type name ->
+            Ok <| Type.Custom name
 
         _ ->
             Err ()

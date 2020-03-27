@@ -3,6 +3,7 @@ module Play.Data.Type exposing (..)
 
 type Type
     = Int
+    | Custom String
 
 
 type alias WordType =

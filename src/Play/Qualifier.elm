@@ -31,7 +31,7 @@ builtinDict =
         ]
 
 
-qualify : List AST.Definition -> Result () (List Definition)
+qualify : List AST.WordDefinition -> Result () (List Definition)
 qualify ast =
     let
         knownUserDefinitions =
@@ -44,7 +44,7 @@ qualify ast =
         |> Result.combine
 
 
-qualifyDefinition : Set String -> AST.Definition -> Result () Definition
+qualifyDefinition : Set String -> AST.WordDefinition -> Result () Definition
 qualifyDefinition knownUserDefinitions definition =
     let
         qualifiedImplementationResult =
@@ -81,3 +81,6 @@ qualifyNode knownUserDefinitions node =
 
                     Nothing ->
                         Err ()
+
+        AST.ConstructType _ ->
+            Err ()
