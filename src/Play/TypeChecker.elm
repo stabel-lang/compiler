@@ -24,7 +24,7 @@ type AstNode
 
 type alias Context =
     { typedWords : Dict String TypedDefinition
-    , untypedWords : Dict String Qualifier.Definition
+    , untypedWords : Dict String Qualifier.WordDefinition
     , stackEffects : List StackEffect
     , errors : List ()
     }
@@ -35,7 +35,7 @@ type StackEffect
     | Pop Type
 
 
-initContext : List Qualifier.Definition -> Context
+initContext : List Qualifier.WordDefinition -> Context
 initContext ast =
     { typedWords = Dict.empty
     , untypedWords = List.foldl (\word acc -> Dict.insert word.name word acc) Dict.empty ast
@@ -44,12 +44,12 @@ initContext ast =
     }
 
 
-typeCheck : List Qualifier.Definition -> Result () (List TypedDefinition)
+typeCheck : List Qualifier.WordDefinition -> Result () (List TypedDefinition)
 typeCheck ast =
     typeCheckHelper (initContext ast) ast
 
 
-typeCheckHelper : Context -> List Qualifier.Definition -> Result () (List TypedDefinition)
+typeCheckHelper : Context -> List Qualifier.WordDefinition -> Result () (List TypedDefinition)
 typeCheckHelper context ast =
     let
         updatedContext =
@@ -62,7 +62,7 @@ typeCheckHelper context ast =
         Err ()
 
 
-typeCheckDefinition : Qualifier.Definition -> Context -> Context
+typeCheckDefinition : Qualifier.WordDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
     let
         cleanContext =

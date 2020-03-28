@@ -9,7 +9,7 @@ import Result.Extra as Result
 import Set exposing (Set)
 
 
-type alias Ast =
+type alias AST =
     { types : Dict String TypeDefinition
     , words : Dict String WordDefinition
     }
@@ -33,7 +33,7 @@ type AstNode
     | ConstructType String
 
 
-parse : List Token -> Result () Ast
+parse : List Token -> Result () AST
 parse tokens =
     let
         ( errors, ast ) =
@@ -95,7 +95,7 @@ isDefinition token =
             False
 
 
-parseDefinition : List Token -> ( List (), Ast ) -> ( List (), Ast )
+parseDefinition : List Token -> ( List (), AST ) -> ( List (), AST )
 parseDefinition tokens ( errors, ast ) =
     case tokens of
         (Token.Metadata "def") :: (Token.Symbol wordName) :: rest ->
