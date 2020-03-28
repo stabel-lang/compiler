@@ -1,6 +1,6 @@
 module Play.Data.Metadata exposing (..)
 
-import Play.Data.Type exposing (WordType)
+import Play.Data.Type exposing (Type, WordType)
 
 
 type alias Metadata =
@@ -14,3 +14,13 @@ default =
     { isEntryPoint = False
     , type_ = Nothing
     }
+
+
+asEntryPoint : Metadata -> Metadata
+asEntryPoint meta =
+    { meta | isEntryPoint = True }
+
+
+withType : List Type -> List Type -> Metadata -> Metadata
+withType inputs outputs meta =
+    { meta | type_ = Just { input = inputs, output = outputs } }

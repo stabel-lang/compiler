@@ -14,19 +14,13 @@ suite =
         [ test "Simple program" <|
             \_ ->
                 let
-                    defaultMeta =
-                        Metadata.default
-
-                    entryMeta =
-                        { defaultMeta | isEntryPoint = True }
-
                     unqualifiedAst =
                         { types = Dict.empty
                         , words =
                             Dict.fromList
                                 [ ( "inc"
                                   , { name = "inc"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
@@ -35,7 +29,7 @@ suite =
                                   )
                                 , ( "dec"
                                   , { name = "dec"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
@@ -44,7 +38,9 @@ suite =
                                   )
                                 , ( "main"
                                   , { name = "main"
-                                    , metadata = entryMeta
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
@@ -64,7 +60,7 @@ suite =
                             Dict.fromList
                                 [ ( "inc"
                                   , { name = "inc"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ Integer 1
                                         , BuiltinPlus
@@ -73,7 +69,7 @@ suite =
                                   )
                                 , ( "dec"
                                   , { name = "dec"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ Integer 1
                                         , BuiltinMinus
@@ -82,7 +78,9 @@ suite =
                                   )
                                 , ( "main"
                                   , { name = "main"
-                                    , metadata = entryMeta
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ Integer 1
                                         , Word "inc"

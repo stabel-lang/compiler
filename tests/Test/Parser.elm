@@ -9,11 +9,6 @@ import Play.Tokenizer as Token exposing (Token(..))
 import Test exposing (Test, describe, test)
 
 
-defaultMeta : Metadata.Metadata
-defaultMeta =
-    Metadata.default
-
-
 suite : Test
 suite =
     describe "Parser"
@@ -59,7 +54,7 @@ suite =
                             Dict.fromList
                                 [ ( "inc"
                                   , { name = "inc"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
@@ -68,7 +63,9 @@ suite =
                                   )
                                 , ( "dec"
                                   , { name = "dec"
-                                    , metadata = { defaultMeta | type_ = Just { input = [ Type.Int ], output = [ Type.Int ] } }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
@@ -77,7 +74,9 @@ suite =
                                   )
                                 , ( "main"
                                   , { name = "main"
-                                    , metadata = { defaultMeta | isEntryPoint = True }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
@@ -133,13 +132,17 @@ suite =
                             Dict.fromList
                                 [ ( ">True"
                                   , { name = ">True"
-                                    , metadata = { defaultMeta | type_ = Just { input = [], output = [ Type.Custom "True" ] } }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
                                     , implementation = [ AST.ConstructType "True" ]
                                     }
                                   )
                                 , ( "as-int"
                                   , { name = "as-int"
-                                    , metadata = { defaultMeta | type_ = Just { input = [ Type.Custom "True" ], output = [ Type.Int ] } }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
                                     , implementation =
                                         [ AST.Integer 1
                                         ]
@@ -147,7 +150,9 @@ suite =
                                   )
                                 , ( "main"
                                   , { name = "main"
-                                    , metadata = { defaultMeta | isEntryPoint = True }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ AST.Word ">True"
                                         , AST.Word "as-int"
