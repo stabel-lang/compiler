@@ -1,7 +1,8 @@
 module Play.Codegen exposing (..)
 
+import Dict
 import List.Extra as List
-import Play.TypeChecker as AST
+import Play.TypeChecker as AST exposing (AST)
 import Wasm
 
 
@@ -172,15 +173,16 @@ baseModule =
 -- Codegen
 
 
-codegen : List AST.TypedDefinition -> Result () Wasm.Module
+codegen : AST -> Result () Wasm.Module
 codegen ast =
-    ast
+    ast.words
+        |> Dict.values
         |> List.map toWasmFuncDef
         |> List.foldl Wasm.withFunction baseModule
         |> Ok
 
 
-toWasmFuncDef : AST.TypedDefinition -> Wasm.FunctionDef
+toWasmFuncDef : AST.WordDefinition -> Wasm.FunctionDef
 toWasmFuncDef def =
     let
         wasmImplementation =

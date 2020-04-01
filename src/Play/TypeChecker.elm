@@ -6,7 +6,18 @@ import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Qualifier as Qualifier
 
 
-type alias TypedDefinition =
+type alias AST =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
+type alias TypeDefinition =
+    { name : String
+    }
+
+
+type alias WordDefinition =
     { name : String
     , type_ : WordType
     , metadata : Metadata
@@ -23,7 +34,8 @@ type AstNode
 
 
 type alias Context =
-    { typedWords : Dict String TypedDefinition
+    { types : Dict String Qualifier.TypeDefinition
+    , typedWords : Dict String WordDefinition
     , untypedWords : Dict String Qualifier.WordDefinition
     , stackEffects : List StackEffect
     , errors : List ()
@@ -35,28 +47,35 @@ type StackEffect
     | Pop Type
 
 
-initContext : List Qualifier.WordDefinition -> Context
+initContext : Qualifier.AST -> Context
 initContext ast =
-    { typedWords = Dict.empty
-    , untypedWords = List.foldl (\word acc -> Dict.insert word.name word acc) Dict.empty ast
+    { types = ast.types
+    , typedWords = Dict.empty
+    , untypedWords = ast.words
     , stackEffects = []
     , errors = []
     }
 
 
-typeCheck : List Qualifier.WordDefinition -> Result () (List TypedDefinition)
+typeCheck : Qualifier.AST -> Result () AST
 typeCheck ast =
     typeCheckHelper (initContext ast) ast
 
 
-typeCheckHelper : Context -> List Qualifier.WordDefinition -> Result () (List TypedDefinition)
+typeCheckHelper : Context -> Qualifier.AST -> Result () AST
 typeCheckHelper context ast =
     let
         updatedContext =
-            List.foldl typeCheckDefinition context ast
+            ast
+                |> .words
+                |> Dict.values
+                |> List.foldl typeCheckDefinition context
     in
     if List.isEmpty updatedContext.errors then
-        Ok <| Dict.values updatedContext.typedWords
+        Ok <|
+            { types = ast.types
+            , words = updatedContext.typedWords
+            }
 
     else
         Err ()
