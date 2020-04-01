@@ -28,6 +28,7 @@ type alias WordDefinition =
 type AstNode
     = IntLiteral Int
     | Word String WordType
+    | ConstructType String
     | BuiltinPlus
     | BuiltinMinus
     | BuiltinEqual
@@ -160,6 +161,9 @@ typeCheckNode node context =
                                 Just def ->
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
+        Qualifier.ConstructType typeName ->
+            addStackEffect context <| wordTypeToStackEffects { input = [], output = [ Type.Custom typeName ] }
+
         Qualifier.BuiltinPlus ->
             addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
 
@@ -217,6 +221,14 @@ untypedToTypedNode context untypedNode =
             case Dict.get name context.typedWords of
                 Just def ->
                     Word def.name def.type_
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.ConstructType typeName ->
+            case Dict.get typeName context.types of
+                Just _ ->
+                    ConstructType typeName
 
                 Nothing ->
                     Debug.todo "Inconcievable!"

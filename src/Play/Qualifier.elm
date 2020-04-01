@@ -27,6 +27,7 @@ type alias WordDefinition =
 type Node
     = Integer Int
     | Word String
+    | ConstructType String
     | BuiltinPlus
     | BuiltinMinus
     | BuiltinEqual
@@ -123,5 +124,5 @@ qualifyNode ast node =
                     Nothing ->
                         Err ()
 
-        Parser.ConstructType _ ->
-            Err ()
+        Parser.ConstructType typeName ->
+            Ok (ConstructType typeName)

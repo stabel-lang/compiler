@@ -132,4 +132,52 @@ suite =
 
                     Ok _ ->
                         Expect.fail "Did not expect type check to succeed."
+        , test "Custom data structure without fields" <|
+            \_ ->
+                let
+                    source =
+                        { types =
+                            Dict.fromList
+                                [ ( "True", { name = "True" } )
+                                ]
+                        , words =
+                            Dict.fromList
+                                [ ( ">True"
+                                  , { name = ">True"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                    , implementation = [ QAST.ConstructType "True" ]
+                                    }
+                                  )
+                                , ( "as-int"
+                                  , { name = "as-int"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                    , implementation =
+                                        [ QAST.Integer 1
+                                        ]
+                                    }
+                                  )
+                                , ( "main"
+                                  , { name = "main"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                    , implementation =
+                                        [ QAST.Word ">True"
+                                        , QAST.Word "as-int"
+                                        ]
+                                    }
+                                  )
+                                ]
+                        }
+                in
+                case typeCheck source of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail"
+
+                    Ok _ ->
+                        Expect.pass
         ]
