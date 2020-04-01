@@ -1,6 +1,6 @@
 module Play.Codegen exposing (..)
 
-import Dict
+import Dict exposing (Dict)
 import List.Extra as List
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
@@ -175,18 +175,31 @@ baseModule =
 
 codegen : AST -> Result () Wasm.Module
 codegen ast =
+    let
+        typeMetaDict =
+            ast.types
+                |> Dict.values
+                |> typeMeta
+    in
     ast.words
         |> Dict.values
-        |> List.map toWasmFuncDef
+        |> List.map (toWasmFuncDef typeMetaDict)
         |> List.foldl Wasm.withFunction baseModule
         |> Ok
 
 
-toWasmFuncDef : AST.WordDefinition -> Wasm.FunctionDef
-toWasmFuncDef def =
+typeMeta : List AST.TypeDefinition -> Dict String Int
+typeMeta types =
+    types
+        |> List.indexedMap (\idx typeDef -> ( typeDef.name, idx ))
+        |> Dict.fromList
+
+
+toWasmFuncDef : Dict String Int -> AST.WordDefinition -> Wasm.FunctionDef
+toWasmFuncDef typeInfo def =
     let
         wasmImplementation =
-            List.map nodeToInstruction def.implementation
+            List.map (nodeToInstruction typeInfo) def.implementation
     in
     { name = def.name
     , exported = def.metadata.isEntryPoint
@@ -197,8 +210,8 @@ toWasmFuncDef def =
     }
 
 
-nodeToInstruction : AST.AstNode -> Wasm.Instruction
-nodeToInstruction node =
+nodeToInstruction : Dict String Int -> AST.AstNode -> Wasm.Instruction
+nodeToInstruction typeInfo node =
     case node of
         AST.IntLiteral value ->
             Wasm.Batch
@@ -208,6 +221,17 @@ nodeToInstruction node =
 
         AST.Word value _ ->
             Wasm.Call value
+
+        AST.ConstructType typeName ->
+            case Dict.get typeName typeInfo of
+                Just typeId ->
+                    Wasm.Batch
+                        [ Wasm.I32_Const typeId
+                        , Wasm.Call stackPushFn
+                        ]
+
+                Nothing ->
+                    Debug.todo "This cannot happen."
 
         AST.BuiltinPlus ->
             Wasm.Call addIntFn

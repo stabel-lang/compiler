@@ -26,6 +26,22 @@ test('Function calls', async () => {
     expect(result).toBe(3);
 });
 
+test('Enum type', async () => {
+    const wat = await compileToWat(`
+       deftype: True 
+       deftype: False
+
+       def: main
+       entry: true
+       : >True
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    // types are sorted alphabetically, so False will get id 0, and True gets id 1.
+    expect(result).toBe(1);
+});
+
 // Helpers
 
 function compileToWat(sourceCode) {
