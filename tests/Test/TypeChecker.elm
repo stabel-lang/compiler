@@ -9,27 +9,19 @@ import Play.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
 
 
-defaultMeta : Metadata
-defaultMeta =
-    Metadata.default
-
-
 suite : Test
 suite =
     describe "TypeChecker"
         [ test "Simple program" <|
             \_ ->
                 let
-                    entryMeta =
-                        { defaultMeta | isEntryPoint = True }
-
                     input =
                         { types = Dict.empty
                         , words =
                             Dict.fromList
                                 [ ( "inc"
                                   , { name = "inc"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ QAST.Integer 1
                                         , QAST.BuiltinPlus
@@ -38,7 +30,7 @@ suite =
                                   )
                                 , ( "dec"
                                   , { name = "dec"
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ QAST.Integer 1
                                         , QAST.BuiltinMinus
@@ -47,7 +39,9 @@ suite =
                                   )
                                 , ( "main"
                                   , { name = "main"
-                                    , metadata = entryMeta
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ QAST.Integer 1
                                         , QAST.Word "inc"
@@ -68,7 +62,7 @@ suite =
                                 [ ( "inc"
                                   , { name = "inc"
                                     , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ IntLiteral 1
                                         , BuiltinPlus
@@ -78,7 +72,7 @@ suite =
                                 , ( "dec"
                                   , { name = "dec"
                                     , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                    , metadata = defaultMeta
+                                    , metadata = Metadata.default
                                     , implementation =
                                         [ IntLiteral 1
                                         , BuiltinMinus
@@ -88,7 +82,9 @@ suite =
                                 , ( "main"
                                   , { name = "main"
                                     , type_ = { input = [], output = [ Type.Int ] }
-                                    , metadata = entryMeta
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
                                     , implementation =
                                         [ IntLiteral 1
                                         , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
@@ -117,7 +113,9 @@ suite =
                             Dict.fromList
                                 [ ( "main"
                                   , { name = "main"
-                                    , metadata = { defaultMeta | type_ = Just { input = [ Type.Int ], output = [] } }
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] []
                                     , implementation =
                                         [ QAST.Integer 1
                                         , QAST.Integer 2
