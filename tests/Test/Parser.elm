@@ -195,7 +195,7 @@ suite =
                                   , { name = ">Person"
                                     , metadata =
                                         Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "Person" ]
+                                            |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
                                     , implementation = [ AST.ConstructType "Person" ]
                                     }
                                   )

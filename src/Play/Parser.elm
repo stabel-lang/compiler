@@ -250,12 +250,13 @@ parseTypeDefinition typeName members ast =
             , members = members
             }
 
-        defaultMeta =
+        metadata =
             Metadata.default
+                |> Metadata.withType (List.map Tuple.second members) [ Type.Custom typeName ]
 
         ctorDef =
             { name = ">" ++ typeName
-            , metadata = { defaultMeta | type_ = Just { input = [], output = [ Type.Custom typeName ] } }
+            , metadata = metadata
             , implementation = [ ConstructType typeName ]
             }
     in
