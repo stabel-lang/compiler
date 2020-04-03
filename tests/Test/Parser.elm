@@ -102,9 +102,9 @@ suite =
                     source =
                         [ Metadata "deftype"
                         , Type "True"
-                        , Metadata "def"
 
                         -- as int
+                        , Metadata "def"
                         , Symbol "as-int"
                         , Metadata "type"
                         , Type "True"
@@ -112,21 +112,16 @@ suite =
                         , Type "Int"
                         , Metadata ""
                         , Token.Integer 1
-
-                        -- entry point
-                        , Metadata "def"
-                        , Symbol "main"
-                        , Metadata "entry"
-                        , Symbol "true"
-                        , Metadata ""
-                        , Symbol ">True"
-                        , Symbol "as-int"
                         ]
 
                     expectedAst =
                         { types =
                             Dict.fromList
-                                [ ( "True", { name = "True" } )
+                                [ ( "True"
+                                  , { name = "True"
+                                    , members = []
+                                    }
+                                  )
                                 ]
                         , words =
                             Dict.fromList
@@ -148,14 +143,69 @@ suite =
                                         ]
                                     }
                                   )
-                                , ( "main"
-                                  , { name = "main"
+                                ]
+                        }
+                in
+                case parse source of
+                    Err () ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
+        , test "Custom data structure with fields" <|
+            \_ ->
+                let
+                    source =
+                        [ Metadata "deftype"
+                        , Type "Person"
+                        , Metadata ""
+                        , ListStart
+                        , Metadata "age"
+                        , Type "Int"
+                        , Metadata "jobs"
+                        , Type "Int"
+                        , ListEnd
+
+                        -- get-age
+                        , Metadata "def"
+                        , Symbol "get-age"
+                        , Metadata "type"
+                        , Type "Person"
+                        , TypeSeperator
+                        , Type "Int"
+                        , Metadata ""
+                        , Token.Integer 1
+                        ]
+
+                    expectedAst =
+                        { types =
+                            Dict.fromList
+                                [ ( "Person"
+                                  , { name = "Person"
+                                    , members =
+                                        [ ( "age", Type.Int )
+                                        , ( "jobs", Type.Int )
+                                        ]
+                                    }
+                                  )
+                                ]
+                        , words =
+                            Dict.fromList
+                                [ ( ">Person"
+                                  , { name = ">Person"
                                     , metadata =
                                         Metadata.default
-                                            |> Metadata.asEntryPoint
+                                            |> Metadata.withType [] [ Type.Custom "Person" ]
+                                    , implementation = [ AST.ConstructType "Person" ]
+                                    }
+                                  )
+                                , ( "get-age"
+                                  , { name = "get-age"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
                                     , implementation =
-                                        [ AST.Word ">True"
-                                        , AST.Word "as-int"
+                                        [ AST.Integer 1
                                         ]
                                     }
                                   )

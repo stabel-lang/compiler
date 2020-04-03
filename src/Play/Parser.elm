@@ -17,6 +17,7 @@ type alias AST =
 
 type alias TypeDefinition =
     { name : String
+    , members : List ( String, Type )
     }
 
 
@@ -138,25 +139,28 @@ parseDefinition tokens ( errors, ast ) =
                             )
 
         (Token.Metadata "deftype") :: (Token.Type typeName) :: [] ->
-            let
-                typeDef =
-                    { name = typeName }
-
-                defaultMeta =
-                    Metadata.default
-
-                ctorDef =
-                    { name = ">" ++ typeName
-                    , metadata = { defaultMeta | type_ = Just { input = [], output = [ Type.Custom typeName ] } }
-                    , implementation = [ ConstructType typeName ]
-                    }
-            in
             ( errors
-            , { ast
-                | types = Dict.insert typeName typeDef ast.types
-                , words = Dict.insert ctorDef.name ctorDef ast.words
-              }
+            , parseTypeDefinition typeName [] ast
             )
+
+        (Token.Metadata "deftype") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
+            case List.splitWhen (\t -> t == Token.ListEnd) rest of
+                Just ( types, [ Token.ListEnd ] ) ->
+                    case parseTypeMembers types [] of
+                        Err () ->
+                            ( () :: errors
+                            , ast
+                            )
+
+                        Ok members ->
+                            ( errors
+                            , parseTypeDefinition typeName members ast
+                            )
+
+                _ ->
+                    ( () :: errors
+                    , ast
+                    )
 
         _ ->
             ( () :: errors
@@ -238,6 +242,29 @@ parseAstNode token =
             Err ()
 
 
+parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
+parseTypeDefinition typeName members ast =
+    let
+        typeDef =
+            { name = typeName
+            , members = members
+            }
+
+        defaultMeta =
+            Metadata.default
+
+        ctorDef =
+            { name = ">" ++ typeName
+            , metadata = { defaultMeta | type_ = Just { input = [], output = [ Type.Custom typeName ] } }
+            , implementation = [ ConstructType typeName ]
+            }
+    in
+    { ast
+        | types = Dict.insert typeName typeDef ast.types
+        , words = Dict.insert ctorDef.name ctorDef ast.words
+    }
+
+
 parseType : Token -> Result () Type
 parseType token =
     case token of
@@ -246,6 +273,24 @@ parseType token =
 
         Token.Type name ->
             Ok <| Type.Custom name
+
+        _ ->
+            Err ()
+
+
+parseTypeMembers : List Token -> List ( String, Type ) -> Result () (List ( String, Type ))
+parseTypeMembers tokens acc =
+    case tokens of
+        [] ->
+            Ok (List.reverse acc)
+
+        (Token.Metadata name) :: ((Token.Type _) as typeToken) :: rest ->
+            case parseType typeToken of
+                Err () ->
+                    Err ()
+
+                Ok typeValue ->
+                    parseTypeMembers rest (( name, typeValue ) :: acc)
 
         _ ->
             Err ()

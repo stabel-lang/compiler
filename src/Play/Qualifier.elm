@@ -73,7 +73,7 @@ qualifyType :
     -> ( List (), Dict String TypeDefinition )
 qualifyType ast unqualifiedWord ( errors, acc ) =
     ( errors
-    , Dict.insert unqualifiedWord.name unqualifiedWord acc
+    , Dict.insert unqualifiedWord.name { name = unqualifiedWord.name } acc
     )
 
 
