@@ -126,3 +126,6 @@ qualifyNode ast node =
 
         Parser.ConstructType typeName ->
             Ok (ConstructType typeName)
+
+        _ ->
+            Err ()

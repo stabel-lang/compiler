@@ -32,6 +32,8 @@ type AstNode
     = Integer Int
     | Word String
     | ConstructType String
+    | GetMember String String
+    | SetMember String String
 
 
 parse : List Token -> Result () AST

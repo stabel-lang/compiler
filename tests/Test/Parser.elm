@@ -199,13 +199,45 @@ suite =
                                     , implementation = [ AST.ConstructType "Person" ]
                                     }
                                   )
+                                , ( ">age"
+                                  , { name = ">age"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                    , implementation = [ AST.SetMember "Person" "age" ]
+                                    }
+                                  )
+                                , ( ">jobs"
+                                  , { name = ">jobs"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                    , implementation = [ AST.SetMember "Person" "jobs" ]
+                                    }
+                                  )
+                                , ( "age>"
+                                  , { name = "age>"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                    , implementation = [ AST.GetMember "Person" "age" ]
+                                    }
+                                  )
+                                , ( "jobs>"
+                                  , { name = "jobs>"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                    , implementation = [ AST.GetMember "Person" "jobs" ]
+                                    }
+                                  )
                                 , ( "get-age"
                                   , { name = "get-age"
                                     , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
                                     , implementation =
-                                        [ AST.Integer 1
+                                        [ AST.Word "age>"
                                         ]
                                     }
                                   )
