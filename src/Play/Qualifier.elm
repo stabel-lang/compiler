@@ -2,6 +2,7 @@ module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
 import Play.Data.Metadata exposing (Metadata)
+import Play.Data.Type exposing (Type)
 import Play.Parser as Parser
 import Result.Extra as Result
 
@@ -14,6 +15,7 @@ type alias AST =
 
 type alias TypeDefinition =
     { name : String
+    , members : List ( String, Type )
     }
 
 
@@ -28,6 +30,8 @@ type Node
     = Integer Int
     | Word String
     | ConstructType String
+    | GetMember String String
+    | SetMember String String
     | BuiltinPlus
     | BuiltinMinus
     | BuiltinEqual
@@ -73,7 +77,7 @@ qualifyType :
     -> ( List (), Dict String TypeDefinition )
 qualifyType ast unqualifiedWord ( errors, acc ) =
     ( errors
-    , Dict.insert unqualifiedWord.name { name = unqualifiedWord.name } acc
+    , Dict.insert unqualifiedWord.name unqualifiedWord acc
     )
 
 
@@ -127,5 +131,8 @@ qualifyNode ast node =
         Parser.ConstructType typeName ->
             Ok (ConstructType typeName)
 
-        _ ->
-            Err ()
+        Parser.SetMember typeName memberName ->
+            Ok (SetMember typeName memberName)
+
+        Parser.GetMember typeName memberName ->
+            Ok (GetMember typeName memberName)

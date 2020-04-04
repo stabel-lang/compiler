@@ -138,7 +138,11 @@ suite =
                     source =
                         { types =
                             Dict.fromList
-                                [ ( "True", { name = "True" } )
+                                [ ( "True"
+                                  , { name = "True"
+                                    , members = []
+                                    }
+                                  )
                                 ]
                         , words =
                             Dict.fromList
@@ -168,6 +172,79 @@ suite =
                                     , implementation =
                                         [ QAST.Word ">True"
                                         , QAST.Word "as-int"
+                                        ]
+                                    }
+                                  )
+                                ]
+                        }
+                in
+                case typeCheck source of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail"
+
+                    Ok _ ->
+                        Expect.pass
+        , test "Custom data structure with fields" <|
+            \_ ->
+                let
+                    source =
+                        { types =
+                            Dict.fromList
+                                [ ( "Person"
+                                  , { name = "Person"
+                                    , members = [ ( "age", Type.Int ) ]
+                                    }
+                                  )
+                                ]
+                        , words =
+                            Dict.fromList
+                                [ ( ">Person"
+                                  , { name = ">Person"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Custom "Person" ]
+                                    , implementation = [ QAST.ConstructType "Person" ]
+                                    }
+                                  )
+                                , ( ">age"
+                                  , { name = ">age"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                    , implementation = [ QAST.SetMember "Person" "age" ]
+                                    }
+                                  )
+                                , ( "age>"
+                                  , { name = "age>"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                    , implementation = [ QAST.GetMember "Person" "age" ]
+                                    }
+                                  )
+                                , ( "inc-age"
+                                  , { name = "inc-age"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
+                                    , implementation =
+                                        [ QAST.Word "age>"
+                                        , QAST.Integer 1
+                                        , QAST.BuiltinPlus
+                                        , QAST.Word ">Person"
+                                        ]
+                                    }
+                                  )
+                                , ( "main"
+                                  , { name = "main"
+                                    , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                    , implementation =
+                                        [ QAST.Integer 1
+                                        , QAST.Word ">Person"
+                                        , QAST.Word "inc-age"
+                                        , QAST.Word "age>"
                                         ]
                                     }
                                   )

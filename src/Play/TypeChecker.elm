@@ -1,6 +1,7 @@
 module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
+import List.Extra as List
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Qualifier as Qualifier
@@ -14,6 +15,7 @@ type alias AST =
 
 type alias TypeDefinition =
     { name : String
+    , members : List ( String, Type )
     }
 
 
@@ -29,6 +31,8 @@ type AstNode
     = IntLiteral Int
     | Word String WordType
     | ConstructType String
+    | SetMember String String Type
+    | GetMember String String Type
     | BuiltinPlus
     | BuiltinMinus
     | BuiltinEqual
@@ -162,7 +166,40 @@ typeCheckNode node context =
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
         Qualifier.ConstructType typeName ->
-            addStackEffect context <| wordTypeToStackEffects { input = [], output = [ Type.Custom typeName ] }
+            case Dict.get typeName context.types of
+                Just type_ ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = List.map Tuple.second type_.members
+                            , output = [ Type.Custom typeName ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
+
+        Qualifier.SetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = [ Type.Custom typeName, memberType ]
+                            , output = [ Type.Custom typeName ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
+
+        Qualifier.GetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = [ Type.Custom typeName ]
+                            , output = [ memberType ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
 
         Qualifier.BuiltinPlus ->
             addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
@@ -176,9 +213,8 @@ typeCheckNode node context =
 
 wordTypeToStackEffects : WordType -> List StackEffect
 wordTypeToStackEffects wordType =
-    List.map Pop wordType.input
-        ++ List.map Push wordType.output
-        |> List.reverse
+    List.map Push wordType.output
+        ++ List.map Pop wordType.input
 
 
 wordTypeFromStackEffects : Context -> ( Context, WordType )
@@ -233,6 +269,22 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
+        Qualifier.SetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    SetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.GetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    GetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
         Qualifier.BuiltinPlus ->
             BuiltinPlus
 
@@ -241,3 +293,11 @@ untypedToTypedNode context untypedNode =
 
         Qualifier.BuiltinEqual ->
             BuiltinEqual
+
+
+getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
+getMemberType typeDict typeName memberName =
+    Dict.get typeName typeDict
+        |> Maybe.map .members
+        |> Maybe.andThen (List.find (\( name, _ ) -> name == memberName))
+        |> Maybe.map Tuple.second
