@@ -261,10 +261,32 @@ parseTypeDefinition typeName members ast =
             , metadata = metadata
             , implementation = [ ConstructType typeName ]
             }
+
+        generatedDefs =
+            members
+                |> List.concatMap setterGetterPair
+                |> (::) ctorDef
+                |> List.map (\def -> ( def.name, def ))
+                |> Dict.fromList
+
+        setterGetterPair ( memberName, memberType ) =
+            [ { name = ">" ++ memberName
+              , metadata =
+                    Metadata.default
+                        |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
+              , implementation = [ SetMember typeName memberName ]
+              }
+            , { name = memberName ++ ">"
+              , metadata =
+                    Metadata.default
+                        |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
+              , implementation = [ GetMember typeName memberName ]
+              }
+            ]
     in
     { ast
         | types = Dict.insert typeName typeDef ast.types
-        , words = Dict.insert ctorDef.name ctorDef ast.words
+        , words = Dict.union generatedDefs ast.words
     }
 
 

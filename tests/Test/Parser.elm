@@ -174,7 +174,7 @@ suite =
                         , TypeSeperator
                         , Type "Int"
                         , Metadata ""
-                        , Token.Integer 1
+                        , Token.Symbol "age>"
                         ]
 
                     expectedAst =
