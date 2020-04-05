@@ -316,7 +316,7 @@ nodeToInstruction typeInfo node =
                                 , Wasm.Call stackPopFn
                                 , Wasm.I32_Store
                                 , Wasm.Local_Get 1
-                                , Wasm.I32_Const wasmPtrSize
+                                , Wasm.I32_Const 1
                                 , Wasm.I32_Sub
                                 , Wasm.Local_Set 1
                                 , Wasm.Break 0
@@ -330,10 +330,36 @@ nodeToInstruction typeInfo node =
                     Debug.todo "This cannot happen."
 
         AST.SetMember typeName memberName memberType ->
-            Wasm.I32_Const 0
+            case getMemberType typeInfo typeName memberName of
+                Just memberIndex ->
+                    Wasm.Batch
+                        [ Wasm.Call swapFn -- Instance should now be at top of stack
+                        , Wasm.Call stackPopFn
+                        , Wasm.Local_Tee 0
+                        , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
+                        , Wasm.I32_Add -- Calculate member address
+                        , Wasm.Call stackPopFn -- Retrieve new value
+                        , Wasm.I32_Store
+                        , Wasm.Local_Get 0 -- Return instance
+                        , Wasm.Call stackPushFn
+                        ]
+
+                Nothing ->
+                    Debug.todo "This cannot happen!"
 
         AST.GetMember typeName memberName memberType ->
-            Wasm.I32_Const 0
+            case getMemberType typeInfo typeName memberName of
+                Just memberIndex ->
+                    Wasm.Batch
+                        [ Wasm.Call stackPopFn -- Get instance address
+                        , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
+                        , Wasm.I32_Add -- Calculate member address
+                        , Wasm.I32_Load -- Retrieve member
+                        , Wasm.Call stackPushFn -- Push member onto stack
+                        ]
+
+                Nothing ->
+                    Debug.todo "This cannot happen!"
 
         AST.BuiltinPlus ->
             Wasm.Call addIntFn
@@ -343,3 +369,11 @@ nodeToInstruction typeInfo node =
 
         AST.BuiltinEqual ->
             Wasm.Call eqIntFn
+
+
+getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int
+getMemberType typeInfoDict typeName memberName =
+    Dict.get typeName typeInfoDict
+        |> Maybe.map (List.indexedMap (\idx ( name, _ ) -> ( idx, name )) << .members)
+        |> Maybe.andThen (List.find (\( _, name ) -> name == memberName))
+        |> Maybe.map Tuple.first
