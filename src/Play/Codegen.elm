@@ -51,6 +51,11 @@ allocFn =
     "__alloc"
 
 
+copyStructFn : String
+copyStructFn =
+    "__copy_str"
+
+
 stackPushFn : String
 stackPushFn =
     "__stack_push"
@@ -122,6 +127,41 @@ baseModule =
                 , Wasm.I32_Add
                 , Wasm.I32_Store
                 , Wasm.Local_Get 1
+                ]
+            }
+        |> Wasm.withFunction
+            { name = copyStructFn
+            , exported = False
+            , args = [ Wasm.Int32, Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , locals = [ Wasm.Int32, Wasm.Int32 ]
+            , instructions =
+                [ Wasm.Local_Get 1 -- Size in bytes
+                , Wasm.Call allocFn
+                , Wasm.Local_Set 2 -- Save output instance
+                , Wasm.Block
+                    [ Wasm.Loop
+                        [ Wasm.Local_Get 1
+                        , Wasm.I32_EqZero
+                        , Wasm.BreakIf 1 -- break out of loop
+                        , Wasm.Local_Get 1
+                        , Wasm.I32_Const wasmPtrSize
+                        , Wasm.I32_Sub
+                        , Wasm.Local_Set 1 -- Decreased pointer size
+                        , Wasm.Local_Get 0 -- Source struct
+                        , Wasm.Local_Get 1
+                        , Wasm.I32_Add
+                        , Wasm.I32_Load -- Get a byte from source struct
+                        , Wasm.Local_Set 3 -- Save byte to copy
+                        , Wasm.Local_Get 2 -- Dest struct
+                        , Wasm.Local_Get 1
+                        , Wasm.I32_Add
+                        , Wasm.Local_Get 3
+                        , Wasm.I32_Store -- Copy byte from source to dest struct
+                        , Wasm.Break 0 -- loop
+                        ]
+                    ]
+                , Wasm.Local_Get 2
                 ]
             }
         |> Wasm.withFunction
@@ -330,19 +370,33 @@ nodeToInstruction typeInfo node =
                     Debug.todo "This cannot happen."
 
         AST.SetMember typeName memberName memberType ->
-            case getMemberType typeInfo typeName memberName of
-                Just memberIndex ->
-                    Wasm.Batch
-                        [ Wasm.Call swapFn -- Instance should now be at top of stack
-                        , Wasm.Call stackPopFn
-                        , Wasm.Local_Tee 0
-                        , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
-                        , Wasm.I32_Add -- Calculate member address
-                        , Wasm.Call stackPopFn -- Retrieve new value
-                        , Wasm.I32_Store
-                        , Wasm.Local_Get 0 -- Return instance
-                        , Wasm.Call stackPushFn
-                        ]
+            case Dict.get typeName typeInfo of
+                Just type_ ->
+                    let
+                        typeSize =
+                            wasmPtrSize + (memberSize * wasmPtrSize)
+
+                        memberSize =
+                            List.length type_.members
+                    in
+                    case getMemberType typeInfo typeName memberName of
+                        Just memberIndex ->
+                            Wasm.Batch
+                                [ Wasm.Call swapFn -- Instance should now be at top of stack
+                                , Wasm.Call stackPopFn
+                                , Wasm.I32_Const typeSize
+                                , Wasm.Call copyStructFn -- Return copy of instance
+                                , Wasm.Local_Tee 0
+                                , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
+                                , Wasm.I32_Add -- Calculate member address
+                                , Wasm.Call stackPopFn -- Retrieve new value
+                                , Wasm.I32_Store
+                                , Wasm.Local_Get 0 -- Return instance
+                                , Wasm.Call stackPushFn
+                                ]
+
+                        Nothing ->
+                            Debug.todo "NOOOOO!"
 
                 Nothing ->
                     Debug.todo "This cannot happen!"

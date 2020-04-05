@@ -54,7 +54,7 @@ test('Compound type', async () => {
 
         def: main
         entry: true
-        : 0 >Person 19 >age inc-age age>
+        : 1 >Person 19 >age inc-age age>
     `);
 
     const result = await runCode(wat, 'main');
