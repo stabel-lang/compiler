@@ -2,8 +2,15 @@ module Play.Codegen exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Play.Data.Type exposing (Type)
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
+
+
+type alias TypeInformation =
+    { id : Int
+    , members : List ( String, Type )
+    }
 
 
 
@@ -15,8 +22,33 @@ wasmPtrSize =
     4
 
 
+stackCapacityOffset : Int
+stackCapacityOffset =
+    0
+
+
+stackPositionOffset : Int
+stackPositionOffset =
+    wasmPtrSize
+
+
+defaultStackSize : Int
+defaultStackSize =
+    1024
+
+
+initialHeapPositionOffset : Int
+initialHeapPositionOffset =
+    stackPositionOffset + wasmPtrSize
+
+
 
 -- Bultin function names
+
+
+allocFn : String
+allocFn =
+    "__alloc"
 
 
 stackPushFn : String
@@ -64,9 +96,32 @@ baseModule =
             , results = []
             , locals = []
             , instructions =
-                [ Wasm.I32_Const 0
-                , Wasm.I32_Const 0
+                [ Wasm.I32_Const stackCapacityOffset
+                , Wasm.I32_Const defaultStackSize
                 , Wasm.I32_Store
+                , Wasm.I32_Const stackPositionOffset
+                , Wasm.I32_Const (wasmPtrSize * 3)
+                , Wasm.I32_Store
+                , Wasm.I32_Const initialHeapPositionOffset
+                , Wasm.I32_Const (defaultStackSize + wasmPtrSize)
+                , Wasm.I32_Store
+                ]
+            }
+        |> Wasm.withFunction
+            { name = allocFn
+            , exported = False
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , locals = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.I32_Const initialHeapPositionOffset
+                , Wasm.I32_Const initialHeapPositionOffset
+                , Wasm.I32_Load
+                , Wasm.Local_Tee 1
+                , Wasm.Local_Get 0
+                , Wasm.I32_Add
+                , Wasm.I32_Store
+                , Wasm.Local_Get 1
                 ]
             }
         |> Wasm.withFunction
@@ -76,17 +131,16 @@ baseModule =
             , results = []
             , locals = [ Wasm.Int32 ]
             , instructions =
-                [ Wasm.I32_Const 0
+                [ Wasm.I32_Const stackPositionOffset
                 , Wasm.I32_Load -- Get current stack position
+                , Wasm.Local_Tee 1
+                , Wasm.Local_Get 0
+                , Wasm.I32_Store -- Store input value in stack
+                , Wasm.I32_Const stackPositionOffset
+                , Wasm.Local_Get 1
                 , Wasm.I32_Const wasmPtrSize
                 , Wasm.I32_Add -- Bump stack size
-                , Wasm.Local_Set 1 -- Store new stack size
-                , Wasm.I32_Const 0
-                , Wasm.Local_Get 1
-                , Wasm.I32_Store -- Store new stack size
-                , Wasm.Local_Get 1
-                , Wasm.Local_Get 0
-                , Wasm.I32_Store -- Store input value in new stack position
+                , Wasm.I32_Store -- Save new stack position
                 ]
             }
         |> Wasm.withFunction
@@ -94,21 +148,17 @@ baseModule =
             , exported = False
             , args = []
             , results = [ Wasm.Int32 ]
-            , locals = [ Wasm.Int32, Wasm.Int32 ]
+            , locals = [ Wasm.Int32 ]
             , instructions =
-                [ Wasm.I32_Const 0
-                , Wasm.I32_Load -- Get current stack position
-                , Wasm.Local_Tee 0
+                [ Wasm.I32_Const stackPositionOffset
+                , Wasm.I32_Const stackPositionOffset
                 , Wasm.I32_Load
-                , Wasm.Local_Set 1 -- Store item at top of stack in local 1
-                , Wasm.Local_Get 0 -- Get stack position again
                 , Wasm.I32_Const wasmPtrSize
                 , Wasm.I32_Sub
-                , Wasm.Local_Set 0 -- Store decreased stack position
-                , Wasm.I32_Const 0
+                , Wasm.Local_Tee 0 -- Save new stack position in local register
+                , Wasm.I32_Store -- save new stack position in global variable
                 , Wasm.Local_Get 0
-                , Wasm.I32_Store
-                , Wasm.Local_Get 1
+                , Wasm.I32_Load -- Load element at top of the stack
                 ]
             }
         |> Wasm.withFunction
@@ -188,29 +238,42 @@ codegen ast =
         |> Ok
 
 
-typeMeta : List AST.TypeDefinition -> Dict String Int
+typeMeta : List AST.TypeDefinition -> Dict String TypeInformation
 typeMeta types =
     types
-        |> List.indexedMap (\idx typeDef -> ( typeDef.name, idx ))
+        |> List.indexedMap
+            (\idx typeDef ->
+                ( typeDef.name
+                , { id = idx
+                  , members = typeDef.members
+                  }
+                )
+            )
         |> Dict.fromList
 
 
-toWasmFuncDef : Dict String Int -> AST.WordDefinition -> Wasm.FunctionDef
+toWasmFuncDef : Dict String TypeInformation -> AST.WordDefinition -> Wasm.FunctionDef
 toWasmFuncDef typeInfo def =
     let
         wasmImplementation =
             List.map (nodeToInstruction typeInfo) def.implementation
+
+        numberOfLocals =
+            List.filterMap Wasm.maximumLocalIndex wasmImplementation
+                |> List.maximum
+                |> Maybe.map ((+) 1)
+                |> Maybe.withDefault 0
     in
     { name = def.name
     , exported = def.metadata.isEntryPoint
     , args = []
     , results = []
-    , locals = []
+    , locals = List.repeat numberOfLocals Wasm.Int32
     , instructions = wasmImplementation
     }
 
 
-nodeToInstruction : Dict String Int -> AST.AstNode -> Wasm.Instruction
+nodeToInstruction : Dict String TypeInformation -> AST.AstNode -> Wasm.Instruction
 nodeToInstruction typeInfo node =
     case node of
         AST.IntLiteral value ->
@@ -224,9 +287,42 @@ nodeToInstruction typeInfo node =
 
         AST.ConstructType typeName ->
             case Dict.get typeName typeInfo of
-                Just typeId ->
+                Just type_ ->
+                    let
+                        typeSize =
+                            wasmPtrSize + (memberSize * wasmPtrSize)
+
+                        memberSize =
+                            List.length type_.members
+                    in
                     Wasm.Batch
-                        [ Wasm.I32_Const typeId
+                        [ Wasm.I32_Const typeSize
+                        , Wasm.Call allocFn
+                        , Wasm.Local_Tee 0
+                        , Wasm.I32_Const type_.id
+                        , Wasm.I32_Store
+                        , Wasm.I32_Const memberSize
+                        , Wasm.Local_Set 1
+                        , Wasm.Block
+                            [ Wasm.Loop
+                                [ Wasm.Local_Get 1
+                                , Wasm.I32_EqZero
+                                , Wasm.BreakIf 1
+                                , Wasm.Local_Get 0
+                                , Wasm.I32_Const wasmPtrSize
+                                , Wasm.Local_Get 1
+                                , Wasm.I32_Mul
+                                , Wasm.I32_Add
+                                , Wasm.Call stackPopFn
+                                , Wasm.I32_Store
+                                , Wasm.Local_Get 1
+                                , Wasm.I32_Const wasmPtrSize
+                                , Wasm.I32_Sub
+                                , Wasm.Local_Set 1
+                                , Wasm.Break 0
+                                ]
+                            ]
+                        , Wasm.Local_Get 0
                         , Wasm.Call stackPushFn
                         ]
 

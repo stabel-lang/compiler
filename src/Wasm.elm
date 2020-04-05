@@ -62,6 +62,10 @@ typeToString type_ =
 type Instruction
     = NoOp
     | Batch (List Instruction)
+    | Block (List Instruction)
+    | Loop (List Instruction)
+    | Break Int
+    | BreakIf Int
     | Call String
     | Local_Get Int
     | Local_Set Int
@@ -69,7 +73,9 @@ type Instruction
     | I32_Const Int
     | I32_Add
     | I32_Sub
+    | I32_Mul
     | I32_Eq
+    | I32_EqZero
     | I32_Store
     | I32_Load
 
@@ -83,7 +89,29 @@ instructionToString ((Module module_) as fullModule) ins =
         Batch insList ->
             insList
                 |> List.map (instructionToString fullModule)
-                |> String.join " "
+                |> String.join "\n"
+
+        Block insList ->
+            "(block\n"
+                ++ (insList
+                        |> List.map (instructionToString fullModule)
+                        |> String.join "\n"
+                   )
+                ++ "\n)"
+
+        Loop insList ->
+            "(loop\n"
+                ++ (insList
+                        |> List.map (instructionToString fullModule)
+                        |> String.join "\n"
+                   )
+                ++ "\n)"
+
+        Break num ->
+            "(br " ++ String.fromInt num ++ ")"
+
+        BreakIf num ->
+            "(br_if " ++ String.fromInt num ++ ")"
 
         Call word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
@@ -111,14 +139,48 @@ instructionToString ((Module module_) as fullModule) ins =
         I32_Sub ->
             "i32.sub"
 
+        I32_Mul ->
+            "i32.mul"
+
         I32_Eq ->
             "i32.eq"
+
+        I32_EqZero ->
+            "i32.eqz"
 
         I32_Store ->
             "i32.store"
 
         I32_Load ->
             "i32.load"
+
+
+maximumLocalIndex : Instruction -> Maybe Int
+maximumLocalIndex ins =
+    case ins of
+        Batch insList ->
+            List.filterMap maximumLocalIndex insList
+                |> List.maximum
+
+        Block insList ->
+            List.filterMap maximumLocalIndex insList
+                |> List.maximum
+
+        Loop insList ->
+            List.filterMap maximumLocalIndex insList
+                |> List.maximum
+
+        Local_Get idx ->
+            Just idx
+
+        Local_Set idx ->
+            Just idx
+
+        Local_Tee idx ->
+            Just idx
+
+        _ ->
+            Nothing
 
 
 initModule : Module

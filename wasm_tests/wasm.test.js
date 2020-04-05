@@ -7,6 +7,7 @@ test('Simple expression', async () => {
         entry: true
         : 1 1 +
     `);
+
     const result = await runCode(wat, 'main');
 
     expect(result).toBe(2);
@@ -21,6 +22,7 @@ test('Function calls', async () => {
         def: inc
         : 1 +
     `);
+
     const result = await runCode(wat, 'main');
 
     expect(result).toBe(3);
@@ -52,7 +54,7 @@ test('Compound type', async () => {
 
         def: main
         entry: true
-        : 19 >Person inc-age age>
+        : 0 >Person 19 >age inc-age age>
     `);
 
     const result = await runCode(wat, 'main');
@@ -95,5 +97,7 @@ async function runCode(wat, functionName) {
     program.instance.exports[functionName]();
 
     const memoryView = new Uint32Array(memory.buffer, 0, 20);
-    return memoryView[1];
+    // The first three I32 positions are used for stack and heap information
+    // The fourth position is the first element of the stack
+    return memoryView[3];
 }
