@@ -1,13 +1,28 @@
 module Play.Parser exposing (..)
 
+import Dict exposing (Dict)
+import Dict.Extra as Dict
 import List.Extra as List
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type)
 import Play.Tokenizer as Token exposing (Token)
 import Result.Extra as Result
+import Set exposing (Set)
 
 
-type alias Definition =
+type alias AST =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
+type alias TypeDefinition =
+    { name : String
+    , members : List ( String, Type )
+    }
+
+
+type alias WordDefinition =
     { name : String
     , metadata : Metadata
     , implementation : List AstNode
@@ -17,14 +32,30 @@ type alias Definition =
 type AstNode
     = Integer Int
     | Word String
+    | ConstructType String
+    | GetMember String String
+    | SetMember String String
 
 
-parse : List Token -> Result () (List Definition)
+parse : List Token -> Result () AST
 parse tokens =
-    tokens
-        |> gather isDefinition
-        |> List.map parseDefinition
-        |> Result.combine
+    let
+        ( errors, ast ) =
+            tokens
+                |> gather isDefinition
+                |> List.foldl parseDefinition
+                    ( []
+                    , { types = Dict.empty
+                      , words = Dict.empty
+                      }
+                    )
+    in
+    case errors of
+        [] ->
+            Ok ast
+
+        _ ->
+            Err ()
 
 
 gather : (a -> Bool) -> List a -> List (List a)
@@ -53,23 +84,30 @@ gatherHelp pred tokens acc =
             gatherHelp pred remainingTokens (tilNextDefinition :: acc)
 
 
+definitionKeywords : Set String
+definitionKeywords =
+    Set.fromList [ "def", "deftype" ]
+
+
 isDefinition : Token -> Bool
 isDefinition token =
     case token of
-        Token.Metadata "def" ->
-            True
+        Token.Metadata value ->
+            Set.member value definitionKeywords
 
         _ ->
             False
 
 
-parseDefinition : List Token -> Result () Definition
-parseDefinition tokens =
+parseDefinition : List Token -> ( List (), AST ) -> ( List (), AST )
+parseDefinition tokens ( errors, ast ) =
     case tokens of
         (Token.Metadata "def") :: (Token.Symbol wordName) :: rest ->
             case List.splitWhen (\token -> token == Token.Metadata "") rest of
                 Nothing ->
-                    Err ()
+                    ( () :: errors
+                    , ast
+                    )
 
                 Just ( meta, impl ) ->
                     let
@@ -85,18 +123,52 @@ parseDefinition tokens =
                                 |> Result.combine
                     in
                     case ( metaParseErrors, parsedImpl ) of
-                        ( [], Ok ast ) ->
-                            Ok
-                                { name = wordName
-                                , metadata = metadata
-                                , implementation = ast
-                                }
+                        ( [], Ok wordImpl ) ->
+                            ( errors
+                            , { ast
+                                | words =
+                                    Dict.insert wordName
+                                        { name = wordName
+                                        , metadata = metadata
+                                        , implementation = wordImpl
+                                        }
+                                        ast.words
+                              }
+                            )
 
                         _ ->
-                            Err ()
+                            ( () :: errors
+                            , ast
+                            )
+
+        (Token.Metadata "deftype") :: (Token.Type typeName) :: [] ->
+            ( errors
+            , parseTypeDefinition typeName [] ast
+            )
+
+        (Token.Metadata "deftype") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
+            case List.splitWhen (\t -> t == Token.ListEnd) rest of
+                Just ( types, [ Token.ListEnd ] ) ->
+                    case parseTypeMembers types [] of
+                        Err () ->
+                            ( () :: errors
+                            , ast
+                            )
+
+                        Ok members ->
+                            ( errors
+                            , parseTypeDefinition typeName members ast
+                            )
+
+                _ ->
+                    ( () :: errors
+                    , ast
+                    )
 
         _ ->
-            Err ()
+            ( () :: errors
+            , ast
+            )
 
 
 isMeta : Token -> Bool
@@ -173,11 +245,77 @@ parseAstNode token =
             Err ()
 
 
+parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
+parseTypeDefinition typeName members ast =
+    let
+        typeDef =
+            { name = typeName
+            , members = members
+            }
+
+        metadata =
+            Metadata.default
+                |> Metadata.withType (List.map Tuple.second members) [ Type.Custom typeName ]
+
+        ctorDef =
+            { name = ">" ++ typeName
+            , metadata = metadata
+            , implementation = [ ConstructType typeName ]
+            }
+
+        generatedDefs =
+            members
+                |> List.concatMap setterGetterPair
+                |> (::) ctorDef
+                |> Dict.fromListBy .name
+
+        setterGetterPair ( memberName, memberType ) =
+            [ { name = ">" ++ memberName
+              , metadata =
+                    Metadata.default
+                        |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
+              , implementation = [ SetMember typeName memberName ]
+              }
+            , { name = memberName ++ ">"
+              , metadata =
+                    Metadata.default
+                        |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
+              , implementation = [ GetMember typeName memberName ]
+              }
+            ]
+    in
+    { ast
+        | types = Dict.insert typeName typeDef ast.types
+        , words = Dict.union generatedDefs ast.words
+    }
+
+
 parseType : Token -> Result () Type
 parseType token =
     case token of
         Token.Type "Int" ->
             Ok Type.Int
+
+        Token.Type name ->
+            Ok <| Type.Custom name
+
+        _ ->
+            Err ()
+
+
+parseTypeMembers : List Token -> List ( String, Type ) -> Result () (List ( String, Type ))
+parseTypeMembers tokens acc =
+    case tokens of
+        [] ->
+            Ok (List.reverse acc)
+
+        (Token.Metadata name) :: ((Token.Type _) as typeToken) :: rest ->
+            case parseType typeToken of
+                Err () ->
+                    Err ()
+
+                Ok typeValue ->
+                    parseTypeMembers rest (( name, typeValue ) :: acc)
 
         _ ->
             Err ()

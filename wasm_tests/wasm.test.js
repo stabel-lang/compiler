@@ -7,9 +7,10 @@ test('Simple expression', async () => {
         entry: true
         : 1 1 +
     `);
+
     const result = await runCode(wat, 'main');
 
-    expect(result).toBe(2);
+    expect(result.valueOnBottomOfStack()).toBe(2);
 });
 
 test('Function calls', async () => {
@@ -21,9 +22,44 @@ test('Function calls', async () => {
         def: inc
         : 1 +
     `);
+
     const result = await runCode(wat, 'main');
 
-    expect(result).toBe(3);
+    expect(result.valueOnBottomOfStack()).toBe(3);
+});
+
+test('Enum type', async () => {
+    const wat = await compileToWat(`
+       deftype: True 
+       deftype: False
+
+       def: main
+       entry: true
+       : >True
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    // types are sorted alphabetically, so False will get id 0, and True gets id 1.
+    expect(result.typeIdForPointer()).toBe(1);
+});
+
+test('Compound type', async () => {
+    const wat = await compileToWat(`
+        deftype: Person
+        : { age: Int }
+
+        def: inc-age
+        : age> 1 + >Person
+
+        def: main
+        entry: true
+        : 1 >Person 19 >age inc-age age>
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    expect(result.valueOnBottomOfStack()).toBe(20);
 });
 
 // Helpers
@@ -60,6 +96,23 @@ async function runCode(wat, functionName) {
     const program = await WebAssembly.instantiate(wasmModule, imports);
     program.instance.exports[functionName]();
 
-    const memoryView = new Uint32Array(memory.buffer, 0, 20);
-    return memoryView[1];
+    return new ExecutionResult(memory.buffer);
+}
+
+class ExecutionResult {
+    constructor(memoryBuffer) {
+        this.memoryView = new Uint32Array(memoryBuffer, 0, 512);
+    }
+
+    valueOnBottomOfStack() {
+        // The first three I32 positions are used for stack and heap information
+        // The fourth position is the first element of the stack
+        return this.memoryView[3];
+    }
+
+    typeIdForPointer() {
+        const pointer = this.valueOnBottomOfStack();
+        const wordPointer = pointer / 4;
+        return this.memoryView[wordPointer];
+    }
 }

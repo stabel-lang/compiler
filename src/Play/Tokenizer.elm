@@ -9,6 +9,8 @@ type Token
     | Metadata String
     | Type String
     | TypeSeperator
+    | ListStart
+    | ListEnd
 
 
 tokenize : String -> Result () (List Token)
@@ -35,11 +37,19 @@ recognizeToken word =
                     |> Metadata
                     |> Ok
 
-            else if word == "--" then
-                Ok TypeSeperator
-
             else
-                Ok (Symbol word)
+                case word of
+                    "--" ->
+                        Ok TypeSeperator
+
+                    "{" ->
+                        Ok ListStart
+
+                    "}" ->
+                        Ok ListEnd
+
+                    _ ->
+                        Ok (Symbol word)
 
 
 stringStartsWithUpper : String -> Bool

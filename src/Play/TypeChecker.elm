@@ -1,12 +1,25 @@
 module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
+import List.Extra as List
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Qualifier as Qualifier
 
 
-type alias TypedDefinition =
+type alias AST =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
+type alias TypeDefinition =
+    { name : String
+    , members : List ( String, Type )
+    }
+
+
+type alias WordDefinition =
     { name : String
     , type_ : WordType
     , metadata : Metadata
@@ -17,14 +30,18 @@ type alias TypedDefinition =
 type AstNode
     = IntLiteral Int
     | Word String WordType
+    | ConstructType String
+    | SetMember String String Type
+    | GetMember String String Type
     | BuiltinPlus
     | BuiltinMinus
     | BuiltinEqual
 
 
 type alias Context =
-    { typedWords : Dict String TypedDefinition
-    , untypedWords : Dict String Qualifier.Definition
+    { types : Dict String Qualifier.TypeDefinition
+    , typedWords : Dict String WordDefinition
+    , untypedWords : Dict String Qualifier.WordDefinition
     , stackEffects : List StackEffect
     , errors : List ()
     }
@@ -35,34 +52,41 @@ type StackEffect
     | Pop Type
 
 
-initContext : List Qualifier.Definition -> Context
+initContext : Qualifier.AST -> Context
 initContext ast =
-    { typedWords = Dict.empty
-    , untypedWords = List.foldl (\word acc -> Dict.insert word.name word acc) Dict.empty ast
+    { types = ast.types
+    , typedWords = Dict.empty
+    , untypedWords = ast.words
     , stackEffects = []
     , errors = []
     }
 
 
-typeCheck : List Qualifier.Definition -> Result () (List TypedDefinition)
+typeCheck : Qualifier.AST -> Result () AST
 typeCheck ast =
     typeCheckHelper (initContext ast) ast
 
 
-typeCheckHelper : Context -> List Qualifier.Definition -> Result () (List TypedDefinition)
+typeCheckHelper : Context -> Qualifier.AST -> Result () AST
 typeCheckHelper context ast =
     let
         updatedContext =
-            List.foldl typeCheckDefinition context ast
+            ast
+                |> .words
+                |> Dict.values
+                |> List.foldl typeCheckDefinition context
     in
     if List.isEmpty updatedContext.errors then
-        Ok <| Dict.values updatedContext.typedWords
+        Ok <|
+            { types = ast.types
+            , words = updatedContext.typedWords
+            }
 
     else
         Err ()
 
 
-typeCheckDefinition : Qualifier.Definition -> Context -> Context
+typeCheckDefinition : Qualifier.WordDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
     let
         cleanContext =
@@ -141,6 +165,42 @@ typeCheckNode node context =
                                 Just def ->
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
+        Qualifier.ConstructType typeName ->
+            case Dict.get typeName context.types of
+                Just type_ ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = List.map Tuple.second type_.members
+                            , output = [ Type.Custom typeName ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
+
+        Qualifier.SetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = [ Type.Custom typeName, memberType ]
+                            , output = [ Type.Custom typeName ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
+
+        Qualifier.GetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = [ Type.Custom typeName ]
+                            , output = [ memberType ]
+                            }
+
+                Nothing ->
+                    Debug.todo "inconcievable!"
+
         Qualifier.BuiltinPlus ->
             addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
 
@@ -153,9 +213,8 @@ typeCheckNode node context =
 
 wordTypeToStackEffects : WordType -> List StackEffect
 wordTypeToStackEffects wordType =
-    List.map Pop wordType.input
-        ++ List.map Push wordType.output
-        |> List.reverse
+    List.map Push wordType.output
+        ++ List.map Pop wordType.input
 
 
 wordTypeFromStackEffects : Context -> ( Context, WordType )
@@ -202,6 +261,30 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
+        Qualifier.ConstructType typeName ->
+            case Dict.get typeName context.types of
+                Just _ ->
+                    ConstructType typeName
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.SetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    SetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.GetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    GetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
         Qualifier.BuiltinPlus ->
             BuiltinPlus
 
@@ -210,3 +293,11 @@ untypedToTypedNode context untypedNode =
 
         Qualifier.BuiltinEqual ->
             BuiltinEqual
+
+
+getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
+getMemberType typeDict typeName memberName =
+    Dict.get typeName typeDict
+        |> Maybe.map .members
+        |> Maybe.andThen (List.find (\( name, _ ) -> name == memberName))
+        |> Maybe.map Tuple.second

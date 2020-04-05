@@ -8,6 +8,7 @@
         "direct": {
             "elm/core": "1.0.5",
             "elm/html": "1.0.0",
+            "elm-community/dict-extra": "2.4.0",
             "elm-community/list-extra": "8.2.3",
             "elm-community/result-extra": "2.4.0"
         },

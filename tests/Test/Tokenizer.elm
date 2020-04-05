@@ -64,4 +64,53 @@ suite =
 
                     Ok tokens ->
                         Expect.equalLists expectedTokens tokens
+        , test "Data structure without fields" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        deftype: True
+                        """
+
+                    expectedTokens =
+                        [ Metadata "deftype"
+                        , Type "True"
+                        ]
+                in
+                case tokenize source of
+                    Err () ->
+                        Expect.fail "Did not expect tokenization to fail"
+
+                    Ok tokens ->
+                        Expect.equalLists expectedTokens tokens
+        , test "Data structure with fields" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        deftype: Person
+                        : {
+                            age: Int
+                            jobs: Int
+                        }
+                        """
+
+                    expectedTokens =
+                        [ Metadata "deftype"
+                        , Type "Person"
+                        , Metadata ""
+                        , ListStart
+                        , Metadata "age"
+                        , Type "Int"
+                        , Metadata "jobs"
+                        , Type "Int"
+                        , ListEnd
+                        ]
+                in
+                case tokenize source of
+                    Err () ->
+                        Expect.fail "Did not expect tokenization to fail"
+
+                    Ok tokens ->
+                        Expect.equalLists expectedTokens tokens
         ]
