@@ -233,6 +233,12 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen."
 
+        AST.SetMember typeName memberName memberType ->
+            Wasm.I32_Const 0
+
+        AST.GetMember typeName memberName memberType ->
+            Wasm.I32_Const 0
+
         AST.BuiltinPlus ->
             Wasm.Call addIntFn
 

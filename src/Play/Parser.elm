@@ -1,6 +1,7 @@
 module Play.Parser exposing (..)
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import List.Extra as List
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type)
@@ -266,8 +267,7 @@ parseTypeDefinition typeName members ast =
             members
                 |> List.concatMap setterGetterPair
                 |> (::) ctorDef
-                |> List.map (\def -> ( def.name, def ))
-                |> Dict.fromList
+                |> Dict.fromListBy .name
 
         setterGetterPair ( memberName, memberType ) =
             [ { name = ">" ++ memberName

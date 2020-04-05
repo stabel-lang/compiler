@@ -1,6 +1,7 @@
 module Test.Parser exposing (..)
 
 import Dict
+import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata
 import Play.Data.Type as Type
@@ -51,33 +52,28 @@ suite =
                     expectedAst =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , { name = "inc"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
                                         ]
-                                    }
-                                  )
-                                , ( "dec"
-                                  , { name = "dec"
-                                    , metadata =
+                                  }
+                                , { name = "dec"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
-                                    , implementation =
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
                                         ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
                                         , AST.Word "inc"
@@ -85,8 +81,7 @@ suite =
                                         , AST.Integer 2
                                         , AST.Word "="
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in
@@ -116,33 +111,27 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "True"
-                                  , { name = "True"
-                                    , members = []
-                                    }
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "True"
+                                  , members = []
+                                  }
                                 ]
                         , words =
-                            Dict.fromList
-                                [ ( ">True"
-                                  , { name = ">True"
-                                    , metadata =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                    , implementation = [ AST.ConstructType "True" ]
-                                    }
-                                  )
-                                , ( "as-int"
-                                  , { name = "as-int"
-                                    , metadata =
+                                  , implementation = [ AST.ConstructType "True" ]
+                                  }
+                                , { name = "as-int"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
-                                    , implementation =
+                                  , implementation =
                                         [ AST.Integer 1
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in
@@ -179,68 +168,54 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "Person"
-                                  , { name = "Person"
-                                    , members =
+                            Dict.fromListBy .name
+                                [ { name = "Person"
+                                  , members =
                                         [ ( "age", Type.Int )
                                         , ( "jobs", Type.Int )
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         , words =
-                            Dict.fromList
-                                [ ( ">Person"
-                                  , { name = ">Person"
-                                    , metadata =
+                            Dict.fromListBy .name
+                                [ { name = ">Person"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
-                                    , implementation = [ AST.ConstructType "Person" ]
-                                    }
-                                  )
-                                , ( ">age"
-                                  , { name = ">age"
-                                    , metadata =
+                                  , implementation = [ AST.ConstructType "Person" ]
+                                  }
+                                , { name = ">age"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                    , implementation = [ AST.SetMember "Person" "age" ]
-                                    }
-                                  )
-                                , ( ">jobs"
-                                  , { name = ">jobs"
-                                    , metadata =
+                                  , implementation = [ AST.SetMember "Person" "age" ]
+                                  }
+                                , { name = ">jobs"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                    , implementation = [ AST.SetMember "Person" "jobs" ]
-                                    }
-                                  )
-                                , ( "age>"
-                                  , { name = "age>"
-                                    , metadata =
+                                  , implementation = [ AST.SetMember "Person" "jobs" ]
+                                  }
+                                , { name = "age>"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                    , implementation = [ AST.GetMember "Person" "age" ]
-                                    }
-                                  )
-                                , ( "jobs>"
-                                  , { name = "jobs>"
-                                    , metadata =
+                                  , implementation = [ AST.GetMember "Person" "age" ]
+                                  }
+                                , { name = "jobs>"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                    , implementation = [ AST.GetMember "Person" "jobs" ]
-                                    }
-                                  )
-                                , ( "get-age"
-                                  , { name = "get-age"
-                                    , metadata =
+                                  , implementation = [ AST.GetMember "Person" "jobs" ]
+                                  }
+                                , { name = "get-age"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                    , implementation =
+                                  , implementation =
                                         [ AST.Word "age>"
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in

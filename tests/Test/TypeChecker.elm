@@ -1,6 +1,7 @@
 module Test.TypeChecker exposing (..)
 
 import Dict
+import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type
@@ -18,31 +19,26 @@ suite =
                     input =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , { name = "inc"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ QAST.Integer 1
                                         , QAST.BuiltinPlus
                                         ]
-                                    }
-                                  )
-                                , ( "dec"
-                                  , { name = "dec"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                                  }
+                                , { name = "dec"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ QAST.Integer 1
                                         , QAST.BuiltinMinus
                                         ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
+                                  , implementation =
                                         [ QAST.Integer 1
                                         , QAST.Word "inc"
                                         , QAST.Word "inc"
@@ -50,42 +46,36 @@ suite =
                                         , QAST.Integer 2
                                         , QAST.BuiltinEqual
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
 
                     expectedResult =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , { name = "inc"
-                                    , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                    , metadata = Metadata.default
-                                    , implementation =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ IntLiteral 1
                                         , BuiltinPlus
                                         ]
-                                    }
-                                  )
-                                , ( "dec"
-                                  , { name = "dec"
-                                    , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                    , metadata = Metadata.default
-                                    , implementation =
+                                  }
+                                , { name = "dec"
+                                  , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ IntLiteral 1
                                         , BuiltinMinus
                                         ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , type_ = { input = [], output = [ Type.Int ] }
-                                    , metadata =
+                                  }
+                                , { name = "main"
+                                  , type_ = { input = [], output = [ Type.Int ] }
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
+                                  , implementation =
                                         [ IntLiteral 1
                                         , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
                                         , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
@@ -93,8 +83,7 @@ suite =
                                         , IntLiteral 2
                                         , BuiltinEqual
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in
@@ -110,19 +99,17 @@ suite =
                     input =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] []
-                                    , implementation =
+                                  , implementation =
                                         [ QAST.Integer 1
                                         , QAST.Integer 2
                                         , QAST.BuiltinEqual
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in

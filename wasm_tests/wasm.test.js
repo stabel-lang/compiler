@@ -42,6 +42,24 @@ test('Enum type', async () => {
     expect(result).toBe(1);
 });
 
+test('Compound type', async () => {
+    const wat = await compileToWat(`
+        deftype: Person
+        : { age: Int }
+
+        def: inc-age
+        : age> 1 + >Person
+
+        def: main
+        entry: true
+        : 19 >Person inc-age age>
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    expect(result).toBe(20);
+});
+
 // Helpers
 
 function compileToWat(sourceCode) {

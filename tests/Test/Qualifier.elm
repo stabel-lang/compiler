@@ -1,6 +1,7 @@
 module Test.Qualifier exposing (..)
 
-import Dict exposing (Dict)
+import Dict
+import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata
 import Play.Parser as AST
@@ -17,31 +18,26 @@ suite =
                     unqualifiedAst =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , { name = "inc"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
                                         ]
-                                    }
-                                  )
-                                , ( "dec"
-                                  , { name = "dec"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                                  }
+                                , { name = "dec"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
                                         ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
+                                  , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
                                         , AST.Word "inc"
@@ -49,39 +45,33 @@ suite =
                                         , AST.Integer 2
                                         , AST.Word "="
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
 
                     expectedAst =
                         { types = Dict.empty
                         , words =
-                            Dict.fromList
-                                [ ( "inc"
-                                  , { name = "inc"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ Integer 1
                                         , BuiltinPlus
                                         ]
-                                    }
-                                  )
-                                , ( "dec"
-                                  , { name = "dec"
-                                    , metadata = Metadata.default
-                                    , implementation =
+                                  }
+                                , { name = "dec"
+                                  , metadata = Metadata.default
+                                  , implementation =
                                         [ Integer 1
                                         , BuiltinMinus
                                         ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
+                                  , implementation =
                                         [ Integer 1
                                         , Word "inc"
                                         , Word "inc"
@@ -89,8 +79,7 @@ suite =
                                         , Integer 2
                                         , BuiltinEqual
                                         ]
-                                    }
-                                  )
+                                  }
                                 ]
                         }
                 in
