@@ -225,4 +225,46 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , test "Parser understands generic types" <|
+            \_ ->
+                let
+                    source =
+                        [ Metadata "def"
+                        , Symbol "over"
+                        , Metadata "type"
+                        , Symbol "a"
+                        , Symbol "b"
+                        , TypeSeperator
+                        , Symbol "a"
+                        , Symbol "b"
+                        , Symbol "a"
+                        , Metadata ""
+                        , Symbol "dup"
+                        , Symbol "rotate"
+                        ]
+
+                    expectedAst =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "over"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , implementation =
+                                        [ AST.Word "dup"
+                                        , AST.Word "rotate"
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case parse source of
+                    Err () ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         ]
