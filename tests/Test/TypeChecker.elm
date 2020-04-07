@@ -245,4 +245,46 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic types" <|
+            \_ ->
+                let
+                    input =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Integer 1
+                                        , QAST.Integer 2
+                                        , QAST.Word "over"
+                                        , QAST.Builtin Builtin.Plus
+                                        , QAST.Builtin Builtin.Minus
+                                        , QAST.Integer 2
+                                        , QAST.Builtin Builtin.Equal
+                                        ]
+                                  }
+                                , { name = "over"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , implementation =
+                                        [ QAST.Builtin Builtin.StackSwap
+                                        , QAST.Builtin Builtin.StackDuplicate
+                                        , QAST.Builtin Builtin.StackRightRotate
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
         ]
