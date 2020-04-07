@@ -1,6 +1,7 @@
 module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
+import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.Type exposing (Type)
 import Play.Parser as Parser
@@ -32,18 +33,17 @@ type Node
     | ConstructType String
     | GetMember String String
     | SetMember String String
-    | BuiltinPlus
-    | BuiltinMinus
-    | BuiltinEqual
+    | Builtin Builtin
 
 
 builtinDict : Dict String Node
 builtinDict =
-    Dict.fromList
-        [ ( "+", BuiltinPlus )
-        , ( "-", BuiltinMinus )
-        , ( "=", BuiltinEqual )
-        ]
+    [ ( "+", Builtin.Plus )
+    , ( "-", Builtin.Minus )
+    , ( "=", Builtin.Equal )
+    ]
+        |> Dict.fromList
+        |> Dict.map (\_ v -> Builtin v)
 
 
 qualify : Parser.AST -> Result () AST

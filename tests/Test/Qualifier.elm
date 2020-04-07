@@ -3,6 +3,7 @@ module Test.Qualifier exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
+import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
@@ -57,14 +58,14 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ Integer 1
-                                        , BuiltinPlus
+                                        , Builtin Builtin.Plus
                                         ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ Integer 1
-                                        , BuiltinMinus
+                                        , Builtin Builtin.Minus
                                         ]
                                   }
                                 , { name = "main"
@@ -77,7 +78,7 @@ suite =
                                         , Word "inc"
                                         , Word "dec"
                                         , Integer 2
-                                        , BuiltinEqual
+                                        , Builtin Builtin.Equal
                                         ]
                                   }
                                 ]

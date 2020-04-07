@@ -2,6 +2,7 @@ module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Qualifier as Qualifier
@@ -33,9 +34,7 @@ type AstNode
     | ConstructType String
     | SetMember String String Type
     | GetMember String String Type
-    | BuiltinPlus
-    | BuiltinMinus
-    | BuiltinEqual
+    | Builtin Builtin
 
 
 type alias Context =
@@ -201,14 +200,8 @@ typeCheckNode node context =
                 Nothing ->
                     Debug.todo "inconcievable!"
 
-        Qualifier.BuiltinPlus ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
-
-        Qualifier.BuiltinMinus ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
-
-        Qualifier.BuiltinEqual ->
-            addStackEffect context <| wordTypeToStackEffects { input = [ Type.Int, Type.Int ], output = [ Type.Int ] }
+        Qualifier.Builtin builtin ->
+            addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
 
 
 wordTypeToStackEffects : WordType -> List StackEffect
@@ -285,14 +278,8 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
-        Qualifier.BuiltinPlus ->
-            BuiltinPlus
-
-        Qualifier.BuiltinMinus ->
-            BuiltinMinus
-
-        Qualifier.BuiltinEqual ->
-            BuiltinEqual
+        Qualifier.Builtin builtin ->
+            Builtin builtin
 
 
 getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
