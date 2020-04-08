@@ -3,7 +3,7 @@ module Play.Qualifier exposing (..)
 import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
-import Play.Data.Type exposing (Type)
+import Play.Data.Type as Type exposing (Type)
 import Play.Parser as Parser
 import Result.Extra as Result
 
@@ -40,7 +40,14 @@ builtinDict : Dict String Node
 builtinDict =
     [ ( "+", Builtin.Plus )
     , ( "-", Builtin.Minus )
+    , ( "*", Builtin.Multiply )
+    , ( "/", Builtin.Divide )
     , ( "=", Builtin.Equal )
+    , ( "swap", Builtin.StackSwap )
+    , ( "dup", Builtin.StackDuplicate )
+    , ( "drop", Builtin.StackDrop )
+    , ( "rotate", Builtin.StackRightRotate )
+    , ( "-rotate", Builtin.StackLeftRotate )
     ]
         |> Dict.fromList
         |> Dict.map (\_ v -> Builtin v)
@@ -103,7 +110,7 @@ qualifyDefinition ast unqualifiedWord ( errors, acc ) =
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
-                , metadata = unqualifiedWord.metadata
+                , metadata = qualifyMetadata unqualifiedWord.name unqualifiedWord.metadata
                 , implementation = qualifiedImplementation
                 }
                 acc
@@ -136,3 +143,24 @@ qualifyNode ast node =
 
         Parser.GetMember typeName memberName ->
             Ok (GetMember typeName memberName)
+
+
+qualifyMetadata : String -> Metadata -> Metadata
+qualifyMetadata baseName metadata =
+    let
+        helper { input, output } =
+            { input = List.map (qualifyMetadataType baseName) input
+            , output = List.map (qualifyMetadataType baseName) output
+            }
+    in
+    { metadata | type_ = Maybe.map helper metadata.type_ }
+
+
+qualifyMetadataType : String -> Type -> Type
+qualifyMetadataType baseName type_ =
+    case type_ of
+        Type.Generic id ->
+            Type.Generic (id ++ "_" ++ baseName)
+
+        _ ->
+            type_

@@ -270,8 +270,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
-                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                                [ Type.Generic "a_over", Type.Generic "b_over" ]
+                                                [ Type.Generic "a_over", Type.Generic "b_over", Type.Generic "a_over" ]
                                   , implementation =
                                         [ QAST.Builtin Builtin.StackSwap
                                         , QAST.Builtin Builtin.StackDuplicate
