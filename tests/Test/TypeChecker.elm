@@ -270,8 +270,11 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Generic "a_over", Type.Generic "b_over" ]
-                                                [ Type.Generic "a_over", Type.Generic "b_over", Type.Generic "a_over" ]
+                                                -- Most would start at a and increment, but we need to check that
+                                                -- the typechecker cares about the relationship between these generic
+                                                -- variables, not the names themselves
+                                                [ Type.Generic "b_over", Type.Generic "c_over" ]
+                                                [ Type.Generic "b_over", Type.Generic "c_over", Type.Generic "b_over" ]
                                   , implementation =
                                         [ QAST.Builtin Builtin.StackSwap
                                         , QAST.Builtin Builtin.StackDuplicate
