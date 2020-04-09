@@ -2,6 +2,7 @@ module Play.Codegen exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Play.Data.Builtin as Builtin
 import Play.Data.Type exposing (Type)
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
@@ -76,14 +77,44 @@ subIntFn =
     "__sub_i32"
 
 
+mulIntFn : String
+mulIntFn =
+    "__mul_i32"
+
+
+divIntFn : String
+divIntFn =
+    "__div_i32"
+
+
 eqIntFn : String
 eqIntFn =
     "__eq_i32"
 
 
+dupFn : String
+dupFn =
+    "__duplicate"
+
+
+dropFn : String
+dropFn =
+    "__drop"
+
+
 swapFn : String
 swapFn =
     "__swap"
+
+
+rotFn : String
+rotFn =
+    "__rotate"
+
+
+leftRotFn : String
+leftRotFn =
+    "__left_rotate"
 
 
 
@@ -202,6 +233,31 @@ baseModule =
                 ]
             }
         |> Wasm.withFunction
+            { name = dupFn
+            , exported = False
+            , args = []
+            , results = []
+            , locals = [ Wasm.Int32 ]
+            , instructions =
+                [ Wasm.Call stackPopFn
+                , Wasm.Local_Tee 0
+                , Wasm.Local_Get 0
+                , Wasm.Call stackPushFn
+                , Wasm.Call stackPushFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = dropFn
+            , exported = False
+            , args = []
+            , results = []
+            , locals = []
+            , instructions =
+                [ Wasm.Call stackPopFn
+                , Wasm.Drop
+                ]
+            }
+        |> Wasm.withFunction
             { name = swapFn
             , exported = False
             , args = []
@@ -213,6 +269,48 @@ baseModule =
                 , Wasm.Call stackPopFn
                 , Wasm.Local_Get 0
                 , Wasm.Call stackPushFn
+                , Wasm.Call stackPushFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = rotFn
+            , exported = False
+            , args = []
+            , results = []
+            , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
+            , instructions =
+                [ Wasm.Call stackPopFn
+                , Wasm.Local_Set 0 -- c
+                , Wasm.Call stackPopFn
+                , Wasm.Local_Set 1 -- b
+                , Wasm.Call stackPopFn
+                , Wasm.Local_Set 2 -- a
+                , Wasm.Local_Get 0
+                , Wasm.Call stackPushFn
+                , Wasm.Local_Get 2
+                , Wasm.Call stackPushFn
+                , Wasm.Local_Get 1
+                , Wasm.Call stackPushFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = leftRotFn
+            , exported = False
+            , args = []
+            , results = []
+            , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
+            , instructions =
+                [ Wasm.Call stackPopFn
+                , Wasm.Local_Set 0 -- c
+                , Wasm.Call stackPopFn
+                , Wasm.Local_Set 1 -- b
+                , Wasm.Call stackPopFn
+                , Wasm.Local_Set 2 -- a
+                , Wasm.Local_Get 1
+                , Wasm.Call stackPushFn
+                , Wasm.Local_Get 0
+                , Wasm.Call stackPushFn
+                , Wasm.Local_Get 2
                 , Wasm.Call stackPushFn
                 ]
             }
@@ -241,6 +339,34 @@ baseModule =
                 , Wasm.Call stackPopFn
                 , Wasm.Call stackPopFn
                 , Wasm.I32_Sub
+                , Wasm.Call stackPushFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = mulIntFn
+            , exported = False
+            , args = []
+            , locals = []
+            , results = []
+            , instructions =
+                [ Wasm.Call swapFn
+                , Wasm.Call stackPopFn
+                , Wasm.Call stackPopFn
+                , Wasm.I32_Mul
+                , Wasm.Call stackPushFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = divIntFn
+            , exported = False
+            , args = []
+            , locals = []
+            , results = []
+            , instructions =
+                [ Wasm.Call swapFn
+                , Wasm.Call stackPopFn
+                , Wasm.Call stackPopFn
+                , Wasm.I32_Div
                 , Wasm.Call stackPushFn
                 ]
             }
@@ -415,14 +541,37 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen!"
 
-        AST.BuiltinPlus ->
-            Wasm.Call addIntFn
+        AST.Builtin builtin ->
+            case builtin of
+                Builtin.Plus ->
+                    Wasm.Call addIntFn
 
-        AST.BuiltinMinus ->
-            Wasm.Call subIntFn
+                Builtin.Minus ->
+                    Wasm.Call subIntFn
 
-        AST.BuiltinEqual ->
-            Wasm.Call eqIntFn
+                Builtin.Multiply ->
+                    Wasm.Call mulIntFn
+
+                Builtin.Divide ->
+                    Wasm.Call divIntFn
+
+                Builtin.Equal ->
+                    Wasm.Call eqIntFn
+
+                Builtin.StackDuplicate ->
+                    Wasm.Call dupFn
+
+                Builtin.StackDrop ->
+                    Wasm.Call dropFn
+
+                Builtin.StackSwap ->
+                    Wasm.Call swapFn
+
+                Builtin.StackRightRotate ->
+                    Wasm.Call rotFn
+
+                Builtin.StackLeftRotate ->
+                    Wasm.Call leftRotFn
 
 
 getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int

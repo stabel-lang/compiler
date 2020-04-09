@@ -62,6 +62,40 @@ test('Compound type', async () => {
     expect(result.valueOnBottomOfStack()).toBe(20);
 });
 
+test('Square', async () => {
+    const wat = await compileToWat(`
+        def: main
+        entry: true
+        type: -- Int
+        : 5 square
+
+        def: square
+        type: Int -- Int
+        : dup *
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    expect(result.valueOnBottomOfStack()).toBe(25);
+});
+
+test('Over', async() => {
+    const wat = await compileToWat(`
+        def: main
+        entry: true
+        type: -- Int
+        : 1 2 over - + 2 =
+
+        def: over
+        type: a b -- a b a
+        : swap dup rotate
+    `);
+
+    const result = await runCode(wat, 'main');
+
+    expect(result.valueOnBottomOfStack()).toBe(1);
+});
+
 // Helpers
 
 function compileToWat(sourceCode) {
