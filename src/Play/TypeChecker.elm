@@ -230,7 +230,13 @@ wordTypeFromStackEffectsHelper : List StackEffect -> ( Context, WordType ) -> ( 
 wordTypeFromStackEffectsHelper effects ( context, wordType ) =
     case effects of
         [] ->
-            ( context, wordType )
+            ( context
+              -- TODO: Really need to get this list reverse madness figured out and solved properly
+            , { wordType
+                | input = wordType.input
+                , output = List.reverse wordType.output
+              }
+            )
 
         (Pop type_) :: remainingEffects ->
             case wordType.output of
@@ -338,12 +344,17 @@ simplifyWordType defName ( context, wordType ) =
         reduceGenericName type_ =
             case type_ of
                 Type.Generic genName ->
-                    case Dict.get genName aliases of
-                        Just actualName ->
-                            Type.Generic actualName
+                    case getGenericBinding context type_ of
+                        Just boundType ->
+                            boundType
 
                         Nothing ->
-                            type_
+                            case Dict.get genName aliases of
+                                Just actualName ->
+                                    Type.Generic actualName
+
+                                Nothing ->
+                                    type_
 
                 _ ->
                     type_

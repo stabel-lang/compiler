@@ -33,3 +33,22 @@ test('Over', async() => {
 
     expect(result.stackElement()).toBe(1);
 });
+
+test('Under', async() => {
+    // Not sure if under is actually a known function in forth
+    // This is mainly to test -rotate
+    const wat = await compiler.toWat(`
+        def: main
+        entry: true
+        type: -- Int
+        : 1 2 under - + 3 =
+
+        def: under
+        type: a b -- b b a
+        : dup -rotate
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});

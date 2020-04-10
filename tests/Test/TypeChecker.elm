@@ -290,4 +290,38 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic types with type annotation" <|
+            \_ ->
+                let
+                    input =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Integer 5
+                                        , QAST.Word "square"
+                                        ]
+                                  }
+                                , { name = "square"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Builtin Builtin.StackDuplicate
+                                        , QAST.Builtin Builtin.Multiply
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
         ]
