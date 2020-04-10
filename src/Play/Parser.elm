@@ -299,6 +299,9 @@ parseType token =
         Token.Type name ->
             Ok <| Type.Custom name
 
+        Token.Symbol genericName ->
+            Ok <| Type.Generic genericName
+
         _ ->
             Err ()
 

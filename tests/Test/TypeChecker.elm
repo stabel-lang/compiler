@@ -3,6 +3,7 @@ module Test.TypeChecker exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
+import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type
 import Play.Qualifier as QAST
@@ -24,14 +25,14 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ QAST.Integer 1
-                                        , QAST.BuiltinPlus
+                                        , QAST.Builtin Builtin.Plus
                                         ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ QAST.Integer 1
-                                        , QAST.BuiltinMinus
+                                        , QAST.Builtin Builtin.Minus
                                         ]
                                   }
                                 , { name = "main"
@@ -44,7 +45,7 @@ suite =
                                         , QAST.Word "inc"
                                         , QAST.Word "dec"
                                         , QAST.Integer 2
-                                        , QAST.BuiltinEqual
+                                        , QAST.Builtin Builtin.Equal
                                         ]
                                   }
                                 ]
@@ -59,7 +60,7 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ IntLiteral 1
-                                        , BuiltinPlus
+                                        , Builtin Builtin.Plus
                                         ]
                                   }
                                 , { name = "dec"
@@ -67,7 +68,7 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ IntLiteral 1
-                                        , BuiltinMinus
+                                        , Builtin Builtin.Minus
                                         ]
                                   }
                                 , { name = "main"
@@ -81,7 +82,7 @@ suite =
                                         , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
                                         , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
                                         , IntLiteral 2
-                                        , BuiltinEqual
+                                        , Builtin Builtin.Equal
                                         ]
                                   }
                                 ]
@@ -107,7 +108,7 @@ suite =
                                   , implementation =
                                         [ QAST.Integer 1
                                         , QAST.Integer 2
-                                        , QAST.BuiltinEqual
+                                        , QAST.Builtin Builtin.Equal
                                         ]
                                   }
                                 ]
@@ -217,7 +218,7 @@ suite =
                                     , implementation =
                                         [ QAST.Word "age>"
                                         , QAST.Integer 1
-                                        , QAST.BuiltinPlus
+                                        , QAST.Builtin Builtin.Plus
                                         , QAST.Word ">Person"
                                         ]
                                     }
@@ -241,6 +242,85 @@ suite =
                 case typeCheck source of
                     Err () ->
                         Expect.fail "Did not expect type check to fail"
+
+                    Ok _ ->
+                        Expect.pass
+        , test "Generic types" <|
+            \_ ->
+                let
+                    input =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Integer 1
+                                        , QAST.Integer 2
+                                        , QAST.Word "over"
+                                        , QAST.Builtin Builtin.Plus
+                                        , QAST.Builtin Builtin.Minus
+                                        , QAST.Integer 2
+                                        , QAST.Builtin Builtin.Equal
+                                        ]
+                                  }
+                                , { name = "over"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                -- Most would start at a and increment, but we need to check that
+                                                -- the typechecker cares about the relationship between these generic
+                                                -- variables, not the names themselves
+                                                [ Type.Generic "b_over", Type.Generic "c_over" ]
+                                                [ Type.Generic "b_over", Type.Generic "c_over", Type.Generic "b_over" ]
+                                  , implementation =
+                                        [ QAST.Builtin Builtin.StackSwap
+                                        , QAST.Builtin Builtin.StackDuplicate
+                                        , QAST.Builtin Builtin.StackRightRotate
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
+        , test "Generic types with type annotation" <|
+            \_ ->
+                let
+                    input =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Integer 5
+                                        , QAST.Word "square"
+                                        ]
+                                  }
+                                , { name = "square"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , implementation =
+                                        [ QAST.Builtin Builtin.StackDuplicate
+                                        , QAST.Builtin Builtin.Multiply
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
                         Expect.pass

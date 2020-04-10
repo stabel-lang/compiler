@@ -3,7 +3,9 @@ module Test.Qualifier exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
+import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata
+import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
 import Test exposing (Test, describe, test)
@@ -57,14 +59,14 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ Integer 1
-                                        , BuiltinPlus
+                                        , Builtin Builtin.Plus
                                         ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
                                         [ Integer 1
-                                        , BuiltinMinus
+                                        , Builtin Builtin.Minus
                                         ]
                                   }
                                 , { name = "main"
@@ -77,7 +79,57 @@ suite =
                                         , Word "inc"
                                         , Word "dec"
                                         , Integer 2
-                                        , BuiltinEqual
+                                        , Builtin Builtin.Equal
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case qualify unqualifiedAst of
+                    Err () ->
+                        Expect.fail "Did not expect qualification to fail"
+
+                    Ok qualifiedAst ->
+                        Expect.equal expectedAst qualifiedAst
+        , test "Generic function types" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "over"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , implementation =
+                                        [ AST.Word "swap"
+                                        , AST.Word "dup"
+                                        , AST.Word "rotate"
+                                        ]
+                                  }
+                                ]
+                        }
+
+                    expectedAst =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "over"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a_over", Type.Generic "b_over" ]
+                                                [ Type.Generic "a_over"
+                                                , Type.Generic "b_over"
+                                                , Type.Generic "a_over"
+                                                ]
+                                  , implementation =
+                                        [ Builtin Builtin.StackSwap
+                                        , Builtin Builtin.StackDuplicate
+                                        , Builtin Builtin.StackRightRotate
                                         ]
                                   }
                                 ]

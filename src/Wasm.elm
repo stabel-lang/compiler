@@ -74,10 +74,12 @@ type Instruction
     | I32_Add
     | I32_Sub
     | I32_Mul
+    | I32_Div
     | I32_Eq
     | I32_EqZero
     | I32_Store
     | I32_Load
+    | Drop
 
 
 instructionToString : Module -> Instruction -> String
@@ -142,6 +144,9 @@ instructionToString ((Module module_) as fullModule) ins =
         I32_Mul ->
             "i32.mul"
 
+        I32_Div ->
+            "i32.div_s"
+
         I32_Eq ->
             "i32.eq"
 
@@ -153,6 +158,9 @@ instructionToString ((Module module_) as fullModule) ins =
 
         I32_Load ->
             "i32.load"
+
+        Drop ->
+            "drop"
 
 
 maximumLocalIndex : Instruction -> Maybe Int
