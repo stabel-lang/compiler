@@ -16,10 +16,9 @@ type alias AST =
     }
 
 
-type alias TypeDefinition =
-    { name : String
-    , members : List ( String, Type )
-    }
+type TypeDefinition
+    = CustomTypeDef String (List ( String, Type ))
+    | UnionTypeDef String (List Type)
 
 
 type alias WordDefinition =
@@ -86,7 +85,11 @@ gatherHelp pred tokens acc =
 
 definitionKeywords : Set String
 definitionKeywords =
-    Set.fromList [ "def", "deftype" ]
+    Set.fromList
+        [ "def"
+        , "deftype"
+        , "defunion"
+        ]
 
 
 isDefinition : Token -> Bool
@@ -158,6 +161,31 @@ parseDefinition tokens ( errors, ast ) =
                         Ok members ->
                             ( errors
                             , parseTypeDefinition typeName members ast
+                            )
+
+                _ ->
+                    ( () :: errors
+                    , ast
+                    )
+
+        (Token.Metadata "defunion") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
+            case List.splitWhen (\t -> t == Token.ListEnd) rest of
+                Just ( types, [ Token.ListEnd ] ) ->
+                    let
+                        possibleMemberTypes =
+                            types
+                                |> List.map parseType
+                                |> Result.combine
+                    in
+                    case possibleMemberTypes of
+                        Err () ->
+                            ( () :: errors
+                            , ast
+                            )
+
+                        Ok members ->
+                            ( errors
+                            , parseUnionTypeDefinition typeName members ast
                             )
 
                 _ ->
@@ -249,9 +277,7 @@ parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
 parseTypeDefinition typeName members ast =
     let
         typeDef =
-            { name = typeName
-            , members = members
-            }
+            CustomTypeDef typeName members
 
         metadata =
             Metadata.default
@@ -322,3 +348,22 @@ parseTypeMembers tokens acc =
 
         _ ->
             Err ()
+
+
+typeDefinitionName : TypeDefinition -> String
+typeDefinitionName typeDef =
+    case typeDef of
+        CustomTypeDef name _ ->
+            name
+
+        UnionTypeDef name _ ->
+            name
+
+
+parseUnionTypeDefinition : String -> List Type -> AST -> AST
+parseUnionTypeDefinition typeName members ast =
+    let
+        typeDef =
+            UnionTypeDef typeName members
+    in
+    { ast | types = Dict.insert typeName typeDef ast.types }

@@ -111,10 +111,8 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy .name
-                                [ { name = "True"
-                                  , members = []
-                                  }
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ CustomTypeDef "True" []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -168,13 +166,11 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy .name
-                                [ { name = "Person"
-                                  , members =
-                                        [ ( "age", Type.Int )
-                                        , ( "jobs", Type.Int )
-                                        ]
-                                  }
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ CustomTypeDef "Person"
+                                    [ ( "age", Type.Int )
+                                    , ( "jobs", Type.Int )
+                                    ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -256,6 +252,64 @@ suite =
                                   , implementation =
                                         [ AST.Word "dup"
                                         , AST.Word "rotate"
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case parse source of
+                    Err () ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
+        , test "Parser understands union types" <|
+            \_ ->
+                let
+                    source =
+                        [ Metadata "defunion"
+                        , Type "Bool"
+                        , Metadata ""
+                        , ListStart
+                        , Type "True"
+                        , Type "False"
+                        , ListEnd
+
+                        -- True
+                        , Metadata "deftype"
+                        , Type "True"
+
+                        -- False
+                        , Metadata "deftype"
+                        , Type "False"
+                        ]
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ UnionTypeDef "Bool"
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef "True" []
+                                , CustomTypeDef "False" []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        [ AST.ConstructType "True"
+                                        ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        [ AST.ConstructType "False"
                                         ]
                                   }
                                 ]
