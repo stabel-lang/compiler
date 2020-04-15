@@ -55,6 +55,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
+                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
@@ -64,6 +65,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
@@ -73,6 +75,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
+                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
@@ -120,12 +123,14 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , whens = []
                                   , implementation = [ AST.ConstructType "True" ]
                                   }
                                 , { name = "as-int"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         ]
@@ -178,36 +183,42 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
+                                  , whens = []
                                   , implementation = [ AST.ConstructType "Person" ]
                                   }
                                 , { name = ">age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                  , whens = []
                                   , implementation = [ AST.SetMember "Person" "age" ]
                                   }
                                 , { name = ">jobs"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                  , whens = []
                                   , implementation = [ AST.SetMember "Person" "jobs" ]
                                   }
                                 , { name = "age>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                  , whens = []
                                   , implementation = [ AST.GetMember "Person" "age" ]
                                   }
                                 , { name = "jobs>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                  , whens = []
                                   , implementation = [ AST.GetMember "Person" "jobs" ]
                                   }
                                 , { name = "get-age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.Word "age>"
                                         ]
@@ -249,6 +260,7 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Generic "a", Type.Generic "b" ]
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.Word "dup"
                                         , AST.Word "rotate"
@@ -263,7 +275,7 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , test "Parser understands union types" <|
+        , test "Parser understands union types and multifunctions" <|
             \_ ->
                 let
                     source =
@@ -282,6 +294,16 @@ suite =
                         -- False
                         , Metadata "deftype"
                         , Type "False"
+
+                        -- Multifn
+                        , Metadata "defmulti"
+                        , Symbol "to-int"
+                        , Metadata "when"
+                        , Type "True"
+                        , Token.Integer 1
+                        , Metadata "when"
+                        , Type "False"
+                        , Token.Integer 0
                         ]
 
                     expectedAst =
@@ -300,6 +322,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.ConstructType "True"
                                         ]
@@ -308,9 +331,18 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , whens = []
                                   , implementation =
                                         [ AST.ConstructType "False"
                                         ]
+                                  }
+                                , { name = "to-int"
+                                  , metadata = Metadata.default
+                                  , whens =
+                                        [ ( Type.Custom "False", [ AST.Integer 0 ] )
+                                        , ( Type.Custom "True", [ AST.Integer 1 ] )
+                                        ]
+                                  , implementation = []
                                   }
                                 ]
                         }
