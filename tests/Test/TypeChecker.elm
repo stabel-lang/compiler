@@ -24,29 +24,32 @@ suite =
                                 [ { name = "inc"
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Builtin Builtin.Plus
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Builtin Builtin.Plus
+                                            ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Builtin Builtin.Minus
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Builtin Builtin.Minus
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
                                   , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Word "inc"
-                                        , QAST.Word "inc"
-                                        , QAST.Word "dec"
-                                        , QAST.Integer 2
-                                        , QAST.Builtin Builtin.Equal
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Word "inc"
+                                            , QAST.Word "inc"
+                                            , QAST.Word "dec"
+                                            , QAST.Integer 2
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
                                   }
                                 ]
                         }
@@ -106,10 +109,11 @@ suite =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] []
                                   , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Integer 2
-                                        , QAST.Builtin Builtin.Equal
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Integer 2
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
                                   }
                                 ]
                         }
@@ -125,44 +129,38 @@ suite =
                 let
                     source =
                         { types =
-                            Dict.fromList
-                                [ ( "True"
-                                  , { name = "True"
-                                    , members = []
-                                    }
-                                  )
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "True" []
                                 ]
                         , words =
-                            Dict.fromList
-                                [ ( ">True"
-                                  , { name = ">True"
-                                    , metadata =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                    , implementation = [ QAST.ConstructType "True" ]
-                                    }
-                                  )
-                                , ( "as-int"
-                                  , { name = "as-int"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "True" ]
+                                  }
+                                , { name = "as-int"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Int ]
-                                    , implementation =
-                                        [ QAST.Integer 1
-                                        ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            ]
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
-                                        [ QAST.Word ">True"
-                                        , QAST.Word "as-int"
-                                        ]
-                                    }
-                                  )
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word ">True"
+                                            , QAST.Word "as-int"
+                                            ]
+                                  }
                                 ]
                         }
                 in
@@ -177,65 +175,59 @@ suite =
                 let
                     source =
                         { types =
-                            Dict.fromList
-                                [ ( "Person"
-                                  , { name = "Person"
-                                    , members = [ ( "age", Type.Int ) ]
-                                    }
-                                  )
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Person" [ ( "age", Type.Int ) ]
                                 ]
                         , words =
-                            Dict.fromList
-                                [ ( ">Person"
-                                  , { name = ">Person"
-                                    , metadata =
+                            Dict.fromListBy .name
+                                [ { name = ">Person"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Custom "Person" ]
-                                    , implementation = [ QAST.ConstructType "Person" ]
-                                    }
-                                  )
-                                , ( ">age"
-                                  , { name = ">age"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Person" ]
+                                  }
+                                , { name = ">age"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                    , implementation = [ QAST.SetMember "Person" "age" ]
-                                    }
-                                  )
-                                , ( "age>"
-                                  , { name = "age>"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.SetMember "Person" "age" ]
+                                  }
+                                , { name = "age>"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                    , implementation = [ QAST.GetMember "Person" "age" ]
-                                    }
-                                  )
-                                , ( "inc-age"
-                                  , { name = "inc-age"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.GetMember "Person" "age" ]
+                                  }
+                                , { name = "inc-age"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
-                                    , implementation =
-                                        [ QAST.Word "age>"
-                                        , QAST.Integer 1
-                                        , QAST.Builtin Builtin.Plus
-                                        , QAST.Word ">Person"
-                                        ]
-                                    }
-                                  )
-                                , ( "main"
-                                  , { name = "main"
-                                    , metadata =
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word "age>"
+                                            , QAST.Integer 1
+                                            , QAST.Builtin Builtin.Plus
+                                            , QAST.Word ">Person"
+                                            ]
+                                  }
+                                , { name = "main"
+                                  , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                    , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Word ">Person"
-                                        , QAST.Word "inc-age"
-                                        , QAST.Word "age>"
-                                        ]
-                                    }
-                                  )
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Word ">Person"
+                                            , QAST.Word "inc-age"
+                                            , QAST.Word "age>"
+                                            ]
+                                  }
                                 ]
                         }
                 in
@@ -257,14 +249,15 @@ suite =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
-                                        [ QAST.Integer 1
-                                        , QAST.Integer 2
-                                        , QAST.Word "over"
-                                        , QAST.Builtin Builtin.Plus
-                                        , QAST.Builtin Builtin.Minus
-                                        , QAST.Integer 2
-                                        , QAST.Builtin Builtin.Equal
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 1
+                                            , QAST.Integer 2
+                                            , QAST.Word "over"
+                                            , QAST.Builtin Builtin.Plus
+                                            , QAST.Builtin Builtin.Minus
+                                            , QAST.Integer 2
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
                                   }
                                 , { name = "over"
                                   , metadata =
@@ -276,10 +269,11 @@ suite =
                                                 [ Type.Generic "b_over", Type.Generic "c_over" ]
                                                 [ Type.Generic "b_over", Type.Generic "c_over", Type.Generic "b_over" ]
                                   , implementation =
-                                        [ QAST.Builtin Builtin.StackSwap
-                                        , QAST.Builtin Builtin.StackDuplicate
-                                        , QAST.Builtin Builtin.StackRightRotate
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin Builtin.StackSwap
+                                            , QAST.Builtin Builtin.StackDuplicate
+                                            , QAST.Builtin Builtin.StackRightRotate
+                                            ]
                                   }
                                 ]
                         }
@@ -302,18 +296,20 @@ suite =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
-                                        [ QAST.Integer 5
-                                        , QAST.Word "square"
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 5
+                                            , QAST.Word "square"
+                                            ]
                                   }
                                 , { name = "square"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
                                   , implementation =
-                                        [ QAST.Builtin Builtin.StackDuplicate
-                                        , QAST.Builtin Builtin.Multiply
-                                        ]
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin Builtin.StackDuplicate
+                                            , QAST.Builtin Builtin.Multiply
+                                            ]
                                   }
                                 ]
                         }

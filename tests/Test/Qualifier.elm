@@ -61,29 +61,32 @@ suite =
                                 [ { name = "inc"
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ Integer 1
-                                        , Builtin Builtin.Plus
-                                        ]
+                                        SoloImpl
+                                            [ Integer 1
+                                            , Builtin Builtin.Plus
+                                            ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ Integer 1
-                                        , Builtin Builtin.Minus
-                                        ]
+                                        SoloImpl
+                                            [ Integer 1
+                                            , Builtin Builtin.Minus
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
                                   , implementation =
-                                        [ Integer 1
-                                        , Word "inc"
-                                        , Word "inc"
-                                        , Word "dec"
-                                        , Integer 2
-                                        , Builtin Builtin.Equal
-                                        ]
+                                        SoloImpl
+                                            [ Integer 1
+                                            , Word "inc"
+                                            , Word "inc"
+                                            , Word "dec"
+                                            , Integer 2
+                                            , Builtin Builtin.Equal
+                                            ]
                                   }
                                 ]
                         }
@@ -131,10 +134,103 @@ suite =
                                                 , Type.Generic "a_over"
                                                 ]
                                   , implementation =
-                                        [ Builtin Builtin.StackSwap
-                                        , Builtin Builtin.StackDuplicate
-                                        , Builtin Builtin.StackRightRotate
+                                        SoloImpl
+                                            [ Builtin Builtin.StackSwap
+                                            , Builtin Builtin.StackDuplicate
+                                            , Builtin Builtin.StackRightRotate
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case qualify unqualifiedAst of
+                    Err () ->
+                        Expect.fail "Did not expect qualification to fail"
+
+                    Ok qualifiedAst ->
+                        Expect.equal expectedAst qualifiedAst
+        , test "Union types and multifunctions" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ AST.UnionTypeDef "Bool"
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , AST.CustomTypeDef "True" []
+                                , AST.CustomTypeDef "False" []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , whens = []
+                                  , implementation =
+                                        [ AST.ConstructType "True"
                                         ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , whens = []
+                                  , implementation =
+                                        [ AST.ConstructType "False"
+                                        ]
+                                  }
+                                , { name = "to-int"
+                                  , metadata = Metadata.default
+                                  , whens =
+                                        [ ( Type.Custom "False", [ AST.Integer 0 ] )
+                                        , ( Type.Custom "True", [ AST.Integer 1 ] )
+                                        ]
+                                  , implementation = []
+                                  }
+                                ]
+                        }
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef "Bool"
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef "True" []
+                                , CustomTypeDef "False" []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "False"
+                                            ]
+                                  }
+                                , { name = "to-int"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( Type.Custom "False", [ Integer 0 ] )
+                                            , ( Type.Custom "True", [ Integer 1 ] )
+                                            ]
+                                            []
                                   }
                                 ]
                         }

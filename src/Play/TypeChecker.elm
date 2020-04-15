@@ -1,6 +1,7 @@
 module Play.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
@@ -39,7 +40,7 @@ type AstNode
 
 
 type alias Context =
-    { types : Dict String Qualifier.TypeDefinition
+    { types : Dict String TypeDefinition
     , typedWords : Dict String WordDefinition
     , untypedWords : Dict String Qualifier.WordDefinition
     , stackEffects : List StackEffect
@@ -55,7 +56,22 @@ type StackEffect
 
 initContext : Qualifier.AST -> Context
 initContext ast =
-    { types = ast.types
+    let
+        concreteTypes =
+            ast.types
+                |> Dict.values
+                |> List.map
+                    (\t ->
+                        case t of
+                            Qualifier.CustomTypeDef name members ->
+                                { name = name, members = members }
+
+                            Qualifier.UnionTypeDef name _ ->
+                                { name = name, members = [] }
+                    )
+                |> Dict.fromListBy .name
+    in
+    { types = concreteTypes
     , typedWords = Dict.empty
     , untypedWords = ast.words
     , stackEffects = []
@@ -77,10 +93,24 @@ typeCheckHelper context ast =
                 |> .words
                 |> Dict.values
                 |> List.foldl typeCheckDefinition context
+
+        concreteTypes =
+            ast.types
+                |> Dict.values
+                |> List.map
+                    (\t ->
+                        case t of
+                            Qualifier.CustomTypeDef name members ->
+                                { name = name, members = members }
+
+                            Qualifier.UnionTypeDef name _ ->
+                                { name = name, members = [] }
+                    )
+                |> Dict.fromListBy .name
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
-            { types = ast.types
+            { types = concreteTypes
             , words = updatedContext.typedWords
             }
 
@@ -103,8 +133,16 @@ typeCheckDefinition untypedDef context =
 
         Nothing ->
             let
+                impl =
+                    case untypedDef.implementation of
+                        Qualifier.SoloImpl impl_ ->
+                            impl_
+
+                        Qualifier.MultiImpl _ impl_ ->
+                            impl_
+
                 contextWithStackEffects =
-                    List.foldl typeCheckNode cleanContext untypedDef.implementation
+                    List.foldl typeCheckNode cleanContext impl
 
                 ( contextAfterWordTypeInduction, wordType ) =
                     wordTypeFromStackEffects contextWithStackEffects
@@ -117,7 +155,7 @@ typeCheckDefinition untypedDef context =
                                 { name = untypedDef.name
                                 , type_ = wordType
                                 , metadata = untypedDef.metadata
-                                , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) untypedDef.implementation
+                                , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) impl
                                 }
                                 contextAfterWordTypeInduction.typedWords
                         , boundGenerics = Dict.empty

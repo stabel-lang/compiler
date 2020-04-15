@@ -14,17 +14,21 @@ type alias AST =
     }
 
 
-type alias TypeDefinition =
-    { name : String
-    , members : List ( String, Type )
-    }
+type TypeDefinition
+    = CustomTypeDef String (List ( String, Type ))
+    | UnionTypeDef String (List Type)
 
 
 type alias WordDefinition =
     { name : String
     , metadata : Metadata
-    , implementation : List Node
+    , implementation : WordImplementation
     }
+
+
+type WordImplementation
+    = SoloImpl (List Node)
+    | MultiImpl (List ( Type, List Node )) (List Node)
 
 
 type Node
@@ -86,10 +90,10 @@ qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
         Parser.CustomTypeDef name members ->
-            Dict.insert name { name = name, members = members } acc
+            Dict.insert name (CustomTypeDef name members) acc
 
-        _ ->
-            acc
+        Parser.UnionTypeDef name memberTypes ->
+            Dict.insert name (UnionTypeDef name memberTypes) acc
     )
 
 
@@ -100,26 +104,52 @@ qualifyDefinition :
     -> ( List (), Dict String WordDefinition )
 qualifyDefinition ast unqualifiedWord ( errors, acc ) =
     let
+        qualifiedWhensResult =
+            unqualifiedWord.whens
+                |> List.map (qualifyWhen ast)
+                |> Result.combine
+
         qualifiedImplementationResult =
             unqualifiedWord.implementation
                 |> List.map (qualifyNode ast)
                 |> Result.combine
     in
-    case qualifiedImplementationResult of
-        Err () ->
-            ( () :: errors
-            , acc
-            )
-
-        Ok qualifiedImplementation ->
+    case ( qualifiedWhensResult, qualifiedImplementationResult ) of
+        ( Ok qualifiedWhens, Ok qualifiedImplementation ) ->
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
                 , metadata = qualifyMetadata unqualifiedWord.name unqualifiedWord.metadata
-                , implementation = qualifiedImplementation
+                , implementation =
+                    if List.isEmpty qualifiedWhens then
+                        SoloImpl qualifiedImplementation
+
+                    else
+                        MultiImpl qualifiedWhens qualifiedImplementation
                 }
                 acc
             )
+
+        _ ->
+            ( () :: errors
+            , acc
+            )
+
+
+qualifyWhen : Parser.AST -> ( Type, List Parser.AstNode ) -> Result () ( Type, List Node )
+qualifyWhen ast ( type_, impl ) =
+    let
+        qualifiedImplementationResult =
+            impl
+                |> List.map (qualifyNode ast)
+                |> Result.combine
+    in
+    case qualifiedImplementationResult of
+        Err () ->
+            Err ()
+
+        Ok qualifiedImplementation ->
+            Ok ( type_, qualifiedImplementation )
 
 
 qualifyNode : Parser.AST -> Parser.AstNode -> Result () Node
@@ -169,3 +199,13 @@ qualifyMetadataType baseName type_ =
 
         _ ->
             type_
+
+
+typeDefinitionName : TypeDefinition -> String
+typeDefinitionName typeDef =
+    case typeDef of
+        CustomTypeDef name _ ->
+            name
+
+        UnionTypeDef name _ ->
+            name
