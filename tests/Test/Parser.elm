@@ -55,7 +55,6 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
@@ -65,7 +64,6 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
@@ -75,7 +73,6 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
@@ -114,8 +111,10 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ CustomTypeDef "True" []
+                            Dict.fromListBy .name
+                                [ { name = "True"
+                                  , members = []
+                                  }
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -123,14 +122,12 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , whens = []
                                   , implementation = [ AST.ConstructType "True" ]
                                   }
                                 , { name = "as-int"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         ]
@@ -171,11 +168,13 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ CustomTypeDef "Person"
-                                    [ ( "age", Type.Int )
-                                    , ( "jobs", Type.Int )
-                                    ]
+                            Dict.fromListBy .name
+                                [ { name = "Person"
+                                  , members =
+                                        [ ( "age", Type.Int )
+                                        , ( "jobs", Type.Int )
+                                        ]
+                                  }
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -183,42 +182,36 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
                                   , implementation = [ AST.ConstructType "Person" ]
                                   }
                                 , { name = ">age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
                                   , implementation = [ AST.SetMember "Person" "age" ]
                                   }
                                 , { name = ">jobs"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
                                   , implementation = [ AST.SetMember "Person" "jobs" ]
                                   }
                                 , { name = "age>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation = [ AST.GetMember "Person" "age" ]
                                   }
                                 , { name = "jobs>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation = [ AST.GetMember "Person" "jobs" ]
                                   }
                                 , { name = "get-age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
                                         [ AST.Word "age>"
                                         ]
@@ -260,89 +253,10 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Generic "a", Type.Generic "b" ]
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
-                                  , whens = []
                                   , implementation =
                                         [ AST.Word "dup"
                                         , AST.Word "rotate"
                                         ]
-                                  }
-                                ]
-                        }
-                in
-                case parse source of
-                    Err () ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
-        , test "Parser understands union types and multifunctions" <|
-            \_ ->
-                let
-                    source =
-                        [ Metadata "defunion"
-                        , Type "Bool"
-                        , Metadata ""
-                        , ListStart
-                        , Type "True"
-                        , Type "False"
-                        , ListEnd
-
-                        -- True
-                        , Metadata "deftype"
-                        , Type "True"
-
-                        -- False
-                        , Metadata "deftype"
-                        , Type "False"
-
-                        -- Multifn
-                        , Metadata "defmulti"
-                        , Symbol "to-int"
-                        , Metadata "when"
-                        , Type "True"
-                        , Token.Integer 1
-                        , Metadata "when"
-                        , Type "False"
-                        , Token.Integer 0
-                        ]
-
-                    expectedAst =
-                        { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" []
-                                , CustomTypeDef "False" []
-                                ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , whens = []
-                                  , implementation =
-                                        [ AST.ConstructType "True"
-                                        ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , whens = []
-                                  , implementation =
-                                        [ AST.ConstructType "False"
-                                        ]
-                                  }
-                                , { name = "to-int"
-                                  , metadata = Metadata.default
-                                  , whens =
-                                        [ ( Type.Custom "False", [ AST.Integer 0 ] )
-                                        , ( Type.Custom "True", [ AST.Integer 1 ] )
-                                        ]
-                                  , implementation = []
                                   }
                                 ]
                         }

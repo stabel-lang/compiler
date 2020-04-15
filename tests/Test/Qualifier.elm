@@ -23,7 +23,6 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "+"
@@ -31,7 +30,6 @@ suite =
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "-"
@@ -41,7 +39,6 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
                                         [ AST.Integer 1
                                         , AST.Word "inc"
@@ -107,7 +104,6 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Generic "a", Type.Generic "b" ]
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
-                                  , whens = []
                                   , implementation =
                                         [ AST.Word "swap"
                                         , AST.Word "dup"
