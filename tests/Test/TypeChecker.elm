@@ -62,17 +62,19 @@ suite =
                                   , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ IntLiteral 1
-                                        , Builtin Builtin.Plus
-                                        ]
+                                        SoloImpl
+                                            [ IntLiteral 1
+                                            , Builtin Builtin.Plus
+                                            ]
                                   }
                                 , { name = "dec"
                                   , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
                                   , metadata = Metadata.default
                                   , implementation =
-                                        [ IntLiteral 1
-                                        , Builtin Builtin.Minus
-                                        ]
+                                        SoloImpl
+                                            [ IntLiteral 1
+                                            , Builtin Builtin.Minus
+                                            ]
                                   }
                                 , { name = "main"
                                   , type_ = { input = [], output = [ Type.Int ] }
@@ -80,13 +82,14 @@ suite =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
                                   , implementation =
-                                        [ IntLiteral 1
-                                        , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                        , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                        , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
-                                        , IntLiteral 2
-                                        , Builtin Builtin.Equal
-                                        ]
+                                        SoloImpl
+                                            [ IntLiteral 1
+                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , IntLiteral 2
+                                            , Builtin Builtin.Equal
+                                            ]
                                   }
                                 ]
                         }

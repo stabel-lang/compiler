@@ -16,18 +16,22 @@ type alias AST =
     }
 
 
-type alias TypeDefinition =
-    { name : String
-    , members : List ( String, Type )
-    }
+type TypeDefinition
+    = CustomTypeDef String (List ( String, Type ))
+    | UnionTypeDef String (List Type)
 
 
 type alias WordDefinition =
     { name : String
     , type_ : WordType
     , metadata : Metadata
-    , implementation : List AstNode
+    , implementation : WordImplementation
     }
+
+
+type WordImplementation
+    = SoloImpl (List AstNode)
+    | MultiImpl (List ( Type, List AstNode )) (List AstNode)
 
 
 type AstNode
@@ -64,12 +68,12 @@ initContext ast =
                     (\t ->
                         case t of
                             Qualifier.CustomTypeDef name members ->
-                                { name = name, members = members }
+                                CustomTypeDef name members
 
-                            Qualifier.UnionTypeDef name _ ->
-                                { name = name, members = [] }
+                            Qualifier.UnionTypeDef name memberTypes ->
+                                UnionTypeDef name memberTypes
                     )
-                |> Dict.fromListBy .name
+                |> Dict.fromListBy typeDefName
     in
     { types = concreteTypes
     , typedWords = Dict.empty
@@ -101,12 +105,12 @@ typeCheckHelper context ast =
                     (\t ->
                         case t of
                             Qualifier.CustomTypeDef name members ->
-                                { name = name, members = members }
+                                CustomTypeDef name members
 
-                            Qualifier.UnionTypeDef name _ ->
-                                { name = name, members = [] }
+                            Qualifier.UnionTypeDef name memberTypes ->
+                                UnionTypeDef name memberTypes
                     )
-                |> Dict.fromListBy .name
+                |> Dict.fromListBy typeDefName
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
@@ -155,7 +159,7 @@ typeCheckDefinition untypedDef context =
                                 { name = untypedDef.name
                                 , type_ = wordType
                                 , metadata = untypedDef.metadata
-                                , implementation = List.map (untypedToTypedNode contextAfterWordTypeInduction) impl
+                                , implementation = SoloImpl (List.map (untypedToTypedNode contextAfterWordTypeInduction) impl)
                                 }
                                 contextAfterWordTypeInduction.typedWords
                         , boundGenerics = Dict.empty
@@ -215,14 +219,14 @@ typeCheckNode node context =
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
-                Just type_ ->
+                Just (CustomTypeDef _ members) ->
                     addStackEffect context <|
                         wordTypeToStackEffects
-                            { input = List.map Tuple.second type_.members
+                            { input = List.map Tuple.second members
                             , output = [ Type.Custom typeName ]
                             }
 
-                Nothing ->
+                _ ->
                     Debug.todo "inconcievable!"
 
         Qualifier.SetMember typeName memberName ->
@@ -520,7 +524,20 @@ untypedToTypedNode context untypedNode =
 
 getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
 getMemberType typeDict typeName memberName =
-    Dict.get typeName typeDict
-        |> Maybe.map .members
-        |> Maybe.andThen (List.find (\( name, _ ) -> name == memberName))
-        |> Maybe.map Tuple.second
+    case Dict.get typeName typeDict of
+        Just (CustomTypeDef _ members) ->
+            List.find (\( name, _ ) -> name == memberName) members
+                |> Maybe.map Tuple.second
+
+        _ ->
+            Nothing
+
+
+typeDefName : TypeDefinition -> String
+typeDefName typeDef =
+    case typeDef of
+        CustomTypeDef name _ ->
+            name
+
+        UnionTypeDef name _ ->
+            name
