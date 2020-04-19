@@ -323,4 +323,76 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Unions and multifunctions" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.UnionTypeDef "Bool"
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , QAST.CustomTypeDef "True" []
+                                , QAST.CustomTypeDef "False" []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "False"
+                                            ]
+                                  }
+                                , { name = "to-int"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        QAST.MultiImpl
+                                            [ ( Type.Custom "False"
+                                              , [ QAST.Builtin Builtin.StackDrop
+                                                , QAST.Integer 0
+                                                ]
+                                              )
+                                            , ( Type.Custom "True"
+                                              , [ QAST.Builtin Builtin.StackDrop
+                                                , QAST.Integer 1
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word ">True"
+                                            , QAST.Word "to-int"
+                                            , QAST.Word ">False"
+                                            , QAST.Word "to-int"
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
         ]
