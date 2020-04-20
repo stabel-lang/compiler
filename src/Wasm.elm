@@ -66,6 +66,7 @@ type Instruction
     | Loop (List Instruction)
     | Break Int
     | BreakIf Int
+    | Return
     | Call String
     | Local_Get Int
     | Local_Set Int
@@ -76,6 +77,7 @@ type Instruction
     | I32_Mul
     | I32_Div
     | I32_Eq
+    | I32_NotEq
     | I32_EqZero
     | I32_Store
     | I32_Load
@@ -115,6 +117,9 @@ instructionToString ((Module module_) as fullModule) ins =
         BreakIf num ->
             "(br_if " ++ String.fromInt num ++ ")"
 
+        Return ->
+            "return"
+
         Call word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
@@ -149,6 +154,9 @@ instructionToString ((Module module_) as fullModule) ins =
 
         I32_Eq ->
             "i32.eq"
+
+        I32_NotEq ->
+            "i32.ne"
 
         I32_EqZero ->
             "i32.eqz"

@@ -3,7 +3,7 @@ module Play.Codegen exposing (..)
 import Dict exposing (Dict)
 import List.Extra as List
 import Play.Data.Builtin as Builtin
-import Play.Data.Type exposing (Type)
+import Play.Data.Type as Type exposing (Type)
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
 
@@ -432,45 +432,68 @@ typeMeta types =
 
 toWasmFuncDef : Dict String TypeInformation -> AST.WordDefinition -> Wasm.FunctionDef
 toWasmFuncDef typeInfo def =
-    case def.implementation of
-        AST.MultiImpl whens defaultImpl ->
-            -- TODO
-            let
-                wasmImplementation =
-                    List.map (nodeToInstruction typeInfo) defaultImpl
+    let
+        wasmImplementation =
+            case def.implementation of
+                AST.MultiImpl whens defaultImpl ->
+                    [ multiFnToInstructions typeInfo whens ]
 
-                numberOfLocals =
-                    List.filterMap Wasm.maximumLocalIndex wasmImplementation
-                        |> List.maximum
-                        |> Maybe.map ((+) 1)
-                        |> Maybe.withDefault 0
-            in
-            { name = def.name
-            , exported = def.metadata.isEntryPoint
-            , args = []
-            , results = []
-            , locals = List.repeat numberOfLocals Wasm.Int32
-            , instructions = wasmImplementation
-            }
-
-        AST.SoloImpl impl ->
-            let
-                wasmImplementation =
+                AST.SoloImpl impl ->
                     List.map (nodeToInstruction typeInfo) impl
 
-                numberOfLocals =
-                    List.filterMap Wasm.maximumLocalIndex wasmImplementation
-                        |> List.maximum
-                        |> Maybe.map ((+) 1)
-                        |> Maybe.withDefault 0
+        numberOfLocals =
+            List.filterMap Wasm.maximumLocalIndex wasmImplementation
+                |> List.maximum
+                |> Maybe.map ((+) 1)
+                |> Maybe.withDefault 0
+    in
+    { name = def.name
+    , exported = def.metadata.isEntryPoint
+    , args = []
+    , results = []
+    , locals = List.repeat numberOfLocals Wasm.Int32
+    , instructions = wasmImplementation
+    }
+
+
+multiFnToInstructions : Dict String TypeInformation -> List ( Type, List AST.AstNode ) -> Wasm.Instruction
+multiFnToInstructions typeInfo whens =
+    let
+        branches =
+            List.foldl buildBranch (Wasm.Batch []) whens
+
+        buildBranch ( type_, nodes ) ins =
+            let
+                typeId =
+                    case type_ of
+                        Type.Custom name ->
+                            Dict.get name typeInfo
+                                |> Maybe.map .id
+                                |> Maybe.withDefault 0
+
+                        _ ->
+                            -- TODO: What if we get an Int here?
+                            0
             in
-            { name = def.name
-            , exported = def.metadata.isEntryPoint
-            , args = []
-            , results = []
-            , locals = List.repeat numberOfLocals Wasm.Int32
-            , instructions = wasmImplementation
-            }
+            Wasm.Block
+                [ ins
+                , Wasm.Local_Get 0
+                , Wasm.I32_Const typeId
+                , Wasm.I32_NotEq
+                , Wasm.BreakIf 0 -- Move to next branch unless theres a type match
+                , Wasm.Batch (List.map (nodeToInstruction typeInfo) nodes)
+                , Wasm.Return
+                ]
+    in
+    Wasm.Batch
+        [ Wasm.Call stackPopFn -- TODO: This only works for arity 0 words.
+        , Wasm.Local_Tee 0
+        , Wasm.Local_Get 0
+        , Wasm.Call stackPushFn -- TODO: should probably have a way of _just_ reading values from stack
+        , Wasm.I32_Load
+        , Wasm.Local_Set 0 -- store instance id in local
+        , branches
+        ]
 
 
 nodeToInstruction : Dict String TypeInformation -> AST.AstNode -> Wasm.Instruction
