@@ -407,12 +407,24 @@ codegen ast =
 typeMeta : List AST.TypeDefinition -> Dict String TypeInformation
 typeMeta types =
     types
+        |> List.filterMap
+            (\typeDef ->
+                case typeDef of
+                    AST.CustomTypeDef name members ->
+                        Just
+                            ( name
+                            , { id = 0
+                              , members = members
+                              }
+                            )
+
+                    _ ->
+                        Nothing
+            )
         |> List.indexedMap
-            (\idx typeDef ->
-                ( typeDef.name
-                , { id = idx
-                  , members = typeDef.members
-                  }
+            (\idx ( name, def ) ->
+                ( name
+                , { def | id = idx }
                 )
             )
         |> Dict.fromList
@@ -420,23 +432,45 @@ typeMeta types =
 
 toWasmFuncDef : Dict String TypeInformation -> AST.WordDefinition -> Wasm.FunctionDef
 toWasmFuncDef typeInfo def =
-    let
-        wasmImplementation =
-            List.map (nodeToInstruction typeInfo) def.implementation
+    case def.implementation of
+        AST.MultiImpl whens defaultImpl ->
+            -- TODO
+            let
+                wasmImplementation =
+                    List.map (nodeToInstruction typeInfo) defaultImpl
 
-        numberOfLocals =
-            List.filterMap Wasm.maximumLocalIndex wasmImplementation
-                |> List.maximum
-                |> Maybe.map ((+) 1)
-                |> Maybe.withDefault 0
-    in
-    { name = def.name
-    , exported = def.metadata.isEntryPoint
-    , args = []
-    , results = []
-    , locals = List.repeat numberOfLocals Wasm.Int32
-    , instructions = wasmImplementation
-    }
+                numberOfLocals =
+                    List.filterMap Wasm.maximumLocalIndex wasmImplementation
+                        |> List.maximum
+                        |> Maybe.map ((+) 1)
+                        |> Maybe.withDefault 0
+            in
+            { name = def.name
+            , exported = def.metadata.isEntryPoint
+            , args = []
+            , results = []
+            , locals = List.repeat numberOfLocals Wasm.Int32
+            , instructions = wasmImplementation
+            }
+
+        AST.SoloImpl impl ->
+            let
+                wasmImplementation =
+                    List.map (nodeToInstruction typeInfo) impl
+
+                numberOfLocals =
+                    List.filterMap Wasm.maximumLocalIndex wasmImplementation
+                        |> List.maximum
+                        |> Maybe.map ((+) 1)
+                        |> Maybe.withDefault 0
+            in
+            { name = def.name
+            , exported = def.metadata.isEntryPoint
+            , args = []
+            , results = []
+            , locals = List.repeat numberOfLocals Wasm.Int32
+            , instructions = wasmImplementation
+            }
 
 
 nodeToInstruction : Dict String TypeInformation -> AST.AstNode -> Wasm.Instruction
