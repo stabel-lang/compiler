@@ -16,11 +16,11 @@ test('Multifns', async () => {
 
         def: main
         entry: true
-        : >True to-int >False to-int 0 =
+        : >True to-int >False to-int =
     `);
 
     const result = await compiler.run(wat, 'main');
 
-    expect(result.stackElement()).toBe(1);
+    expect(result.stackElement()).toBe(0);
 });
 
