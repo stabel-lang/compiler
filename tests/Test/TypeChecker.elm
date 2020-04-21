@@ -323,76 +323,142 @@ suite =
 
                     Ok _ ->
                         Expect.pass
-        , test "Unions and multifunctions" <|
-            \_ ->
-                let
-                    input =
-                        { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "Bool"
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , QAST.CustomTypeDef "True" []
-                                , QAST.CustomTypeDef "False" []
+        , describe "Unions and multifunctions" <|
+            let
+                template multiFn =
+                    { types =
+                        Dict.fromListBy QAST.typeDefinitionName
+                            [ QAST.UnionTypeDef "Bool"
+                                [ Type.Custom "True"
+                                , Type.Custom "False"
                                 ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "True"
+                            , QAST.CustomTypeDef "True" []
+                            , QAST.CustomTypeDef "False" []
+                            ]
+                    , words =
+                        Dict.fromListBy .name
+                            [ { name = ">True"
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType [] [ Type.Custom "True" ]
+                              , implementation =
+                                    QAST.SoloImpl
+                                        [ QAST.ConstructType "True"
+                                        ]
+                              }
+                            , { name = ">False"
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType [] [ Type.Custom "False" ]
+                              , implementation =
+                                    QAST.SoloImpl
+                                        [ QAST.ConstructType "False"
+                                        ]
+                              }
+                            , multiFn
+                            , { name = "main"
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.asEntryPoint
+                              , implementation =
+                                    QAST.SoloImpl
+                                        [ QAST.Word ">True"
+                                        , QAST.Word "to-int"
+                                        , QAST.Word ">False"
+                                        , QAST.Word "to-int"
+                                        , QAST.Builtin Builtin.Equal
+                                        ]
+                              }
+                            ]
+                    }
+            in
+            [ test "Simplest case" <|
+                \_ ->
+                    let
+                        input =
+                            template
+                                { name = "to-int"
+                                , metadata = Metadata.default
+                                , implementation =
+                                    QAST.MultiImpl
+                                        [ ( Type.Custom "False"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 0
                                             ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "False"
+                                          )
+                                        , ( Type.Custom "True"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 1
                                             ]
-                                  }
-                                , { name = "to-int"
-                                  , metadata = Metadata.default
-                                  , implementation =
-                                        QAST.MultiImpl
-                                            [ ( Type.Custom "False"
-                                              , [ QAST.Builtin Builtin.StackDrop
-                                                , QAST.Integer 0
-                                                ]
-                                              )
-                                            , ( Type.Custom "True"
-                                              , [ QAST.Builtin Builtin.StackDrop
-                                                , QAST.Integer 1
-                                                ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Word ">True"
-                                            , QAST.Word "to-int"
-                                            , QAST.Word ">False"
-                                            , QAST.Word "to-int"
-                                            , QAST.Builtin Builtin.Equal
-                                            ]
-                                  }
-                                ]
-                        }
-                in
-                case typeCheck input of
-                    Err () ->
-                        Expect.fail "Did not expect type check to fail."
+                                          )
+                                        ]
+                                        []
+                                }
+                    in
+                    case typeCheck input of
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
 
-                    Ok _ ->
-                        Expect.pass
+                        Ok _ ->
+                            Expect.pass
+            , test "With type signature" <|
+                \_ ->
+                    let
+                        input =
+                            template
+                                { name = "to-int"
+                                , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                , implementation =
+                                    QAST.MultiImpl
+                                        [ ( Type.Custom "False"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 0
+                                            ]
+                                          )
+                                        , ( Type.Custom "True"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 1
+                                            ]
+                                          )
+                                        ]
+                                        []
+                                }
+                    in
+                    case typeCheck input of
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
+
+                        Ok _ ->
+                            Expect.pass
+            , test "With default branch" <|
+                \_ ->
+                    let
+                        input =
+                            template
+                                { name = "to-int"
+                                , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                , implementation =
+                                    QAST.MultiImpl
+                                        [ ( Type.Custom "False"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 0
+                                            ]
+                                          )
+                                        ]
+                                        [ QAST.Builtin Builtin.StackDrop
+                                        , QAST.Integer 1
+                                        ]
+                                }
+                    in
+                    case typeCheck input of
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
+
+                        Ok _ ->
+                            Expect.pass
+            ]
         ]
