@@ -273,7 +273,7 @@ verifyTypeSignature inferredType untypedDef context =
                 ( _, simplifiedAnnotatedType ) =
                     simplifyWordType untypedDef.name ( context, annotatedType )
             in
-            if not <| compatibleWordTypes simplifiedAnnotatedType inferredType then
+            if not <| compatibleWordTypes simplifiedAnnotatedType inferredType context then
                 { context | errors = () :: context.errors }
 
             else
@@ -283,29 +283,71 @@ verifyTypeSignature inferredType untypedDef context =
             context
 
 
-compatibleWordTypes : WordType -> WordType -> Bool
-compatibleWordTypes a b =
+compatibleWordTypes : WordType -> WordType -> Context -> Bool
+compatibleWordTypes a b context =
     let
         aTypes =
-            a.input ++ a.output
+            a.input
+                ++ a.output
+                |> List.map resolveUnion
 
         bTypes =
-            b.input ++ b.output
+            b.input
+                ++ b.output
+                |> List.map resolveUnion
+
+        resolveUnion type_ =
+            case type_ of
+                Type.Custom typeName ->
+                    case Dict.get typeName context.types of
+                        Just (UnionTypeDef _ members) ->
+                            Type.Union members
+
+                        _ ->
+                            type_
+
+                _ ->
+                    type_
 
         compareType lhs rhs =
-            if lhs == rhs then
-                True
+            case ( lhs, rhs ) of
+                ( Type.Generic _, _ ) ->
+                    True
 
-            else
-                case ( lhs, rhs ) of
-                    ( Type.Generic _, _ ) ->
-                        True
+                ( _, Type.Generic _ ) ->
+                    True
 
-                    ( _, Type.Generic _ ) ->
-                        True
+                ( Type.Union lMembers, Type.Union rMembers ) ->
+                    Set.fromList (List.map typeAsStr lMembers) == Set.fromList (List.map typeAsStr rMembers)
 
-                    _ ->
-                        False
+                ( Type.Union lMembers, _ ) ->
+                    lMembers
+                        |> List.map typeAsStr
+                        |> Set.fromList
+                        |> Set.member (typeAsStr rhs)
+
+                ( _, Type.Union rMembers ) ->
+                    rMembers
+                        |> List.map typeAsStr
+                        |> Set.fromList
+                        |> Set.member (typeAsStr lhs)
+
+                _ ->
+                    lhs == rhs
+
+        typeAsStr t =
+            case t of
+                Type.Custom name ->
+                    name ++ "_Custom"
+
+                Type.Int ->
+                    "Int"
+
+                Type.Union _ ->
+                    "Union"
+
+                Type.Generic name ->
+                    name ++ "_Generic"
     in
     if List.length a.input /= List.length b.input || List.length a.output /= List.length b.output then
         False
