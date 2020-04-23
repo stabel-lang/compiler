@@ -77,3 +77,28 @@ test('Multiple arguments', async () => {
     expect(result.stackElement()).toBe(20);
 });
 
+test('Primitive types', async () => {
+    const wat = await compiler.toWat(`
+        defunion: Money
+        : { Int Cents }
+
+        deftype: Cents
+        : { value: Int }
+
+        defmulti: add-dollar
+        when: Int
+            +
+        when: Cents
+            100 * swap value> + >Cents
+
+        def: main
+        entry: true
+        : 100 >Cents
+          1 add-dollar
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(20);
+});
+
