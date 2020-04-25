@@ -156,11 +156,24 @@ typeCheckDefinition untypedDef context =
                     verifyTypeSignature inferredType untypedDef finalContext
                         |> cleanContext
 
-                Qualifier.MultiImpl whens impl ->
+                Qualifier.MultiImpl initialWhens defaultImpl ->
                     let
-                        -- TODO: make sure default impl is typechecked as well
-                        ( _, _ ) =
-                            typeCheckImplementation untypedDef impl (cleanContext context)
+                        whens =
+                            case defaultImpl of
+                                [] ->
+                                    initialWhens
+
+                                _ ->
+                                    let
+                                        ( inferredDefaultType, _ ) =
+                                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                                    in
+                                    case inferredDefaultType.input of
+                                        [] ->
+                                            Debug.todo "Default impl doesn't have an input argument"
+
+                                        firstType :: _ ->
+                                            ( firstType, defaultImpl ) :: initialWhens
 
                         inferWhenTypes ( _, im ) ( infs, ctx ) =
                             let
@@ -234,12 +247,21 @@ typeCheckDefinition untypedDef context =
                                 | typedWords =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
-                                        , type_ = inferredType
+                                        , type_ =
+                                            case untypedDef.metadata.type_ of
+                                                Just annotatedType ->
+                                                    { annotatedType
+                                                        | input = List.map (resolveUnion newContext) annotatedType.input
+                                                        , output = List.map (resolveUnion newContext) annotatedType.output
+                                                    }
+
+                                                Nothing ->
+                                                    inferredType
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
                                                 (List.map (Tuple.mapSecond (List.map (untypedToTypedNode newContext))) whens)
-                                                (List.map (untypedToTypedNode newContext) impl)
+                                                (List.map (untypedToTypedNode newContext) defaultImpl)
                                         }
                                         newContext.typedWords
                                 , errors =
@@ -252,6 +274,21 @@ typeCheckDefinition untypedDef context =
                     in
                     verifyTypeSignature inferredType untypedDef finalContext
                         |> cleanContext
+
+
+resolveUnion : Context -> Type -> Type
+resolveUnion context type_ =
+    case type_ of
+        Type.Custom typeName ->
+            case Dict.get typeName context.types of
+                Just (UnionTypeDef _ members) ->
+                    Type.Union members
+
+                _ ->
+                    type_
+
+        _ ->
+            type_
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -284,30 +321,17 @@ verifyTypeSignature inferredType untypedDef context =
 
 
 compatibleWordTypes : WordType -> WordType -> Context -> Bool
-compatibleWordTypes a b context =
+compatibleWordTypes annotated inferred context =
     let
-        aTypes =
-            a.input
-                ++ a.output
-                |> List.map resolveUnion
+        annotatedTypes =
+            annotated.input
+                ++ annotated.output
+                |> List.map (resolveUnion context)
 
-        bTypes =
-            b.input
-                ++ b.output
-                |> List.map resolveUnion
-
-        resolveUnion type_ =
-            case type_ of
-                Type.Custom typeName ->
-                    case Dict.get typeName context.types of
-                        Just (UnionTypeDef _ members) ->
-                            Type.Union members
-
-                        _ ->
-                            type_
-
-                _ ->
-                    type_
+        inferredTypes =
+            inferred.input
+                ++ inferred.output
+                |> List.map (resolveUnion context)
 
         compareType lhs rhs =
             case ( lhs, rhs ) of
@@ -318,7 +342,27 @@ compatibleWordTypes a b context =
                     True
 
                 ( Type.Union lMembers, Type.Union rMembers ) ->
-                    Set.fromList (List.map typeAsStr lMembers) == Set.fromList (List.map typeAsStr rMembers)
+                    let
+                        lSet =
+                            Set.fromList (List.map typeAsStr lMembers)
+
+                        rSet =
+                            Set.fromList (List.map typeAsStr rMembers)
+
+                        diff =
+                            Set.diff rSet lSet
+                                |> Set.toList
+                    in
+                    case diff of
+                        [] ->
+                            True
+
+                        [ oneDiff ] ->
+                            -- Likely the default case
+                            String.endsWith "_Generic" oneDiff
+
+                        _ ->
+                            False
 
                 ( Type.Union lMembers, _ ) ->
                     lMembers
@@ -349,11 +393,14 @@ compatibleWordTypes a b context =
                 Type.Generic name ->
                     name ++ "_Generic"
     in
-    if List.length a.input /= List.length b.input || List.length a.output /= List.length b.output then
+    if
+        (List.length annotated.input /= List.length inferred.input)
+            || (List.length annotated.output /= List.length inferred.output)
+    then
         False
 
     else
-        List.map2 compareType aTypes bTypes
+        List.map2 compareType annotatedTypes inferredTypes
             |> List.all identity
 
 
