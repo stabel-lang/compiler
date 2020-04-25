@@ -549,19 +549,33 @@ compatibleTypes context typeA typeB =
                 ( context, True )
 
             else
-                let
-                    stillCompatible =
-                        case ( boundA, boundB ) of
-                            ( Type.Union unionTypes, _ ) ->
-                                List.member boundB unionTypes
+                case ( boundA, boundB ) of
+                    ( Type.Union unionTypes, _ ) ->
+                        ( context, List.member boundB unionTypes )
 
-                            ( _, Type.Union unionTypes ) ->
-                                List.member boundA unionTypes
+                    ( _, Type.Union unionTypes ) ->
+                        if List.member boundA unionTypes then
+                            ( context, True )
 
-                            _ ->
-                                False
-                in
-                ( context, stillCompatible )
+                        else
+                            let
+                                isGeneric t =
+                                    case t of
+                                        Type.Generic _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                            in
+                            case List.find isGeneric unionTypes of
+                                Just generic ->
+                                    compatibleTypes context typeA generic
+
+                                Nothing ->
+                                    ( context, False )
+
+                    _ ->
+                        ( context, False )
 
 
 getGenericBinding : Context -> Type -> Maybe Type

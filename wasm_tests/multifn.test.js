@@ -40,7 +40,9 @@ test('Default branch', async () => {
 
         def: main
         entry: true
-        : >True to-int >False to-int -
+        : >True to-int 
+          >False to-int 
+          -
     `);
 
     const result = await compiler.run(wat, 'main');

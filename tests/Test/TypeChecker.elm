@@ -460,5 +460,31 @@ suite =
 
                         Ok _ ->
                             Expect.pass
+            , test "With default branch (no type meta)" <|
+                \_ ->
+                    let
+                        input =
+                            template
+                                { name = "to-int"
+                                , metadata = Metadata.default
+                                , implementation =
+                                    QAST.MultiImpl
+                                        [ ( Type.Custom "False"
+                                          , [ QAST.Builtin Builtin.StackDrop
+                                            , QAST.Integer 0
+                                            ]
+                                          )
+                                        ]
+                                        [ QAST.Builtin Builtin.StackDrop
+                                        , QAST.Integer 1
+                                        ]
+                                }
+                    in
+                    case typeCheck input of
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
+
+                        Ok _ ->
+                            Expect.pass
             ]
         ]

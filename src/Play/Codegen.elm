@@ -436,7 +436,7 @@ toWasmFuncDef typeInfo def =
         wasmImplementation =
             case def.implementation of
                 AST.MultiImpl whens defaultImpl ->
-                    [ multiFnToInstructions typeInfo whens ]
+                    [ multiFnToInstructions typeInfo whens defaultImpl ]
 
                 AST.SoloImpl impl ->
                     List.map (nodeToInstruction typeInfo) impl
@@ -456,8 +456,8 @@ toWasmFuncDef typeInfo def =
     }
 
 
-multiFnToInstructions : Dict String TypeInformation -> List ( Type, List AST.AstNode ) -> Wasm.Instruction
-multiFnToInstructions typeInfo whens =
+multiFnToInstructions : Dict String TypeInformation -> List ( Type, List AST.AstNode ) -> List AST.AstNode -> Wasm.Instruction
+multiFnToInstructions typeInfo whens defaultImpl =
     let
         branches =
             List.foldl buildBranch (Wasm.Batch []) whens
@@ -493,6 +493,7 @@ multiFnToInstructions typeInfo whens =
         , Wasm.I32_Load
         , Wasm.Local_Set 0 -- store instance id in local
         , branches
+        , Wasm.Batch (List.map (nodeToInstruction typeInfo) defaultImpl)
         ]
 
 
