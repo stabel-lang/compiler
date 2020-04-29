@@ -67,11 +67,17 @@ test('Multiple arguments', async () => {
         when: Dog
             4 * >man-years
 
+        defmulti: get-man-age
+        when: Person
+            age>
+        when: Dog
+            man-years>
+
         def: main
         entry: true
         : 18 >Person 10 add-to-age 
           0 >Dog 2 add-to-age 
-          man-years> swap age> swap -
+          get-man-age swap get-man-age swap -
     `);
 
     const result = await compiler.run(wat, 'main');
