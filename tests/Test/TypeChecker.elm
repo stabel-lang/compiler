@@ -617,5 +617,85 @@ suite =
 
                         Ok _ ->
                             Expect.pass
+            , test "Function requiring a concrete type should not accept an union with that type" <|
+                \_ ->
+                    let
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Bool"
+                                        [ Type.Custom "True"
+                                        , Type.Custom "False"
+                                        ]
+                                    , QAST.CustomTypeDef "True" []
+                                    , QAST.CustomTypeDef "False" []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">True"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "True"
+                                                ]
+                                      }
+                                    , { name = ">False"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "False"
+                                                ]
+                                      }
+                                    , { name = "not"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( Type.Custom "True"
+                                                  , [ QAST.Builtin Builtin.StackDrop
+                                                    , QAST.Word ">False"
+                                                    ]
+                                                  )
+                                                , ( Type.Custom "False"
+                                                  , [ QAST.Builtin Builtin.StackDrop
+                                                    , QAST.Word ">True"
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "true-to-int"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin Builtin.StackDrop
+                                                , QAST.Integer 1
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Word ">True"
+                                                , QAST.Word "not"
+                                                , QAST.Word "true-to-int"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.fail "Did not expect type check to pass."
+
+                        Err () ->
+                            Expect.pass
             ]
         ]

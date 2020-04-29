@@ -146,7 +146,13 @@ typeCheckDefinition untypedDef context =
                                 | typedWords =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
-                                        , type_ = inferredType
+                                        , type_ =
+                                            case untypedDef.metadata.type_ of
+                                                Just annotatedType ->
+                                                    annotatedType
+
+                                                Nothing ->
+                                                    inferredType
                                         , metadata = untypedDef.metadata
                                         , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
                                         }
@@ -396,11 +402,9 @@ compatibleWordTypes annotated inferred context =
                         _ ->
                             False
 
-                ( Type.Union lMembers, _ ) ->
-                    lMembers
-                        |> List.map typeAsStr
-                        |> Set.fromList
-                        |> Set.member (typeAsStr rhs)
+                ( Type.Union _, _ ) ->
+                    -- Cannot go from union to concrete type
+                    False
 
                 ( _, Type.Union rMembers ) ->
                     rMembers
@@ -595,8 +599,10 @@ compatibleTypes context typeA typeB =
 
             else
                 case ( boundA, boundB ) of
-                    ( Type.Union unionTypes, _ ) ->
-                        ( context, List.member boundB unionTypes )
+                    ( Type.Union _, _ ) ->
+                        -- Cannot go from union to concrete type
+                        -- And we currently require unions to be exact matches
+                        ( context, False )
 
                     ( _, Type.Union unionTypes ) ->
                         if List.member boundA unionTypes then
