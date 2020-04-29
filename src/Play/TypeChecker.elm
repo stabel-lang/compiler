@@ -194,6 +194,7 @@ typeCheckDefinition untypedDef context =
                         whensAreCompatible =
                             inferredWhenTypes
                                 |> List.map stripFirstInput
+                                |> List.map countOutput
                                 |> areAllEqual
 
                         typeCheckWhen ( forType, inf ) =
@@ -221,6 +222,9 @@ typeCheckDefinition untypedDef context =
                                 _ ->
                                     inf
 
+                        countOutput wordType =
+                            ( wordType.input, List.length wordType.output )
+
                         areAllEqual ls =
                             case ls of
                                 [] ->
@@ -233,6 +237,7 @@ typeCheckDefinition untypedDef context =
                             List.head inferredWhenTypes
                                 |> Maybe.withDefault { input = [], output = [] }
                                 |> replaceFirstType (Type.Union (List.map Tuple.first whens))
+                                |> joinOutputs (List.map .output inferredWhenTypes)
 
                         replaceFirstType with inf =
                             case inf.input of
@@ -241,6 +246,30 @@ typeCheckDefinition untypedDef context =
 
                                 _ ->
                                     inf
+
+                        joinOutputs outputs result =
+                            case outputs of
+                                first :: second :: rest ->
+                                    let
+                                        joined =
+                                            List.map2 unionize first second
+
+                                        unionize lhs rhs =
+                                            case ( lhs, rhs ) of
+                                                _ ->
+                                                    if lhs == rhs then
+                                                        lhs
+
+                                                    else
+                                                        Type.Union [ lhs, rhs ]
+                                    in
+                                    joinOutputs (joined :: rest) result
+
+                                joined :: [] ->
+                                    { result | output = joined }
+
+                                _ ->
+                                    result
 
                         finalContext =
                             { newContext
@@ -294,8 +323,11 @@ resolveUnion context type_ =
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
 typeCheckImplementation untypedDef impl context =
     let
-        contextWithStackEffects =
-            List.foldl typeCheckNode context impl
+        ( _, contextWithStackEffects ) =
+            List.foldl
+                (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode idx node ctx ))
+                ( 0, context )
+                impl
     in
     wordTypeFromStackEffects contextWithStackEffects
         |> simplifyWordType untypedDef.name
@@ -378,20 +410,6 @@ compatibleWordTypes annotated inferred context =
 
                 _ ->
                     lhs == rhs
-
-        typeAsStr t =
-            case t of
-                Type.Custom name ->
-                    name ++ "_Custom"
-
-                Type.Int ->
-                    "Int"
-
-                Type.Union _ ->
-                    "Union"
-
-                Type.Generic name ->
-                    name ++ "_Generic"
     in
     if
         (List.length annotated.input /= List.length inferred.input)
@@ -404,11 +422,38 @@ compatibleWordTypes annotated inferred context =
             |> List.all identity
 
 
-typeCheckNode : Qualifier.Node -> Context -> Context
-typeCheckNode node context =
+typeAsStr : Type -> String
+typeAsStr t =
+    case t of
+        Type.Custom name ->
+            name ++ "_Custom"
+
+        Type.Int ->
+            "Int"
+
+        Type.Union _ ->
+            "Union"
+
+        Type.Generic name ->
+            name ++ "_Generic"
+
+
+typeCheckNode : Int -> Qualifier.Node -> Context -> Context
+typeCheckNode idx node context =
     let
         addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ effects }
+            { ctx | stackEffects = ctx.stackEffects ++ List.map tagGeneric effects }
+
+        tagGeneric effect =
+            case effect of
+                Push (Type.Generic genName) ->
+                    Push (Type.Generic (genName ++ String.fromInt idx))
+
+                Pop (Type.Generic genName) ->
+                    Pop (Type.Generic (genName ++ String.fromInt idx))
+
+                _ ->
+                    effect
     in
     case node of
         Qualifier.Integer _ ->

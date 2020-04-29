@@ -70,7 +70,7 @@ test('Multiple arguments', async () => {
         def: main
         entry: true
         : 18 >Person 10 add-to-age 
-          0 >Dog 2 >add-to-age 
+          0 >Dog 2 add-to-age 
           man-years> swap age> swap -
     `);
 

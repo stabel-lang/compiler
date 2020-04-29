@@ -486,5 +486,136 @@ suite =
 
                         Ok _ ->
                             Expect.pass
+            , test "When returning union" <|
+                \_ ->
+                    let
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Beings"
+                                        [ Type.Custom "Person"
+                                        , Type.Custom "Dog"
+                                        ]
+                                    , QAST.CustomTypeDef "Person"
+                                        [ ( "age", Type.Int ) ]
+                                    , QAST.CustomTypeDef "Dog"
+                                        [ ( "man-years", Type.Int ) ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Person"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Person" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Person"
+                                                ]
+                                      }
+                                    , { name = ">Dog"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Dog" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Dog"
+                                                ]
+                                      }
+                                    , { name = "age>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "Person" "age"
+                                                ]
+                                      }
+                                    , { name = "man-years>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Dog" ] [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "Dog" "man-years"
+                                                ]
+                                      }
+                                    , { name = ">age"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "Person" "age"
+                                                ]
+                                      }
+                                    , { name = ">man-years"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Dog", Type.Int ] [ Type.Custom "Dog" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "Dog" "man-years"
+                                                ]
+                                      }
+                                    , { name = "add-to-age"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( Type.Custom "Person"
+                                                  , [ QAST.Word ">age"
+                                                    ]
+                                                  )
+                                                , ( Type.Custom "Dog"
+                                                  , [ QAST.Integer 4
+                                                    , QAST.Builtin Builtin.Multiply
+                                                    , QAST.Word ">man-years"
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "get-man-age"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( Type.Custom "Person"
+                                                  , [ QAST.Word "age>" ]
+                                                  )
+                                                , ( Type.Custom "Dog"
+                                                  , [ QAST.Word "man-years>" ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 18
+                                                , QAST.Word ">Person"
+                                                , QAST.Integer 10
+                                                , QAST.Word "add-to-age"
+                                                , QAST.Integer 0
+                                                , QAST.Word ">Dog"
+                                                , QAST.Integer 2
+                                                , QAST.Word "add-to-age"
+                                                , QAST.Word "get-man-age"
+                                                , QAST.Builtin Builtin.StackSwap
+                                                , QAST.Word "get-man-age"
+                                                , QAST.Builtin Builtin.StackSwap
+                                                , QAST.Builtin Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
+
+                        Ok _ ->
+                            Expect.pass
             ]
         ]
