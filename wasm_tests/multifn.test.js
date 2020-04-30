@@ -63,9 +63,14 @@ test('Multiple arguments', async () => {
 
         defmulti: add-to-age
         when: Person
+            swap dup age>
+            -rotate +
             >age
         when: Dog
-            4 * >man-years
+            4 * 
+            swap dup man-years>
+            -rotate +
+            >man-years
 
         defmulti: get-man-age
         when: Person
@@ -77,7 +82,9 @@ test('Multiple arguments', async () => {
         entry: true
         : 18 >Person 10 add-to-age 
           0 >Dog 2 add-to-age 
-          get-man-age swap get-man-age swap -
+          get-man-age swap 
+          get-man-age swap 
+          -
     `);
 
     const result = await compiler.run(wat, 'main');

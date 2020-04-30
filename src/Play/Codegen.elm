@@ -117,6 +117,11 @@ leftRotFn =
     "__left_rotate"
 
 
+stackGetElementFn : String
+stackGetElementFn =
+    "__stack_get"
+
+
 
 -- Base module
 
@@ -383,6 +388,24 @@ baseModule =
                 , Wasm.Call stackPushFn
                 ]
             }
+        |> Wasm.withFunction
+            { name = stackGetElementFn
+            , exported = False
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , locals = []
+            , instructions =
+                [ Wasm.I32_Const stackPositionOffset
+                , Wasm.I32_Load
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.Local_Get 0 -- read offset
+                , Wasm.I32_Const 1
+                , Wasm.I32_Add -- add one to offset
+                , Wasm.I32_Mul -- offset * ptrSize
+                , Wasm.I32_Sub -- stackPosition - ptrOffset
+                , Wasm.I32_Load
+                ]
+            }
 
 
 
@@ -436,7 +459,7 @@ toWasmFuncDef typeInfo def =
         wasmImplementation =
             case def.implementation of
                 AST.MultiImpl whens defaultImpl ->
-                    [ multiFnToInstructions typeInfo whens defaultImpl ]
+                    [ multiFnToInstructions typeInfo def whens defaultImpl ]
 
                 AST.SoloImpl impl ->
                     List.map (nodeToInstruction typeInfo) impl
@@ -456,8 +479,13 @@ toWasmFuncDef typeInfo def =
     }
 
 
-multiFnToInstructions : Dict String TypeInformation -> List ( Type, List AST.AstNode ) -> List AST.AstNode -> Wasm.Instruction
-multiFnToInstructions typeInfo whens defaultImpl =
+multiFnToInstructions :
+    Dict String TypeInformation
+    -> AST.WordDefinition
+    -> List ( Type, List AST.AstNode )
+    -> List AST.AstNode
+    -> Wasm.Instruction
+multiFnToInstructions typeInfo def whens defaultImpl =
     let
         branches =
             List.foldl buildBranch (Wasm.Batch []) whens
@@ -484,12 +512,13 @@ multiFnToInstructions typeInfo whens defaultImpl =
                 , Wasm.Batch (List.map (nodeToInstruction typeInfo) nodes)
                 , Wasm.Return
                 ]
+
+        selfIndex =
+            max 0 (List.length def.type_.input - 1)
     in
     Wasm.Batch
-        [ Wasm.Call stackPopFn -- TODO: This only works for arity 0 words.
-        , Wasm.Local_Tee 0
-        , Wasm.Local_Get 0
-        , Wasm.Call stackPushFn -- TODO: should probably have a way of _just_ reading values from stack
+        [ Wasm.I32_Const selfIndex
+        , Wasm.Call stackGetElementFn
         , Wasm.I32_Load
         , Wasm.Local_Set 0 -- store instance id in local
         , branches
