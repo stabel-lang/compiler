@@ -491,6 +491,9 @@ typeCheckNode idx node context =
                                 Just def ->
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
+        Qualifier.WordRef _ ->
+            Debug.todo "Type checker doesn't support word references at the moment."
+
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
                 Just (CustomTypeDef _ members) ->
@@ -799,6 +802,9 @@ untypedToTypedNode context untypedNode =
 
                 Nothing ->
                     Debug.todo "Inconcievable!"
+
+        Qualifier.WordRef _ ->
+            Debug.todo "No support for word references at the moment."
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
