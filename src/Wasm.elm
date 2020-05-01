@@ -84,93 +84,6 @@ type Instruction
     | Drop
 
 
-instructionToString : Module -> Instruction -> String
-instructionToString ((Module module_) as fullModule) ins =
-    case ins of
-        NoOp ->
-            "nop"
-
-        Batch insList ->
-            insList
-                |> List.map (instructionToString fullModule)
-                |> String.join "\n"
-
-        Block insList ->
-            "(block\n"
-                ++ (insList
-                        |> List.map (instructionToString fullModule)
-                        |> String.join "\n"
-                   )
-                ++ "\n)"
-
-        Loop insList ->
-            "(loop\n"
-                ++ (insList
-                        |> List.map (instructionToString fullModule)
-                        |> String.join "\n"
-                   )
-                ++ "\n)"
-
-        Break num ->
-            "(br " ++ String.fromInt num ++ ")"
-
-        BreakIf num ->
-            "(br_if " ++ String.fromInt num ++ ")"
-
-        Return ->
-            "return"
-
-        Call word ->
-            case List.findIndex (\f -> f.name == word) module_.functions of
-                Just idx ->
-                    "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
-
-                Nothing ->
-                    Debug.todo "Did not expect this"
-
-        Local_Get idx ->
-            "(local.get " ++ String.fromInt idx ++ ")"
-
-        Local_Set idx ->
-            "(local.set " ++ String.fromInt idx ++ ")"
-
-        Local_Tee idx ->
-            "(local.tee " ++ String.fromInt idx ++ ")"
-
-        I32_Const num ->
-            "(i32.const " ++ String.fromInt num ++ ")"
-
-        I32_Add ->
-            "i32.add"
-
-        I32_Sub ->
-            "i32.sub"
-
-        I32_Mul ->
-            "i32.mul"
-
-        I32_Div ->
-            "i32.div_s"
-
-        I32_Eq ->
-            "i32.eq"
-
-        I32_NotEq ->
-            "i32.ne"
-
-        I32_EqZero ->
-            "i32.eqz"
-
-        I32_Store ->
-            "i32.store"
-
-        I32_Load ->
-            "i32.load"
-
-        Drop ->
-            "drop"
-
-
 maximumLocalIndex : Instruction -> Maybe Int
 maximumLocalIndex ins =
     case ins of
@@ -359,9 +272,92 @@ formatFunction module_ function =
                 ]
     in
     [ Str fullFuncDef
-    , Indent <| List.map (Str << instructionToString module_) function.instructions
+    , Indent <| List.map (formatInstruction module_) function.instructions
     , Str ")"
     ]
+
+
+formatInstruction : Module -> Instruction -> FormatHint
+formatInstruction ((Module module_) as fullModule) ins =
+    case ins of
+        NoOp ->
+            Str "nop"
+
+        Batch insList ->
+            BatchFormat <| List.map (formatInstruction fullModule) insList
+
+        Block insList ->
+            BatchFormat
+                [ Str "(block"
+                , Indent <| List.map (formatInstruction fullModule) insList
+                , Str ")"
+                ]
+
+        Loop insList ->
+            BatchFormat
+                [ Str "(loop"
+                , Indent <| List.map (formatInstruction fullModule) insList
+                , Str ")"
+                ]
+
+        Break num ->
+            Str <| "(br " ++ String.fromInt num ++ ")"
+
+        BreakIf num ->
+            Str <| "(br_if " ++ String.fromInt num ++ ")"
+
+        Return ->
+            Str "return"
+
+        Call word ->
+            case List.findIndex (\f -> f.name == word) module_.functions of
+                Just idx ->
+                    Str <| "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
+
+                Nothing ->
+                    Debug.todo "Did not expect this"
+
+        Local_Get idx ->
+            Str <| "(local.get " ++ String.fromInt idx ++ ")"
+
+        Local_Set idx ->
+            Str <| "(local.set " ++ String.fromInt idx ++ ")"
+
+        Local_Tee idx ->
+            Str <| "(local.tee " ++ String.fromInt idx ++ ")"
+
+        I32_Const num ->
+            Str <| "(i32.const " ++ String.fromInt num ++ ")"
+
+        I32_Add ->
+            Str "i32.add"
+
+        I32_Sub ->
+            Str "i32.sub"
+
+        I32_Mul ->
+            Str "i32.mul"
+
+        I32_Div ->
+            Str "i32.div_s"
+
+        I32_Eq ->
+            Str "i32.eq"
+
+        I32_NotEq ->
+            Str "i32.ne"
+
+        I32_EqZero ->
+            Str "i32.eqz"
+
+        I32_Store ->
+            Str "i32.store"
+
+        I32_Load ->
+            Str "i32.load"
+
+        Drop ->
+            Str "drop"
 
 
 formatExport : Module -> Int -> List FormatHint
@@ -387,23 +383,42 @@ formatStartFunction maybeStartFunction =
 type FormatHint
     = Str String
     | Indent (List FormatHint)
+    | BatchFormat (List FormatHint)
 
 
 format : FormatHint -> String
 format hint =
     formatHelper 0 hint
+        |> Maybe.withDefault ""
 
 
-formatHelper : Int -> FormatHint -> String
+formatHelper : Int -> FormatHint -> Maybe String
 formatHelper indentation hint =
     case hint of
+        Str "" ->
+            Nothing
+
         Str value ->
             applyIndentation indentation value
+                |> Just
+
+        Indent [] ->
+            Nothing
 
         Indent strs ->
             strs
-                |> List.map (formatHelper (indentation + 4))
+                |> List.filterMap (formatHelper (indentation + 2))
                 |> String.join "\n"
+                |> Just
+
+        BatchFormat [] ->
+            Nothing
+
+        BatchFormat hints ->
+            hints
+                |> List.filterMap (formatHelper indentation)
+                |> String.join "\n"
+                |> Just
 
 
 applyIndentation : Int -> String -> String
