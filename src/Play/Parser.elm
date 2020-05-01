@@ -35,6 +35,7 @@ type AstNode
     | ConstructType String
     | GetMember String String
     | SetMember String String
+    | Quotation (List AstNode)
 
 
 parse : List Token -> Result () AST
@@ -124,7 +125,7 @@ parseDefinition tokens ( errors, ast ) =
                         parsedImpl =
                             impl
                                 |> List.drop 1
-                                |> List.map parseAstNode
+                                |> parseAstNodes []
                                 |> Result.combine
                     in
                     case ( metaParseErrors, parsedImpl ) of
@@ -218,7 +219,7 @@ parseDefinition tokens ( errors, ast ) =
                         parsedImpl =
                             impl
                                 |> List.drop 1
-                                |> List.map parseAstNode
+                                |> parseAstNodes []
                                 |> Result.combine
                     in
                     case ( metaParseErrors, whenParseErrors, parsedImpl ) of
@@ -279,32 +280,13 @@ parseMeta tokens ( errors, metadata ) =
                 )
 
         (Token.Metadata "type") :: values ->
-            case List.splitWhen (\token -> token == Token.TypeSeperator) values of
-                Just ( inputs, outputs ) ->
-                    let
-                        possibleInputTypes =
-                            inputs
-                                |> List.map parseType
-                                |> Result.combine
+            case parseWordType values of
+                Ok type_ ->
+                    ( errors
+                    , { metadata | type_ = Just type_ }
+                    )
 
-                        possibleOutputTypes =
-                            outputs
-                                |> List.drop 1
-                                |> List.map parseType
-                                |> Result.combine
-                    in
-                    case ( possibleInputTypes, possibleOutputTypes ) of
-                        ( Ok inputTypes, Ok outputTypes ) ->
-                            ( errors
-                            , { metadata | type_ = Just { input = inputTypes, output = outputTypes } }
-                            )
-
-                        _ ->
-                            ( () :: errors
-                            , metadata
-                            )
-
-                Nothing ->
+                Err () ->
                     ( () :: errors
                     , metadata
                     )
@@ -313,6 +295,31 @@ parseMeta tokens ( errors, metadata ) =
             ( () :: errors
             , metadata
             )
+
+
+parseWordType : List Token -> Result () Type.WordType
+parseWordType tokens =
+    case nestedListSplit Token.QuoteStart Token.QuoteStop Token.TypeSeperator tokens of
+        Just ( inputs, outputs ) ->
+            let
+                possibleInputTypes =
+                    parseTypes [] inputs
+                        |> Result.combine
+
+                possibleOutputTypes =
+                    outputs
+                        |> parseTypes []
+                        |> Result.combine
+            in
+            case ( possibleInputTypes, possibleOutputTypes ) of
+                ( Ok inputTypes, Ok outputTypes ) ->
+                    Ok { input = inputTypes, output = outputTypes }
+
+                _ ->
+                    Err ()
+
+        Nothing ->
+            Err ()
 
 
 isWhen : Token -> Bool
@@ -332,7 +339,7 @@ parseWhen tokens ( errors, cases ) =
             let
                 parsedImpl =
                     impl
-                        |> List.map parseAstNode
+                        |> parseAstNodes []
                         |> Result.combine
             in
             case ( parseType typeToken, parsedImpl ) of
@@ -352,17 +359,35 @@ parseWhen tokens ( errors, cases ) =
             )
 
 
-parseAstNode : Token -> Result () AstNode
-parseAstNode token =
-    case token of
-        Token.Integer value ->
-            Ok (Integer value)
+parseAstNodes : List (Result () AstNode) -> List Token -> List (Result () AstNode)
+parseAstNodes result remaining =
+    case remaining of
+        [] ->
+            List.reverse result
 
-        Token.Symbol value ->
-            Ok (Word value)
+        current :: next ->
+            case current of
+                Token.Integer value ->
+                    parseAstNodes (Ok (Integer value) :: result) next
 
-        _ ->
-            Err ()
+                Token.Symbol value ->
+                    parseAstNodes ((Ok <| Word value) :: result) next
+
+                Token.QuoteStart ->
+                    case List.splitWhen (\t -> t == Token.QuoteStop) next of
+                        Just ( quotImplTokens, newNext ) ->
+                            case Result.combine (parseAstNodes [] quotImplTokens) of
+                                Ok quotImpl ->
+                                    parseAstNodes (Ok (Quotation quotImpl) :: result) (List.drop 1 newNext)
+
+                                _ ->
+                                    parseAstNodes (Err () :: result) (List.drop 1 newNext)
+
+                        Nothing ->
+                            parseAstNodes (Err () :: result) next
+
+                _ ->
+                    parseAstNodes (Err () :: result) next
 
 
 parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
@@ -427,6 +452,44 @@ parseType token =
             Err ()
 
 
+parseTypes : List (Result () Type) -> List Token -> List (Result () Type)
+parseTypes result remaining =
+    case remaining of
+        [] ->
+            List.reverse result
+
+        current :: next ->
+            case current of
+                Token.Type "Int" ->
+                    parseTypes (Ok Type.Int :: result) next
+
+                Token.Type name ->
+                    parseTypes ((Ok <| Type.Custom name) :: result) next
+
+                Token.Symbol genericName ->
+                    parseTypes ((Ok <| Type.Generic genericName) :: result) next
+
+                Token.QuoteStart ->
+                    case List.splitWhen (\t -> t == Token.QuoteStop) next of
+                        Just ( quotTypes, newNext ) ->
+                            let
+                                possibleQuoteType =
+                                    parseWordType quotTypes
+                            in
+                            case possibleQuoteType of
+                                Ok quotType ->
+                                    parseTypes (Ok (Type.Quotation quotType) :: result) (List.drop 1 newNext)
+
+                                _ ->
+                                    parseTypes (Err () :: result) (List.drop 1 newNext)
+
+                        Nothing ->
+                            parseTypes (Err () :: result) next
+
+                _ ->
+                    parseTypes (Err () :: result) next
+
+
 parseTypeMembers : List Token -> List ( String, Type ) -> Result () (List ( String, Type ))
 parseTypeMembers tokens acc =
     case tokens of
@@ -462,3 +525,32 @@ parseUnionTypeDefinition typeName members ast =
             UnionTypeDef typeName members
     in
     { ast | types = Dict.insert typeName typeDef ast.types }
+
+
+nestedListSplit : Token -> Token -> Token -> List Token -> Maybe ( List Token, List Token )
+nestedListSplit newBlockStart newBlockEnd splitter ls =
+    nestedListSplitHelper newBlockStart newBlockEnd splitter 0 [] ls
+
+
+nestedListSplitHelper : Token -> Token -> Token -> Int -> List Token -> List Token -> Maybe ( List Token, List Token )
+nestedListSplitHelper newBlockStart newBlockEnd splitter nested before after =
+    case after of
+        [] ->
+            Nothing
+
+        first :: rest ->
+            if first == newBlockStart then
+                nestedListSplitHelper newBlockStart newBlockEnd splitter (nested + 1) (first :: before) rest
+
+            else if first == newBlockEnd then
+                if nested <= 0 then
+                    Nothing
+
+                else
+                    nestedListSplitHelper newBlockStart newBlockEnd splitter (nested - 1) (first :: before) rest
+
+            else if first == splitter && nested == 0 then
+                Just ( List.reverse before, rest )
+
+            else
+                nestedListSplitHelper newBlockStart newBlockEnd splitter nested (first :: before) rest

@@ -179,6 +179,9 @@ qualifyNode ast node =
         Parser.GetMember typeName memberName ->
             Ok (GetMember typeName memberName)
 
+        Parser.Quotation _ ->
+            Debug.todo "No support for qualifying quotations at the moment."
+
 
 qualifyMetadata : String -> Metadata -> Metadata
 qualifyMetadata baseName metadata =

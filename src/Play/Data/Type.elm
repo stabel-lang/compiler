@@ -6,6 +6,7 @@ type Type
     | Custom String
     | Generic String
     | Union (List Type)
+    | Quotation WordType
 
 
 type alias WordType =
