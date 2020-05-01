@@ -3,7 +3,7 @@ module Play.Codegen exposing (..)
 import Dict exposing (Dict)
 import List.Extra as List
 import Play.Data.Builtin as Builtin
-import Play.Data.Type exposing (Type)
+import Play.Data.Type as Type exposing (Type)
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
 
@@ -115,6 +115,11 @@ rotFn =
 leftRotFn : String
 leftRotFn =
     "__left_rotate"
+
+
+stackGetElementFn : String
+stackGetElementFn =
+    "__stack_get"
 
 
 
@@ -383,6 +388,24 @@ baseModule =
                 , Wasm.Call stackPushFn
                 ]
             }
+        |> Wasm.withFunction
+            { name = stackGetElementFn
+            , exported = False
+            , args = [ Wasm.Int32 ]
+            , results = [ Wasm.Int32 ]
+            , locals = []
+            , instructions =
+                [ Wasm.I32_Const stackPositionOffset
+                , Wasm.I32_Load
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.Local_Get 0 -- read offset
+                , Wasm.I32_Const 1
+                , Wasm.I32_Add -- add one to offset
+                , Wasm.I32_Mul -- offset * ptrSize
+                , Wasm.I32_Sub -- stackPosition - ptrOffset
+                , Wasm.I32_Load
+                ]
+            }
 
 
 
@@ -407,12 +430,24 @@ codegen ast =
 typeMeta : List AST.TypeDefinition -> Dict String TypeInformation
 typeMeta types =
     types
+        |> List.filterMap
+            (\typeDef ->
+                case typeDef of
+                    AST.CustomTypeDef name members ->
+                        Just
+                            ( name
+                            , { id = 0
+                              , members = members
+                              }
+                            )
+
+                    _ ->
+                        Nothing
+            )
         |> List.indexedMap
-            (\idx typeDef ->
-                ( typeDef.name
-                , { id = idx
-                  , members = typeDef.members
-                  }
+            (\idx ( name, def ) ->
+                ( name
+                , { def | id = idx }
                 )
             )
         |> Dict.fromList
@@ -422,7 +457,12 @@ toWasmFuncDef : Dict String TypeInformation -> AST.WordDefinition -> Wasm.Functi
 toWasmFuncDef typeInfo def =
     let
         wasmImplementation =
-            List.map (nodeToInstruction typeInfo) def.implementation
+            case def.implementation of
+                AST.MultiImpl whens defaultImpl ->
+                    [ multiFnToInstructions typeInfo def whens defaultImpl ]
+
+                AST.SoloImpl impl ->
+                    List.map (nodeToInstruction typeInfo) impl
 
         numberOfLocals =
             List.filterMap Wasm.maximumLocalIndex wasmImplementation
@@ -437,6 +477,53 @@ toWasmFuncDef typeInfo def =
     , locals = List.repeat numberOfLocals Wasm.Int32
     , instructions = wasmImplementation
     }
+
+
+multiFnToInstructions :
+    Dict String TypeInformation
+    -> AST.WordDefinition
+    -> List ( Type, List AST.AstNode )
+    -> List AST.AstNode
+    -> Wasm.Instruction
+multiFnToInstructions typeInfo def whens defaultImpl =
+    let
+        branches =
+            List.foldl buildBranch (Wasm.Batch []) whens
+
+        buildBranch ( type_, nodes ) ins =
+            let
+                typeId =
+                    case type_ of
+                        Type.Custom name ->
+                            Dict.get name typeInfo
+                                |> Maybe.map .id
+                                |> Maybe.withDefault 0
+
+                        _ ->
+                            -- TODO: What if we get an Int here?
+                            0
+            in
+            Wasm.Block
+                [ ins
+                , Wasm.Local_Get 0
+                , Wasm.I32_Const typeId
+                , Wasm.I32_NotEq
+                , Wasm.BreakIf 0 -- Move to next branch unless theres a type match
+                , Wasm.Batch (List.map (nodeToInstruction typeInfo) nodes)
+                , Wasm.Return
+                ]
+
+        selfIndex =
+            max 0 (List.length def.type_.input - 1)
+    in
+    Wasm.Batch
+        [ Wasm.I32_Const selfIndex
+        , Wasm.Call stackGetElementFn
+        , Wasm.I32_Load
+        , Wasm.Local_Set 0 -- store instance id in local
+        , branches
+        , Wasm.Batch (List.map (nodeToInstruction typeInfo) defaultImpl)
+        ]
 
 
 nodeToInstruction : Dict String TypeInformation -> AST.AstNode -> Wasm.Instruction
