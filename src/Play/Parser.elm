@@ -16,15 +16,15 @@ type alias AST =
     }
 
 
-type alias TypeDefinition =
-    { name : String
-    , members : List ( String, Type )
-    }
+type TypeDefinition
+    = CustomTypeDef String (List ( String, Type ))
+    | UnionTypeDef String (List Type)
 
 
 type alias WordDefinition =
     { name : String
     , metadata : Metadata
+    , whens : List ( Type, List AstNode )
     , implementation : List AstNode
     }
 
@@ -86,7 +86,12 @@ gatherHelp pred tokens acc =
 
 definitionKeywords : Set String
 definitionKeywords =
-    Set.fromList [ "def", "deftype" ]
+    Set.fromList
+        [ "def"
+        , "deftype"
+        , "defunion"
+        , "defmulti"
+        ]
 
 
 isDefinition : Token -> Bool
@@ -130,6 +135,7 @@ parseDefinition tokens ( errors, ast ) =
                                     Dict.insert wordName
                                         { name = wordName
                                         , metadata = metadata
+                                        , whens = []
                                         , implementation = wordImpl
                                         }
                                         ast.words
@@ -164,6 +170,83 @@ parseDefinition tokens ( errors, ast ) =
                     ( () :: errors
                     , ast
                     )
+
+        (Token.Metadata "defunion") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
+            case List.splitWhen (\t -> t == Token.ListEnd) rest of
+                Just ( types, [ Token.ListEnd ] ) ->
+                    let
+                        possibleMemberTypes =
+                            types
+                                |> List.map parseType
+                                |> Result.combine
+                    in
+                    case possibleMemberTypes of
+                        Err () ->
+                            ( () :: errors
+                            , ast
+                            )
+
+                        Ok members ->
+                            ( errors
+                            , parseUnionTypeDefinition typeName members ast
+                            )
+
+                _ ->
+                    ( () :: errors
+                    , ast
+                    )
+
+        (Token.Metadata "defmulti") :: (Token.Symbol wordName) :: rest ->
+            let
+                parseMulti meta impl =
+                    let
+                        isMetaSectionAWhen =
+                            List.head >> Maybe.map isWhen >> Maybe.withDefault False
+
+                        ( metaParseErrors, metadata ) =
+                            meta
+                                |> gather isMeta
+                                |> List.filter (isMetaSectionAWhen >> not)
+                                |> List.foldl parseMeta ( [], Metadata.default )
+
+                        ( whenParseErrors, whens ) =
+                            meta
+                                |> gather isMeta
+                                |> List.filter isMetaSectionAWhen
+                                |> List.foldl parseWhen ( [], [] )
+
+                        parsedImpl =
+                            impl
+                                |> List.drop 1
+                                |> List.map parseAstNode
+                                |> Result.combine
+                    in
+                    case ( metaParseErrors, whenParseErrors, parsedImpl ) of
+                        ( [], [], Ok wordImpl ) ->
+                            ( errors
+                            , { ast
+                                | words =
+                                    Dict.insert wordName
+                                        { name = wordName
+                                        , metadata = metadata
+                                        , whens = whens
+                                        , implementation = wordImpl
+                                        }
+                                        ast.words
+                              }
+                            )
+
+                        _ ->
+                            ( () :: errors
+                            , ast
+                            )
+            in
+            case List.splitWhen (\token -> token == Token.Metadata "") rest of
+                Nothing ->
+                    parseMulti rest []
+
+                Just ( meta, impl ) ->
+                    parseMulti meta impl
 
         _ ->
             ( () :: errors
@@ -232,6 +315,43 @@ parseMeta tokens ( errors, metadata ) =
             )
 
 
+isWhen : Token -> Bool
+isWhen token =
+    case token of
+        Token.Metadata "when" ->
+            True
+
+        _ ->
+            False
+
+
+parseWhen : List Token -> ( List (), List ( Type, List AstNode ) ) -> ( List (), List ( Type, List AstNode ) )
+parseWhen tokens ( errors, cases ) =
+    case tokens of
+        (Token.Metadata "when") :: ((Token.Type _) as typeToken) :: impl ->
+            let
+                parsedImpl =
+                    impl
+                        |> List.map parseAstNode
+                        |> Result.combine
+            in
+            case ( parseType typeToken, parsedImpl ) of
+                ( Ok type_, Ok wordImpl ) ->
+                    ( errors
+                    , ( type_, wordImpl ) :: cases
+                    )
+
+                _ ->
+                    ( () :: errors
+                    , cases
+                    )
+
+        _ ->
+            ( () :: errors
+            , cases
+            )
+
+
 parseAstNode : Token -> Result () AstNode
 parseAstNode token =
     case token of
@@ -249,9 +369,7 @@ parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
 parseTypeDefinition typeName members ast =
     let
         typeDef =
-            { name = typeName
-            , members = members
-            }
+            CustomTypeDef typeName members
 
         metadata =
             Metadata.default
@@ -260,6 +378,7 @@ parseTypeDefinition typeName members ast =
         ctorDef =
             { name = ">" ++ typeName
             , metadata = metadata
+            , whens = []
             , implementation = [ ConstructType typeName ]
             }
 
@@ -274,12 +393,14 @@ parseTypeDefinition typeName members ast =
               , metadata =
                     Metadata.default
                         |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
+              , whens = []
               , implementation = [ SetMember typeName memberName ]
               }
             , { name = memberName ++ ">"
               , metadata =
                     Metadata.default
                         |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
+              , whens = []
               , implementation = [ GetMember typeName memberName ]
               }
             ]
@@ -322,3 +443,22 @@ parseTypeMembers tokens acc =
 
         _ ->
             Err ()
+
+
+typeDefinitionName : TypeDefinition -> String
+typeDefinitionName typeDef =
+    case typeDef of
+        CustomTypeDef name _ ->
+            name
+
+        UnionTypeDef name _ ->
+            name
+
+
+parseUnionTypeDefinition : String -> List Type -> AST -> AST
+parseUnionTypeDefinition typeName members ast =
+    let
+        typeDef =
+            UnionTypeDef typeName members
+    in
+    { ast | types = Dict.insert typeName typeDef ast.types }

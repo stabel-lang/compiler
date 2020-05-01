@@ -82,9 +82,14 @@ qualifyType :
     -> Parser.TypeDefinition
     -> ( List (), Dict String TypeDefinition )
     -> ( List (), Dict String TypeDefinition )
-qualifyType ast unqualifiedWord ( errors, acc ) =
+qualifyType ast typeDef ( errors, acc ) =
     ( errors
-    , Dict.insert unqualifiedWord.name unqualifiedWord acc
+    , case typeDef of
+        Parser.CustomTypeDef name members ->
+            Dict.insert name { name = name, members = members } acc
+
+        _ ->
+            acc
     )
 
 
