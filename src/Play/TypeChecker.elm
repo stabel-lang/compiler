@@ -444,6 +444,9 @@ typeAsStr t =
         Type.Quotation _ ->
             Debug.todo "No support for type checking quotations at the moment."
 
+        Type.StackRange _ ->
+            Debug.todo "No support for type checking stack ranges at the moment."
+
 
 typeCheckNode : Int -> Qualifier.Node -> Context -> Context
 typeCheckNode idx node context =

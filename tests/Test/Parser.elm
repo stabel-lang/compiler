@@ -425,4 +425,79 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , test "Parser understands stack ranges" <|
+            \_ ->
+                let
+                    source =
+                        [ Metadata "def"
+                        , Symbol "apply-to-num"
+                        , Metadata "type"
+                        , Symbol "a..."
+                        , QuoteStart
+                        , Symbol "a..."
+                        , TypeSeperator
+                        , Symbol "b..."
+                        , QuoteStop
+                        , TypeSeperator
+                        , Symbol "b..."
+                        , Metadata ""
+                        , Symbol "!"
+
+                        -- main
+                        , Metadata "def"
+                        , Symbol "main"
+                        , Metadata "entry"
+                        , Symbol "true"
+                        , Metadata ""
+                        , Token.Integer 1
+                        , QuoteStart
+                        , Token.Integer 1
+                        , Symbol "+"
+                        , QuoteStop
+                        , Symbol "apply-to-num"
+                        ]
+
+                    expectedAst =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "apply-to-num"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.StackRange "a"
+                                                , Type.Quotation
+                                                    { input = [ Type.StackRange "a" ]
+                                                    , output = [ Type.StackRange "b" ]
+                                                    }
+                                                ]
+                                                [ Type.StackRange "b" ]
+                                  , whens = []
+                                  , implementation =
+                                        [ AST.Word "!"
+                                        ]
+                                  }
+                                , { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                  , whens = []
+                                  , implementation =
+                                        [ AST.Integer 1
+                                        , AST.Quotation
+                                            [ AST.Integer 1
+                                            , AST.Word "+"
+                                            ]
+                                        , AST.Word "apply-to-num"
+                                        ]
+                                  }
+                                ]
+                        }
+                in
+                case parse source of
+                    Err () ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         ]

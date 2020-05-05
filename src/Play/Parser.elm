@@ -467,7 +467,11 @@ parseTypes result remaining =
                     parseTypes ((Ok <| Type.Custom name) :: result) next
 
                 Token.Symbol genericName ->
-                    parseTypes ((Ok <| Type.Generic genericName) :: result) next
+                    if String.endsWith "..." genericName then
+                        parseTypes ((Ok <| Type.StackRange (String.dropRight 3 genericName)) :: result) next
+
+                    else
+                        parseTypes ((Ok <| Type.Generic genericName) :: result) next
 
                 Token.QuoteStart ->
                     case List.splitWhen (\t -> t == Token.QuoteStop) next of

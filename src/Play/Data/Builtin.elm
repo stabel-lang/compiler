@@ -71,6 +71,12 @@ wordType builtin =
             }
 
         Apply ->
-            { input = []
-            , output = []
+            { input =
+                [ Type.StackRange "a__apply"
+                , Type.Quotation
+                    { input = [ Type.StackRange "a__apply" ]
+                    , output = [ Type.StackRange "b__apply" ]
+                    }
+                ]
+            , output = [ Type.StackRange "b__apply" ]
             }

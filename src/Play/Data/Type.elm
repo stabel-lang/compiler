@@ -7,6 +7,7 @@ type Type
     | Generic String
     | Union (List Type)
     | Quotation WordType
+    | StackRange String
 
 
 type alias WordType =
