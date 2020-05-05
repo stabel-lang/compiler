@@ -698,4 +698,58 @@ suite =
                         Err () ->
                             Expect.pass
             ]
+        , describe "Quotations"
+            [ test "Simple example" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "apply-to-num"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.WordRef "main__quot2"
+                                                , QAST.Word "apply-to-num"
+                                                , QAST.WordRef "main__quot1"
+                                                , QAST.Word "apply-to-num"
+                                                ]
+                                      }
+                                    , { name = "main__quot2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Builtin Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.fail "Did not expect type check to pass."
+
+                        Err () ->
+                            Expect.pass
+            ]
         ]
