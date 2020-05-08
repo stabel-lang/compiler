@@ -747,9 +747,61 @@ suite =
                     in
                     case typeCheck input of
                         Ok _ ->
-                            Expect.fail "Did not expect type check to pass."
+                            Expect.pass
 
                         Err () ->
+                            Expect.fail "Did not expect type check to fail."
+            , test "Simpler example" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 2
+                                                , QAST.WordRef "main__quot1"
+                                                , QAST.Builtin Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Word "inc"
+                                                , QAST.Word "dec"
+                                                , QAST.Word "dec"
+                                                ]
+                                      }
+                                    , { name = "inc"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "dec"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Builtin Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
                             Expect.pass
+
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
             ]
         ]

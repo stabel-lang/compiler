@@ -68,6 +68,8 @@ type Instruction
     | BreakIf Int
     | Return
     | Call String
+    | CallIndirect
+    | FunctionIndex String -- Not actual WASM, do re-evaluate
     | Local_Get Int
     | Local_Set Int
     | Local_Tee Int
@@ -313,6 +315,17 @@ formatInstruction ((Module module_) as fullModule) ins =
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
                     Str <| "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
+
+                Nothing ->
+                    Debug.todo "Did not expect this"
+
+        CallIndirect ->
+            Str <| "call_indirect"
+
+        FunctionIndex word ->
+            case List.findIndex (\f -> f.name == word) module_.functions of
+                Just idx ->
+                    Str <| "(i32.const " ++ String.fromInt idx ++ ") ;; $" ++ word
 
                 Nothing ->
                     Debug.todo "Did not expect this"

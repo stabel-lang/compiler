@@ -538,6 +538,9 @@ nodeToInstruction typeInfo node =
         AST.Word value _ ->
             Wasm.Call value
 
+        AST.WordRef name ->
+            Wasm.FunctionIndex name
+
         AST.ConstructType typeName ->
             case Dict.get typeName typeInfo of
                 Just type_ ->
@@ -659,6 +662,9 @@ nodeToInstruction typeInfo node =
 
                 Builtin.StackLeftRotate ->
                     Wasm.Call leftRotFn
+
+                Builtin.Apply ->
+                    Wasm.CallIndirect
 
 
 getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int
