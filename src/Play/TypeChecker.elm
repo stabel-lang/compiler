@@ -37,6 +37,7 @@ type WordImplementation
 type AstNode
     = IntLiteral Int
     | Word String WordType
+    | WordRef String
     | ConstructType String
     | SetMember String String Type
     | GetMember String String Type
@@ -442,10 +443,10 @@ typeAsStr t =
             name ++ "_Generic"
 
         Type.Quotation _ ->
-            Debug.todo "No support for type checking quotations at the moment."
+            "quot"
 
-        Type.StackRange _ ->
-            Debug.todo "No support for type checking stack ranges at the moment."
+        Type.StackRange name ->
+            name ++ "..."
 
 
 typeCheckNode : Int -> Qualifier.Node -> Context -> Context
@@ -494,8 +495,18 @@ typeCheckNode idx node context =
                                 Just def ->
                                     addStackEffect newContext <| wordTypeToStackEffects def.type_
 
-        Qualifier.WordRef _ ->
-            Debug.todo "Type checker doesn't support word references at the moment."
+        Qualifier.WordRef ref ->
+            let
+                contextAfterWordCheck =
+                    typeCheckNode idx (Qualifier.Word ref) context
+            in
+            case Dict.get ref contextAfterWordCheck.typedWords of
+                Just def ->
+                    addStackEffect contextAfterWordCheck <|
+                        [ Push <| Type.Quotation def.type_ ]
+
+                _ ->
+                    Debug.todo "inconcievable!"
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
@@ -806,8 +817,8 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
-        Qualifier.WordRef _ ->
-            Debug.todo "No support for word references at the moment."
+        Qualifier.WordRef ref ->
+            WordRef ref
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
