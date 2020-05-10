@@ -50,6 +50,7 @@ type alias Context =
     , untypedWords : Dict String Qualifier.WordDefinition
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
+    , boundStackRanges : Dict String (List Type)
     , errors : List ()
     }
 
@@ -81,6 +82,7 @@ initContext ast =
     , untypedWords = ast.words
     , stackEffects = []
     , boundGenerics = Dict.empty
+    , boundStackRanges = Dict.empty
     , errors = []
     }
 
@@ -129,6 +131,7 @@ typeCheckDefinition untypedDef context =
             { ctx
                 | stackEffects = []
                 , boundGenerics = Dict.empty
+                , boundStackRanges = Dict.empty
             }
     in
     case Dict.get untypedDef.name context.typedWords of
@@ -571,6 +574,24 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
               }
             )
 
+        (Pop ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
+            case Dict.get rangeName context.boundStackRanges of
+                Just needToPop ->
+                    wordTypeFromStackEffectsHelper (List.map Pop needToPop ++ remainingEffects) ( context, wordType )
+
+                Nothing ->
+                    case wordType.output of
+                        [] ->
+                            wordTypeFromStackEffectsHelper remainingEffects <|
+                                ( context, { wordType | input = type_ :: wordType.input } )
+
+                        availableType :: remainingOutput ->
+                            if availableType /= Type.StackRange rangeName then
+                                ( { context | errors = () :: context.errors }, wordType )
+
+                            else
+                                ( context, { wordType | output = remainingOutput } )
+
         (Pop type_) :: remainingEffects ->
             case wordType.output of
                 [] ->
@@ -588,6 +609,17 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
                     else
                         wordTypeFromStackEffectsHelper remainingEffects <|
                             ( newContext, { wordType | output = remainingOutput } )
+
+        (Push ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
+            case Dict.get rangeName context.boundStackRanges of
+                Just range ->
+                    wordTypeFromStackEffectsHelper
+                        (List.map Push range ++ remainingEffects)
+                        ( context, wordType )
+
+                Nothing ->
+                    wordTypeFromStackEffectsHelper remainingEffects <|
+                        ( context, { wordType | output = type_ :: wordType.output } )
 
         (Push type_) :: remainingEffects ->
             wordTypeFromStackEffectsHelper remainingEffects <|
@@ -645,6 +677,25 @@ compatibleTypes context typeA typeB =
                                 Nothing ->
                                     ( context, False )
 
+                    ( Type.Quotation lhs, Type.Quotation rhs ) ->
+                        let
+                            boundRanges =
+                                Dict.empty
+                                    |> bindStackRange context lhs.input rhs.input
+                                    |> bindStackRange context lhs.output rhs.output
+
+                            actualInputRequirement =
+                                replaceStackRange boundRanges rhs.input
+
+                            actualOutputRequirement =
+                                replaceStackRange boundRanges rhs.output
+                        in
+                        ( { context
+                            | boundStackRanges = Dict.union context.boundStackRanges boundRanges
+                          }
+                        , lhs.input == actualInputRequirement && lhs.output == actualOutputRequirement
+                        )
+
                     _ ->
                         ( context, False )
 
@@ -681,6 +732,58 @@ bindGeneric toBind target context =
 
         _ ->
             context
+
+
+bindStackRange : Context -> List Type -> List Type -> Dict String (List Type) -> Dict String (List Type)
+bindStackRange context actual expected bound =
+    let
+        rangeUpdater existing newType =
+            case existing of
+                Just vals ->
+                    Just <| vals ++ [ newType ]
+
+                Nothing ->
+                    Just [ newType ]
+    in
+    case ( actual, expected ) of
+        ( [], _ ) ->
+            bound
+
+        ( _, [] ) ->
+            bound
+
+        ( afirst :: arest, (Type.StackRange rangeName) :: [] ) ->
+            let
+                newBound =
+                    Dict.update rangeName (\existing -> rangeUpdater existing afirst) bound
+            in
+            bindStackRange context arest expected newBound
+
+        ( afirst :: arest, bfirst :: brest ) ->
+            let
+                ( newContext, compatible ) =
+                    compatibleTypes context afirst bfirst
+            in
+            if compatible then
+                bindStackRange newContext arest brest bound
+
+            else
+                bound
+
+
+replaceStackRange : Dict String (List Type) -> List Type -> List Type
+replaceStackRange boundRanges types =
+    List.concatMap
+        (\t ->
+            case t of
+                Type.StackRange rangeName ->
+                    Dict.get rangeName boundRanges
+                        |> Maybe.withDefault []
+
+                otherwise ->
+                    [ otherwise ]
+        )
+        types
 
 
 simplifyWordType : String -> ( Context, WordType ) -> ( Context, WordType )
