@@ -7,6 +7,8 @@ type Module
     = Module
         { typeSignatures : List TypeSignature
         , functions : List Function
+        , nextFunctionIndex : Int
+        , quotables : List Int
         , imports : List Import
         , exports : List Int
         , start : Maybe Int
@@ -118,7 +120,9 @@ initModule : Module
 initModule =
     Module
         { typeSignatures = []
+        , nextFunctionIndex = 0
         , functions = []
+        , quotables = []
         , imports = []
         , exports = []
         , start = Nothing
@@ -165,9 +169,16 @@ withFunction funcDef (Module module_) =
     Module <|
         { updatedModule
             | functions = updatedModule.functions ++ [ newFunction ]
+            , nextFunctionIndex = updatedModule.nextFunctionIndex + 1
+            , quotables =
+                if funcDef.args == [] && funcDef.results == [] then
+                    updatedModule.quotables ++ [ updatedModule.nextFunctionIndex ]
+
+                else
+                    updatedModule.quotables
             , exports =
                 if funcDef.exported then
-                    updatedModule.exports ++ [ List.length updatedModule.functions ]
+                    updatedModule.exports ++ [ updatedModule.nextFunctionIndex ]
 
                 else
                     updatedModule.exports
@@ -207,6 +218,8 @@ toString ((Module module_) as fullModule) =
     , List.concatMap formatImports module_.imports
         |> Indent
     , List.concatMap formatTypeSignature module_.typeSignatures
+        |> Indent
+    , formatTable fullModule
         |> Indent
     , List.concatMap (formatFunction fullModule) module_.functions
         |> Indent
@@ -253,6 +266,30 @@ formatTypeSignature typeSignature =
                 |> String.join " "
     in
     [ Str formattedSignature ]
+
+
+formatTable : Module -> List FormatHint
+formatTable (Module module_) =
+    let
+        tableDef =
+            String.join " "
+                [ "(table"
+                , String.fromInt (List.length module_.quotables)
+                , "funcref)"
+                ]
+
+        elemDef =
+            String.join " "
+                [ "(elem"
+                , "(i32.const 0)"
+                , String.join " " <|
+                    List.map (\funcIdx -> String.fromInt funcIdx) module_.quotables
+                , ")"
+                ]
+    in
+    [ Str tableDef
+    , Str elemDef
+    ]
 
 
 formatFunction : Module -> Function -> List FormatHint
@@ -325,7 +362,12 @@ formatInstruction ((Module module_) as fullModule) ins =
         FunctionIndex word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
-                    Str <| "(i32.const " ++ String.fromInt idx ++ ") ;; $" ++ word
+                    case List.findIndex ((==) idx) module_.quotables of
+                        Just quoteIdx ->
+                            Str <| "(i32.const " ++ String.fromInt quoteIdx ++ ") ;; $" ++ word
+
+                        Nothing ->
+                            Debug.todo "Did not expect this"
 
                 Nothing ->
                     Debug.todo "Did not expect this"
