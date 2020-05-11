@@ -727,7 +727,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot2"
-                                      , metadata = Metadata.default
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer 1
@@ -735,7 +737,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata = Metadata.default
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer 1
@@ -751,43 +755,56 @@ suite =
 
                         Err () ->
                             Expect.fail "Did not expect type check to fail."
-            , test "Simpler example" <|
+            , test "With type annotation" <|
                 \_ ->
                     let
                         input =
                             { types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "main"
+                                    [ { name = "apply-to-num"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Int
+                                                    , Type.Quotation
+                                                        { input = [ Type.Int ]
+                                                        , output = [ Type.Int ]
+                                                        }
+                                                    ]
+                                                    [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 2
+                                                [ QAST.Integer 1
+                                                , QAST.WordRef "main__quot2"
+                                                , QAST.Word "apply-to-num"
                                                 , QAST.WordRef "main__quot1"
-                                                , QAST.Builtin Builtin.Apply
+                                                , QAST.Word "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "main__quot1"
-                                      , metadata = Metadata.default
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Word "inc"
-                                                , QAST.Word "dec"
-                                                , QAST.Word "dec"
-                                                ]
-                                      }
-                                    , { name = "inc"
-                                      , metadata = Metadata.default
+                                    , { name = "main__quot2"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer 1
                                                 , QAST.Builtin Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "dec"
-                                      , metadata = Metadata.default
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer 1
