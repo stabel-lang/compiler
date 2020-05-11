@@ -132,6 +132,7 @@ initModule =
 type alias FunctionDef =
     { name : String
     , exported : Bool
+    , isIndirectlyCalled : Bool
     , args : List Type
     , results : List Type
     , locals : List Type
@@ -171,7 +172,7 @@ withFunction funcDef (Module module_) =
             | functions = updatedModule.functions ++ [ newFunction ]
             , nextFunctionIndex = updatedModule.nextFunctionIndex + 1
             , quotables =
-                if funcDef.args == [] && funcDef.results == [] then
+                if funcDef.isIndirectlyCalled then
                     updatedModule.quotables ++ [ updatedModule.nextFunctionIndex ]
 
                 else

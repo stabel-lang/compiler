@@ -230,7 +230,9 @@ qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
                 Ok qualifiedQuotImpl ->
                     ( Dict.insert quotName
                         { name = quotName
-                        , metadata = Metadata.default
+                        , metadata =
+                            Metadata.default
+                                |> Metadata.isQuoted
                         , implementation = SoloImpl qualifiedQuotImpl
                         }
                         newWordsAfterQuot

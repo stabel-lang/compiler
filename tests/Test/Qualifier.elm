@@ -314,7 +314,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main__quot2"
-                                  , metadata = Metadata.default
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
                                   , implementation =
                                         SoloImpl
                                             [ Integer 1
@@ -322,7 +324,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main__quot1"
-                                  , metadata = Metadata.default
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
                                   , implementation =
                                         SoloImpl
                                             [ Integer 1
