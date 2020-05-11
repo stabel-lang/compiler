@@ -211,23 +211,36 @@ qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
                     List.foldr (qualifyNode ast currentDefName) ( qualifiedWords, [] ) quotImpl
                         |> Tuple.mapSecond Result.combine
-
-                quotBaseName =
-                    currentDefName ++ "__" ++ "quot"
-
-                quotName =
-                    quotBaseName ++ String.fromInt (quotId 1)
-
-                quotId possibleId =
-                    case Dict.get (quotBaseName ++ String.fromInt possibleId) newWordsAfterQuot of
-                        Just _ ->
-                            quotId (possibleId + 1)
-
-                        Nothing ->
-                            possibleId
             in
             case qualifiedQuotImplResult of
+                Ok [ Word wordRef ] ->
+                    case Dict.get wordRef newWordsAfterQuot of
+                        Nothing ->
+                            Debug.todo "Cannot happen"
+
+                        Just oldWord ->
+                            ( Dict.insert wordRef
+                                { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
+                                newWordsAfterQuot
+                            , Ok (WordRef wordRef) :: qualifiedNodes
+                            )
+
                 Ok qualifiedQuotImpl ->
+                    let
+                        quotBaseName =
+                            currentDefName ++ "__" ++ "quot"
+
+                        quotName =
+                            quotBaseName ++ String.fromInt (quotId 1)
+
+                        quotId possibleId =
+                            case Dict.get (quotBaseName ++ String.fromInt possibleId) newWordsAfterQuot of
+                                Just _ ->
+                                    quotId (possibleId + 1)
+
+                                Nothing ->
+                                    possibleId
+                    in
                     ( Dict.insert quotName
                         { name = quotName
                         , metadata =

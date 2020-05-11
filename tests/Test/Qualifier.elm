@@ -241,105 +241,172 @@ suite =
 
                     Ok qualifiedAst ->
                         Expect.equal expectedAst qualifiedAst
-        , test "Quotations" <|
-            \_ ->
-                let
-                    unqualifiedAst =
-                        { types = Dict.empty
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "apply-to-num"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Int
-                                                , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+        , describe "Quotations"
+            [ test "Basic case" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "apply-to-num"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Int
+                                                    , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                                    ]
+                                                    [ Type.Int ]
+                                      , whens = []
+                                      , implementation =
+                                            [ AST.Word "!"
+                                            ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , whens = []
+                                      , implementation =
+                                            [ AST.Integer 1
+                                            , AST.Quotation
+                                                [ AST.Integer 1
+                                                , AST.Word "+"
                                                 ]
-                                                [ Type.Int ]
-                                  , whens = []
-                                  , implementation =
-                                        [ AST.Word "!"
-                                        ]
-                                  }
-                                , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , whens = []
-                                  , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Quotation
+                                            , AST.Word "apply-to-num"
+                                            , AST.Quotation
+                                                [ AST.Integer 1
+                                                , AST.Word "-"
+                                                ]
+                                            , AST.Word "apply-to-num"
+                                            ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "apply-to-num"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Int
+                                                    , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                                    ]
+                                                    [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , WordRef "main__quot2"
+                                                , Word "apply-to-num"
+                                                , WordRef "main__quot1"
+                                                , Word "apply-to-num"
+                                                ]
+                                      }
+                                    , { name = "main__quot2"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , Builtin Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case qualify unqualifiedAst of
+                        Err () ->
+                            Expect.fail "Did not expect qualification to fail"
+
+                        Ok qualifiedAst ->
+                            Expect.equal expectedAst qualifiedAst
+            , test "Do not create new function if quoting exactly one word" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , whens = []
+                                      , implementation =
+                                            [ AST.Integer 1
+                                            , AST.Quotation
+                                                [ AST.Word "inc"
+                                                ]
+                                            , AST.Word "!"
+                                            ]
+                                      }
+                                    , { name = "inc"
+                                      , metadata = Metadata.default
+                                      , whens = []
+                                      , implementation =
                                             [ AST.Integer 1
                                             , AST.Word "+"
                                             ]
-                                        , AST.Word "apply-to-num"
-                                        , AST.Quotation
-                                            [ AST.Integer 1
-                                            , AST.Word "-"
-                                            ]
-                                        , AST.Word "apply-to-num"
-                                        ]
-                                  }
-                                ]
-                        }
+                                      }
+                                    ]
+                            }
 
-                    expectedAst =
-                        { types = Dict.empty
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "apply-to-num"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Int
-                                                , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , WordRef "inc"
+                                                , Builtin Builtin.Apply
                                                 ]
-                                                [ Type.Int ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ Builtin Builtin.Apply
-                                            ]
-                                  }
-                                , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer 1
-                                            , WordRef "main__quot2"
-                                            , Word "apply-to-num"
-                                            , WordRef "main__quot1"
-                                            , Word "apply-to-num"
-                                            ]
-                                  }
-                                , { name = "main__quot2"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isQuoted
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer 1
-                                            , Builtin Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "main__quot1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isQuoted
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer 1
-                                            , Builtin Builtin.Minus
-                                            ]
-                                  }
-                                ]
-                        }
-                in
-                case qualify unqualifiedAst of
-                    Err () ->
-                        Expect.fail "Did not expect qualification to fail"
+                                      }
+                                    , { name = "inc"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case qualify unqualifiedAst of
+                        Err () ->
+                            Expect.fail "Did not expect qualification to fail"
 
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                        Ok qualifiedAst ->
+                            Expect.equal expectedAst qualifiedAst
+            ]
         ]
