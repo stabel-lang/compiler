@@ -365,69 +365,192 @@ verifyTypeSignature inferredType untypedDef context =
 compatibleWordTypes : WordType -> WordType -> Context -> Bool
 compatibleWordTypes annotated inferred context =
     let
-        annotatedTypes =
-            annotated.input
-                ++ annotated.output
-                |> List.map (resolveUnion context)
+        annotatedInputTypes =
+            List.map (resolveUnion context) annotated.input
 
-        inferredTypes =
-            inferred.input
-                ++ inferred.output
-                |> List.map (resolveUnion context)
+        inferredInputTypes =
+            List.map (resolveUnion context) inferred.input
 
-        compareType lhs rhs =
-            case ( lhs, rhs ) of
-                ( Type.Generic _, _ ) ->
-                    True
+        annotatedOutputTypes =
+            List.map (resolveUnion context) annotated.output
 
-                ( _, Type.Generic _ ) ->
-                    True
+        inferredOutputTypes =
+            List.map (resolveUnion context) inferred.output
 
-                ( Type.Union lMembers, Type.Union rMembers ) ->
-                    let
-                        lSet =
-                            Set.fromList (List.map typeAsStr lMembers)
+        ( inputRangeDict, inputsCompatible ) =
+            compareType_ annotatedInputTypes inferredInputTypes Dict.empty
 
-                        rSet =
-                            Set.fromList (List.map typeAsStr rMembers)
+        ( _, outputsCompatible ) =
+            compareType_ annotatedOutputTypes inferredOutputTypes inputRangeDict
+    in
+    inputsCompatible && outputsCompatible
 
-                        diff =
-                            Set.diff rSet lSet
-                                |> Set.toList
-                    in
-                    case diff of
-                        [] ->
-                            True
 
-                        [ oneDiff ] ->
-                            -- Likely the default case
-                            String.endsWith "_Generic" oneDiff
+compareType_ : List Type -> List Type -> Dict String (List Type) -> ( Dict String (List Type), Bool )
+compareType_ lhs rhs rangeDict =
+    case ( lhs, rhs ) of
+        ( [], [] ) ->
+            ( rangeDict, True )
 
-                        _ ->
-                            False
+        ( (Type.StackRange lhsName) :: lhsRest, (Type.StackRange rhsName) :: rhsRest ) ->
+            if lhsName == rhsName then
+                compareType_ lhsRest rhsRest rangeDict
 
-                ( Type.Union _, _ ) ->
-                    -- Cannot go from union to concrete type
-                    False
+            else
+                ( rangeDict, False )
 
-                ( _, Type.Union rMembers ) ->
+        ( (Type.StackRange _) :: [], [] ) ->
+            ( rangeDict, True )
+
+        ( [], (Type.StackRange _) :: [] ) ->
+            ( rangeDict, True )
+
+        ( lhsEl :: lhsRest, (Type.StackRange rangeName) :: [] ) ->
+            compareType_ lhsRest rhs <|
+                Dict.update rangeName
+                    (\maybeVal ->
+                        maybeVal
+                            |> Maybe.withDefault []
+                            |> (\existing -> existing ++ [ lhsEl ])
+                            |> Just
+                    )
+                    rangeDict
+
+        ( lhsEl :: lhsRest, (Type.StackRange rangeName) :: rhsNext :: rhsRest ) ->
+            if sameBaseType lhsEl rhsNext then
+                compareType_ lhs (rhsNext :: rhsRest) rangeDict
+
+            else
+                compareType_ lhsRest rhs <|
+                    Dict.update rangeName
+                        (\maybeVal ->
+                            maybeVal
+                                |> Maybe.withDefault []
+                                |> (\existing -> existing ++ [ lhsEl ])
+                                |> Just
+                        )
+                        rangeDict
+
+        ( (Type.Quotation lhsQuotType) :: lhsRest, (Type.Quotation rhsQuotType) :: rhsRest ) ->
+            let
+                lhsInputRangeApplied =
+                    applyRangeDict rangeDict lhsQuotType.input
+
+                lhsOutputRangeApplied =
+                    applyRangeDict rangeDict lhsQuotType.output
+
+                rhsInputRangeApplied =
+                    applyRangeDict rangeDict rhsQuotType.input
+
+                rhsOutputRangeApplied =
+                    applyRangeDict rangeDict rhsQuotType.output
+
+                applyRangeDict rd types =
+                    List.concatMap
+                        (\type_ ->
+                            case type_ of
+                                Type.StackRange rangeName ->
+                                    case Dict.get rangeName rd of
+                                        Just subst ->
+                                            subst
+
+                                        Nothing ->
+                                            [ type_ ]
+
+                                other ->
+                                    [ other ]
+                        )
+                        types
+
+                ( dictRangePostInputs, inputCompatible ) =
+                    compareType_ lhsInputRangeApplied rhsInputRangeApplied rangeDict
+
+                ( dictRangePostOutputs, outputCompatible ) =
+                    compareType_ lhsOutputRangeApplied rhsOutputRangeApplied dictRangePostInputs
+            in
+            if inputCompatible && outputCompatible then
+                compareType_ lhsRest rhsRest dictRangePostOutputs
+
+            else
+                ( dictRangePostOutputs, False )
+
+        ( (Type.Generic _) :: lhsRest, _ :: rhsRest ) ->
+            compareType_ lhsRest rhsRest rangeDict
+
+        ( _ :: lhsRest, (Type.Generic _) :: rhsRest ) ->
+            compareType_ lhsRest rhsRest rangeDict
+
+        ( (Type.Union lMembers) :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
+            let
+                lSet =
+                    Set.fromList (List.map typeAsStr lMembers)
+
+                rSet =
+                    Set.fromList (List.map typeAsStr rMembers)
+
+                diff =
+                    Set.diff rSet lSet
+                        |> Set.toList
+            in
+            case diff of
+                [] ->
+                    compareType_ lhsRest rhsRest rangeDict
+
+                [ oneDiff ] ->
+                    -- Likely the default case
+                    if String.endsWith "_Generic" oneDiff then
+                        compareType_ lhsRest rhsRest rangeDict
+
+                    else
+                        ( rangeDict, False )
+
+                _ ->
+                    ( rangeDict, False )
+
+        ( (Type.Union _) :: _, _ ) ->
+            -- Cannot go from union to concrete type
+            ( rangeDict, False )
+
+        ( lhsEl :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
+            let
+                compatible =
                     rMembers
                         |> List.map typeAsStr
                         |> Set.fromList
-                        |> Set.member (typeAsStr lhs)
+                        |> Set.member (typeAsStr lhsEl)
+            in
+            if compatible then
+                compareType_ lhsRest rhsRest rangeDict
 
-                _ ->
-                    lhs == rhs
-    in
-    if
-        (List.length annotated.input /= List.length inferred.input)
-            || (List.length annotated.output /= List.length inferred.output)
-    then
-        False
+            else
+                ( rangeDict, False )
+
+        ( lhsEl :: lhsRest, rhsEl :: rhsRest ) ->
+            if lhsEl == rhsEl then
+                compareType_ lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        _ ->
+            ( rangeDict, False )
+
+
+sameBaseType : Type -> Type -> Bool
+sameBaseType lhs rhs =
+    if lhs == rhs then
+        True
 
     else
-        List.map2 compareType annotatedTypes inferredTypes
-            |> List.all identity
+        case ( lhs, rhs ) of
+            ( Type.Quotation _, Type.Quotation _ ) ->
+                True
+
+            ( Type.Union _, Type.Union _ ) ->
+                True
+
+            _ ->
+                False
 
 
 typeAsStr : Type -> String
