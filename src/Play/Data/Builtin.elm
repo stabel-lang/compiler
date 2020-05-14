@@ -14,6 +14,7 @@ type Builtin
     | StackSwap
     | StackRightRotate
     | StackLeftRotate
+    | Apply
 
 
 wordType : Builtin -> WordType
@@ -67,4 +68,15 @@ wordType builtin =
         StackLeftRotate ->
             { input = [ Type.Generic "a__rot", Type.Generic "b__rot", Type.Generic "c__rot" ]
             , output = [ Type.Generic "b__rot", Type.Generic "c__rot", Type.Generic "a__rot" ]
+            }
+
+        Apply ->
+            { input =
+                [ Type.StackRange "a__apply"
+                , Type.Quotation
+                    { input = [ Type.StackRange "a__apply" ]
+                    , output = [ Type.StackRange "b__apply" ]
+                    }
+                ]
+            , output = [ Type.StackRange "b__apply" ]
             }

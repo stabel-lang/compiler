@@ -133,6 +133,7 @@ baseModule =
         |> Wasm.withStartFunction
             { name = "__initialize"
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = []
@@ -151,6 +152,7 @@ baseModule =
         |> Wasm.withFunction
             { name = allocFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = [ Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , locals = [ Wasm.Int32 ]
@@ -168,6 +170,7 @@ baseModule =
         |> Wasm.withFunction
             { name = copyStructFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = [ Wasm.Int32, Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , locals = [ Wasm.Int32, Wasm.Int32 ]
@@ -203,6 +206,7 @@ baseModule =
         |> Wasm.withFunction
             { name = stackPushFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = [ Wasm.Int32 ]
             , results = []
             , locals = [ Wasm.Int32 ]
@@ -222,6 +226,7 @@ baseModule =
         |> Wasm.withFunction
             { name = stackPopFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = [ Wasm.Int32 ]
             , locals = [ Wasm.Int32 ]
@@ -240,6 +245,7 @@ baseModule =
         |> Wasm.withFunction
             { name = dupFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = [ Wasm.Int32 ]
@@ -254,6 +260,7 @@ baseModule =
         |> Wasm.withFunction
             { name = dropFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = []
@@ -265,6 +272,7 @@ baseModule =
         |> Wasm.withFunction
             { name = swapFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = [ Wasm.Int32 ]
@@ -280,6 +288,7 @@ baseModule =
         |> Wasm.withFunction
             { name = rotFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
@@ -301,6 +310,7 @@ baseModule =
         |> Wasm.withFunction
             { name = leftRotFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
@@ -322,6 +332,7 @@ baseModule =
         |> Wasm.withFunction
             { name = addIntFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , results = []
             , locals = []
@@ -336,6 +347,7 @@ baseModule =
         |> Wasm.withFunction
             { name = subIntFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , locals = []
             , results = []
@@ -350,6 +362,7 @@ baseModule =
         |> Wasm.withFunction
             { name = mulIntFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , locals = []
             , results = []
@@ -364,6 +377,7 @@ baseModule =
         |> Wasm.withFunction
             { name = divIntFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , locals = []
             , results = []
@@ -378,6 +392,7 @@ baseModule =
         |> Wasm.withFunction
             { name = eqIntFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = []
             , locals = []
             , results = []
@@ -391,6 +406,7 @@ baseModule =
         |> Wasm.withFunction
             { name = stackGetElementFn
             , exported = False
+            , isIndirectlyCalled = False
             , args = [ Wasm.Int32 ]
             , results = [ Wasm.Int32 ]
             , locals = []
@@ -472,6 +488,7 @@ toWasmFuncDef typeInfo def =
     in
     { name = def.name
     , exported = def.metadata.isEntryPoint
+    , isIndirectlyCalled = def.metadata.isQuoted
     , args = []
     , results = []
     , locals = List.repeat numberOfLocals Wasm.Int32
@@ -537,6 +554,9 @@ nodeToInstruction typeInfo node =
 
         AST.Word value _ ->
             Wasm.Call value
+
+        AST.WordRef name ->
+            Wasm.FunctionIndex name
 
         AST.ConstructType typeName ->
             case Dict.get typeName typeInfo of
@@ -659,6 +679,9 @@ nodeToInstruction typeInfo node =
 
                 Builtin.StackLeftRotate ->
                     Wasm.Call leftRotFn
+
+                Builtin.Apply ->
+                    Wasm.CallIndirect
 
 
 getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int

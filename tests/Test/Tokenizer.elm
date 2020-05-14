@@ -113,4 +113,53 @@ suite =
 
                     Ok tokens ->
                         Expect.equalLists expectedTokens tokens
+        , test "Quotations" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: apply-to-num
+                        type: Int [ Int -- Int ] -- Int
+                        : !
+
+                        def: main
+                        entry: True
+                        : 1 [ 1 + ] apply-to-num
+                        """
+
+                    expectedTokens =
+                        [ Metadata "def"
+                        , Symbol "apply-to-num"
+                        , Metadata "type"
+                        , Type "Int"
+                        , QuoteStart
+                        , Type "Int"
+                        , TypeSeperator
+                        , Type "Int"
+                        , QuoteStop
+                        , TypeSeperator
+                        , Type "Int"
+                        , Metadata ""
+                        , Symbol "!"
+
+                        -- main
+                        , Metadata "def"
+                        , Symbol "main"
+                        , Metadata "entry"
+                        , Type "True"
+                        , Metadata ""
+                        , Integer 1
+                        , QuoteStart
+                        , Integer 1
+                        , Symbol "+"
+                        , QuoteStop
+                        , Symbol "apply-to-num"
+                        ]
+                in
+                case tokenize source of
+                    Err () ->
+                        Expect.fail "Did not expect tokenization to fail"
+
+                    Ok tokens ->
+                        Expect.equalLists expectedTokens tokens
         ]

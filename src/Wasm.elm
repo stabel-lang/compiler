@@ -7,6 +7,8 @@ type Module
     = Module
         { typeSignatures : List TypeSignature
         , functions : List Function
+        , nextFunctionIndex : Int
+        , quotables : List Int
         , imports : List Import
         , exports : List Int
         , start : Maybe Int
@@ -68,6 +70,8 @@ type Instruction
     | BreakIf Int
     | Return
     | Call String
+    | CallIndirect
+    | FunctionIndex String -- Not actual WASM, do re-evaluate
     | Local_Get Int
     | Local_Set Int
     | Local_Tee Int
@@ -116,7 +120,9 @@ initModule : Module
 initModule =
     Module
         { typeSignatures = []
+        , nextFunctionIndex = 0
         , functions = []
+        , quotables = []
         , imports = []
         , exports = []
         , start = Nothing
@@ -126,6 +132,7 @@ initModule =
 type alias FunctionDef =
     { name : String
     , exported : Bool
+    , isIndirectlyCalled : Bool
     , args : List Type
     , results : List Type
     , locals : List Type
@@ -163,9 +170,16 @@ withFunction funcDef (Module module_) =
     Module <|
         { updatedModule
             | functions = updatedModule.functions ++ [ newFunction ]
+            , nextFunctionIndex = updatedModule.nextFunctionIndex + 1
+            , quotables =
+                if funcDef.isIndirectlyCalled then
+                    updatedModule.quotables ++ [ updatedModule.nextFunctionIndex ]
+
+                else
+                    updatedModule.quotables
             , exports =
                 if funcDef.exported then
-                    updatedModule.exports ++ [ List.length updatedModule.functions ]
+                    updatedModule.exports ++ [ updatedModule.nextFunctionIndex ]
 
                 else
                     updatedModule.exports
@@ -205,6 +219,8 @@ toString ((Module module_) as fullModule) =
     , List.concatMap formatImports module_.imports
         |> Indent
     , List.concatMap formatTypeSignature module_.typeSignatures
+        |> Indent
+    , formatTable fullModule
         |> Indent
     , List.concatMap (formatFunction fullModule) module_.functions
         |> Indent
@@ -251,6 +267,30 @@ formatTypeSignature typeSignature =
                 |> String.join " "
     in
     [ Str formattedSignature ]
+
+
+formatTable : Module -> List FormatHint
+formatTable (Module module_) =
+    let
+        tableDef =
+            String.join " "
+                [ "(table"
+                , String.fromInt (List.length module_.quotables)
+                , "funcref)"
+                ]
+
+        elemDef =
+            String.join " "
+                [ "(elem"
+                , "(i32.const 0)"
+                , String.join " " <|
+                    List.map (\funcIdx -> String.fromInt funcIdx) module_.quotables
+                , ")"
+                ]
+    in
+    [ Str tableDef
+    , Str elemDef
+    ]
 
 
 formatFunction : Module -> Function -> List FormatHint
@@ -313,6 +353,22 @@ formatInstruction ((Module module_) as fullModule) ins =
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
                     Str <| "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
+
+                Nothing ->
+                    Debug.todo "Did not expect this"
+
+        CallIndirect ->
+            Str <| "call_indirect"
+
+        FunctionIndex word ->
+            case List.findIndex (\f -> f.name == word) module_.functions of
+                Just idx ->
+                    case List.findIndex ((==) idx) module_.quotables of
+                        Just quoteIdx ->
+                            Str <| "(i32.const " ++ String.fromInt quoteIdx ++ ") ;; $" ++ word
+
+                        Nothing ->
+                            Debug.todo "Did not expect this"
 
                 Nothing ->
                     Debug.todo "Did not expect this"

@@ -11,6 +11,8 @@ type Token
     | TypeSeperator
     | ListStart
     | ListEnd
+    | QuoteStart
+    | QuoteStop
 
 
 tokenize : String -> Result () (List Token)
@@ -47,6 +49,12 @@ recognizeToken word =
 
                     "}" ->
                         Ok ListEnd
+
+                    "[" ->
+                        Ok QuoteStart
+
+                    "]" ->
+                        Ok QuoteStop
 
                     _ ->
                         Ok (Symbol word)
