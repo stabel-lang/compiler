@@ -106,12 +106,22 @@ qualifyDefinition :
     -> ( List (), Dict String WordDefinition )
 qualifyDefinition ast unqualifiedWord ( errors, acc ) =
     let
+        ( whens, impl ) =
+            case unqualifiedWord.implementation of
+                Parser.SoloImpl defImpl ->
+                    ( [], defImpl )
+
+                Parser.MultiImpl whenImpl defImpl ->
+                    ( whenImpl, defImpl )
+
         ( newWordsAfterWhens, qualifiedWhensResult ) =
-            List.foldr (qualifyWhen ast unqualifiedWord.name) ( acc, [] ) unqualifiedWord.whens
+            whens
+                |> List.map (\( Parser.TypeMatch t_ _, whenImpl ) -> ( t_, whenImpl ))
+                |> List.foldr (qualifyWhen ast unqualifiedWord.name) ( acc, [] )
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
-            List.foldr (qualifyNode ast unqualifiedWord.name) ( newWordsAfterWhens, [] ) unqualifiedWord.implementation
+            List.foldr (qualifyNode ast unqualifiedWord.name) ( newWordsAfterWhens, [] ) impl
                 |> Tuple.mapSecond Result.combine
     in
     case ( qualifiedWhensResult, qualifiedImplementationResult ) of

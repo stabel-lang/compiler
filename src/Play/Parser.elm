@@ -24,9 +24,17 @@ type TypeDefinition
 type alias WordDefinition =
     { name : String
     , metadata : Metadata
-    , whens : List ( Type, List AstNode )
-    , implementation : List AstNode
+    , implementation : WordImplementation
     }
+
+
+type WordImplementation
+    = SoloImpl (List AstNode)
+    | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
+
+
+type TypeMatch
+    = TypeMatch Type (List ( String, TypeMatch ))
 
 
 type AstNode
@@ -136,8 +144,7 @@ parseDefinition tokens ( errors, ast ) =
                                     Dict.insert wordName
                                         { name = wordName
                                         , metadata = metadata
-                                        , whens = []
-                                        , implementation = wordImpl
+                                        , implementation = SoloImpl wordImpl
                                         }
                                         ast.words
                               }
@@ -230,8 +237,7 @@ parseDefinition tokens ( errors, ast ) =
                                     Dict.insert wordName
                                         { name = wordName
                                         , metadata = metadata
-                                        , whens = whens
-                                        , implementation = wordImpl
+                                        , implementation = MultiImpl whens wordImpl
                                         }
                                         ast.words
                               }
@@ -332,7 +338,7 @@ isWhen token =
             False
 
 
-parseWhen : List Token -> ( List (), List ( Type, List AstNode ) ) -> ( List (), List ( Type, List AstNode ) )
+parseWhen : List Token -> ( List (), List ( TypeMatch, List AstNode ) ) -> ( List (), List ( TypeMatch, List AstNode ) )
 parseWhen tokens ( errors, cases ) =
     case tokens of
         (Token.Metadata "when") :: ((Token.Type _) as typeToken) :: impl ->
@@ -342,7 +348,7 @@ parseWhen tokens ( errors, cases ) =
                         |> parseAstNodes []
                         |> Result.combine
             in
-            case ( parseType typeToken, parsedImpl ) of
+            case ( parseTypeMatch typeToken, parsedImpl ) of
                 ( Ok type_, Ok wordImpl ) ->
                     ( errors
                     , ( type_, wordImpl ) :: cases
@@ -403,8 +409,8 @@ parseTypeDefinition typeName members ast =
         ctorDef =
             { name = ">" ++ typeName
             , metadata = metadata
-            , whens = []
-            , implementation = [ ConstructType typeName ]
+            , implementation =
+                SoloImpl [ ConstructType typeName ]
             }
 
         generatedDefs =
@@ -418,15 +424,17 @@ parseTypeDefinition typeName members ast =
               , metadata =
                     Metadata.default
                         |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
-              , whens = []
-              , implementation = [ SetMember typeName memberName ]
+              , implementation =
+                    SoloImpl
+                        [ SetMember typeName memberName ]
               }
             , { name = memberName ++ ">"
               , metadata =
                     Metadata.default
                         |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
-              , whens = []
-              , implementation = [ GetMember typeName memberName ]
+              , implementation =
+                    SoloImpl
+                        [ GetMember typeName memberName ]
               }
             ]
     in
@@ -447,6 +455,22 @@ parseType token =
 
         Token.Symbol genericName ->
             Ok <| Type.Generic genericName
+
+        _ ->
+            Err ()
+
+
+parseTypeMatch : Token -> Result () TypeMatch
+parseTypeMatch token =
+    case token of
+        Token.Type "Int" ->
+            Ok <| TypeMatch Type.Int []
+
+        Token.Type name ->
+            Ok <| TypeMatch (Type.Custom name) []
+
+        Token.Symbol genericName ->
+            Ok <| TypeMatch (Type.Generic genericName) []
 
         _ ->
             Err ()

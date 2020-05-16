@@ -23,33 +23,33 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "+"
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "+"
+                                            ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "-"
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "-"
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "inc"
-                                        , AST.Word "inc"
-                                        , AST.Word "dec"
-                                        , AST.Integer 2
-                                        , AST.Word "="
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "inc"
+                                            , AST.Word "inc"
+                                            , AST.Word "dec"
+                                            , AST.Integer 2
+                                            , AST.Word "="
+                                            ]
                                   }
                                 ]
                         }
@@ -110,12 +110,12 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Generic "a", Type.Generic "b" ]
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Word "swap"
-                                        , AST.Word "dup"
-                                        , AST.Word "rotate"
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.Word "swap"
+                                            , AST.Word "dup"
+                                            , AST.Word "rotate"
+                                            ]
                                   }
                                 ]
                         }
@@ -168,27 +168,28 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.ConstructType "True"
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.ConstructType "True"
+                                            ]
                                   }
                                 , { name = ">False"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.ConstructType "False"
-                                        ]
+                                        AST.SoloImpl
+                                            [ AST.ConstructType "False"
+                                            ]
                                   }
                                 , { name = "to-int"
                                   , metadata = Metadata.default
-                                  , whens =
-                                        [ ( Type.Custom "False", [ AST.Integer 0 ] )
-                                        , ( Type.Custom "True", [ AST.Integer 1 ] )
-                                        ]
-                                  , implementation = []
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch (Type.Custom "False") [], [ AST.Integer 0 ] )
+                                            , ( AST.TypeMatch (Type.Custom "True") [], [ AST.Integer 1 ] )
+                                            ]
+                                            []
                                   }
                                 ]
                         }
@@ -257,29 +258,29 @@ suite =
                                                     , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
                                                     ]
                                                     [ Type.Int ]
-                                      , whens = []
                                       , implementation =
-                                            [ AST.Word "!"
-                                            ]
+                                            AST.SoloImpl
+                                                [ AST.Word "!"
+                                                ]
                                       }
                                     , { name = "main"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
-                                      , whens = []
                                       , implementation =
-                                            [ AST.Integer 1
-                                            , AST.Quotation
+                                            AST.SoloImpl
                                                 [ AST.Integer 1
-                                                , AST.Word "+"
+                                                , AST.Quotation
+                                                    [ AST.Integer 1
+                                                    , AST.Word "+"
+                                                    ]
+                                                , AST.Word "apply-to-num"
+                                                , AST.Quotation
+                                                    [ AST.Integer 1
+                                                    , AST.Word "-"
+                                                    ]
+                                                , AST.Word "apply-to-num"
                                                 ]
-                                            , AST.Word "apply-to-num"
-                                            , AST.Quotation
-                                                [ AST.Integer 1
-                                                , AST.Word "-"
-                                                ]
-                                            , AST.Word "apply-to-num"
-                                            ]
                                       }
                                     ]
                             }
@@ -354,22 +355,22 @@ suite =
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
-                                      , whens = []
                                       , implementation =
-                                            [ AST.Integer 1
-                                            , AST.Quotation
-                                                [ AST.Word "inc"
+                                            AST.SoloImpl
+                                                [ AST.Integer 1
+                                                , AST.Quotation
+                                                    [ AST.Word "inc"
+                                                    ]
+                                                , AST.Word "!"
                                                 ]
-                                            , AST.Word "!"
-                                            ]
                                       }
                                     , { name = "inc"
                                       , metadata = Metadata.default
-                                      , whens = []
                                       , implementation =
-                                            [ AST.Integer 1
-                                            , AST.Word "+"
-                                            ]
+                                            AST.SoloImpl
+                                                [ AST.Integer 1
+                                                , AST.Word "+"
+                                                ]
                                       }
                                     ]
                             }
