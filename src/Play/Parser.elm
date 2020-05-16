@@ -34,7 +34,13 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch Type (List ( String, TypeMatch ))
+    = TypeMatch Type (List ( String, TypeMatchValue ))
+
+
+type TypeMatchValue
+    = LiteralInt Int
+    | LiteralType Type
+    | RecursiveMatch TypeMatch
 
 
 type AstNode
@@ -359,10 +365,81 @@ parseWhen tokens ( errors, cases ) =
                     , cases
                     )
 
+        (Token.Metadata "when") :: (Token.PatternMatchStart typeName) :: remaining ->
+            case semanticSplit isPatternMatchStart Token.ParenStop remaining of
+                ( pattern, impl ) ->
+                    let
+                        parsedImpl =
+                            impl
+                                |> parseAstNodes []
+                                |> Result.combine
+                    in
+                    case ( parsePatternMatch typeName pattern, parsedImpl ) of
+                        ( Just ( typeMatch, [] ), Ok wordImpl ) ->
+                            ( errors
+                            , ( typeMatch, wordImpl ) :: cases
+                            )
+
+                        _ ->
+                            ( () :: errors
+                            , cases
+                            )
+
         _ ->
             ( () :: errors
             , cases
             )
+
+
+parsePatternMatch : String -> List Token -> Maybe ( TypeMatch, List Token )
+parsePatternMatch typeName tokens =
+    case parseType (Token.Type typeName) of
+        Ok type_ ->
+            case semanticSplit isPatternMatchStart Token.ParenStop tokens of
+                ( pattern, rem ) ->
+                    Just <| ( TypeMatch type_ (collectPatternAttributes pattern []), rem )
+
+        Err _ ->
+            Nothing
+
+
+collectPatternAttributes : List Token -> List ( String, TypeMatchValue ) -> List ( String, TypeMatchValue )
+collectPatternAttributes tokens result =
+    case tokens of
+        [] ->
+            List.reverse result
+
+        (Token.Symbol attrValue) :: (Token.Integer val) :: rest ->
+            collectPatternAttributes rest (( attrValue, LiteralInt val ) :: result)
+
+        (Token.Symbol attrValue) :: ((Token.Type _) as tokenType) :: rest ->
+            case parseType tokenType of
+                Ok type_ ->
+                    collectPatternAttributes rest (( attrValue, LiteralType type_ ) :: result)
+
+                Err _ ->
+                    []
+
+        (Token.Symbol attrValue) :: (Token.PatternMatchStart subName) :: rest ->
+            case parsePatternMatch subName rest of
+                Just ( typeMatch, remaining ) ->
+                    collectPatternAttributes remaining (( attrValue, RecursiveMatch typeMatch ) :: result)
+
+                Nothing ->
+                    []
+
+        _ ->
+            []
+
+
+isPatternMatchStart : Token -> Bool
+isPatternMatchStart token =
+    case token of
+        Token.PatternMatchStart _ ->
+            True
+
+        _ ->
+            False
 
 
 parseAstNodes : List (Result () AstNode) -> List Token -> List (Result () AstNode)
@@ -582,3 +659,29 @@ nestedListSplitHelper newBlockStart newBlockEnd splitter nested before after =
 
             else
                 nestedListSplitHelper newBlockStart newBlockEnd splitter nested (first :: before) rest
+
+
+semanticSplit : (Token -> Bool) -> Token -> List Token -> ( List Token, List Token )
+semanticSplit newBlockStart newBlockEnd ls =
+    semanticSplitHelper newBlockStart newBlockEnd 0 [] ls
+
+
+semanticSplitHelper : (Token -> Bool) -> Token -> Int -> List Token -> List Token -> ( List Token, List Token )
+semanticSplitHelper newBlockStart newBlockEnd nested before after =
+    case after of
+        [] ->
+            ( List.reverse before, [] )
+
+        first :: rest ->
+            if newBlockStart first then
+                semanticSplitHelper newBlockStart newBlockEnd (nested + 1) (first :: before) rest
+
+            else if first == newBlockEnd then
+                if nested <= 0 then
+                    ( List.reverse before, rest )
+
+                else
+                    semanticSplitHelper newBlockStart newBlockEnd (nested - 1) (first :: before) rest
+
+            else
+                semanticSplitHelper newBlockStart newBlockEnd nested (first :: before) rest

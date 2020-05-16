@@ -506,4 +506,137 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , describe "Pattern matching"
+            [ test "Single match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "zero?"
+                            , Metadata "when"
+                            , PatternMatchStart "Int"
+                            , Symbol "value"
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "zero?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch Type.Int [ ( "value", AST.LiteralInt 0 ) ], [ AST.Word ">True" ] )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Recursive match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "pair?"
+                            , Metadata "when"
+                            , PatternMatchStart "List"
+                            , Symbol "tail"
+                            , PatternMatchStart "List"
+                            , Symbol "tail"
+                            , Type "Nil"
+                            , ParenStop
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "pair?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "List")
+                                                        [ ( "tail"
+                                                          , AST.RecursiveMatch
+                                                                (TypeMatch (Type.Custom "List")
+                                                                    [ ( "tail", AST.LiteralType (Type.Custom "Nil") )
+                                                                    ]
+                                                                )
+                                                          )
+                                                        ]
+                                                  , [ AST.Word ">True" ]
+                                                  )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Multiple match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "origo?"
+                            , Metadata "when"
+                            , PatternMatchStart "Pair"
+                            , Symbol "first"
+                            , Token.Integer 0
+                            , Symbol "second"
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "origo?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "Pair")
+                                                        [ ( "first", AST.LiteralInt 0 )
+                                                        , ( "second", AST.LiteralInt 0 )
+                                                        ]
+                                                  , [ AST.Word ">True" ]
+                                                  )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            ]
         ]
