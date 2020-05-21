@@ -499,7 +499,7 @@ toWasmFuncDef typeInfo def =
 multiFnToInstructions :
     Dict String TypeInformation
     -> AST.WordDefinition
-    -> List ( Type, List AST.AstNode )
+    -> List ( AST.TypeMatch, List AST.AstNode )
     -> List AST.AstNode
     -> Wasm.Instruction
 multiFnToInstructions typeInfo def whens defaultImpl =
@@ -511,7 +511,7 @@ multiFnToInstructions typeInfo def whens defaultImpl =
             let
                 typeId =
                     case type_ of
-                        Type.Custom name ->
+                        AST.TypeMatch (Type.Custom name) _ ->
                             Dict.get name typeInfo
                                 |> Maybe.map .id
                                 |> Maybe.withDefault 0

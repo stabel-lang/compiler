@@ -91,3 +91,24 @@ test('Multiple arguments', async () => {
 
     expect(result.stackElement()).toBe(20);
 });
+
+test('Pattern matching', async () => {
+    const wat = await compiler.toWat(`
+        deftype: Box
+        : { value: Int }
+
+        defmulti: not
+        when: Box( value 0 )
+          drop 1
+        when: Box
+          drop 0
+
+        def: main
+        entry: true
+        : 0 >Box not
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});

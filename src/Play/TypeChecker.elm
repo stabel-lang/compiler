@@ -31,7 +31,17 @@ type alias WordDefinition =
 
 type WordImplementation
     = SoloImpl (List AstNode)
-    | MultiImpl (List ( Type, List AstNode )) (List AstNode)
+    | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
+
+
+type TypeMatch
+    = TypeMatch Type (List ( String, TypeMatchValue ))
+
+
+type TypeMatchValue
+    = LiteralInt Int
+    | LiteralType Type
+    | RecursiveMatch TypeMatch
 
 
 type AstNode
@@ -284,6 +294,20 @@ typeCheckDefinition untypedDef context =
                         extractType (Qualifier.TypeMatch t_ _) =
                             t_
 
+                        mapTypeMatch (Qualifier.TypeMatch type_ cond) =
+                            TypeMatch type_ (List.map mapTypeMatchValue cond)
+
+                        mapTypeMatchValue ( fieldName, value ) =
+                            case value of
+                                Qualifier.LiteralInt val ->
+                                    ( fieldName, LiteralInt val )
+
+                                Qualifier.LiteralType val ->
+                                    ( fieldName, LiteralType val )
+
+                                Qualifier.RecursiveMatch val ->
+                                    ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
                         finalContext =
                             { newContext
                                 | typedWords =
@@ -302,7 +326,7 @@ typeCheckDefinition untypedDef context =
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
-                                                (List.map (Tuple.mapBoth extractType (List.map (untypedToTypedNode newContext))) whens)
+                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) whens)
                                                 (List.map (untypedToTypedNode newContext) defaultImpl)
                                         }
                                         newContext.typedWords
