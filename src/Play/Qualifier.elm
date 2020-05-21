@@ -6,6 +6,7 @@ import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type)
 import Play.Parser as Parser
 import Result.Extra as Result
+import Set exposing (Set)
 
 
 type alias AST =
@@ -28,7 +29,17 @@ type alias WordDefinition =
 
 type WordImplementation
     = SoloImpl (List Node)
-    | MultiImpl (List ( Type, List Node )) (List Node)
+    | MultiImpl (List ( TypeMatch, List Node )) (List Node)
+
+
+type TypeMatch
+    = TypeMatch Type (List ( String, TypeMatchValue ))
+
+
+type TypeMatchValue
+    = LiteralInt Int
+    | LiteralType Type
+    | RecursiveMatch TypeMatch
 
 
 type Node
@@ -70,7 +81,7 @@ qualify ast =
         ( wordErrors, qualifiedWords ) =
             ast.words
                 |> Dict.values
-                |> List.foldl (qualifyDefinition ast) ( [], Dict.empty )
+                |> List.foldl (qualifyDefinition ast qualifiedTypes) ( [], Dict.empty )
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -101,10 +112,11 @@ qualifyType ast typeDef ( errors, acc ) =
 
 qualifyDefinition :
     Parser.AST
+    -> Dict String TypeDefinition
     -> Parser.WordDefinition
     -> ( List (), Dict String WordDefinition )
     -> ( List (), Dict String WordDefinition )
-qualifyDefinition ast unqualifiedWord ( errors, acc ) =
+qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
     let
         ( whens, impl ) =
             case unqualifiedWord.implementation of
@@ -116,8 +128,7 @@ qualifyDefinition ast unqualifiedWord ( errors, acc ) =
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
             whens
-                |> List.map (\( Parser.TypeMatch t_ _, whenImpl ) -> ( t_, whenImpl ))
-                |> List.foldr (qualifyWhen ast unqualifiedWord.name) ( acc, [] )
+                |> List.foldr (qualifyWhen ast qualifiedTypes unqualifiedWord.name) ( acc, [] )
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
@@ -148,26 +159,105 @@ qualifyDefinition ast unqualifiedWord ( errors, acc ) =
 
 qualifyWhen :
     Parser.AST
+    -> Dict String TypeDefinition
     -> String
-    -> ( Type, List Parser.AstNode )
-    -> ( Dict String WordDefinition, List (Result () ( Type, List Node )) )
-    -> ( Dict String WordDefinition, List (Result () ( Type, List Node )) )
-qualifyWhen ast wordName ( type_, impl ) ( qualifiedWords, result ) =
+    -> ( Parser.TypeMatch, List Parser.AstNode )
+    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
+qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
             List.foldr (qualifyNode ast wordName) ( qualifiedWords, [] ) impl
                 |> Tuple.mapSecond Result.combine
+
+        qualifiedMatchResult =
+            qualifyMatch qualifiedTypes typeMatch
     in
-    case qualifiedImplementationResult of
-        Err () ->
+    case ( qualifiedImplementationResult, qualifiedMatchResult ) of
+        ( Err (), _ ) ->
             ( newWords
             , Err () :: result
             )
 
-        Ok qualifiedImplementation ->
+        ( _, Err () ) ->
             ( newWords
-            , Ok ( type_, qualifiedImplementation ) :: result
+            , Err () :: result
             )
+
+        ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
+            ( newWords
+            , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
+            )
+
+
+qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result () TypeMatch
+qualifyMatch qualifiedTypes typeMatch =
+    case typeMatch of
+        Parser.TypeMatch Type.Int [] ->
+            Ok <| TypeMatch Type.Int []
+
+        Parser.TypeMatch Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
+            Ok <| TypeMatch Type.Int [ ( "value", LiteralInt val ) ]
+
+        Parser.TypeMatch ((Type.Custom name) as type_) patterns ->
+            case Dict.get name qualifiedTypes of
+                Just (CustomTypeDef _ members) ->
+                    let
+                        memberNames =
+                            members
+                                |> List.map Tuple.first
+                                |> Set.fromList
+
+                        qualifiedPatternsResult =
+                            patterns
+                                |> List.map (qualifyMatchValue qualifiedTypes memberNames)
+                                |> Result.combine
+                    in
+                    case qualifiedPatternsResult of
+                        Ok qualifiedPatterns ->
+                            Ok <| TypeMatch type_ qualifiedPatterns
+
+                        Err () ->
+                            Err ()
+
+                Just (UnionTypeDef _ types) ->
+                    if List.isEmpty patterns then
+                        Ok <| TypeMatch (Type.Union types) []
+
+                    else
+                        Err ()
+
+                Nothing ->
+                    Err ()
+
+        _ ->
+            Err ()
+
+
+qualifyMatchValue :
+    Dict String TypeDefinition
+    -> Set String
+    -> ( String, Parser.TypeMatchValue )
+    -> Result () ( String, TypeMatchValue )
+qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
+    if Set.member fieldName memberNames then
+        case matchValue of
+            Parser.LiteralInt val ->
+                Ok <| ( fieldName, LiteralInt val )
+
+            Parser.LiteralType type_ ->
+                Ok <| ( fieldName, LiteralType type_ )
+
+            Parser.RecursiveMatch typeMatch ->
+                case qualifyMatch qualifiedTypes typeMatch of
+                    Err () ->
+                        Err ()
+
+                    Ok match ->
+                        Ok <| ( fieldName, RecursiveMatch match )
+
+    else
+        Err ()
 
 
 qualifyNode :

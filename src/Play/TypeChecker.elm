@@ -183,7 +183,7 @@ typeCheckDefinition untypedDef context =
                                             Debug.todo "Default impl doesn't have an input argument"
 
                                         firstType :: _ ->
-                                            ( firstType, defaultImpl ) :: initialWhens
+                                            ( Qualifier.TypeMatch firstType [], defaultImpl ) :: initialWhens
 
                         inferWhenTypes ( _, im ) ( infs, ctx ) =
                             let
@@ -207,7 +207,7 @@ typeCheckDefinition untypedDef context =
                                 |> List.map countOutput
                                 |> areAllEqual
 
-                        typeCheckWhen ( forType, inf ) =
+                        typeCheckWhen ( Qualifier.TypeMatch forType _, inf ) =
                             case inf.input of
                                 firstInput :: _ ->
                                     let
@@ -246,7 +246,7 @@ typeCheckDefinition untypedDef context =
                         inferredType =
                             List.head inferredWhenTypes
                                 |> Maybe.withDefault { input = [], output = [] }
-                                |> replaceFirstType (Type.Union (List.map Tuple.first whens))
+                                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractType) whens))
                                 |> joinOutputs (List.map .output inferredWhenTypes)
 
                         replaceFirstType with inf =
@@ -281,6 +281,9 @@ typeCheckDefinition untypedDef context =
                                 _ ->
                                     result
 
+                        extractType (Qualifier.TypeMatch t_ _) =
+                            t_
+
                         finalContext =
                             { newContext
                                 | typedWords =
@@ -299,7 +302,7 @@ typeCheckDefinition untypedDef context =
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
-                                                (List.map (Tuple.mapSecond (List.map (untypedToTypedNode newContext))) whens)
+                                                (List.map (Tuple.mapBoth extractType (List.map (untypedToTypedNode newContext))) whens)
                                                 (List.map (untypedToTypedNode newContext) defaultImpl)
                                         }
                                         newContext.typedWords

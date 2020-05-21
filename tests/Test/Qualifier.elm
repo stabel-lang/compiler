@@ -228,8 +228,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         MultiImpl
-                                            [ ( Type.Custom "False", [ Integer 0 ] )
-                                            , ( Type.Custom "True", [ Integer 1 ] )
+                                            [ ( TypeMatch (Type.Custom "False") [], [ Integer 0 ] )
+                                            , ( TypeMatch (Type.Custom "True") [], [ Integer 1 ] )
                                             ]
                                             []
                                   }
@@ -399,6 +399,157 @@ suite =
                                                 [ Integer 1
                                                 , Builtin Builtin.Plus
                                                 ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case qualify unqualifiedAst of
+                        Err () ->
+                            Expect.fail "Did not expect qualification to fail"
+
+                        Ok qualifiedAst ->
+                            Expect.equal expectedAst qualifiedAst
+            ]
+        , describe "Pattern matching"
+            [ test "Basic example" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ AST.UnionTypeDef "Bool"
+                                        [ Type.Custom "True"
+                                        , Type.Custom "False"
+                                        ]
+                                    , AST.CustomTypeDef "True" []
+                                    , AST.CustomTypeDef "False" []
+                                    , AST.CustomTypeDef "Box"
+                                        [ ( "value", Type.Int ) ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">True"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ConstructType "True"
+                                                ]
+                                      }
+                                    , { name = ">False"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ConstructType "False"
+                                                ]
+                                      }
+                                    , { name = ">Box"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Box" ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ConstructType "Box"
+                                                ]
+                                      }
+                                    , { name = ">value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int, Type.Custom "Box" ] [ Type.Custom "Box" ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.SetMember "Box" "value"
+                                                ]
+                                      }
+                                    , { name = "<value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Box" ] [ Type.Int ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.GetMember "Box" "value"
+                                                ]
+                                      }
+                                    , { name = "zero?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch (Type.Custom "Box") [ ( "value", AST.LiteralInt 0 ) ], [ AST.Word ">True" ] )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy typeDefinitionName
+                                    [ UnionTypeDef "Bool"
+                                        [ Type.Custom "True"
+                                        , Type.Custom "False"
+                                        ]
+                                    , CustomTypeDef "True" []
+                                    , CustomTypeDef "False" []
+                                    , CustomTypeDef "Box"
+                                        [ ( "value", Type.Int ) ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">True"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "True"
+                                                ]
+                                      }
+                                    , { name = ">False"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "False"
+                                                ]
+                                      }
+                                    , { name = ">Box"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Box" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "Box"
+                                                ]
+                                      }
+                                    , { name = ">value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int, Type.Custom "Box" ] [ Type.Custom "Box" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ SetMember "Box" "value"
+                                                ]
+                                      }
+                                    , { name = "<value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Box" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ GetMember "Box" "value"
+                                                ]
+                                      }
+                                    , { name = "zero?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word ">True" ] )
+                                                ]
+                                                [ Word ">False" ]
                                       }
                                     ]
                             }
