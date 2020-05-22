@@ -119,17 +119,18 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
                                 , conditions
-                                    |> List.concatMap conditionTest
+                                    |> List.concatMap (conditionTest localIdx)
                                     |> Wasm.Batch
                                 ]
 
                         _ ->
                             Debug.todo "Only supports custom types in when clauses"
 
-                conditionTest ( fieldName, value ) =
+                conditionTest localIdx ( fieldName, value ) =
                     case value of
                         AST.LiteralInt num ->
-                            [ Wasm.Call BaseModule.dupFn
+                            [ Wasm.Local_Get localIdx
+                            , Wasm.Call BaseModule.stackPushFn
                             , Wasm.Call <| fieldName ++ ">"
                             , Wasm.Call BaseModule.stackPopFn
                             , Wasm.I32_Const num
@@ -146,7 +147,8 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                                 |> Maybe.map .id
                                                 |> Maybe.withDefault 0
                                     in
-                                    [ Wasm.Call BaseModule.dupFn
+                                    [ Wasm.Local_Get localIdx
+                                    , Wasm.Call BaseModule.stackPushFn
                                     , Wasm.Call <| fieldName ++ ">"
                                     , Wasm.Call BaseModule.stackPopFn
                                     , Wasm.I32_Load -- get type id
@@ -159,12 +161,16 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                     Debug.todo "oops"
 
                         AST.RecursiveMatch match ->
-                            [ Wasm.Call BaseModule.dupFn
+                            let
+                                nextLocalIdx =
+                                    localIdx + 1
+                            in
+                            [ Wasm.Local_Get localIdx
+                            , Wasm.Call BaseModule.stackPushFn
                             , Wasm.Call <| fieldName ++ ">"
-                            , Wasm.I32_Const 0
-                            , Wasm.Call BaseModule.stackGetElementFn
-                            , Wasm.Local_Set 1
-                            , makeInequalityTest match 1
+                            , Wasm.Call BaseModule.stackPopFn
+                            , Wasm.Local_Set nextLocalIdx
+                            , makeInequalityTest match nextLocalIdx
                             ]
 
                 implementation =

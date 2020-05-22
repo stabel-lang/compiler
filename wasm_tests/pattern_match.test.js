@@ -148,8 +148,6 @@ test('Recursive match reverse case', async () => {
         : 2 >Box >BoxOfBox deep-one?
     `);
 
-    console.log(wat);
-
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(0);
