@@ -101,7 +101,10 @@ multiFnToInstructions typeInfo def whens defaultImpl =
         buildBranch ( type_, nodes ) previousBranch =
             let
                 testForInequality =
-                    case type_ of
+                    makeInequalityTest type_ 0
+
+                makeInequalityTest t_ localIdx =
+                    case t_ of
                         AST.TypeMatch (Type.Custom name) conditions ->
                             let
                                 typeId =
@@ -110,7 +113,7 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                         |> Maybe.withDefault 0
                             in
                             Wasm.Batch
-                                [ Wasm.Local_Get 0
+                                [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
                                 , Wasm.I32_Const typeId
                                 , Wasm.I32_NotEq -- Types doesn't match?
@@ -121,8 +124,7 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                 ]
 
                         _ ->
-                            -- TODO: What if we get an Int here?
-                            Wasm.Batch []
+                            Debug.todo "Only supports custom types in when clauses"
 
                 conditionTest ( fieldName, value ) =
                     case value of
@@ -157,7 +159,13 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                     Debug.todo "oops"
 
                         AST.RecursiveMatch match ->
-                            []
+                            [ Wasm.Call BaseModule.dupFn
+                            , Wasm.Call <| fieldName ++ ">"
+                            , Wasm.I32_Const 0
+                            , Wasm.Call BaseModule.stackGetElementFn
+                            , Wasm.Local_Set 1
+                            , makeInequalityTest match 1
+                            ]
 
                 implementation =
                     nodes

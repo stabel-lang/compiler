@@ -12,15 +12,17 @@ async function init() {
         deftype: Box
         : { value: Int }
 
-        defmulti: not
-        when: Box( value 0 )
+        deftype: BoxOfBox
+        : { box: Box }
+
+        defmulti: deep-one?
+        when: BoxOfBox( box Box( value 1 ) )
           drop 1
-        when: Box
-          drop 0
+        : drop 0
 
         def: main
         entry: true
-        : 0 >Box not
+        : 1 >Box >BoxOfBox deep-one?
     `);
 
     const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;

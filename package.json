@@ -13,7 +13,7 @@
   "scripts": {
     "test": "elm-test && npm run wasm-test",
     "auto-elm-test": "elm-test --watch",
-    "wasm-test": "elm make src/Main.elm --output wasm_tests/compiler.js && jest"
+    "wasm-test": "elm make src/Main.elm --output wasm_tests/compiler.js && jest -t 'Recursive match'"
   },
   "author": "Robin Heggelund Hansen",
   "license": "MIT"

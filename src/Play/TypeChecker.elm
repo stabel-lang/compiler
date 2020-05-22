@@ -326,7 +326,7 @@ typeCheckDefinition untypedDef context =
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
-                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) whens)
+                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
                                                 (List.map (untypedToTypedNode newContext) defaultImpl)
                                         }
                                         newContext.typedWords
