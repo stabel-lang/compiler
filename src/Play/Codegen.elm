@@ -505,28 +505,78 @@ multiFnToInstructions :
 multiFnToInstructions typeInfo def whens defaultImpl =
     let
         branches =
-            List.foldl buildBranch (Wasm.Batch []) whens
+            List.foldr buildBranch (Wasm.Batch []) whens
 
-        buildBranch ( type_, nodes ) ins =
+        buildBranch ( type_, nodes ) previousBranch =
             let
-                typeId =
+                testForInequality =
                     case type_ of
-                        AST.TypeMatch (Type.Custom name) _ ->
-                            Dict.get name typeInfo
-                                |> Maybe.map .id
-                                |> Maybe.withDefault 0
+                        AST.TypeMatch (Type.Custom name) conditions ->
+                            let
+                                typeId =
+                                    Dict.get name typeInfo
+                                        |> Maybe.map .id
+                                        |> Maybe.withDefault 0
+                            in
+                            Wasm.Batch
+                                [ Wasm.Local_Get 0
+                                , Wasm.I32_Load -- Load instance id
+                                , Wasm.I32_Const typeId
+                                , Wasm.I32_NotEq -- Types doesn't match?
+                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                                , conditions
+                                    |> List.concatMap conditionTest
+                                    |> Wasm.Batch
+                                ]
 
                         _ ->
                             -- TODO: What if we get an Int here?
-                            0
+                            Wasm.Batch []
+
+                conditionTest ( fieldName, value ) =
+                    case value of
+                        AST.LiteralInt num ->
+                            [ Wasm.Call dupFn
+                            , Wasm.Call <| fieldName ++ ">"
+                            , Wasm.Call stackPopFn
+                            , Wasm.I32_Const num
+                            , Wasm.I32_NotEq -- not same number?
+                            , Wasm.BreakIf 0 -- move to next branch
+                            ]
+
+                        AST.LiteralType typ_ ->
+                            case typ_ of
+                                Type.Custom typeName ->
+                                    let
+                                        typeId =
+                                            Dict.get typeName typeInfo
+                                                |> Maybe.map .id
+                                                |> Maybe.withDefault 0
+                                    in
+                                    [ Wasm.Call dupFn
+                                    , Wasm.Call <| fieldName ++ ">"
+                                    , Wasm.Call stackPopFn
+                                    , Wasm.I32_Load -- get type id
+                                    , Wasm.I32_Const typeId
+                                    , Wasm.I32_NotEq -- not same type?
+                                    , Wasm.BreakIf 0 -- move to next branch
+                                    ]
+
+                                _ ->
+                                    Debug.todo "oops"
+
+                        AST.RecursiveMatch match ->
+                            []
+
+                implementation =
+                    nodes
+                        |> List.map (nodeToInstruction typeInfo)
+                        |> Wasm.Batch
             in
             Wasm.Block
-                [ ins
-                , Wasm.Local_Get 0
-                , Wasm.I32_Const typeId
-                , Wasm.I32_NotEq
-                , Wasm.BreakIf 0 -- Move to next branch unless theres a type match
-                , Wasm.Batch (List.map (nodeToInstruction typeInfo) nodes)
+                [ previousBranch
+                , testForInequality
+                , implementation
                 , Wasm.Return
                 ]
 
@@ -536,7 +586,6 @@ multiFnToInstructions typeInfo def whens defaultImpl =
     Wasm.Batch
         [ Wasm.I32_Const selfIndex
         , Wasm.Call stackGetElementFn
-        , Wasm.I32_Load
         , Wasm.Local_Set 0 -- store instance id in local
         , branches
         , Wasm.Batch (List.map (nodeToInstruction typeInfo) defaultImpl)
