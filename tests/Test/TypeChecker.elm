@@ -381,12 +381,12 @@ suite =
                                 , metadata = Metadata.default
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( Type.Custom "False"
+                                        [ ( QAST.TypeMatch (Type.Custom "False") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 0
                                             ]
                                           )
-                                        , ( Type.Custom "True"
+                                        , ( QAST.TypeMatch (Type.Custom "True") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 1
                                             ]
@@ -412,12 +412,12 @@ suite =
                                         |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( Type.Custom "False"
+                                        [ ( QAST.TypeMatch (Type.Custom "False") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 0
                                             ]
                                           )
-                                        , ( Type.Custom "True"
+                                        , ( QAST.TypeMatch (Type.Custom "True") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 1
                                             ]
@@ -443,7 +443,7 @@ suite =
                                         |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( Type.Custom "False"
+                                        [ ( QAST.TypeMatch (Type.Custom "False") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 0
                                             ]
@@ -469,7 +469,7 @@ suite =
                                 , metadata = Metadata.default
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( Type.Custom "False"
+                                        [ ( QAST.TypeMatch (Type.Custom "False") []
                                           , [ QAST.Builtin Builtin.StackDrop
                                             , QAST.Integer 0
                                             ]
@@ -561,11 +561,11 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( Type.Custom "Person"
+                                                [ ( QAST.TypeMatch (Type.Custom "Person") []
                                                   , [ QAST.Word ">age"
                                                     ]
                                                   )
-                                                , ( Type.Custom "Dog"
+                                                , ( QAST.TypeMatch (Type.Custom "Dog") []
                                                   , [ QAST.Integer 4
                                                     , QAST.Builtin Builtin.Multiply
                                                     , QAST.Word ">man-years"
@@ -578,10 +578,10 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( Type.Custom "Person"
+                                                [ ( QAST.TypeMatch (Type.Custom "Person") []
                                                   , [ QAST.Word "age>" ]
                                                   )
-                                                , ( Type.Custom "Dog"
+                                                , ( QAST.TypeMatch (Type.Custom "Dog") []
                                                   , [ QAST.Word "man-years>" ]
                                                   )
                                                 ]
@@ -654,12 +654,12 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( Type.Custom "True"
+                                                [ ( QAST.TypeMatch (Type.Custom "True") []
                                                   , [ QAST.Builtin Builtin.StackDrop
                                                     , QAST.Word ">False"
                                                     ]
                                                   )
-                                                , ( Type.Custom "False"
+                                                , ( QAST.TypeMatch (Type.Custom "False") []
                                                   , [ QAST.Builtin Builtin.StackDrop
                                                     , QAST.Word ">True"
                                                     ]

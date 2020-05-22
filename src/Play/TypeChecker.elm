@@ -31,7 +31,17 @@ type alias WordDefinition =
 
 type WordImplementation
     = SoloImpl (List AstNode)
-    | MultiImpl (List ( Type, List AstNode )) (List AstNode)
+    | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
+
+
+type TypeMatch
+    = TypeMatch Type (List ( String, TypeMatchValue ))
+
+
+type TypeMatchValue
+    = LiteralInt Int
+    | LiteralType Type
+    | RecursiveMatch TypeMatch
 
 
 type AstNode
@@ -183,7 +193,7 @@ typeCheckDefinition untypedDef context =
                                             Debug.todo "Default impl doesn't have an input argument"
 
                                         firstType :: _ ->
-                                            ( firstType, defaultImpl ) :: initialWhens
+                                            ( Qualifier.TypeMatch firstType [], defaultImpl ) :: initialWhens
 
                         inferWhenTypes ( _, im ) ( infs, ctx ) =
                             let
@@ -207,7 +217,7 @@ typeCheckDefinition untypedDef context =
                                 |> List.map countOutput
                                 |> areAllEqual
 
-                        typeCheckWhen ( forType, inf ) =
+                        typeCheckWhen ( Qualifier.TypeMatch forType _, inf ) =
                             case inf.input of
                                 firstInput :: _ ->
                                     let
@@ -246,7 +256,7 @@ typeCheckDefinition untypedDef context =
                         inferredType =
                             List.head inferredWhenTypes
                                 |> Maybe.withDefault { input = [], output = [] }
-                                |> replaceFirstType (Type.Union (List.map Tuple.first whens))
+                                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractType) whens))
                                 |> joinOutputs (List.map .output inferredWhenTypes)
 
                         replaceFirstType with inf =
@@ -281,6 +291,23 @@ typeCheckDefinition untypedDef context =
                                 _ ->
                                     result
 
+                        extractType (Qualifier.TypeMatch t_ _) =
+                            t_
+
+                        mapTypeMatch (Qualifier.TypeMatch type_ cond) =
+                            TypeMatch type_ (List.map mapTypeMatchValue cond)
+
+                        mapTypeMatchValue ( fieldName, value ) =
+                            case value of
+                                Qualifier.LiteralInt val ->
+                                    ( fieldName, LiteralInt val )
+
+                                Qualifier.LiteralType val ->
+                                    ( fieldName, LiteralType val )
+
+                                Qualifier.RecursiveMatch val ->
+                                    ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
                         finalContext =
                             { newContext
                                 | typedWords =
@@ -299,7 +326,7 @@ typeCheckDefinition untypedDef context =
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
-                                                (List.map (Tuple.mapSecond (List.map (untypedToTypedNode newContext))) whens)
+                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
                                                 (List.map (untypedToTypedNode newContext) defaultImpl)
                                         }
                                         newContext.typedWords

@@ -55,35 +55,35 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "+"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "+"
+                                            ]
                                   }
                                 , { name = "dec"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "-"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "-"
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Word "inc"
-                                        , AST.Word "inc"
-                                        , AST.Word "dec"
-                                        , AST.Integer 2
-                                        , AST.Word "="
-                                        ]
+                                        SoloImpl
+                                            [ AST.Integer 1
+                                            , AST.Word "inc"
+                                            , AST.Word "inc"
+                                            , AST.Word "dec"
+                                            , AST.Integer 2
+                                            , AST.Word "="
+                                            ]
                                   }
                                 ]
                         }
@@ -123,17 +123,18 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , whens = []
-                                  , implementation = [ AST.ConstructType "True" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.ConstructType "True" ]
                                   }
                                 , { name = "as-int"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        ]
+                                        SoloImpl
+                                            [ AST.Integer 1
+                                            ]
                                   }
                                 ]
                         }
@@ -183,45 +184,45 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
-                                  , implementation = [ AST.ConstructType "Person" ]
+                                  , implementation =
+                                        SoloImpl [ AST.ConstructType "Person" ]
                                   }
                                 , { name = ">age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
-                                  , implementation = [ AST.SetMember "Person" "age" ]
+                                  , implementation =
+                                        SoloImpl [ AST.SetMember "Person" "age" ]
                                   }
                                 , { name = ">jobs"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , whens = []
-                                  , implementation = [ AST.SetMember "Person" "jobs" ]
+                                  , implementation =
+                                        SoloImpl [ AST.SetMember "Person" "jobs" ]
                                   }
                                 , { name = "age>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
-                                  , implementation = [ AST.GetMember "Person" "age" ]
+                                  , implementation =
+                                        SoloImpl [ AST.GetMember "Person" "age" ]
                                   }
                                 , { name = "jobs>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
-                                  , implementation = [ AST.GetMember "Person" "jobs" ]
+                                  , implementation =
+                                        SoloImpl [ AST.GetMember "Person" "jobs" ]
                                   }
                                 , { name = "get-age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Word "age>"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Word "age>"
+                                            ]
                                   }
                                 ]
                         }
@@ -260,11 +261,11 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Generic "a", Type.Generic "b" ]
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Word "dup"
-                                        , AST.Word "rotate"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Word "dup"
+                                            , AST.Word "rotate"
+                                            ]
                                   }
                                 ]
                         }
@@ -322,27 +323,32 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.ConstructType "True"
-                                        ]
+                                        SoloImpl
+                                            [ AST.ConstructType "True"
+                                            ]
                                   }
                                 , { name = ">False"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.ConstructType "False"
-                                        ]
+                                        SoloImpl
+                                            [ AST.ConstructType "False"
+                                            ]
                                   }
                                 , { name = "to-int"
                                   , metadata = Metadata.default
-                                  , whens =
-                                        [ ( Type.Custom "False", [ AST.Integer 0 ] )
-                                        , ( Type.Custom "True", [ AST.Integer 1 ] )
-                                        ]
-                                  , implementation = []
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch (Type.Custom "False") []
+                                              , [ AST.Integer 0 ]
+                                              )
+                                            , ( TypeMatch (Type.Custom "True") []
+                                              , [ AST.Integer 1 ]
+                                              )
+                                            ]
+                                            []
                                   }
                                 ]
                         }
@@ -397,24 +403,24 @@ suite =
                                                 , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
                                                 ]
                                                 [ Type.Int ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Word "!"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Word "!"
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Quotation
+                                        SoloImpl
                                             [ AST.Integer 1
-                                            , AST.Word "+"
+                                            , AST.Quotation
+                                                [ AST.Integer 1
+                                                , AST.Word "+"
+                                                ]
+                                            , AST.Word "apply-to-num"
                                             ]
-                                        , AST.Word "apply-to-num"
-                                        ]
                                   }
                                 ]
                         }
@@ -472,24 +478,24 @@ suite =
                                                     }
                                                 ]
                                                 [ Type.StackRange "b" ]
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Word "!"
-                                        ]
+                                        SoloImpl
+                                            [ AST.Word "!"
+                                            ]
                                   }
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
-                                  , whens = []
                                   , implementation =
-                                        [ AST.Integer 1
-                                        , AST.Quotation
+                                        SoloImpl
                                             [ AST.Integer 1
-                                            , AST.Word "+"
+                                            , AST.Quotation
+                                                [ AST.Integer 1
+                                                , AST.Word "+"
+                                                ]
+                                            , AST.Word "apply-to-num"
                                             ]
-                                        , AST.Word "apply-to-num"
-                                        ]
                                   }
                                 ]
                         }
@@ -500,4 +506,159 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , describe "Pattern matching"
+            [ test "Single match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "zero?"
+                            , Metadata "when"
+                            , PatternMatchStart "Int"
+                            , Symbol "value"
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "zero?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch Type.Int [ ( "value", AST.LiteralInt 0 ) ], [ AST.Word ">True" ] )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Recursive match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "pair?"
+                            , Metadata "when"
+                            , PatternMatchStart "List"
+                            , Symbol "tail"
+                            , PatternMatchStart "List"
+                            , Symbol "tail"
+                            , Type "Nil"
+                            , ParenStop
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "pair?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "List")
+                                                        [ ( "tail"
+                                                          , AST.RecursiveMatch
+                                                                (TypeMatch (Type.Custom "List")
+                                                                    [ ( "tail", AST.LiteralType (Type.Custom "Nil") )
+                                                                    ]
+                                                                )
+                                                          )
+                                                        ]
+                                                  , [ AST.Word ">True" ]
+                                                  )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Multiple match" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "origo?"
+                            , Metadata "when"
+                            , PatternMatchStart "Pair"
+                            , Symbol "first"
+                            , Token.Integer 0
+                            , Symbol "second"
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "origo?"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "Pair")
+                                                        [ ( "first", AST.LiteralInt 0 )
+                                                        , ( "second", AST.LiteralInt 0 )
+                                                        ]
+                                                  , [ AST.Word ">True" ]
+                                                  )
+                                                ]
+                                                [ AST.Word ">False" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Syntax error" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "origo?"
+                            , Metadata "when"
+                            , PatternMatchStart "Pair"
+                            , Token.Integer 0
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.pass
+
+                        Ok ast ->
+                            Expect.fail "Did not expect parsing to succeed"
+            ]
         ]

@@ -13,6 +13,8 @@ type Token
     | ListEnd
     | QuoteStart
     | QuoteStop
+    | PatternMatchStart String
+    | ParenStop
 
 
 tokenize : String -> Result () (List Token)
@@ -31,7 +33,14 @@ recognizeToken word =
 
         Nothing ->
             if stringStartsWithUpper word then
-                Ok (Type word)
+                if String.endsWith "(" word then
+                    word
+                        |> String.dropRight 1
+                        |> PatternMatchStart
+                        |> Ok
+
+                else
+                    Ok (Type word)
 
             else if String.endsWith ":" word then
                 word
@@ -55,6 +64,9 @@ recognizeToken word =
 
                     "]" ->
                         Ok QuoteStop
+
+                    ")" ->
+                        Ok ParenStop
 
                     _ ->
                         Ok (Symbol word)

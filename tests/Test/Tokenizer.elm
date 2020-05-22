@@ -162,4 +162,33 @@ suite =
 
                     Ok tokens ->
                         Expect.equalLists expectedTokens tokens
+        , test "Pattern matching" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmulti: some
+                        when: Type( age: 0 ) >True
+                        : >False
+                        """
+
+                    expectedTokens =
+                        [ Metadata "defmulti"
+                        , Symbol "some"
+                        , Metadata "when"
+                        , PatternMatchStart "Type"
+                        , Metadata "age"
+                        , Integer 0
+                        , ParenStop
+                        , Symbol ">True"
+                        , Metadata ""
+                        , Symbol ">False"
+                        ]
+                in
+                case tokenize source of
+                    Err () ->
+                        Expect.fail "Did not expect tokenization to fail"
+
+                    Ok tokens ->
+                        Expect.equalLists expectedTokens tokens
         ]

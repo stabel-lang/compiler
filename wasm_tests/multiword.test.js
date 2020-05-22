@@ -91,3 +91,4 @@ test('Multiple arguments', async () => {
 
     expect(result.stackElement()).toBe(20);
 });
+
