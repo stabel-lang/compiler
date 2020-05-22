@@ -397,17 +397,22 @@ parsePatternMatch typeName tokens =
         Ok type_ ->
             case semanticSplit isPatternMatchStart Token.ParenStop tokens of
                 ( pattern, rem ) ->
-                    Just <| ( TypeMatch type_ (collectPatternAttributes pattern []), rem )
+                    case collectPatternAttributes pattern [] of
+                        Ok patterns ->
+                            Just <| ( TypeMatch type_ patterns, rem )
+
+                        Err _ ->
+                            Nothing
 
         Err _ ->
             Nothing
 
 
-collectPatternAttributes : List Token -> List ( String, TypeMatchValue ) -> List ( String, TypeMatchValue )
+collectPatternAttributes : List Token -> List ( String, TypeMatchValue ) -> Result () (List ( String, TypeMatchValue ))
 collectPatternAttributes tokens result =
     case tokens of
         [] ->
-            List.reverse result
+            Ok (List.reverse result)
 
         (Token.Symbol attrValue) :: (Token.Integer val) :: rest ->
             collectPatternAttributes rest (( attrValue, LiteralInt val ) :: result)
@@ -418,7 +423,7 @@ collectPatternAttributes tokens result =
                     collectPatternAttributes rest (( attrValue, LiteralType type_ ) :: result)
 
                 Err _ ->
-                    []
+                    Err ()
 
         (Token.Symbol attrValue) :: (Token.PatternMatchStart subName) :: rest ->
             case parsePatternMatch subName rest of
@@ -426,10 +431,10 @@ collectPatternAttributes tokens result =
                     collectPatternAttributes remaining (( attrValue, RecursiveMatch typeMatch ) :: result)
 
                 Nothing ->
-                    []
+                    Err ()
 
         _ ->
-            []
+            Err ()
 
 
 isPatternMatchStart : Token -> Bool

@@ -638,5 +638,27 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "Syntax error" <|
+                \_ ->
+                    let
+                        source =
+                            [ Metadata "defmulti"
+                            , Symbol "origo?"
+                            , Metadata "when"
+                            , PatternMatchStart "Pair"
+                            , Token.Integer 0
+                            , Token.Integer 0
+                            , ParenStop
+                            , Symbol ">True"
+                            , Metadata ""
+                            , Symbol ">False"
+                            ]
+                    in
+                    case parse source of
+                        Err () ->
+                            Expect.pass
+
+                        Ok ast ->
+                            Expect.fail "Did not expect parsing to succeed"
             ]
         ]
