@@ -2,6 +2,7 @@ module Play.Codegen exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Play.Codegen.BaseModule as BaseModule
 import Play.Data.Builtin as Builtin
 import Play.Data.Type as Type exposing (Type)
 import Play.TypeChecker as AST exposing (AST)
@@ -12,416 +13,6 @@ type alias TypeInformation =
     { id : Int
     , members : List ( String, Type )
     }
-
-
-
--- Constants
-
-
-wasmPtrSize : Int
-wasmPtrSize =
-    4
-
-
-stackCapacityOffset : Int
-stackCapacityOffset =
-    0
-
-
-stackPositionOffset : Int
-stackPositionOffset =
-    wasmPtrSize
-
-
-defaultStackSize : Int
-defaultStackSize =
-    1024
-
-
-initialHeapPositionOffset : Int
-initialHeapPositionOffset =
-    stackPositionOffset + wasmPtrSize
-
-
-
--- Bultin function names
-
-
-allocFn : String
-allocFn =
-    "__alloc"
-
-
-copyStructFn : String
-copyStructFn =
-    "__copy_str"
-
-
-stackPushFn : String
-stackPushFn =
-    "__stack_push"
-
-
-stackPopFn : String
-stackPopFn =
-    "__stack_pop"
-
-
-addIntFn : String
-addIntFn =
-    "__add_i32"
-
-
-subIntFn : String
-subIntFn =
-    "__sub_i32"
-
-
-mulIntFn : String
-mulIntFn =
-    "__mul_i32"
-
-
-divIntFn : String
-divIntFn =
-    "__div_i32"
-
-
-eqIntFn : String
-eqIntFn =
-    "__eq_i32"
-
-
-dupFn : String
-dupFn =
-    "__duplicate"
-
-
-dropFn : String
-dropFn =
-    "__drop"
-
-
-swapFn : String
-swapFn =
-    "__swap"
-
-
-rotFn : String
-rotFn =
-    "__rotate"
-
-
-leftRotFn : String
-leftRotFn =
-    "__left_rotate"
-
-
-stackGetElementFn : String
-stackGetElementFn =
-    "__stack_get"
-
-
-
--- Base module
-
-
-baseModule : Wasm.Module
-baseModule =
-    Wasm.initModule
-        |> Wasm.withImport "host" "memory" (Wasm.Memory 1 Nothing)
-        |> Wasm.withStartFunction
-            { name = "__initialize"
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = []
-            , instructions =
-                [ Wasm.I32_Const stackCapacityOffset
-                , Wasm.I32_Const defaultStackSize
-                , Wasm.I32_Store
-                , Wasm.I32_Const stackPositionOffset
-                , Wasm.I32_Const (wasmPtrSize * 3)
-                , Wasm.I32_Store
-                , Wasm.I32_Const initialHeapPositionOffset
-                , Wasm.I32_Const (defaultStackSize + wasmPtrSize)
-                , Wasm.I32_Store
-                ]
-            }
-        |> Wasm.withFunction
-            { name = allocFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = [ Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
-            , locals = [ Wasm.Int32 ]
-            , instructions =
-                [ Wasm.I32_Const initialHeapPositionOffset
-                , Wasm.I32_Const initialHeapPositionOffset
-                , Wasm.I32_Load
-                , Wasm.Local_Tee 1
-                , Wasm.Local_Get 0
-                , Wasm.I32_Add
-                , Wasm.I32_Store
-                , Wasm.Local_Get 1
-                ]
-            }
-        |> Wasm.withFunction
-            { name = copyStructFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = [ Wasm.Int32, Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
-            , locals = [ Wasm.Int32, Wasm.Int32 ]
-            , instructions =
-                [ Wasm.Local_Get 1 -- Size in bytes
-                , Wasm.Call allocFn
-                , Wasm.Local_Set 2 -- Save output instance
-                , Wasm.Block
-                    [ Wasm.Loop
-                        [ Wasm.Local_Get 1
-                        , Wasm.I32_EqZero
-                        , Wasm.BreakIf 1 -- break out of loop
-                        , Wasm.Local_Get 1
-                        , Wasm.I32_Const wasmPtrSize
-                        , Wasm.I32_Sub
-                        , Wasm.Local_Set 1 -- Decreased pointer size
-                        , Wasm.Local_Get 0 -- Source struct
-                        , Wasm.Local_Get 1
-                        , Wasm.I32_Add
-                        , Wasm.I32_Load -- Get a byte from source struct
-                        , Wasm.Local_Set 3 -- Save byte to copy
-                        , Wasm.Local_Get 2 -- Dest struct
-                        , Wasm.Local_Get 1
-                        , Wasm.I32_Add
-                        , Wasm.Local_Get 3
-                        , Wasm.I32_Store -- Copy byte from source to dest struct
-                        , Wasm.Break 0 -- loop
-                        ]
-                    ]
-                , Wasm.Local_Get 2
-                ]
-            }
-        |> Wasm.withFunction
-            { name = stackPushFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = [ Wasm.Int32 ]
-            , results = []
-            , locals = [ Wasm.Int32 ]
-            , instructions =
-                [ Wasm.I32_Const stackPositionOffset
-                , Wasm.I32_Load -- Get current stack position
-                , Wasm.Local_Tee 1
-                , Wasm.Local_Get 0
-                , Wasm.I32_Store -- Store input value in stack
-                , Wasm.I32_Const stackPositionOffset
-                , Wasm.Local_Get 1
-                , Wasm.I32_Const wasmPtrSize
-                , Wasm.I32_Add -- Bump stack size
-                , Wasm.I32_Store -- Save new stack position
-                ]
-            }
-        |> Wasm.withFunction
-            { name = stackPopFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = [ Wasm.Int32 ]
-            , locals = [ Wasm.Int32 ]
-            , instructions =
-                [ Wasm.I32_Const stackPositionOffset
-                , Wasm.I32_Const stackPositionOffset
-                , Wasm.I32_Load
-                , Wasm.I32_Const wasmPtrSize
-                , Wasm.I32_Sub
-                , Wasm.Local_Tee 0 -- Save new stack position in local register
-                , Wasm.I32_Store -- save new stack position in global variable
-                , Wasm.Local_Get 0
-                , Wasm.I32_Load -- Load element at top of the stack
-                ]
-            }
-        |> Wasm.withFunction
-            { name = dupFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = [ Wasm.Int32 ]
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Local_Tee 0
-                , Wasm.Local_Get 0
-                , Wasm.Call stackPushFn
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = dropFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = []
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Drop
-                ]
-            }
-        |> Wasm.withFunction
-            { name = swapFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = [ Wasm.Int32 ]
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Local_Set 0
-                , Wasm.Call stackPopFn
-                , Wasm.Local_Get 0
-                , Wasm.Call stackPushFn
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = rotFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Local_Set 0 -- c
-                , Wasm.Call stackPopFn
-                , Wasm.Local_Set 1 -- b
-                , Wasm.Call stackPopFn
-                , Wasm.Local_Set 2 -- a
-                , Wasm.Local_Get 0
-                , Wasm.Call stackPushFn
-                , Wasm.Local_Get 2
-                , Wasm.Call stackPushFn
-                , Wasm.Local_Get 1
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = leftRotFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Local_Set 0 -- c
-                , Wasm.Call stackPopFn
-                , Wasm.Local_Set 1 -- b
-                , Wasm.Call stackPopFn
-                , Wasm.Local_Set 2 -- a
-                , Wasm.Local_Get 1
-                , Wasm.Call stackPushFn
-                , Wasm.Local_Get 0
-                , Wasm.Call stackPushFn
-                , Wasm.Local_Get 2
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = addIntFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , results = []
-            , locals = []
-            , instructions =
-                [ Wasm.Call swapFn
-                , Wasm.Call stackPopFn
-                , Wasm.Call stackPopFn
-                , Wasm.I32_Add
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = subIntFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , locals = []
-            , results = []
-            , instructions =
-                [ Wasm.Call swapFn
-                , Wasm.Call stackPopFn
-                , Wasm.Call stackPopFn
-                , Wasm.I32_Sub
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = mulIntFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , locals = []
-            , results = []
-            , instructions =
-                [ Wasm.Call swapFn
-                , Wasm.Call stackPopFn
-                , Wasm.Call stackPopFn
-                , Wasm.I32_Mul
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = divIntFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , locals = []
-            , results = []
-            , instructions =
-                [ Wasm.Call swapFn
-                , Wasm.Call stackPopFn
-                , Wasm.Call stackPopFn
-                , Wasm.I32_Div
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = eqIntFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = []
-            , locals = []
-            , results = []
-            , instructions =
-                [ Wasm.Call stackPopFn
-                , Wasm.Call stackPopFn
-                , Wasm.I32_Eq
-                , Wasm.Call stackPushFn
-                ]
-            }
-        |> Wasm.withFunction
-            { name = stackGetElementFn
-            , exported = False
-            , isIndirectlyCalled = False
-            , args = [ Wasm.Int32 ]
-            , results = [ Wasm.Int32 ]
-            , locals = []
-            , instructions =
-                [ Wasm.I32_Const stackPositionOffset
-                , Wasm.I32_Load
-                , Wasm.I32_Const wasmPtrSize
-                , Wasm.Local_Get 0 -- read offset
-                , Wasm.I32_Const 1
-                , Wasm.I32_Add -- add one to offset
-                , Wasm.I32_Mul -- offset * ptrSize
-                , Wasm.I32_Sub -- stackPosition - ptrOffset
-                , Wasm.I32_Load
-                ]
-            }
 
 
 
@@ -439,7 +30,7 @@ codegen ast =
     ast.words
         |> Dict.values
         |> List.map (toWasmFuncDef typeMetaDict)
-        |> List.foldl Wasm.withFunction baseModule
+        |> List.foldl Wasm.withFunction BaseModule.baseModule
         |> Ok
 
 
@@ -536,9 +127,9 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                 conditionTest ( fieldName, value ) =
                     case value of
                         AST.LiteralInt num ->
-                            [ Wasm.Call dupFn
+                            [ Wasm.Call BaseModule.dupFn
                             , Wasm.Call <| fieldName ++ ">"
-                            , Wasm.Call stackPopFn
+                            , Wasm.Call BaseModule.stackPopFn
                             , Wasm.I32_Const num
                             , Wasm.I32_NotEq -- not same number?
                             , Wasm.BreakIf 0 -- move to next branch
@@ -553,9 +144,9 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                                                 |> Maybe.map .id
                                                 |> Maybe.withDefault 0
                                     in
-                                    [ Wasm.Call dupFn
+                                    [ Wasm.Call BaseModule.dupFn
                                     , Wasm.Call <| fieldName ++ ">"
-                                    , Wasm.Call stackPopFn
+                                    , Wasm.Call BaseModule.stackPopFn
                                     , Wasm.I32_Load -- get type id
                                     , Wasm.I32_Const typeId
                                     , Wasm.I32_NotEq -- not same type?
@@ -585,7 +176,7 @@ multiFnToInstructions typeInfo def whens defaultImpl =
     in
     Wasm.Batch
         [ Wasm.I32_Const selfIndex
-        , Wasm.Call stackGetElementFn
+        , Wasm.Call BaseModule.stackGetElementFn
         , Wasm.Local_Set 0 -- store instance id in local
         , branches
         , Wasm.Batch (List.map (nodeToInstruction typeInfo) defaultImpl)
@@ -598,7 +189,7 @@ nodeToInstruction typeInfo node =
         AST.IntLiteral value ->
             Wasm.Batch
                 [ Wasm.I32_Const value
-                , Wasm.Call stackPushFn
+                , Wasm.Call BaseModule.stackPushFn
                 ]
 
         AST.Word value _ ->
@@ -612,14 +203,14 @@ nodeToInstruction typeInfo node =
                 Just type_ ->
                     let
                         typeSize =
-                            wasmPtrSize + (memberSize * wasmPtrSize)
+                            BaseModule.wasmPtrSize + (memberSize * BaseModule.wasmPtrSize)
 
                         memberSize =
                             List.length type_.members
                     in
                     Wasm.Batch
                         [ Wasm.I32_Const typeSize
-                        , Wasm.Call allocFn
+                        , Wasm.Call BaseModule.allocFn
                         , Wasm.Local_Tee 0
                         , Wasm.I32_Const type_.id
                         , Wasm.I32_Store
@@ -631,11 +222,11 @@ nodeToInstruction typeInfo node =
                                 , Wasm.I32_EqZero
                                 , Wasm.BreakIf 1
                                 , Wasm.Local_Get 0
-                                , Wasm.I32_Const wasmPtrSize
+                                , Wasm.I32_Const BaseModule.wasmPtrSize
                                 , Wasm.Local_Get 1
                                 , Wasm.I32_Mul
                                 , Wasm.I32_Add
-                                , Wasm.Call stackPopFn
+                                , Wasm.Call BaseModule.stackPopFn
                                 , Wasm.I32_Store
                                 , Wasm.Local_Get 1
                                 , Wasm.I32_Const 1
@@ -645,7 +236,7 @@ nodeToInstruction typeInfo node =
                                 ]
                             ]
                         , Wasm.Local_Get 0
-                        , Wasm.Call stackPushFn
+                        , Wasm.Call BaseModule.stackPushFn
                         ]
 
                 Nothing ->
@@ -656,7 +247,7 @@ nodeToInstruction typeInfo node =
                 Just type_ ->
                     let
                         typeSize =
-                            wasmPtrSize + (memberSize * wasmPtrSize)
+                            BaseModule.wasmPtrSize + (memberSize * BaseModule.wasmPtrSize)
 
                         memberSize =
                             List.length type_.members
@@ -664,17 +255,17 @@ nodeToInstruction typeInfo node =
                     case getMemberType typeInfo typeName memberName of
                         Just memberIndex ->
                             Wasm.Batch
-                                [ Wasm.Call swapFn -- Instance should now be at top of stack
-                                , Wasm.Call stackPopFn
+                                [ Wasm.Call BaseModule.swapFn -- Instance should now be at top of stack
+                                , Wasm.Call BaseModule.stackPopFn
                                 , Wasm.I32_Const typeSize
-                                , Wasm.Call copyStructFn -- Return copy of instance
+                                , Wasm.Call BaseModule.copyStructFn -- Return copy of instance
                                 , Wasm.Local_Tee 0
-                                , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
+                                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
                                 , Wasm.I32_Add -- Calculate member address
-                                , Wasm.Call stackPopFn -- Retrieve new value
+                                , Wasm.Call BaseModule.stackPopFn -- Retrieve new value
                                 , Wasm.I32_Store
                                 , Wasm.Local_Get 0 -- Return instance
-                                , Wasm.Call stackPushFn
+                                , Wasm.Call BaseModule.stackPushFn
                                 ]
 
                         Nothing ->
@@ -687,11 +278,11 @@ nodeToInstruction typeInfo node =
             case getMemberType typeInfo typeName memberName of
                 Just memberIndex ->
                     Wasm.Batch
-                        [ Wasm.Call stackPopFn -- Get instance address
-                        , Wasm.I32_Const ((memberIndex + 1) * wasmPtrSize) -- Calculate member offset
+                        [ Wasm.Call BaseModule.stackPopFn -- Get instance address
+                        , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
                         , Wasm.I32_Add -- Calculate member address
                         , Wasm.I32_Load -- Retrieve member
-                        , Wasm.Call stackPushFn -- Push member onto stack
+                        , Wasm.Call BaseModule.stackPushFn -- Push member onto stack
                         ]
 
                 Nothing ->
@@ -700,34 +291,34 @@ nodeToInstruction typeInfo node =
         AST.Builtin builtin ->
             case builtin of
                 Builtin.Plus ->
-                    Wasm.Call addIntFn
+                    Wasm.Call BaseModule.addIntFn
 
                 Builtin.Minus ->
-                    Wasm.Call subIntFn
+                    Wasm.Call BaseModule.subIntFn
 
                 Builtin.Multiply ->
-                    Wasm.Call mulIntFn
+                    Wasm.Call BaseModule.mulIntFn
 
                 Builtin.Divide ->
-                    Wasm.Call divIntFn
+                    Wasm.Call BaseModule.divIntFn
 
                 Builtin.Equal ->
-                    Wasm.Call eqIntFn
+                    Wasm.Call BaseModule.eqIntFn
 
                 Builtin.StackDuplicate ->
-                    Wasm.Call dupFn
+                    Wasm.Call BaseModule.dupFn
 
                 Builtin.StackDrop ->
-                    Wasm.Call dropFn
+                    Wasm.Call BaseModule.dropFn
 
                 Builtin.StackSwap ->
-                    Wasm.Call swapFn
+                    Wasm.Call BaseModule.swapFn
 
                 Builtin.StackRightRotate ->
-                    Wasm.Call rotFn
+                    Wasm.Call BaseModule.rotFn
 
                 Builtin.StackLeftRotate ->
-                    Wasm.Call leftRotFn
+                    Wasm.Call BaseModule.leftRotFn
 
                 Builtin.Apply ->
                     Wasm.CallIndirect
