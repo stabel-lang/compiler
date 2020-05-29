@@ -52,25 +52,30 @@ type AstNode
     | Quotation (List AstNode)
 
 
-parse : List Token -> Result () AST
-parse tokens =
-    let
-        ( errors, ast ) =
-            tokens
-                |> gather isDefinition
-                |> List.foldl parseDefinition
-                    ( []
-                    , { types = Dict.empty
-                      , words = Dict.empty
-                      }
-                    )
-    in
-    case errors of
-        [] ->
-            Ok ast
-
-        _ ->
+run : String -> Result () AST
+run sourceCode =
+    case Token.tokenize sourceCode of
+        Err _ ->
             Err ()
+
+        Ok tokens ->
+            let
+                ( errors, ast ) =
+                    tokens
+                        |> gather isDefinition
+                        |> List.foldl parseDefinition
+                            ( []
+                            , { types = Dict.empty
+                              , words = Dict.empty
+                              }
+                            )
+            in
+            case errors of
+                [] ->
+                    Ok ast
+
+                _ ->
+                    Err ()
 
 
 gather : (a -> Bool) -> List a -> List (List a)

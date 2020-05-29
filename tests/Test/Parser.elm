@@ -17,37 +17,18 @@ suite =
             \_ ->
                 let
                     source =
-                        [ -- inc function
-                          Metadata "def"
-                        , Symbol "inc"
-                        , Metadata ""
-                        , Token.Integer 1
-                        , Symbol "+"
+                        """
+                        def: inc
+                        : 1 +
 
-                        -- dec function
-                        , Metadata "def"
-                        , Symbol "dec"
-                        , Metadata "type"
-                        , Type "Int"
-                        , TypeSeperator
-                        , Type "Int"
-                        , Metadata ""
-                        , Token.Integer 1
-                        , Symbol "-"
-                        , Metadata "def"
+                        def: dec
+                        type: Int -- Int
+                        : 1 -
 
-                        -- main function
-                        , Symbol "main"
-                        , Metadata "entry"
-                        , Symbol "true"
-                        , Metadata ""
-                        , Token.Integer 1
-                        , Symbol "inc"
-                        , Symbol "inc"
-                        , Symbol "dec"
-                        , Token.Integer 2
-                        , Symbol "="
-                        ]
+                        def: main
+                        entry: true
+                        : 1 inc inc dec 2 =
+                        """
 
                     expectedAst =
                         { types = Dict.empty
@@ -88,7 +69,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -98,19 +79,13 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "deftype"
-                        , Type "True"
-
-                        -- as int
-                        , Metadata "def"
-                        , Symbol "as-int"
-                        , Metadata "type"
-                        , Type "True"
-                        , TypeSeperator
-                        , Type "Int"
-                        , Metadata ""
-                        , Token.Integer 1
-                        ]
+                        """
+                        deftype: True
+                        
+                        def: as-int
+                        type: True -- Int
+                        : 1
+                        """
 
                     expectedAst =
                         { types =
@@ -139,7 +114,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -149,26 +124,17 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "deftype"
-                        , Type "Person"
-                        , Metadata ""
-                        , ListStart
-                        , Metadata "age"
-                        , Type "Int"
-                        , Metadata "jobs"
-                        , Type "Int"
-                        , ListEnd
+                        """
+                        deftype: Person
+                        : {
+                            age: Int
+                            jobs: Int
+                        }
 
-                        -- get-age
-                        , Metadata "def"
-                        , Symbol "get-age"
-                        , Metadata "type"
-                        , Type "Person"
-                        , TypeSeperator
-                        , Type "Int"
-                        , Metadata ""
-                        , Token.Symbol "age>"
-                        ]
+                        def: get-age
+                        type: Person -- Int
+                        : age>
+                        """
 
                     expectedAst =
                         { types =
@@ -227,7 +193,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -237,19 +203,11 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "def"
-                        , Symbol "over"
-                        , Metadata "type"
-                        , Symbol "a"
-                        , Symbol "b"
-                        , TypeSeperator
-                        , Symbol "a"
-                        , Symbol "b"
-                        , Symbol "a"
-                        , Metadata ""
-                        , Symbol "dup"
-                        , Symbol "rotate"
-                        ]
+                        """
+                        def: over
+                        type: a b -- a b a
+                        : dup rotate
+                        """
 
                     expectedAst =
                         { types = Dict.empty
@@ -270,7 +228,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -280,32 +238,19 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "defunion"
-                        , Type "Bool"
-                        , Metadata ""
-                        , ListStart
-                        , Type "True"
-                        , Type "False"
-                        , ListEnd
+                        """
+                        defunion: Bool
+                        : { True False }
 
-                        -- True
-                        , Metadata "deftype"
-                        , Type "True"
+                        deftype: True
+                        deftype: False
 
-                        -- False
-                        , Metadata "deftype"
-                        , Type "False"
-
-                        -- Multifn
-                        , Metadata "defmulti"
-                        , Symbol "to-int"
-                        , Metadata "when"
-                        , Type "True"
-                        , Token.Integer 1
-                        , Metadata "when"
-                        , Type "False"
-                        , Token.Integer 0
-                        ]
+                        defmulti: to-int
+                        when: True
+                            drop 1
+                        when: False
+                            drop 0
+                        """
 
                     expectedAst =
                         { types =
@@ -342,10 +287,10 @@ suite =
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch (Type.Custom "False") []
-                                              , [ AST.Integer 0 ]
+                                              , [ AST.Word "drop", AST.Integer 0 ]
                                               )
                                             , ( TypeMatch (Type.Custom "True") []
-                                              , [ AST.Integer 1 ]
+                                              , [ AST.Word "drop", AST.Integer 1 ]
                                               )
                                             ]
                                             []
@@ -353,7 +298,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -363,33 +308,15 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "def"
-                        , Symbol "apply-to-num"
-                        , Metadata "type"
-                        , Type "Int"
-                        , QuoteStart
-                        , Type "Int"
-                        , TypeSeperator
-                        , Type "Int"
-                        , QuoteStop
-                        , TypeSeperator
-                        , Type "Int"
-                        , Metadata ""
-                        , Symbol "!"
+                        """
+                        def: apply-to-num
+                        type: Int [ Int -- Int ] -- Int
+                        : !
 
-                        -- main
-                        , Metadata "def"
-                        , Symbol "main"
-                        , Metadata "entry"
-                        , Symbol "true"
-                        , Metadata ""
-                        , Token.Integer 1
-                        , QuoteStart
-                        , Token.Integer 1
-                        , Symbol "+"
-                        , QuoteStop
-                        , Symbol "apply-to-num"
-                        ]
+                        def: main
+                        entry: true
+                        : 1 [ 1 + ] apply-to-num
+                        """
 
                     expectedAst =
                         { types = Dict.empty
@@ -425,7 +352,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -435,33 +362,15 @@ suite =
             \_ ->
                 let
                     source =
-                        [ Metadata "def"
-                        , Symbol "apply-to-num"
-                        , Metadata "type"
-                        , Symbol "a..."
-                        , QuoteStart
-                        , Symbol "a..."
-                        , TypeSeperator
-                        , Symbol "b..."
-                        , QuoteStop
-                        , TypeSeperator
-                        , Symbol "b..."
-                        , Metadata ""
-                        , Symbol "!"
+                        """
+                        def: apply-to-num
+                        type: a... [ a... -- b... ] -- b...
+                        : !
 
-                        -- main
-                        , Metadata "def"
-                        , Symbol "main"
-                        , Metadata "entry"
-                        , Symbol "true"
-                        , Metadata ""
-                        , Token.Integer 1
-                        , QuoteStart
-                        , Token.Integer 1
-                        , Symbol "+"
-                        , QuoteStop
-                        , Symbol "apply-to-num"
-                        ]
+                        def: main
+                        entry: true
+                        : 1 [ 1 + ] apply-to-num
+                        """
 
                     expectedAst =
                         { types = Dict.empty
@@ -500,7 +409,7 @@ suite =
                                 ]
                         }
                 in
-                case parse source of
+                case run source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -511,17 +420,12 @@ suite =
                 \_ ->
                     let
                         source =
-                            [ Metadata "defmulti"
-                            , Symbol "zero?"
-                            , Metadata "when"
-                            , PatternMatchStart "Int"
-                            , Symbol "value"
-                            , Token.Integer 0
-                            , ParenStop
-                            , Symbol ">True"
-                            , Metadata ""
-                            , Symbol ">False"
-                            ]
+                            """
+                            defmulti: zero?
+                            when: Int( value 0 )
+                                >True
+                            : >False
+                            """
 
                         expectedAst =
                             { types = Dict.empty
@@ -538,7 +442,7 @@ suite =
                                     ]
                             }
                     in
-                    case parse source of
+                    case run source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -548,20 +452,12 @@ suite =
                 \_ ->
                     let
                         source =
-                            [ Metadata "defmulti"
-                            , Symbol "pair?"
-                            , Metadata "when"
-                            , PatternMatchStart "List"
-                            , Symbol "tail"
-                            , PatternMatchStart "List"
-                            , Symbol "tail"
-                            , Type "Nil"
-                            , ParenStop
-                            , ParenStop
-                            , Symbol ">True"
-                            , Metadata ""
-                            , Symbol ">False"
-                            ]
+                            """
+                            defmulti: pair?
+                            when: List( tail List( tail Nil ) )
+                                >True
+                            : >False
+                            """
 
                         expectedAst =
                             { types = Dict.empty
@@ -588,7 +484,7 @@ suite =
                                     ]
                             }
                     in
-                    case parse source of
+                    case run source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -598,19 +494,12 @@ suite =
                 \_ ->
                     let
                         source =
-                            [ Metadata "defmulti"
-                            , Symbol "origo?"
-                            , Metadata "when"
-                            , PatternMatchStart "Pair"
-                            , Symbol "first"
-                            , Token.Integer 0
-                            , Symbol "second"
-                            , Token.Integer 0
-                            , ParenStop
-                            , Symbol ">True"
-                            , Metadata ""
-                            , Symbol ">False"
-                            ]
+                            """
+                            defmulti: origo?
+                            when: Pair( first 0 second 0 )
+                                >True
+                            : >False
+                            """
 
                         expectedAst =
                             { types = Dict.empty
@@ -632,7 +521,7 @@ suite =
                                     ]
                             }
                     in
-                    case parse source of
+                    case run source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -642,19 +531,14 @@ suite =
                 \_ ->
                     let
                         source =
-                            [ Metadata "defmulti"
-                            , Symbol "origo?"
-                            , Metadata "when"
-                            , PatternMatchStart "Pair"
-                            , Token.Integer 0
-                            , Token.Integer 0
-                            , ParenStop
-                            , Symbol ">True"
-                            , Metadata ""
-                            , Symbol ">False"
-                            ]
+                            """
+                            defmulti: origo?
+                            when: Pair( 0 0 )
+                                >True
+                            : >False
+                            """
                     in
-                    case parse source of
+                    case run source of
                         Err () ->
                             Expect.pass
 
