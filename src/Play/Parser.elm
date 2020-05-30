@@ -258,24 +258,16 @@ typeDefinitionParser =
     Parser.succeed CustomTypeDef
         |= typeNameParser
         |. Parser.spaces
-        |= Parser.oneOf
-            [ Parser.succeed identity
-                |. Parser.symbol ":"
-                |. Parser.spaces
-                |. Parser.symbol "{"
-                |. Parser.spaces
-                |= Parser.loop [] typeMemberParser
-                |. Parser.symbol "}"
-                |. Parser.spaces
-            , Parser.succeed []
-            ]
+        |= Parser.loop [] typeMemberParser
 
 
 typeMemberParser : List ( String, Type ) -> Parser (Parser.Step (List ( String, Type )) (List ( String, Type )))
 typeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
-            |= metadataParser
+            |. Parser.symbol ":"
+            |. Parser.spaces
+            |= symbolParser
             |. Parser.spaces
             |= typeParser
             |. Parser.spaces
@@ -288,19 +280,15 @@ unionTypeDefinitionParser =
     Parser.succeed UnionTypeDef
         |= typeNameParser
         |. Parser.spaces
-        |. Parser.symbol ":"
-        |. Parser.spaces
-        |. Parser.symbol "{"
-        |. Parser.spaces
         |= Parser.loop [] unionTypeMemberParser
-        |. Parser.symbol "}"
-        |. Parser.spaces
 
 
 unionTypeMemberParser : List Type -> Parser (Parser.Step (List Type) (List Type))
 unionTypeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
+            |. Parser.symbol ":"
+            |. Parser.spaces
             |= typeParser
             |. Parser.spaces
         , Parser.succeed (Parser.Done (List.reverse types))

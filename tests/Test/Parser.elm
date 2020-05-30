@@ -125,10 +125,8 @@ suite =
                     source =
                         """
                         deftype: Person
-                        : {
-                            age: Int
-                            jobs: Int
-                        }
+                        : age Int
+                        : jobs Int
 
                         def: get-age
                         type: Person -- Int
@@ -239,16 +237,17 @@ suite =
                     source =
                         """
                         defunion: Bool
-                        : { True False }
+                        : True 
+                        : False 
 
                         deftype: True
                         deftype: False
 
                         defmulti: to-int
                         when: True
-                            drop 1
+                          drop 1
                         when: False
-                            drop 0
+                          drop 0
                         """
 
                     expectedAst =
@@ -422,7 +421,7 @@ suite =
                             """
                             defmulti: zero?
                             when: Int( value 0 )
-                                >True
+                              >True
                             : >False
                             """
 
@@ -454,7 +453,7 @@ suite =
                             """
                             defmulti: pair?
                             when: List( tail List( tail Nil ) )
-                                >True
+                              >True
                             : >False
                             """
 
@@ -496,7 +495,7 @@ suite =
                             """
                             defmulti: origo?
                             when: Pair( first 0 second 0 )
-                                >True
+                              >True
                             : >False
                             """
 
@@ -533,7 +532,7 @@ suite =
                             """
                             defmulti: origo?
                             when: Pair( 0 0 )
-                                >True
+                              >True
                             : >False
                             """
                     in
@@ -541,7 +540,7 @@ suite =
                         Err () ->
                             Expect.pass
 
-                        Ok ast ->
+                        Ok _ ->
                             Expect.fail "Did not expect parsing to succeed"
             ]
         ]
