@@ -1,4 +1,14 @@
-module Play.Parser exposing (..)
+module Play.Parser exposing
+    ( AST
+    , AstNode(..)
+    , TypeDefinition(..)
+    , TypeMatch(..)
+    , TypeMatchValue(..)
+    , WordDefinition
+    , WordImplementation(..)
+    , run
+    , typeDefinitionName
+    )
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
