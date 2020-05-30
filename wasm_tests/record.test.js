@@ -19,7 +19,7 @@ test('Enum type', async () => {
 test('Compound type', async () => {
     const wat = await compiler.toWat(`
         deftype: Person
-        : { age: Int }
+        : age Int
 
         def: inc-age
         : age> 1 + >Person

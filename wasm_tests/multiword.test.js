@@ -3,16 +3,17 @@ const compiler = require('./compiler.wrapper');
 test('Simple case', async () => {
     const wat = await compiler.toWat(`
         defunion: Bool
-        : { True False }
+        : True
+        : False
 
         deftype: True
         deftype: False
 
         defmulti: to-int
         when: True
-            drop 100
+          drop 100
         when: False
-            drop 75
+          drop 75
 
         def: main
         entry: true
@@ -28,14 +29,15 @@ test('Simple case', async () => {
 test('Default branch', async () => {
     const wat = await compiler.toWat(`
         defunion: Bool
-        : { True False }
+        : True 
+        : False
 
         deftype: True
         deftype: False
 
         defmulti: to-int
         when: True
-            drop 100
+          drop 100
         : drop 75
 
         def: main
@@ -53,30 +55,31 @@ test('Default branch', async () => {
 test('Multiple arguments', async () => {
     const wat = await compiler.toWat(`
         defunion: Beings
-        : { Person Dog }
+        : Person 
+        : Dog
 
         deftype: Person
-        : { age: Int }
+        : age Int
 
         deftype: Dog
-        : { man-years: Int }
+        : man-years Int
 
         defmulti: add-to-age
         when: Person
-            swap dup age>
-            -rotate +
-            >age
+          swap dup age>
+          -rotate +
+          >age
         when: Dog
-            4 * 
-            swap dup man-years>
-            -rotate +
-            >man-years
+          4 * 
+          swap dup man-years>
+          -rotate +
+          >man-years
 
         defmulti: get-man-age
         when: Person
-            age>
+          age>
         when: Dog
-            man-years>
+          man-years>
 
         def: main
         entry: true
