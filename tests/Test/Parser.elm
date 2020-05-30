@@ -6,7 +6,6 @@ import Expect
 import Play.Data.Metadata as Metadata
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
-import Play.Tokenizer as Token exposing (Token(..))
 import Test exposing (Test, describe, test)
 
 

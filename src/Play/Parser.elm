@@ -2,11 +2,9 @@ module Play.Parser exposing (..)
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
-import List.Extra as List
+import Parser exposing ((|.), (|=), Parser)
 import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.Type as Type exposing (Type)
-import Play.Tokenizer as Token exposing (Token)
-import Result.Extra as Result
+import Play.Data.Type as Type exposing (Type, WordType)
 import Set exposing (Set)
 
 
@@ -54,573 +52,486 @@ type AstNode
 
 run : String -> Result () AST
 run sourceCode =
-    case Token.tokenize sourceCode of
-        Err _ ->
-            Err ()
-
-        Ok tokens ->
-            let
-                ( errors, ast ) =
-                    tokens
-                        |> gather isDefinition
-                        |> List.foldl parseDefinition
-                            ( []
-                            , { types = Dict.empty
-                              , words = Dict.empty
-                              }
-                            )
-            in
-            case errors of
-                [] ->
-                    Ok ast
-
-                _ ->
-                    Err ()
+    Parser.run parser sourceCode
+        |> Result.mapError (always ())
 
 
-gather : (a -> Bool) -> List a -> List (List a)
-gather pred tokens =
-    gatherHelp pred tokens []
+parser : Parser AST
+parser =
+    let
+        emptyAst =
+            { types = Dict.empty
+            , words = Dict.empty
+            }
+    in
+    Parser.succeed identity
+        |. Parser.spaces
+        |= Parser.loop emptyAst definitionParser
+        |. Parser.end
 
 
-gatherHelp : (a -> Bool) -> List a -> List (List a) -> List (List a)
-gatherHelp pred tokens acc =
-    case tokens of
-        [] ->
-            List.reverse acc
+definitionParser : AST -> Parser (Parser.Step AST AST)
+definitionParser ast =
+    let
+        insertWord wordDef =
+            Parser.Loop { ast | words = Dict.insert wordDef.name wordDef ast.words }
 
-        first :: rest ->
-            let
-                tilNextDefinition =
-                    if pred first then
-                        first :: List.takeWhile (not << pred) rest
-
-                    else
-                        List.takeWhile (not << pred) tokens
-
-                remainingTokens =
-                    List.drop (List.length tilNextDefinition) tokens
-            in
-            gatherHelp pred remainingTokens (tilNextDefinition :: acc)
-
-
-definitionKeywords : Set String
-definitionKeywords =
-    Set.fromList
-        [ "def"
-        , "deftype"
-        , "defunion"
-        , "defmulti"
+        insertType typeDef ast_ =
+            { ast_ | types = Dict.insert (typeDefinitionName typeDef) typeDef ast_.types }
+    in
+    Parser.oneOf
+        [ Parser.succeed insertWord
+            |. Parser.keyword "def:"
+            |. Parser.spaces
+            |= wordDefinitionParser
+        , Parser.succeed insertWord
+            |. Parser.keyword "defmulti:"
+            |. Parser.spaces
+            |= multiWordDefinitionParser
+        , Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
+            |. Parser.keyword "deftype:"
+            |. Parser.spaces
+            |= typeDefinitionParser
+        , Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
+            |. Parser.keyword "defunion:"
+            |. Parser.spaces
+            |= unionTypeDefinitionParser
+        , Parser.succeed (Parser.Done ast)
         ]
 
 
-isDefinition : Token -> Bool
-isDefinition token =
-    case token of
-        Token.Metadata value ->
-            Set.member value definitionKeywords
+generateDefaultWordsForType : TypeDefinition -> AST -> AST
+generateDefaultWordsForType typeDef ast =
+    case typeDef of
+        UnionTypeDef _ _ ->
+            ast
 
-        _ ->
-            False
-
-
-parseDefinition : List Token -> ( List (), AST ) -> ( List (), AST )
-parseDefinition tokens ( errors, ast ) =
-    case tokens of
-        (Token.Metadata "def") :: (Token.Symbol wordName) :: rest ->
-            case List.splitWhen (\token -> token == Token.Metadata "") rest of
-                Nothing ->
-                    ( () :: errors
-                    , ast
-                    )
-
-                Just ( meta, impl ) ->
-                    let
-                        ( metaParseErrors, metadata ) =
-                            meta
-                                |> gather isMeta
-                                |> List.foldl parseMeta ( [], Metadata.default )
-
-                        parsedImpl =
-                            impl
-                                |> List.drop 1
-                                |> parseAstNodes []
-                                |> Result.combine
-                    in
-                    case ( metaParseErrors, parsedImpl ) of
-                        ( [], Ok wordImpl ) ->
-                            ( errors
-                            , { ast
-                                | words =
-                                    Dict.insert wordName
-                                        { name = wordName
-                                        , metadata = metadata
-                                        , implementation = SoloImpl wordImpl
-                                        }
-                                        ast.words
-                              }
-                            )
-
-                        _ ->
-                            ( () :: errors
-                            , ast
-                            )
-
-        (Token.Metadata "deftype") :: (Token.Type typeName) :: [] ->
-            ( errors
-            , parseTypeDefinition typeName [] ast
-            )
-
-        (Token.Metadata "deftype") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
-            case List.splitWhen (\t -> t == Token.ListEnd) rest of
-                Just ( types, [ Token.ListEnd ] ) ->
-                    case parseTypeMembers types [] of
-                        Err () ->
-                            ( () :: errors
-                            , ast
-                            )
-
-                        Ok members ->
-                            ( errors
-                            , parseTypeDefinition typeName members ast
-                            )
-
-                _ ->
-                    ( () :: errors
-                    , ast
-                    )
-
-        (Token.Metadata "defunion") :: (Token.Type typeName) :: (Token.Metadata "") :: Token.ListStart :: rest ->
-            case List.splitWhen (\t -> t == Token.ListEnd) rest of
-                Just ( types, [ Token.ListEnd ] ) ->
-                    let
-                        possibleMemberTypes =
-                            types
-                                |> List.map parseType
-                                |> Result.combine
-                    in
-                    case possibleMemberTypes of
-                        Err () ->
-                            ( () :: errors
-                            , ast
-                            )
-
-                        Ok members ->
-                            ( errors
-                            , parseUnionTypeDefinition typeName members ast
-                            )
-
-                _ ->
-                    ( () :: errors
-                    , ast
-                    )
-
-        (Token.Metadata "defmulti") :: (Token.Symbol wordName) :: rest ->
+        CustomTypeDef typeName typeMembers ->
             let
-                parseMulti meta impl =
-                    let
-                        isMetaSectionAWhen =
-                            List.head >> Maybe.map isWhen >> Maybe.withDefault False
+                metadata =
+                    Metadata.default
+                        |> Metadata.withType (List.map Tuple.second typeMembers) [ Type.Custom typeName ]
 
-                        ( metaParseErrors, metadata ) =
-                            meta
-                                |> gather isMeta
-                                |> List.filter (isMetaSectionAWhen >> not)
-                                |> List.foldl parseMeta ( [], Metadata.default )
+                ctorDef =
+                    { name = ">" ++ typeName
+                    , metadata = metadata
+                    , implementation =
+                        SoloImpl [ ConstructType typeName ]
+                    }
 
-                        ( whenParseErrors, whens ) =
-                            meta
-                                |> gather isMeta
-                                |> List.filter isMetaSectionAWhen
-                                |> List.foldl parseWhen ( [], [] )
+                generatedDefs =
+                    typeMembers
+                        |> List.concatMap setterGetterPair
+                        |> (::) ctorDef
+                        |> Dict.fromListBy .name
 
-                        parsedImpl =
-                            impl
-                                |> List.drop 1
-                                |> parseAstNodes []
-                                |> Result.combine
-                    in
-                    case ( metaParseErrors, whenParseErrors, parsedImpl ) of
-                        ( [], [], Ok wordImpl ) ->
-                            ( errors
-                            , { ast
-                                | words =
-                                    Dict.insert wordName
-                                        { name = wordName
-                                        , metadata = metadata
-                                        , implementation = MultiImpl whens wordImpl
-                                        }
-                                        ast.words
-                              }
-                            )
-
-                        _ ->
-                            ( () :: errors
-                            , ast
-                            )
+                setterGetterPair ( memberName, memberType ) =
+                    [ { name = ">" ++ memberName
+                      , metadata =
+                            Metadata.default
+                                |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
+                      , implementation =
+                            SoloImpl
+                                [ SetMember typeName memberName ]
+                      }
+                    , { name = memberName ++ ">"
+                      , metadata =
+                            Metadata.default
+                                |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
+                      , implementation =
+                            SoloImpl
+                                [ GetMember typeName memberName ]
+                      }
+                    ]
             in
-            case List.splitWhen (\token -> token == Token.Metadata "") rest of
+            { ast | words = Dict.union generatedDefs ast.words }
+
+
+debugSpaces : String -> Parser ()
+debugSpaces tag =
+    Parser.chompWhile (\c -> Debug.log tag <| Set.member c whitespaceChars)
+
+
+wordDefinitionParser : Parser WordDefinition
+wordDefinitionParser =
+    let
+        joinParseResults name def =
+            { def | name = name }
+
+        emptyDef =
+            { name = ""
+            , metadata = Metadata.default
+            , implementation = SoloImpl []
+            }
+    in
+    Parser.succeed joinParseResults
+        |= symbolParser
+        |. Parser.spaces
+        |= Parser.loop emptyDef wordMetadataParser
+
+
+wordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
+wordMetadataParser def =
+    let
+        metadata =
+            def.metadata
+    in
+    Parser.oneOf
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
+            |. Parser.keyword "type:"
+            |. Parser.spaces
+            |= typeSignatureParser
+        , Parser.succeed (Parser.Loop { def | metadata = { metadata | isEntryPoint = True } })
+            |. Parser.keyword "entry:"
+            |. Parser.spaces
+            |. Parser.keyword "true"
+            |. Parser.spaces
+        , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
+            |. Parser.keyword ":"
+            |. Parser.spaces
+            |= implementationParser
+        , Parser.succeed (Parser.Done def)
+        ]
+
+
+multiWordDefinitionParser : Parser WordDefinition
+multiWordDefinitionParser =
+    let
+        joinParseResults name def =
+            { def | name = name }
+
+        emptyDef =
+            { name = ""
+            , metadata = Metadata.default
+            , implementation = SoloImpl []
+            }
+    in
+    Parser.succeed joinParseResults
+        |= symbolParser
+        |. Parser.spaces
+        |= Parser.loop emptyDef multiWordMetadataParser
+
+
+multiWordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
+multiWordMetadataParser def =
+    let
+        metadata =
+            def.metadata
+
+        addWhenImpl impl =
+            case def.implementation of
+                MultiImpl whens default ->
+                    MultiImpl (impl :: whens) default
+
+                SoloImpl default ->
+                    MultiImpl [ impl ] default
+
+        setDefaultImpl impl =
+            case def.implementation of
+                MultiImpl whens _ ->
+                    MultiImpl whens impl
+
+                SoloImpl _ ->
+                    MultiImpl [] impl
+    in
+    Parser.oneOf
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
+            |. Parser.keyword "type:"
+            |. Parser.spaces
+            |= typeSignatureParser
+        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
+            |. Parser.keyword "when:"
+            |. Parser.spaces
+            |= typeMatchParser
+            |. Parser.spaces
+            |= implementationParser
+        , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
+            |. Parser.keyword ":"
+            |. Parser.spaces
+            |= implementationParser
+        , Parser.succeed (Parser.Done def)
+        ]
+
+
+typeDefinitionParser : Parser TypeDefinition
+typeDefinitionParser =
+    Parser.succeed CustomTypeDef
+        |= typeNameParser
+        |. Parser.spaces
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol ":"
+                |. Parser.spaces
+                |. Parser.symbol "{"
+                |. Parser.spaces
+                |= Parser.loop [] typeMemberParser
+                |. Parser.symbol "}"
+                |. Parser.spaces
+            , Parser.succeed []
+            ]
+
+
+typeMemberParser : List ( String, Type ) -> Parser (Parser.Step (List ( String, Type )) (List ( String, Type )))
+typeMemberParser types =
+    Parser.oneOf
+        [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
+            |= metadataParser
+            |. Parser.spaces
+            |= typeParser
+            |. Parser.spaces
+        , Parser.succeed (Parser.Done (List.reverse types))
+        ]
+
+
+unionTypeDefinitionParser : Parser TypeDefinition
+unionTypeDefinitionParser =
+    Parser.succeed UnionTypeDef
+        |= typeNameParser
+        |. Parser.spaces
+        |. Parser.symbol ":"
+        |. Parser.spaces
+        |. Parser.symbol "{"
+        |. Parser.spaces
+        |= Parser.loop [] unionTypeMemberParser
+        |. Parser.symbol "}"
+        |. Parser.spaces
+
+
+unionTypeMemberParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+unionTypeMemberParser types =
+    Parser.oneOf
+        [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
+            |= typeParser
+            |. Parser.spaces
+        , Parser.succeed (Parser.Done (List.reverse types))
+        ]
+
+
+{-| The builtin int parser has a bug where it commits when it comes across an 'e'
+-}
+intParser : Parser Int
+intParser =
+    let
+        helper text =
+            case String.toInt text of
+                Just num ->
+                    Parser.succeed num
+
                 Nothing ->
-                    parseMulti rest []
-
-                Just ( meta, impl ) ->
-                    parseMulti meta impl
-
-        _ ->
-            ( () :: errors
-            , ast
-            )
-
-
-isMeta : Token -> Bool
-isMeta token =
-    case token of
-        Token.Metadata _ ->
-            True
-
-        _ ->
-            False
+                    Parser.problem "Not a valid integer"
+    in
+    Parser.variable
+        { start = Char.isDigit
+        , inner = Char.isDigit
+        , reserved = Set.empty
+        }
+        |> Parser.andThen helper
 
 
-parseMeta : List Token -> ( List (), Metadata ) -> ( List (), Metadata )
-parseMeta tokens ( errors, metadata ) =
-    case tokens of
-        [ Token.Metadata "entry", value ] ->
-            if value /= Token.Symbol "true" then
-                ( () :: errors
-                , metadata
-                )
+symbolParser : Parser String
+symbolParser =
+    Parser.backtrackable <|
+        Parser.variable
+            { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+            , inner = validSymbolChar
+            , reserved = Set.empty
+            }
+            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
+
+
+metadataParser : Parser String
+metadataParser =
+    Parser.backtrackable <|
+        Parser.variable
+            { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+            , inner = validSymbolChar
+            , reserved = Set.empty
+            }
+            |. Parser.chompIf (\c -> c == ':')
+
+
+validSymbolChar : Char -> Bool
+validSymbolChar c =
+    not <| Set.member c invalidSymbolChars
+
+
+invalidSymbolChars : Set Char
+invalidSymbolChars =
+    Set.union whitespaceChars specialChars
+
+
+specialChars : Set Char
+specialChars =
+    Set.fromList
+        [ ':'
+        , '{'
+        , '}'
+        , '['
+        , ']'
+        , '('
+        , ')'
+        , '.'
+        ]
+
+
+whitespaceChars : Set Char
+whitespaceChars =
+    Set.fromList
+        [ ' '
+        , '\n'
+        , '\u{000D}'
+        , '\t'
+        ]
+
+
+typeSignatureParser : Parser WordType
+typeSignatureParser =
+    Parser.succeed (\input output -> { input = input, output = output })
+        |= Parser.loop [] typeLoopParser
+        |. Parser.symbol "--"
+        |. Parser.spaces
+        |= Parser.loop [] typeLoopParser
+
+
+typeLoopParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+typeLoopParser reverseTypes =
+    let
+        step type_ =
+            Parser.Loop (type_ :: reverseTypes)
+    in
+    Parser.oneOf
+        [ Parser.succeed step
+            |= typeParser
+            |. Parser.spaces
+        , Parser.succeed step
+            |= genericParser
+            |. Parser.spaces
+        , Parser.succeed (\wordType -> step (Type.Quotation wordType))
+            |. Parser.symbol "["
+            |. Parser.spaces
+            |= typeSignatureParser
+            |. Parser.symbol "]"
+            |. Parser.spaces
+        , Parser.succeed (Parser.Done (List.reverse reverseTypes))
+        ]
+
+
+typeParser : Parser Type
+typeParser =
+    let
+        helper value =
+            if value == "Int" then
+                Type.Int
 
             else
-                ( errors
-                , { metadata | isEntryPoint = True }
-                )
-
-        (Token.Metadata "type") :: values ->
-            case parseWordType values of
-                Ok type_ ->
-                    ( errors
-                    , { metadata | type_ = Just type_ }
-                    )
-
-                Err () ->
-                    ( () :: errors
-                    , metadata
-                    )
-
-        _ ->
-            ( () :: errors
-            , metadata
-            )
-
-
-parseWordType : List Token -> Result () Type.WordType
-parseWordType tokens =
-    case nestedListSplit Token.QuoteStart Token.QuoteStop Token.TypeSeperator tokens of
-        Just ( inputs, outputs ) ->
-            let
-                possibleInputTypes =
-                    parseTypes [] inputs
-                        |> Result.combine
-
-                possibleOutputTypes =
-                    outputs
-                        |> parseTypes []
-                        |> Result.combine
-            in
-            case ( possibleInputTypes, possibleOutputTypes ) of
-                ( Ok inputTypes, Ok outputTypes ) ->
-                    Ok { input = inputTypes, output = outputTypes }
-
-                _ ->
-                    Err ()
-
-        Nothing ->
-            Err ()
-
-
-isWhen : Token -> Bool
-isWhen token =
-    case token of
-        Token.Metadata "when" ->
-            True
-
-        _ ->
-            False
-
-
-parseWhen : List Token -> ( List (), List ( TypeMatch, List AstNode ) ) -> ( List (), List ( TypeMatch, List AstNode ) )
-parseWhen tokens ( errors, cases ) =
-    case tokens of
-        (Token.Metadata "when") :: ((Token.Type _) as typeToken) :: impl ->
-            let
-                parsedImpl =
-                    impl
-                        |> parseAstNodes []
-                        |> Result.combine
-            in
-            case ( parseTypeMatch typeToken, parsedImpl ) of
-                ( Ok type_, Ok wordImpl ) ->
-                    ( errors
-                    , ( type_, wordImpl ) :: cases
-                    )
-
-                _ ->
-                    ( () :: errors
-                    , cases
-                    )
-
-        (Token.Metadata "when") :: (Token.PatternMatchStart typeName) :: remaining ->
-            case semanticSplit isPatternMatchStart Token.ParenStop remaining of
-                ( pattern, impl ) ->
-                    let
-                        parsedImpl =
-                            impl
-                                |> parseAstNodes []
-                                |> Result.combine
-                    in
-                    case ( parsePatternMatch typeName pattern, parsedImpl ) of
-                        ( Just ( typeMatch, [] ), Ok wordImpl ) ->
-                            ( errors
-                            , ( typeMatch, wordImpl ) :: cases
-                            )
-
-                        _ ->
-                            ( () :: errors
-                            , cases
-                            )
-
-        _ ->
-            ( () :: errors
-            , cases
-            )
-
-
-parsePatternMatch : String -> List Token -> Maybe ( TypeMatch, List Token )
-parsePatternMatch typeName tokens =
-    case parseType (Token.Type typeName) of
-        Ok type_ ->
-            case semanticSplit isPatternMatchStart Token.ParenStop tokens of
-                ( pattern, rem ) ->
-                    case collectPatternAttributes pattern [] of
-                        Ok patterns ->
-                            Just <| ( TypeMatch type_ patterns, rem )
-
-                        Err _ ->
-                            Nothing
-
-        Err _ ->
-            Nothing
-
-
-collectPatternAttributes : List Token -> List ( String, TypeMatchValue ) -> Result () (List ( String, TypeMatchValue ))
-collectPatternAttributes tokens result =
-    case tokens of
-        [] ->
-            Ok (List.reverse result)
-
-        (Token.Symbol attrValue) :: (Token.Integer val) :: rest ->
-            collectPatternAttributes rest (( attrValue, LiteralInt val ) :: result)
-
-        (Token.Symbol attrValue) :: ((Token.Type _) as tokenType) :: rest ->
-            case parseType tokenType of
-                Ok type_ ->
-                    collectPatternAttributes rest (( attrValue, LiteralType type_ ) :: result)
-
-                Err _ ->
-                    Err ()
-
-        (Token.Symbol attrValue) :: (Token.PatternMatchStart subName) :: rest ->
-            case parsePatternMatch subName rest of
-                Just ( typeMatch, remaining ) ->
-                    collectPatternAttributes remaining (( attrValue, RecursiveMatch typeMatch ) :: result)
-
-                Nothing ->
-                    Err ()
-
-        _ ->
-            Err ()
-
-
-isPatternMatchStart : Token -> Bool
-isPatternMatchStart token =
-    case token of
-        Token.PatternMatchStart _ ->
-            True
-
-        _ ->
-            False
-
-
-parseAstNodes : List (Result () AstNode) -> List Token -> List (Result () AstNode)
-parseAstNodes result remaining =
-    case remaining of
-        [] ->
-            List.reverse result
-
-        current :: next ->
-            case current of
-                Token.Integer value ->
-                    parseAstNodes (Ok (Integer value) :: result) next
-
-                Token.Symbol value ->
-                    parseAstNodes ((Ok <| Word value) :: result) next
-
-                Token.QuoteStart ->
-                    case List.splitWhen (\t -> t == Token.QuoteStop) next of
-                        Just ( quotImplTokens, newNext ) ->
-                            case Result.combine (parseAstNodes [] quotImplTokens) of
-                                Ok quotImpl ->
-                                    parseAstNodes (Ok (Quotation quotImpl) :: result) (List.drop 1 newNext)
-
-                                _ ->
-                                    parseAstNodes (Err () :: result) (List.drop 1 newNext)
-
-                        Nothing ->
-                            parseAstNodes (Err () :: result) next
-
-                _ ->
-                    parseAstNodes (Err () :: result) next
-
-
-parseTypeDefinition : String -> List ( String, Type ) -> AST -> AST
-parseTypeDefinition typeName members ast =
-    let
-        typeDef =
-            CustomTypeDef typeName members
-
-        metadata =
-            Metadata.default
-                |> Metadata.withType (List.map Tuple.second members) [ Type.Custom typeName ]
-
-        ctorDef =
-            { name = ">" ++ typeName
-            , metadata = metadata
-            , implementation =
-                SoloImpl [ ConstructType typeName ]
-            }
-
-        generatedDefs =
-            members
-                |> List.concatMap setterGetterPair
-                |> (::) ctorDef
-                |> Dict.fromListBy .name
-
-        setterGetterPair ( memberName, memberType ) =
-            [ { name = ">" ++ memberName
-              , metadata =
-                    Metadata.default
-                        |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
-              , implementation =
-                    SoloImpl
-                        [ SetMember typeName memberName ]
-              }
-            , { name = memberName ++ ">"
-              , metadata =
-                    Metadata.default
-                        |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
-              , implementation =
-                    SoloImpl
-                        [ GetMember typeName memberName ]
-              }
-            ]
+                Type.Custom value
     in
-    { ast
-        | types = Dict.insert typeName typeDef ast.types
-        , words = Dict.union generatedDefs ast.words
-    }
+    Parser.map helper typeNameParser
 
 
-parseType : Token -> Result () Type
-parseType token =
-    case token of
-        Token.Type "Int" ->
-            Ok Type.Int
-
-        Token.Type name ->
-            Ok <| Type.Custom name
-
-        Token.Symbol genericName ->
-            Ok <| Type.Generic genericName
-
-        _ ->
-            Err ()
+typeNameParser : Parser String
+typeNameParser =
+    Parser.variable
+        { start = Char.isUpper
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        }
 
 
-parseTypeMatch : Token -> Result () TypeMatch
-parseTypeMatch token =
-    case token of
-        Token.Type "Int" ->
-            Ok <| TypeMatch Type.Int []
+typeMatchParser : Parser TypeMatch
+typeMatchParser =
+    Parser.succeed TypeMatch
+        |= typeParser
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol "("
+                |. Parser.spaces
+                |= Parser.loop [] typeMatchConditionParser
+                |. Parser.symbol ")"
+            , Parser.succeed []
+            ]
+        |. Parser.spaces
 
-        Token.Type name ->
-            Ok <| TypeMatch (Type.Custom name) []
 
-        Token.Symbol genericName ->
-            Ok <| TypeMatch (Type.Generic genericName) []
+typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))
+typeMatchConditionParser nodes =
+    Parser.oneOf
+        [ Parser.succeed (\name value -> Parser.Loop (( name, value ) :: nodes))
+            |= symbolParser
+            |. Parser.spaces
+            |= typeMatchValueParser
+            |. Parser.spaces
+        , Parser.succeed (Parser.Done (List.reverse nodes))
+        ]
 
-        _ ->
-            Err ()
 
-
-parseTypes : List (Result () Type) -> List Token -> List (Result () Type)
-parseTypes result remaining =
-    case remaining of
-        [] ->
-            List.reverse result
-
-        current :: next ->
-            case current of
-                Token.Type "Int" ->
-                    parseTypes (Ok Type.Int :: result) next
-
-                Token.Type name ->
-                    parseTypes ((Ok <| Type.Custom name) :: result) next
-
-                Token.Symbol genericName ->
-                    if String.endsWith "..." genericName then
-                        parseTypes ((Ok <| Type.StackRange (String.dropRight 3 genericName)) :: result) next
-
-                    else
-                        parseTypes ((Ok <| Type.Generic genericName) :: result) next
-
-                Token.QuoteStart ->
-                    case List.splitWhen (\t -> t == Token.QuoteStop) next of
-                        Just ( quotTypes, newNext ) ->
-                            let
-                                possibleQuoteType =
-                                    parseWordType quotTypes
-                            in
-                            case possibleQuoteType of
-                                Ok quotType ->
-                                    parseTypes (Ok (Type.Quotation quotType) :: result) (List.drop 1 newNext)
-
-                                _ ->
-                                    parseTypes (Err () :: result) (List.drop 1 newNext)
-
-                        Nothing ->
-                            parseTypes (Err () :: result) next
+typeMatchValueParser : Parser TypeMatchValue
+typeMatchValueParser =
+    let
+        handleNewType ((TypeMatch type_ conditions) as match) =
+            case conditions of
+                [] ->
+                    LiteralType type_
 
                 _ ->
-                    parseTypes (Err () :: result) next
+                    RecursiveMatch match
+    in
+    Parser.oneOf
+        [ Parser.succeed LiteralInt
+            |= intParser
+        , Parser.succeed handleNewType
+            |= typeMatchParser
+        ]
 
 
-parseTypeMembers : List Token -> List ( String, Type ) -> Result () (List ( String, Type ))
-parseTypeMembers tokens acc =
-    case tokens of
-        [] ->
-            Ok (List.reverse acc)
+genericParser : Parser Type
+genericParser =
+    let
+        helper genericName =
+            Parser.oneOf
+                [ Parser.succeed (Type.StackRange genericName)
+                    |. Parser.symbol "..."
+                , Parser.succeed (Type.Generic genericName)
+                ]
+    in
+    Parser.variable
+        { start = \c -> not (c == '-' || Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        }
+        |> Parser.andThen helper
 
-        (Token.Metadata name) :: ((Token.Type _) as typeToken) :: rest ->
-            case parseType typeToken of
-                Err () ->
-                    Err ()
 
-                Ok typeValue ->
-                    parseTypeMembers rest (( name, typeValue ) :: acc)
+implementationParser : Parser (List AstNode)
+implementationParser =
+    Parser.succeed identity
+        |= Parser.loop [] implementationParserHelp
 
-        _ ->
-            Err ()
+
+implementationParserHelp : List AstNode -> Parser (Parser.Step (List AstNode) (List AstNode))
+implementationParserHelp nodes =
+    Parser.oneOf
+        [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
+            |= nodeParser
+            |. Parser.spaces
+        , Parser.succeed (\quotImpl -> Parser.Loop (Quotation quotImpl :: nodes))
+            |. Parser.symbol "["
+            |. Parser.spaces
+            |= implementationParser
+            |. Parser.symbol "]"
+            |. Parser.spaces
+        , Parser.succeed (Parser.Done (List.reverse nodes))
+        ]
+
+
+nodeParser : Parser AstNode
+nodeParser =
+    Parser.oneOf
+        [ Parser.succeed Integer
+            |= intParser
+        , Parser.succeed Word
+            |= symbolParser
+        ]
 
 
 typeDefinitionName : TypeDefinition -> String
@@ -631,67 +542,3 @@ typeDefinitionName typeDef =
 
         UnionTypeDef name _ ->
             name
-
-
-parseUnionTypeDefinition : String -> List Type -> AST -> AST
-parseUnionTypeDefinition typeName members ast =
-    let
-        typeDef =
-            UnionTypeDef typeName members
-    in
-    { ast | types = Dict.insert typeName typeDef ast.types }
-
-
-nestedListSplit : Token -> Token -> Token -> List Token -> Maybe ( List Token, List Token )
-nestedListSplit newBlockStart newBlockEnd splitter ls =
-    nestedListSplitHelper newBlockStart newBlockEnd splitter 0 [] ls
-
-
-nestedListSplitHelper : Token -> Token -> Token -> Int -> List Token -> List Token -> Maybe ( List Token, List Token )
-nestedListSplitHelper newBlockStart newBlockEnd splitter nested before after =
-    case after of
-        [] ->
-            Nothing
-
-        first :: rest ->
-            if first == newBlockStart then
-                nestedListSplitHelper newBlockStart newBlockEnd splitter (nested + 1) (first :: before) rest
-
-            else if first == newBlockEnd then
-                if nested <= 0 then
-                    Nothing
-
-                else
-                    nestedListSplitHelper newBlockStart newBlockEnd splitter (nested - 1) (first :: before) rest
-
-            else if first == splitter && nested == 0 then
-                Just ( List.reverse before, rest )
-
-            else
-                nestedListSplitHelper newBlockStart newBlockEnd splitter nested (first :: before) rest
-
-
-semanticSplit : (Token -> Bool) -> Token -> List Token -> ( List Token, List Token )
-semanticSplit newBlockStart newBlockEnd ls =
-    semanticSplitHelper newBlockStart newBlockEnd 0 [] ls
-
-
-semanticSplitHelper : (Token -> Bool) -> Token -> Int -> List Token -> List Token -> ( List Token, List Token )
-semanticSplitHelper newBlockStart newBlockEnd nested before after =
-    case after of
-        [] ->
-            ( List.reverse before, [] )
-
-        first :: rest ->
-            if newBlockStart first then
-                semanticSplitHelper newBlockStart newBlockEnd (nested + 1) (first :: before) rest
-
-            else if first == newBlockEnd then
-                if nested <= 0 then
-                    ( List.reverse before, rest )
-
-                else
-                    semanticSplitHelper newBlockStart newBlockEnd (nested - 1) (first :: before) rest
-
-            else
-                semanticSplitHelper newBlockStart newBlockEnd nested (first :: before) rest
