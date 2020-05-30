@@ -30,7 +30,6 @@ codegen ast =
     ast.words
         |> Dict.values
         |> List.map (toWasmFuncDef typeMetaDict)
-        |> List.foldl Wasm.withFunction BaseModule.baseModule
         |> Ok
 
 

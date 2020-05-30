@@ -4,7 +4,6 @@ import Platform exposing (Program)
 import Play.Codegen as Codegen
 import Play.Parser as Parser
 import Play.Qualifier as Qualifier
-import Play.Tokenizer as Tokenizer
 import Play.TypeChecker as TypeChecker
 import Wasm
 
@@ -34,7 +33,7 @@ init _ =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg _ =
     case msg of
         CompileString sourceCode ->
             case compile sourceCode of
@@ -52,8 +51,7 @@ update msg model =
 compile : String -> Result () Wasm.Module
 compile sourceCode =
     sourceCode
-        |> Tokenizer.tokenize
-        |> Result.andThen Parser.parse
+        |> Parser.run
         |> Result.andThen Qualifier.qualify
         |> Result.andThen TypeChecker.typeCheck
         |> Result.andThen Codegen.codegen
@@ -61,7 +59,7 @@ compile sourceCode =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch [ compileString CompileString ]
+    compileString CompileString
 
 
 port compileString : (String -> msg) -> Sub msg
