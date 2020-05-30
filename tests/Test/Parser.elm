@@ -543,4 +543,36 @@ suite =
                         Ok _ ->
                             Expect.fail "Did not expect parsing to succeed"
             ]
+        , test "Support code comments" <|
+            \_ ->
+                let
+                    expectCompiles code =
+                        case run code of
+                            Err () ->
+                                Expect.fail "Did not expect compilation to fail."
+
+                            Ok _ ->
+                                Expect.pass
+                in
+                expectCompiles
+                    """
+                    # Increments the passed in value by one
+                    def: inc
+                    type: # as you'd expect
+                      Int -- Int
+                    : # again, pretty basic
+                      1 +
+
+                    # Guess we should also have a decrement op
+                    def: # what should we call it?
+                      dec
+                    # The type decleration isn't actually necessary, but doesnt hurt either
+                    type: Int -- Int
+                    : 1
+                      # + wouldnt work here
+                      -
+
+                    # And thats it!
+                     # wonder what else we should do...
+                    """
         ]

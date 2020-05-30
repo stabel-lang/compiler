@@ -65,7 +65,7 @@ parser =
             }
     in
     Parser.succeed identity
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop emptyAst definitionParser
         |. Parser.end
 
@@ -82,19 +82,19 @@ definitionParser ast =
     Parser.oneOf
         [ Parser.succeed insertWord
             |. Parser.keyword "def:"
-            |. Parser.spaces
+            |. noiseParser
             |= wordDefinitionParser
         , Parser.succeed insertWord
             |. Parser.keyword "defmulti:"
-            |. Parser.spaces
+            |. noiseParser
             |= multiWordDefinitionParser
         , Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
             |. Parser.keyword "deftype:"
-            |. Parser.spaces
+            |. noiseParser
             |= typeDefinitionParser
         , Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
             |. Parser.keyword "defunion:"
-            |. Parser.spaces
+            |. noiseParser
             |= unionTypeDefinitionParser
         , Parser.succeed (Parser.Done ast)
         ]
@@ -166,7 +166,7 @@ wordDefinitionParser =
     in
     Parser.succeed joinParseResults
         |= symbolParser
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop emptyDef wordMetadataParser
 
 
@@ -179,16 +179,16 @@ wordMetadataParser def =
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
             |. Parser.keyword "type:"
-            |. Parser.spaces
+            |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (Parser.Loop { def | metadata = { metadata | isEntryPoint = True } })
             |. Parser.keyword "entry:"
-            |. Parser.spaces
+            |. noiseParser
             |. Parser.keyword "true"
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
             |. Parser.keyword ":"
-            |. Parser.spaces
+            |. noiseParser
             |= implementationParser
         , Parser.succeed (Parser.Done def)
         ]
@@ -208,7 +208,7 @@ multiWordDefinitionParser =
     in
     Parser.succeed joinParseResults
         |= symbolParser
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop emptyDef multiWordMetadataParser
 
 
@@ -237,17 +237,17 @@ multiWordMetadataParser def =
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
             |. Parser.keyword "type:"
-            |. Parser.spaces
+            |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
             |. Parser.keyword "when:"
-            |. Parser.spaces
+            |. noiseParser
             |= typeMatchParser
-            |. Parser.spaces
+            |. noiseParser
             |= implementationParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
             |. Parser.keyword ":"
-            |. Parser.spaces
+            |. noiseParser
             |= implementationParser
         , Parser.succeed (Parser.Done def)
         ]
@@ -257,7 +257,7 @@ typeDefinitionParser : Parser TypeDefinition
 typeDefinitionParser =
     Parser.succeed CustomTypeDef
         |= typeNameParser
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop [] typeMemberParser
 
 
@@ -266,11 +266,11 @@ typeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
             |. Parser.symbol ":"
-            |. Parser.spaces
+            |. noiseParser
             |= symbolParser
-            |. Parser.spaces
+            |. noiseParser
             |= typeParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
@@ -279,7 +279,7 @@ unionTypeDefinitionParser : Parser TypeDefinition
 unionTypeDefinitionParser =
     Parser.succeed UnionTypeDef
         |= typeNameParser
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop [] unionTypeMemberParser
 
 
@@ -288,9 +288,9 @@ unionTypeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
             |. Parser.symbol ":"
-            |. Parser.spaces
+            |. noiseParser
             |= typeParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
@@ -377,7 +377,7 @@ typeSignatureParser =
     Parser.succeed (\input output -> { input = input, output = output })
         |= Parser.loop [] typeLoopParser
         |. Parser.symbol "--"
-        |. Parser.spaces
+        |. noiseParser
         |= Parser.loop [] typeLoopParser
 
 
@@ -390,16 +390,16 @@ typeLoopParser reverseTypes =
     Parser.oneOf
         [ Parser.succeed step
             |= typeParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed step
             |= genericParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (\wordType -> step (Type.Quotation wordType))
             |. Parser.symbol "["
-            |. Parser.spaces
+            |. noiseParser
             |= typeSignatureParser
             |. Parser.symbol "]"
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse reverseTypes))
         ]
 
@@ -433,12 +433,12 @@ typeMatchParser =
         |= Parser.oneOf
             [ Parser.succeed identity
                 |. Parser.symbol "("
-                |. Parser.spaces
+                |. noiseParser
                 |= Parser.loop [] typeMatchConditionParser
                 |. Parser.symbol ")"
             , Parser.succeed []
             ]
-        |. Parser.spaces
+        |. noiseParser
 
 
 typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))
@@ -446,9 +446,9 @@ typeMatchConditionParser nodes =
     Parser.oneOf
         [ Parser.succeed (\name value -> Parser.Loop (( name, value ) :: nodes))
             |= symbolParser
-            |. Parser.spaces
+            |. noiseParser
             |= typeMatchValueParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
 
@@ -501,13 +501,13 @@ implementationParserHelp nodes =
     Parser.oneOf
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (\quotImpl -> Parser.Loop (Quotation quotImpl :: nodes))
             |. Parser.symbol "["
-            |. Parser.spaces
+            |. noiseParser
             |= implementationParser
             |. Parser.symbol "]"
-            |. Parser.spaces
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
 
@@ -519,6 +519,23 @@ nodeParser =
             |= intParser
         , Parser.succeed Word
             |= symbolParser
+        ]
+
+
+noiseParser : Parser ()
+noiseParser =
+    Parser.loop () noiseParserLoop
+
+
+noiseParserLoop : () -> Parser (Parser.Step () ())
+noiseParserLoop _ =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Loop ())
+            |. Parser.lineComment "#"
+        , Parser.succeed (Parser.Loop ())
+            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
+            |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
+        , Parser.succeed (Parser.Done ())
         ]
 
 
