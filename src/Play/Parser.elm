@@ -25,7 +25,7 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List ( String, Type ))
+    = CustomTypeDef String (List String) (List ( String, Type ))
     | UnionTypeDef String (List Type)
 
 
@@ -116,15 +116,21 @@ generateDefaultWordsForType typeDef ast =
         UnionTypeDef _ _ ->
             ast
 
-        CustomTypeDef typeName typeMembers ->
+        CustomTypeDef typeName binds typeMembers ->
             let
-                metadata =
-                    Metadata.default
-                        |> Metadata.withType (List.map Tuple.second typeMembers) [ Type.Custom typeName ]
+                typeOfType =
+                    case binds of
+                        [] ->
+                            Type.Custom typeName
+
+                        _ ->
+                            Type.CustomGeneric typeName (List.map Type.Generic binds)
 
                 ctorDef =
                     { name = ">" ++ typeName
-                    , metadata = metadata
+                    , metadata =
+                        Metadata.default
+                            |> Metadata.withType (List.map Tuple.second typeMembers) [ typeOfType ]
                     , implementation =
                         SoloImpl [ ConstructType typeName ]
                     }
@@ -139,7 +145,7 @@ generateDefaultWordsForType typeDef ast =
                     [ { name = ">" ++ memberName
                       , metadata =
                             Metadata.default
-                                |> Metadata.withType [ Type.Custom typeName, memberType ] [ Type.Custom typeName ]
+                                |> Metadata.withType [ typeOfType, memberType ] [ typeOfType ]
                       , implementation =
                             SoloImpl
                                 [ SetMember typeName memberName ]
@@ -147,7 +153,7 @@ generateDefaultWordsForType typeDef ast =
                     , { name = memberName ++ ">"
                       , metadata =
                             Metadata.default
-                                |> Metadata.withType [ Type.Custom typeName ] [ memberType ]
+                                |> Metadata.withType [ typeOfType ] [ memberType ]
                       , implementation =
                             SoloImpl
                                 [ GetMember typeName memberName ]
@@ -155,11 +161,6 @@ generateDefaultWordsForType typeDef ast =
                     ]
             in
             { ast | words = Dict.union generatedDefs ast.words }
-
-
-debugSpaces : String -> Parser ()
-debugSpaces tag =
-    Parser.chompWhile (\c -> Debug.log tag <| Set.member c whitespaceChars)
 
 
 wordDefinitionParser : Parser WordDefinition
@@ -268,18 +269,62 @@ typeDefinitionParser =
     Parser.succeed CustomTypeDef
         |= typeNameParser
         |. noiseParser
+        |= Parser.loop [] typeGenericParser
+        |. noiseParser
         |= Parser.loop [] typeMemberParser
+
+
+typeGenericParser : List String -> Parser (Parser.Step (List String) (List String))
+typeGenericParser generics =
+    Parser.oneOf
+        [ Parser.succeed (\name -> Parser.Loop (name :: generics))
+            |= symbolParser
+            |. noiseParser
+        , Parser.succeed (Parser.Done (List.reverse generics))
+        ]
 
 
 typeMemberParser : List ( String, Type ) -> Parser (Parser.Step (List ( String, Type )) (List ( String, Type )))
 typeMemberParser types =
+    let
+        helper name binds =
+            case binds of
+                [] ->
+                    Type.Custom name
+
+                _ ->
+                    Type.CustomGeneric name binds
+    in
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
             |. Parser.symbol ":"
             |. noiseParser
             |= symbolParser
             |. noiseParser
-            |= typeParser
+            |= Parser.oneOf
+                [ Parser.succeed Type.Int
+                    |. Parser.keyword "Int"
+                    |. noiseParser
+                , Parser.succeed helper
+                    |= typeNameParser
+                    |. noiseParser
+                    |= Parser.loop [] typeOrGenericParser
+                , Parser.succeed Type.Generic
+                    |= symbolParser
+                    |. noiseParser
+                ]
+        , Parser.succeed (Parser.Done (List.reverse types))
+        ]
+
+
+typeOrGenericParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+typeOrGenericParser types =
+    Parser.oneOf
+        [ Parser.succeed (\name -> Parser.Loop (Type.Custom name :: types))
+            |= typeNameParser
+            |. noiseParser
+        , Parser.succeed (\name -> Parser.Loop (Type.Generic name :: types))
+            |= symbolParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
@@ -553,7 +598,7 @@ noiseParserLoop _ =
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ ->
+        CustomTypeDef name _ _ ->
             name
 
         UnionTypeDef name _ ->

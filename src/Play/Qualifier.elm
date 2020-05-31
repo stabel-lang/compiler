@@ -102,7 +102,7 @@ qualifyType :
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
-        Parser.CustomTypeDef name members ->
+        Parser.CustomTypeDef name _ members ->
             Dict.insert name (CustomTypeDef name members) acc
 
         Parser.UnionTypeDef name memberTypes ->

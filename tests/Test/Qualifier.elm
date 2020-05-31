@@ -159,8 +159,8 @@ suite =
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , AST.CustomTypeDef "True" []
-                                , AST.CustomTypeDef "False" []
+                                , AST.CustomTypeDef "True" [] []
+                                , AST.CustomTypeDef "False" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -421,9 +421,10 @@ suite =
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , AST.CustomTypeDef "True" []
-                                    , AST.CustomTypeDef "False" []
+                                    , AST.CustomTypeDef "True" [] []
+                                    , AST.CustomTypeDef "False" [] []
                                     , AST.CustomTypeDef "Box"
+                                        []
                                         [ ( "value", Type.Int ) ]
                                     ]
                             , words =

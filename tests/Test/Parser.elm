@@ -74,128 +74,186 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , test "Custom data structure without fields" <|
-            \_ ->
-                let
-                    source =
-                        """
-                        deftype: True
-                        
-                        def: as-int
-                        type: True -- Int
-                        : 1
-                        """
+        , describe "Custom data structures"
+            [ test "Without members" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            deftype: True
+                            
+                            def: as-int
+                            type: True -- Int
+                            : 1
+                            """
 
-                    expectedAst =
-                        { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ CustomTypeDef "True" []
-                                ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ AST.ConstructType "True" ]
-                                  }
-                                , { name = "as-int"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ AST.Integer 1
-                                            ]
-                                  }
-                                ]
-                        }
-                in
-                case run source of
-                    Err () ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
-        , test "Custom data structure with fields" <|
-            \_ ->
-                let
-                    source =
-                        """
-                        deftype: Person
-                        : age Int
-                        : jobs Int
-
-                        def: get-age
-                        type: Person -- Int
-                        : age>
-                        """
-
-                    expectedAst =
-                        { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ CustomTypeDef "Person"
-                                    [ ( "age", Type.Int )
-                                    , ( "jobs", Type.Int )
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ CustomTypeDef "True" [] []
                                     ]
-                                ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = ">Person"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
-                                  , implementation =
-                                        SoloImpl [ AST.ConstructType "Person" ]
-                                  }
-                                , { name = ">age"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , implementation =
-                                        SoloImpl [ AST.SetMember "Person" "age" ]
-                                  }
-                                , { name = ">jobs"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , implementation =
-                                        SoloImpl [ AST.SetMember "Person" "jobs" ]
-                                  }
-                                , { name = "age>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , implementation =
-                                        SoloImpl [ AST.GetMember "Person" "age" ]
-                                  }
-                                , { name = "jobs>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , implementation =
-                                        SoloImpl [ AST.GetMember "Person" "jobs" ]
-                                  }
-                                , { name = "get-age"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ AST.Word "age>"
-                                            ]
-                                  }
-                                ]
-                        }
-                in
-                case run source of
-                    Err () ->
-                        Expect.fail "Did not expect parsing to fail"
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">True"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "True" ]
+                                      }
+                                    , { name = "as-int"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Integer 1
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
 
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "With members" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            deftype: Person
+                            : age Int
+                            : jobs Int
+
+                            def: get-age
+                            type: Person -- Int
+                            : age>
+                            """
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ CustomTypeDef "Person"
+                                        []
+                                        [ ( "age", Type.Int )
+                                        , ( "jobs", Type.Int )
+                                        ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Person"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
+                                      , implementation =
+                                            SoloImpl [ AST.ConstructType "Person" ]
+                                      }
+                                    , { name = ">age"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                      , implementation =
+                                            SoloImpl [ AST.SetMember "Person" "age" ]
+                                      }
+                                    , { name = ">jobs"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                      , implementation =
+                                            SoloImpl [ AST.SetMember "Person" "jobs" ]
+                                      }
+                                    , { name = "age>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl [ AST.GetMember "Person" "age" ]
+                                      }
+                                    , { name = "jobs>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl [ AST.GetMember "Person" "jobs" ]
+                                      }
+                                    , { name = "get-age"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Word "age>"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Generic members" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            deftype: Box a
+                            : element a
+                            """
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ CustomTypeDef "Box"
+                                        [ "a" ]
+                                        [ ( "element", Type.Generic "a" )
+                                        ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Box"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            SoloImpl [ AST.ConstructType "Box" ]
+                                      }
+                                    , { name = ">element"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            SoloImpl [ AST.SetMember "Box" "element" ]
+                                      }
+                                    , { name = "element>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            SoloImpl [ AST.GetMember "Box" "element" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            ]
         , test "Parser understands generic types" <|
             \_ ->
                 let
@@ -257,8 +315,8 @@ suite =
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" []
-                                , CustomTypeDef "False" []
+                                , CustomTypeDef "True" [] []
+                                , CustomTypeDef "False" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name

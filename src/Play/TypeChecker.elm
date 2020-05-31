@@ -583,17 +583,20 @@ sameBaseType lhs rhs =
 typeAsStr : Type -> String
 typeAsStr t =
     case t of
-        Type.Custom name ->
-            name ++ "_Custom"
-
         Type.Int ->
             "Int"
 
-        Type.Union _ ->
-            "Union"
-
         Type.Generic name ->
             name ++ "_Generic"
+
+        Type.Custom name ->
+            name ++ "_Custom"
+
+        Type.CustomGeneric name _ ->
+            name ++ "_Custom"
+
+        Type.Union _ ->
+            "Union"
 
         Type.Quotation _ ->
             "quot"
