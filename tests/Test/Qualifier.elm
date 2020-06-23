@@ -156,6 +156,7 @@ suite =
                         { types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef "Bool"
+                                    []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
@@ -418,6 +419,7 @@ suite =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef "Bool"
+                                        []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]

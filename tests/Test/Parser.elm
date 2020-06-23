@@ -289,77 +289,243 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , test "Parser understands union types and multifunctions" <|
-            \_ ->
-                let
-                    source =
-                        """
-                        defunion: Bool
-                        : True 
-                        : False 
+        , describe "Unions and multifunctions"
+            [ test "Non-generic" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defunion: Bool
+                            : True 
+                            : False 
 
-                        deftype: True
-                        deftype: False
+                            deftype: True
+                            deftype: False
 
-                        defmulti: to-int
-                        when: True
-                          drop 1
-                        when: False
-                          drop 0
-                        """
+                            defmulti: to-int
+                            when: True
+                              drop 1
+                            when: False
+                              drop 0
+                            """
 
-                    expectedAst =
-                        { types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ UnionTypeDef "Bool"
+                                        []
+                                        [ Type.Custom "True"
+                                        , Type.Custom "False"
+                                        ]
+                                    , CustomTypeDef "True" [] []
+                                    , CustomTypeDef "False" [] []
                                     ]
-                                , CustomTypeDef "True" [] []
-                                , CustomTypeDef "False" [] []
-                                ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ AST.ConstructType "True"
-                                            ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ AST.ConstructType "False"
-                                            ]
-                                  }
-                                , { name = "to-int"
-                                  , metadata = Metadata.default
-                                  , implementation =
-                                        MultiImpl
-                                            [ ( TypeMatch (Type.Custom "False") []
-                                              , [ AST.Word "drop", AST.Integer 0 ]
-                                              )
-                                            , ( TypeMatch (Type.Custom "True") []
-                                              , [ AST.Word "drop", AST.Integer 1 ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                ]
-                        }
-                in
-                case run source of
-                    Err () ->
-                        Expect.fail "Did not expect parsing to fail"
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">True"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "True"
+                                                ]
+                                      }
+                                    , { name = ">False"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "False"
+                                                ]
+                                      }
+                                    , { name = "to-int"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Custom "True") []
+                                                  , [ AST.Word "drop", AST.Integer 1 ]
+                                                  )
+                                                , ( TypeMatch (Type.Custom "False") []
+                                                  , [ AST.Word "drop", AST.Integer 0 ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
 
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Generic" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defunion: Maybe a
+                            : a
+                            : Nil
+
+                            deftype: Nil
+
+                            defmulti: if-present
+                            when: a
+                              !
+                            when: Nil
+                              drop
+                            """
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ UnionTypeDef "Maybe"
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , CustomTypeDef "Nil" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "if-present"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.Generic "a") []
+                                                  , [ AST.Word "!" ]
+                                                  )
+                                                , ( TypeMatch (Type.Custom "Nil") []
+                                                  , [ AST.Word "drop" ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Generic with generic members" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defunion: MaybeBox a
+                            : Box a
+                            : Nil
+
+                            deftype: Box a
+                            : element a
+
+                            deftype: Nil
+
+                            defmulti: if-present
+                            when: (Box a )
+                              !
+                            when: Nil
+                              drop
+                            """
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ UnionTypeDef "MaybeBox"
+                                        [ "a" ]
+                                        [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef "Nil" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Box"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "Box"
+                                                ]
+                                      }
+                                    , { name = ">element"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    , Type.Generic "a"
+                                                    ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.SetMember "Box" "element"
+                                                ]
+                                      }
+                                    , { name = "element>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    ]
+                                                    [ Type.Generic "a"
+                                                    ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.GetMember "Box" "element"
+                                                ]
+                                      }
+                                    , { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "if-present"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                  , [ AST.Word "!" ]
+                                                  )
+                                                , ( TypeMatch (Type.Custom "Nil") []
+                                                  , [ AST.Word "drop" ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            ]
         , test "Parser understands quotations" <|
             \_ ->
                 let

@@ -105,7 +105,7 @@ qualifyType ast typeDef ( errors, acc ) =
         Parser.CustomTypeDef name _ members ->
             Dict.insert name (CustomTypeDef name members) acc
 
-        Parser.UnionTypeDef name memberTypes ->
+        Parser.UnionTypeDef name _ memberTypes ->
             Dict.insert name (UnionTypeDef name memberTypes) acc
     )
 
