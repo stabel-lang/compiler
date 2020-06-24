@@ -438,7 +438,7 @@ suite =
                             deftype: Nil
 
                             defmulti: if-present
-                            when: (Box a )
+                            when: (Box a)
                               !
                             when: Nil
                               drop

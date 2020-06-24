@@ -388,24 +388,22 @@ intParser =
 
 symbolParser : Parser String
 symbolParser =
-    Parser.backtrackable <|
-        Parser.variable
+    let
+        validator sym =
+            if String.contains ":" sym then
+                Parser.problem "This is metadata"
+
+            else
+                Parser.succeed sym
+    in
+    Parser.backtrackable
+        (Parser.variable
             { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-            , inner = validSymbolChar
+            , inner = \c -> validSymbolChar c || c == ':'
             , reserved = Set.empty
             }
-            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
-
-
-metadataParser : Parser String
-metadataParser =
-    Parser.backtrackable <|
-        Parser.variable
-            { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-            , inner = validSymbolChar
-            , reserved = Set.empty
-            }
-            |. Parser.chompIf (\c -> c == ':')
+            |> Parser.andThen validator
+        )
 
 
 validSymbolChar : Char -> Bool
