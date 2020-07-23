@@ -96,7 +96,7 @@ multiFnToInstructions :
 multiFnToInstructions typeInfo def whens defaultImpl =
     let
         branches =
-            List.foldr buildBranch (Wasm.Batch []) whens
+            List.foldl buildBranch (Wasm.Batch []) whens
 
         buildBranch ( type_, nodes ) previousBranch =
             let
