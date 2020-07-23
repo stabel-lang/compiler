@@ -79,10 +79,10 @@ initContext ast =
                 |> List.map
                     (\t ->
                         case t of
-                            Qualifier.CustomTypeDef name members ->
+                            Qualifier.CustomTypeDef name _ members ->
                                 CustomTypeDef name members
 
-                            Qualifier.UnionTypeDef name memberTypes ->
+                            Qualifier.UnionTypeDef name _ memberTypes ->
                                 UnionTypeDef name memberTypes
                     )
                 |> Dict.fromListBy typeDefName
@@ -116,10 +116,10 @@ typeCheckHelper context ast =
                 |> List.map
                     (\t ->
                         case t of
-                            Qualifier.CustomTypeDef name members ->
+                            Qualifier.CustomTypeDef name _ members ->
                                 CustomTypeDef name members
 
-                            Qualifier.UnionTypeDef name memberTypes ->
+                            Qualifier.UnionTypeDef name _ memberTypes ->
                                 UnionTypeDef name memberTypes
                     )
                 |> Dict.fromListBy typeDefName

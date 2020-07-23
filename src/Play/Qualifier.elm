@@ -16,8 +16,8 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List ( String, Type ))
-    | UnionTypeDef String (List Type)
+    = CustomTypeDef String (List String) (List ( String, Type ))
+    | UnionTypeDef String (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -102,11 +102,11 @@ qualifyType :
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
-        Parser.CustomTypeDef name _ members ->
-            Dict.insert name (CustomTypeDef name members) acc
+        Parser.CustomTypeDef name generics members ->
+            Dict.insert name (CustomTypeDef name generics members) acc
 
-        Parser.UnionTypeDef name _ memberTypes ->
-            Dict.insert name (UnionTypeDef name memberTypes) acc
+        Parser.UnionTypeDef name generics memberTypes ->
+            Dict.insert name (UnionTypeDef name generics memberTypes) acc
     )
 
 
@@ -201,7 +201,7 @@ qualifyMatch qualifiedTypes typeMatch =
 
         Parser.TypeMatch ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ members) ->
+                Just (CustomTypeDef _ _ members) ->
                     let
                         memberNames =
                             members
@@ -220,7 +220,7 @@ qualifyMatch qualifiedTypes typeMatch =
                         Err () ->
                             Err ()
 
-                Just (UnionTypeDef _ types) ->
+                Just (UnionTypeDef _ _ types) ->
                     if List.isEmpty patterns then
                         Ok <| TypeMatch (Type.Union types) []
 
@@ -382,8 +382,8 @@ qualifyMetadataType baseName type_ =
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ ->
+        CustomTypeDef name _ _ ->
             name
 
-        UnionTypeDef name _ ->
+        UnionTypeDef name _ _ ->
             name

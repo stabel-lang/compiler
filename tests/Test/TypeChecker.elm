@@ -133,7 +133,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "True" []
+                                [ QAST.CustomTypeDef "True" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -179,7 +179,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Person" [ ( "age", Type.Int ) ]
+                                [ QAST.CustomTypeDef "Person" [] [ ( "age", Type.Int ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -329,11 +329,12 @@ suite =
                     { types =
                         Dict.fromListBy QAST.typeDefinitionName
                             [ QAST.UnionTypeDef "Bool"
+                                []
                                 [ Type.Custom "True"
                                 , Type.Custom "False"
                                 ]
-                            , QAST.CustomTypeDef "True" []
-                            , QAST.CustomTypeDef "False" []
+                            , QAST.CustomTypeDef "True" [] []
+                            , QAST.CustomTypeDef "False" [] []
                             ]
                     , words =
                         Dict.fromListBy .name
@@ -493,12 +494,15 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Beings"
+                                        []
                                         [ Type.Custom "Person"
                                         , Type.Custom "Dog"
                                         ]
                                     , QAST.CustomTypeDef "Person"
+                                        []
                                         [ ( "age", Type.Int ) ]
                                     , QAST.CustomTypeDef "Dog"
+                                        []
                                         [ ( "man-years", Type.Int ) ]
                                     ]
                             , words =
@@ -624,11 +628,12 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Bool"
+                                        []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , QAST.CustomTypeDef "True" []
-                                    , QAST.CustomTypeDef "False" []
+                                    , QAST.CustomTypeDef "True" [] []
+                                    , QAST.CustomTypeDef "False" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
