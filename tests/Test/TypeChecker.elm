@@ -323,6 +323,66 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic custom type" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ] ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 5
+                                            , QAST.Word ">Box"
+                                            , QAST.Word "element>"
+                                            , QAST.Integer 10
+                                            , QAST.Builtin Builtin.Plus
+                                            , QAST.Integer 15
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
+                                  }
+                                , { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">element"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.SetMember "Box" "element" ]
+                                  }
+                                , { name = "element>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                                [ Type.Generic "a" ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.GetMember "Box" "element" ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
         , describe "Unions and multifunctions" <|
             let
                 template multiFn =
