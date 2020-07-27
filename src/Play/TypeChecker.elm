@@ -609,18 +609,26 @@ typeCheckNode : Int -> Qualifier.Node -> Context -> Context
 typeCheckNode idx node context =
     let
         addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ List.map tagGeneric effects }
+            { ctx | stackEffects = ctx.stackEffects ++ List.map tagGenericEffect effects }
 
-        tagGeneric effect =
+        tagGenericEffect effect =
             case effect of
-                Push (Type.Generic genName) ->
-                    Push (Type.Generic (genName ++ String.fromInt idx))
+                Push type_ ->
+                    Push <| tagGeneric type_
 
-                Pop (Type.Generic genName) ->
-                    Pop (Type.Generic (genName ++ String.fromInt idx))
+                Pop type_ ->
+                    Pop <| tagGeneric type_
+
+        tagGeneric type_ =
+            case type_ of
+                Type.Generic genName ->
+                    Type.Generic (genName ++ String.fromInt idx)
+
+                Type.CustomGeneric name generics ->
+                    Type.CustomGeneric name (List.map tagGeneric generics)
 
                 _ ->
-                    effect
+                    type_
     in
     case node of
         Qualifier.Integer _ ->
@@ -667,37 +675,90 @@ typeCheckNode idx node context =
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
                 Just (CustomTypeDef _ members) ->
+                    let
+                        memberTypes =
+                            List.map Tuple.second members
+
+                        genericMembers =
+                            List.filter isGeneric memberTypes
+
+                        typeInQuestion =
+                            case genericMembers of
+                                [] ->
+                                    Type.Custom typeName
+
+                                _ ->
+                                    Type.CustomGeneric typeName genericMembers
+                    in
                     addStackEffect context <|
                         wordTypeToStackEffects
-                            { input = List.map Tuple.second members
-                            , output = [ Type.Custom typeName ]
+                            { input = memberTypes
+                            , output = [ typeInQuestion ]
+                            }
+
+                other ->
+                    Debug.todo ("inconcievable: " ++ typeName ++ ": " ++ Debug.toString other)
+
+        Qualifier.SetMember typeName memberName ->
+            case
+                ( Dict.get typeName context.types
+                , getMemberType context.types typeName memberName
+                )
+            of
+                ( Just (CustomTypeDef _ members), Just memberType ) ->
+                    let
+                        memberTypes =
+                            List.map Tuple.second members
+
+                        genericMembers =
+                            List.filter isGeneric memberTypes
+
+                        typeInQuestion =
+                            case genericMembers of
+                                [] ->
+                                    Type.Custom typeName
+
+                                _ ->
+                                    Type.CustomGeneric typeName genericMembers
+                    in
+                    addStackEffect context <|
+                        wordTypeToStackEffects
+                            { input = [ typeInQuestion, memberType ]
+                            , output = [ typeInQuestion ]
                             }
 
                 _ ->
                     Debug.todo "inconcievable!"
 
-        Qualifier.SetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    addStackEffect context <|
-                        wordTypeToStackEffects
-                            { input = [ Type.Custom typeName, memberType ]
-                            , output = [ Type.Custom typeName ]
-                            }
-
-                Nothing ->
-                    Debug.todo "inconcievable!"
-
         Qualifier.GetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
+            case
+                ( Dict.get typeName context.types
+                , getMemberType context.types typeName memberName
+                )
+            of
+                ( Just (CustomTypeDef _ members), Just memberType ) ->
+                    let
+                        memberTypes =
+                            List.map Tuple.second members
+
+                        genericMembers =
+                            List.filter isGeneric memberTypes
+
+                        typeInQuestion =
+                            case genericMembers of
+                                [] ->
+                                    Type.Custom typeName
+
+                                _ ->
+                                    Type.CustomGeneric typeName genericMembers
+                    in
                     addStackEffect context <|
                         wordTypeToStackEffects
-                            { input = [ Type.Custom typeName ]
+                            { input = [ typeInQuestion ]
                             , output = [ memberType ]
                             }
 
-                Nothing ->
+                _ ->
                     Debug.todo "inconcievable!"
 
         Qualifier.Builtin builtin ->
@@ -814,21 +875,33 @@ compatibleTypes context typeA typeB =
                             ( context, True )
 
                         else
-                            let
-                                isGeneric t =
-                                    case t of
-                                        Type.Generic _ ->
-                                            True
-
-                                        _ ->
-                                            False
-                            in
                             case List.find isGeneric unionTypes of
                                 Just generic ->
                                     compatibleTypes context typeA generic
 
                                 Nothing ->
                                     ( context, False )
+
+                    ( Type.CustomGeneric lName lMembers, Type.CustomGeneric rName rMembers ) ->
+                        let
+                            ( updatedContext, compatible ) =
+                                List.foldl foldHelper ( context, True ) members
+
+                            members =
+                                List.map2 Tuple.pair lMembers rMembers
+
+                            foldHelper ( lType, rType ) (( currCtx, isCompatible ) as acc) =
+                                if not isCompatible then
+                                    acc
+
+                                else
+                                    compatibleTypes currCtx lType rType
+                        in
+                        if lName == rName && compatible then
+                            ( updatedContext, True )
+
+                        else
+                            ( context, False )
 
                     ( Type.Quotation lhs, Type.Quotation rhs ) ->
                         let
@@ -1123,3 +1196,13 @@ typeDefName typeDef =
 
         UnionTypeDef name _ ->
             name
+
+
+isGeneric : Type -> Bool
+isGeneric t =
+    case t of
+        Type.Generic _ ->
+            True
+
+        _ ->
+            False

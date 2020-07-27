@@ -353,7 +353,7 @@ suite =
                                             |> Metadata.withType [ Type.Generic "a" ] [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.ConstructType "True"
+                                            [ QAST.ConstructType "Box"
                                             ]
                                   }
                                 , { name = ">element"
