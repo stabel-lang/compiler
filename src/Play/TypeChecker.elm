@@ -507,6 +507,17 @@ compareType_ lhs rhs rangeDict =
         ( _ :: lhsRest, (Type.Generic _) :: rhsRest ) ->
             compareType_ lhsRest rhsRest rangeDict
 
+        ( (Type.CustomGeneric lName lMembers) :: lhsRest, (Type.CustomGeneric rName rMembers) :: rhsRest ) ->
+            let
+                ( _, compatibleMembers ) =
+                    compareType_ lMembers rMembers Dict.empty
+            in
+            if lName == rName && compatibleMembers then
+                compareType_ lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
         ( (Type.Union lMembers) :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
             let
                 lSet =
