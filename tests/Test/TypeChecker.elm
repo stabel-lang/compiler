@@ -766,23 +766,20 @@ suite =
                 \_ ->
                     let
                         listUnion =
-                            [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
-                            , Type.Custom "EmptyList"
-                            ]
-
-                        listUnionInt =
-                            [ Type.CustomGeneric "NonEmptyList" [ Type.Int ]
-                            , Type.Custom "EmptyList"
-                            ]
+                            Type.CustomGeneric "List" [ Type.Generic "a" ]
 
                         input =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
-                                    [ QAST.UnionTypeDef "List" [ "a" ] listUnion
+                                    [ QAST.UnionTypeDef "List"
+                                        [ "a" ]
+                                        [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                        , Type.Custom "EmptyList"
+                                        ]
                                     , QAST.CustomTypeDef "NonEmptyList"
                                         [ "a" ]
-                                        [ ( "element", Type.Generic "a" )
-                                        , ( "rest", Type.Union listUnion )
+                                        [ ( "first", Type.Generic "a" )
+                                        , ( "rest", listUnion )
                                         ]
                                     , QAST.CustomTypeDef "EmptyList" [] []
                                     ]
@@ -801,7 +798,7 @@ suite =
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
-                                                    [ Type.Generic "a", Type.Union listUnion ]
+                                                    [ Type.Generic "a", listUnion ]
                                                     [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
                                       , implementation =
                                             QAST.SoloImpl
@@ -835,7 +832,7 @@ suite =
                                             Metadata.default
                                                 |> Metadata.withType
                                                     [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                                    [ Type.Union listUnion ]
+                                                    [ listUnion ]
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.GetMember "NonEmptyList" "rest"
@@ -845,39 +842,24 @@ suite =
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], Type.Union listUnion ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], listUnion ]
                                                     [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.SetMember "NonEmptyList" "rest"
                                                 ]
                                       }
-                                    , { name = "sum"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Union listUnionInt ] [ Type.Int ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer 0
-                                                , QAST.Word "sum-help"
-                                                ]
-                                      }
-                                    , { name = "sum-help"
+                                    , { name = "first-or-default"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
-                                                    [ Type.Union listUnionInt, Type.Int ]
-                                                    [ Type.Int ]
+                                                    [ listUnion, Type.Generic "a" ]
+                                                    [ Type.Generic "a" ]
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
-                                                  , [ QAST.Builtin Builtin.StackSwap
-                                                    , QAST.Builtin Builtin.StackDuplicate
-                                                    , QAST.Word "rest>"
-                                                    , QAST.Builtin Builtin.StackRightRotate
+                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
+                                                  , [ QAST.Builtin Builtin.StackDrop
                                                     , QAST.Word "first>"
-                                                    , QAST.Builtin Builtin.Plus
-                                                    , QAST.Word "sum-help"
                                                     ]
                                                   )
                                                 , ( QAST.TypeMatch (Type.Custom "EmptyList") []
@@ -895,14 +877,11 @@ suite =
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer 1
-                                                , QAST.Integer 2
-                                                , QAST.Integer 3
                                                 , QAST.Word ">EmptyList"
                                                 , QAST.Word ">NonEmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Word "sum"
-                                                , QAST.Integer 6
+                                                , QAST.Integer 0
+                                                , QAST.Word "first-or-default"
+                                                , QAST.Integer 1
                                                 , QAST.Builtin Builtin.Equal
                                                 ]
                                       }

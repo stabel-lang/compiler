@@ -738,8 +738,8 @@ typeCheckNode idx node context =
                             , output = [ typeInQuestion ]
                             }
 
-                _ ->
-                    Debug.todo "inconcievable!"
+                other ->
+                    Debug.todo ("inconcievable! " ++ Debug.toString other)
 
         Qualifier.GetMember typeName memberName ->
             case
