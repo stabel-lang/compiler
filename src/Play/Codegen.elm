@@ -40,7 +40,7 @@ typeMeta types =
         |> List.filterMap
             (\typeDef ->
                 case typeDef of
-                    AST.CustomTypeDef name members ->
+                    AST.CustomTypeDef name _ members ->
                         Just
                             ( name
                             , { id = 0

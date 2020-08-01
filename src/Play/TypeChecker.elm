@@ -17,8 +17,8 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List ( String, Type ))
-    | UnionTypeDef String (List Type)
+    = CustomTypeDef String (List String) (List ( String, Type ))
+    | UnionTypeDef String (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -74,18 +74,16 @@ initContext : Qualifier.AST -> Context
 initContext ast =
     let
         concreteTypes =
-            ast.types
-                |> Dict.values
-                |> List.map
-                    (\t ->
-                        case t of
-                            Qualifier.CustomTypeDef name _ members ->
-                                CustomTypeDef name members
+            Dict.map
+                (\_ t ->
+                    case t of
+                        Qualifier.CustomTypeDef name generics members ->
+                            CustomTypeDef name generics members
 
-                            Qualifier.UnionTypeDef name _ memberTypes ->
-                                UnionTypeDef name memberTypes
-                    )
-                |> Dict.fromListBy typeDefName
+                        Qualifier.UnionTypeDef name generics memberTypes ->
+                            UnionTypeDef name generics memberTypes
+                )
+                ast.types
     in
     { types = concreteTypes
     , typedWords = Dict.empty
@@ -109,24 +107,10 @@ typeCheckHelper context ast =
             ast.words
                 |> Dict.values
                 |> List.foldl typeCheckDefinition context
-
-        concreteTypes =
-            ast.types
-                |> Dict.values
-                |> List.map
-                    (\t ->
-                        case t of
-                            Qualifier.CustomTypeDef name _ members ->
-                                CustomTypeDef name members
-
-                            Qualifier.UnionTypeDef name _ memberTypes ->
-                                UnionTypeDef name memberTypes
-                    )
-                |> Dict.fromListBy typeDefName
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
-            { types = concreteTypes
+            { types = updatedContext.types
             , words = updatedContext.typedWords
             }
 
@@ -160,13 +144,7 @@ typeCheckDefinition untypedDef context =
                                 | typedWords =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
-                                        , type_ =
-                                            case untypedDef.metadata.type_ of
-                                                Just annotatedType ->
-                                                    annotatedType
-
-                                                Nothing ->
-                                                    inferredType
+                                        , type_ = Maybe.withDefault inferredType untypedDef.metadata.type_
                                         , metadata = untypedDef.metadata
                                         , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
                                         }
@@ -220,19 +198,24 @@ typeCheckDefinition untypedDef context =
                         typeCheckWhen ( Qualifier.TypeMatch forType _, inf ) =
                             case inf.input of
                                 firstInput :: _ ->
-                                    let
-                                        compatible =
-                                            case firstInput of
-                                                Type.Generic _ ->
-                                                    True
-
-                                                _ ->
-                                                    firstInput == forType
-                                    in
-                                    ( compatible, forType, inf )
+                                    ( typeCompatible firstInput forType
+                                    , forType
+                                    , inf
+                                    )
 
                                 [] ->
                                     ( False, forType, inf )
+
+                        typeCompatible lhs rhs =
+                            case ( lhs, rhs ) of
+                                ( Type.Generic _, _ ) ->
+                                    True
+
+                                ( Type.CustomGeneric lName _, Type.CustomGeneric rName _ ) ->
+                                    lName == rName
+
+                                _ ->
+                                    lhs == rhs
 
                         stripFirstInput inf =
                             case inf.input of
@@ -250,8 +233,17 @@ typeCheckDefinition untypedDef context =
                                 [] ->
                                     True
 
-                                first :: rest ->
-                                    List.all ((==) first) rest
+                                ( fTypes, fCnt ) :: rest ->
+                                    List.all
+                                        (\( nTypes, nCnt ) ->
+                                            (fCnt == nCnt)
+                                                && compatibleTypeList fTypes nTypes
+                                        )
+                                        rest
+
+                        compatibleTypeList aLs bLs =
+                            List.map2 Tuple.pair aLs bLs
+                                |> List.all (\( l, r ) -> typeCompatible l r)
 
                         inferredType =
                             List.head inferredWhenTypes
@@ -347,8 +339,34 @@ resolveUnion context type_ =
     case type_ of
         Type.Custom typeName ->
             case Dict.get typeName context.types of
-                Just (UnionTypeDef _ members) ->
+                Just (UnionTypeDef _ _ members) ->
                     Type.Union members
+
+                _ ->
+                    type_
+
+        Type.CustomGeneric typeName types ->
+            case Dict.get typeName context.types of
+                Just (UnionTypeDef _ generics members) ->
+                    let
+                        genericsMap =
+                            List.map2 Tuple.pair generics types
+                                |> Dict.fromList
+
+                        rebindGenerics t =
+                            case t of
+                                Type.Generic val ->
+                                    Dict.get val genericsMap
+                                        |> Maybe.withDefault t
+
+                                Type.CustomGeneric cgName cgMembers ->
+                                    Type.CustomGeneric cgName <|
+                                        List.map rebindGenerics cgMembers
+
+                                _ ->
+                                    t
+                    in
+                    Type.Union (List.map rebindGenerics members)
 
                 _ ->
                     type_
@@ -638,6 +656,9 @@ typeCheckNode idx node context =
                 Type.CustomGeneric name generics ->
                     Type.CustomGeneric name (List.map tagGeneric generics)
 
+                Type.Union members ->
+                    Type.Union (List.map tagGeneric members)
+
                 _ ->
                     type_
     in
@@ -685,7 +706,7 @@ typeCheckNode idx node context =
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
-                Just (CustomTypeDef _ members) ->
+                Just (CustomTypeDef _ _ members) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -716,7 +737,7 @@ typeCheckNode idx node context =
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ members), Just memberType ) ->
+                ( Just (CustomTypeDef _ _ members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -747,7 +768,7 @@ typeCheckNode idx node context =
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ members), Just memberType ) ->
+                ( Just (CustomTypeDef _ _ members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -875,23 +896,23 @@ compatibleTypes context typeA typeB =
                 ( context, True )
 
             else
-                case ( boundA, boundB ) of
+                case ( resolveUnion context boundA, resolveUnion context boundB ) of
                     ( Type.Union _, _ ) ->
                         -- Cannot go from union to concrete type
                         -- And we currently require unions to be exact matches
                         ( context, False )
 
-                    ( _, Type.Union unionTypes ) ->
-                        if List.member boundA unionTypes then
-                            ( context, True )
+                    ( lhsType, Type.Union unionTypes ) ->
+                        let
+                            allMembersTest =
+                                List.map (compatibleTypes context lhsType) unionTypes
+                        in
+                        case List.find Tuple.second allMembersTest of
+                            Just result ->
+                                result
 
-                        else
-                            case List.find isGeneric unionTypes of
-                                Just generic ->
-                                    compatibleTypes context typeA generic
-
-                                Nothing ->
-                                    ( context, False )
+                            Nothing ->
+                                ( context, False )
 
                     ( Type.CustomGeneric lName lMembers, Type.CustomGeneric rName rMembers ) ->
                         let
@@ -1191,7 +1212,7 @@ untypedToTypedNode context untypedNode =
 getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
 getMemberType typeDict typeName memberName =
     case Dict.get typeName typeDict of
-        Just (CustomTypeDef _ members) ->
+        Just (CustomTypeDef _ _ members) ->
             List.find (\( name, _ ) -> name == memberName) members
                 |> Maybe.map Tuple.second
 
@@ -1202,10 +1223,10 @@ getMemberType typeDict typeName memberName =
 typeDefName : TypeDefinition -> String
 typeDefName typeDef =
     case typeDef of
-        CustomTypeDef name _ ->
+        CustomTypeDef name _ _ ->
             name
 
-        UnionTypeDef name _ ->
+        UnionTypeDef name _ _ ->
             name
 
 
