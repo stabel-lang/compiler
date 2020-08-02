@@ -383,6 +383,62 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic custom type fails if not generic is listed" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [] [ ( "element", Type.Generic "a" ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Box"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Ok _ ->
+                        Expect.fail "Expected type check to fail."
+
+                    Err () ->
+                        Expect.pass
+        , test "Generic custom type fails if wrong generic is listed" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "b" ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "b" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Box"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Ok _ ->
+                        Expect.fail "Expected type check to fail."
+
+                    Err () ->
+                        Expect.pass
         , describe "Unions and multifunctions" <|
             let
                 template multiFn =
@@ -894,6 +950,39 @@ suite =
 
                         Err () ->
                             Expect.fail "Expected type check to pass."
+            , test "Generic union fails if not generic is listed" <|
+                \_ ->
+                    let
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Maybe"
+                                        [ "a" ]
+                                        [ Type.Generic "b"
+                                        , Type.Custom "Nothing"
+                                        ]
+                                    , QAST.CustomTypeDef "Nothing" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nothing"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Nothing"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.fail "Expected type check to fail."
+
+                        Err () ->
+                            Expect.pass
             ]
         , describe "Quotations"
             [ test "Simple example" <|
