@@ -84,6 +84,29 @@ initContext ast =
                             UnionTypeDef name generics memberTypes
                 )
                 ast.types
+
+        genericErrors t =
+            let
+                ( listedGenerics, memberTypes ) =
+                    case t of
+                        CustomTypeDef _ generics members ->
+                            ( Set.fromList generics
+                            , List.map Tuple.second members
+                            )
+
+                        UnionTypeDef _ generics mts ->
+                            ( Set.fromList generics, mts )
+
+                usedGenerics =
+                    List.map referencedGenerics memberTypes
+                        |> List.foldl Set.union Set.empty
+                        |> Set.toList
+            in
+            if List.all (\gen -> Set.member gen listedGenerics) usedGenerics then
+                Nothing
+
+            else
+                Just ()
     in
     { types = concreteTypes
     , typedWords = Dict.empty
@@ -91,8 +114,28 @@ initContext ast =
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
-    , errors = []
+    , errors = List.filterMap genericErrors (Dict.values concreteTypes)
     }
+
+
+referencedGenerics : Type -> Set String
+referencedGenerics t =
+    case t of
+        Type.Generic val ->
+            Set.singleton val
+
+        Type.CustomGeneric _ members ->
+            members
+                |> List.map referencedGenerics
+                |> List.foldl Set.union Set.empty
+
+        Type.Union members ->
+            members
+                |> List.map referencedGenerics
+                |> List.foldl Set.union Set.empty
+
+        _ ->
+            Set.empty
 
 
 typeCheck : Qualifier.AST -> Result () AST
