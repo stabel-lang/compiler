@@ -201,7 +201,7 @@ qualifyMatch qualifiedTypes typeMatch =
 
         Parser.TypeMatch ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ _ members) ->
+                Just (CustomTypeDef _ gens members) ->
                     let
                         memberNames =
                             members
@@ -212,10 +212,18 @@ qualifyMatch qualifiedTypes typeMatch =
                             patterns
                                 |> List.map (qualifyMatchValue qualifiedTypes memberNames)
                                 |> Result.combine
+
+                        actualType =
+                            case gens of
+                                [] ->
+                                    type_
+
+                                _ ->
+                                    Type.CustomGeneric name (List.map Type.Generic gens)
                     in
                     case qualifiedPatternsResult of
                         Ok qualifiedPatterns ->
-                            Ok <| TypeMatch type_ qualifiedPatterns
+                            Ok <| TypeMatch actualType qualifiedPatterns
 
                         Err () ->
                             Err ()

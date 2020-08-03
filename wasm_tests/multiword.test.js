@@ -103,7 +103,7 @@ test('Generic arguments', async () => {
 
         deftype: NonEmptyList a
         : first a
-        : rest (List a)
+        : rest List a
 
         deftype: EmptyList
 

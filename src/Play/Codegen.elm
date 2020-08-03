@@ -106,25 +106,31 @@ multiFnToInstructions typeInfo def whens defaultImpl =
                 makeInequalityTest t_ localIdx =
                     case t_ of
                         AST.TypeMatch (Type.Custom name) conditions ->
-                            let
-                                typeId =
-                                    Dict.get name typeInfo
-                                        |> Maybe.map .id
-                                        |> Maybe.withDefault 0
-                            in
-                            Wasm.Batch
-                                [ Wasm.Local_Get localIdx
-                                , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const typeId
-                                , Wasm.I32_NotEq -- Types doesn't match?
-                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                                , conditions
-                                    |> List.concatMap (conditionTest localIdx)
-                                    |> Wasm.Batch
-                                ]
+                            whenSetup localIdx name conditions
+
+                        AST.TypeMatch (Type.CustomGeneric name _) conditions ->
+                            whenSetup localIdx name conditions
 
                         _ ->
                             Debug.todo "Only supports custom types in when clauses"
+
+                whenSetup localIdx typeName conditions =
+                    let
+                        typeId =
+                            Dict.get typeName typeInfo
+                                |> Maybe.map .id
+                                |> Maybe.withDefault 0
+                    in
+                    Wasm.Batch
+                        [ Wasm.Local_Get localIdx
+                        , Wasm.I32_Load -- Load instance id
+                        , Wasm.I32_Const typeId
+                        , Wasm.I32_NotEq -- Types doesn't match?
+                        , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                        , conditions
+                            |> List.concatMap (conditionTest localIdx)
+                            |> Wasm.Batch
+                        ]
 
                 conditionTest localIdx ( fieldName, value ) =
                     case value of
