@@ -156,11 +156,12 @@ suite =
                         { types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef "Bool"
+                                    []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , AST.CustomTypeDef "True" []
-                                , AST.CustomTypeDef "False" []
+                                , AST.CustomTypeDef "True" [] []
+                                , AST.CustomTypeDef "False" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -198,11 +199,12 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" []
-                                , CustomTypeDef "False" []
+                                , CustomTypeDef "True" [] []
+                                , CustomTypeDef "False" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -418,12 +420,14 @@ suite =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef "Bool"
+                                        []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , AST.CustomTypeDef "True" []
-                                    , AST.CustomTypeDef "False" []
+                                    , AST.CustomTypeDef "True" [] []
+                                    , AST.CustomTypeDef "False" [] []
                                     , AST.CustomTypeDef "Box"
+                                        []
                                         [ ( "value", Type.Int ) ]
                                     ]
                             , words =
@@ -488,12 +492,14 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Bool"
+                                        []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , CustomTypeDef "True" []
-                                    , CustomTypeDef "False" []
+                                    , CustomTypeDef "True" [] []
+                                    , CustomTypeDef "False" [] []
                                     , CustomTypeDef "Box"
+                                        []
                                         [ ( "value", Type.Int ) ]
                                     ]
                             , words =

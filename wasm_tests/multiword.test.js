@@ -95,3 +95,31 @@ test('Multiple arguments', async () => {
     expect(result.stackElement()).toBe(20);
 });
 
+test('Generic arguments', async () => {
+    const wat = await compiler.toWat(`
+        defunion: List a
+        : NonEmptyList a 
+        : EmptyList
+
+        deftype: NonEmptyList a
+        : first a
+        : rest List a
+
+        deftype: EmptyList
+
+        defmulti: first-or-default
+        when: NonEmptyList
+          drop first>
+        when: EmptyList
+          swap drop
+
+        def: main
+        entry: true
+        : 1 >EmptyList >NonEmptyList
+          0 first-or-default
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});

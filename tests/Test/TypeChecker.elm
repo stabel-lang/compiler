@@ -133,7 +133,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "True" []
+                                [ QAST.CustomTypeDef "True" [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -179,7 +179,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Person" [ ( "age", Type.Int ) ]
+                                [ QAST.CustomTypeDef "Person" [] [ ( "age", Type.Int ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -323,17 +323,134 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic custom type" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ] ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer 5
+                                            , QAST.Word ">Box"
+                                            , QAST.Word "element>"
+                                            , QAST.Integer 10
+                                            , QAST.Builtin Builtin.Plus
+                                            , QAST.Integer 15
+                                            , QAST.Builtin Builtin.Equal
+                                            ]
+                                  }
+                                , { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Box"
+                                            ]
+                                  }
+                                , { name = ">element"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.SetMember "Box" "element" ]
+                                  }
+                                , { name = "element>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                                [ Type.Generic "a" ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.GetMember "Box" "element" ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Err () ->
+                        Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
+        , test "Generic custom type fails if not generic is listed" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [] [ ( "element", Type.Generic "a" ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Box"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Ok _ ->
+                        Expect.fail "Expected type check to fail."
+
+                    Err () ->
+                        Expect.pass
+        , test "Generic custom type fails if wrong generic is listed" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "b" ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "b" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Box"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case typeCheck input of
+                    Ok _ ->
+                        Expect.fail "Expected type check to fail."
+
+                    Err () ->
+                        Expect.pass
         , describe "Unions and multifunctions" <|
             let
                 template multiFn =
                     { types =
                         Dict.fromListBy QAST.typeDefinitionName
                             [ QAST.UnionTypeDef "Bool"
+                                []
                                 [ Type.Custom "True"
                                 , Type.Custom "False"
                                 ]
-                            , QAST.CustomTypeDef "True" []
-                            , QAST.CustomTypeDef "False" []
+                            , QAST.CustomTypeDef "True" [] []
+                            , QAST.CustomTypeDef "False" [] []
                             ]
                     , words =
                         Dict.fromListBy .name
@@ -493,12 +610,15 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Beings"
+                                        []
                                         [ Type.Custom "Person"
                                         , Type.Custom "Dog"
                                         ]
                                     , QAST.CustomTypeDef "Person"
+                                        []
                                         [ ( "age", Type.Int ) ]
                                     , QAST.CustomTypeDef "Dog"
+                                        []
                                         [ ( "man-years", Type.Int ) ]
                                     ]
                             , words =
@@ -624,11 +744,12 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Bool"
+                                        []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , QAST.CustomTypeDef "True" []
-                                    , QAST.CustomTypeDef "False" []
+                                    , QAST.CustomTypeDef "True" [] []
+                                    , QAST.CustomTypeDef "False" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -694,6 +815,171 @@ suite =
                     case typeCheck input of
                         Ok _ ->
                             Expect.fail "Did not expect type check to pass."
+
+                        Err () ->
+                            Expect.pass
+            , test "Generic union" <|
+                \_ ->
+                    let
+                        listUnion =
+                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "List"
+                                        [ "a" ]
+                                        [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                        , Type.Custom "EmptyList"
+                                        ]
+                                    , QAST.CustomTypeDef "NonEmptyList"
+                                        [ "a" ]
+                                        [ ( "first", Type.Generic "a" )
+                                        , ( "rest", listUnion )
+                                        ]
+                                    , QAST.CustomTypeDef "EmptyList" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">EmptyList"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "EmptyList" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "EmptyList"
+                                                ]
+                                      }
+                                    , { name = ">NonEmptyList"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", listUnion ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "NonEmptyList"
+                                                ]
+                                      }
+                                    , { name = "first>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "NonEmptyList" "first"
+                                                ]
+                                      }
+                                    , { name = ">first"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "NonEmptyList" "first"
+                                                ]
+                                      }
+                                    , { name = "rest>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                                    [ listUnion ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "NonEmptyList" "rest"
+                                                ]
+                                      }
+                                    , { name = ">rest"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], listUnion ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "NonEmptyList" "rest"
+                                                ]
+                                      }
+                                    , { name = "first-or-default"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ listUnion, Type.Generic "a" ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
+                                                  , [ QAST.Builtin Builtin.StackDrop
+                                                    , QAST.Word "first>"
+                                                    ]
+                                                  )
+                                                , ( QAST.TypeMatch (Type.Custom "EmptyList") []
+                                                  , [ QAST.Builtin Builtin.StackSwap
+                                                    , QAST.Builtin Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Word ">EmptyList"
+                                                , QAST.Word ">NonEmptyList"
+                                                , QAST.Integer 0
+                                                , QAST.Word "first-or-default"
+                                                , QAST.Integer 1
+                                                , QAST.Builtin Builtin.Equal
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err () ->
+                            Expect.fail "Expected type check to pass."
+            , test "Generic union fails if not generic is listed" <|
+                \_ ->
+                    let
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Maybe"
+                                        [ "a" ]
+                                        [ Type.Generic "b"
+                                        , Type.Custom "Nothing"
+                                        ]
+                                    , QAST.CustomTypeDef "Nothing" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nothing"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Nothing"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.fail "Expected type check to fail."
 
                         Err () ->
                             Expect.pass

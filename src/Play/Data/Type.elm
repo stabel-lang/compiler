@@ -3,8 +3,9 @@ module Play.Data.Type exposing (..)
 
 type Type
     = Int
-    | Custom String
     | Generic String
+    | Custom String
+    | CustomGeneric String (List Type)
     | Union (List Type)
     | Quotation WordType
     | StackRange String
