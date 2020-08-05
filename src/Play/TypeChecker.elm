@@ -61,6 +61,7 @@ type alias Context =
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
+    , callStack : Set String
     , errors : List ()
     }
 
@@ -114,6 +115,7 @@ initContext ast =
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
+    , callStack = Set.empty
     , errors = List.filterMap genericErrors (Dict.values concreteTypes)
     }
 
@@ -252,6 +254,9 @@ typeCheckDefinition untypedDef context =
                         typeCompatible lhs rhs =
                             case ( lhs, rhs ) of
                                 ( Type.Generic _, _ ) ->
+                                    True
+
+                                ( _, Type.Generic _ ) ->
                                     True
 
                                 ( Type.CustomGeneric lName _, Type.CustomGeneric rName _ ) ->
@@ -421,13 +426,19 @@ resolveUnion context type_ =
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
 typeCheckImplementation untypedDef impl context =
     let
+        contextWithCall =
+            { context | callStack = Set.insert untypedDef.name context.callStack }
+
         ( _, contextWithStackEffects ) =
             List.foldl
                 (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode idx node ctx ))
-                ( 0, context )
+                ( 0, contextWithCall )
                 impl
+
+        contextWithoutCall =
+            { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
     in
-    wordTypeFromStackEffects contextWithStackEffects
+    wordTypeFromStackEffects contextWithoutCall
         |> simplifyWordType untypedDef.name
         |> (\( a, b ) -> ( b, a ))
 
@@ -720,19 +731,29 @@ typeCheckNode idx node context =
                             Debug.todo "inconcievable!"
 
                         Just untypedDef ->
-                            let
-                                contextWithTypedDef =
-                                    typeCheckDefinition untypedDef context
+                            if Set.member name context.callStack then
+                                -- recursive definition!
+                                case untypedDef.metadata.type_ of
+                                    Just annotatedType ->
+                                        addStackEffect context <| wordTypeToStackEffects annotatedType
 
-                                newContext =
-                                    { contextWithTypedDef | stackEffects = context.stackEffects }
-                            in
-                            case Dict.get name newContext.typedWords of
-                                Nothing ->
-                                    Debug.todo "inconcievable!"
+                                    Nothing ->
+                                        { context | errors = () :: context.errors }
 
-                                Just def ->
-                                    addStackEffect newContext <| wordTypeToStackEffects def.type_
+                            else
+                                let
+                                    contextWithTypedDef =
+                                        typeCheckDefinition untypedDef context
+
+                                    newContext =
+                                        { contextWithTypedDef | stackEffects = context.stackEffects }
+                                in
+                                case Dict.get name newContext.typedWords of
+                                    Nothing ->
+                                        Debug.todo "inconcievable!"
+
+                                    Just def ->
+                                        addStackEffect newContext <| wordTypeToStackEffects def.type_
 
         Qualifier.WordRef ref ->
             let
@@ -940,22 +961,35 @@ compatibleTypes context typeA typeB =
 
             else
                 case ( resolveUnion context boundA, resolveUnion context boundB ) of
+                    ( Type.Union leftUnion, Type.Union rightUnion ) ->
+                        -- TODO: Requires unions to be sorted in same order
+                        let
+                            lengthTest =
+                                List.length leftUnion == List.length rightUnion
+
+                            ( newContext, allMembersTest ) =
+                                List.map2 Tuple.pair leftUnion rightUnion
+                                    |> List.foldl foldHelper ( context, True )
+
+                            foldHelper ( lType, rType ) ( ctx, currValue ) =
+                                if not currValue then
+                                    ( ctx, currValue )
+
+                                else
+                                    compatibleTypes ctx lType rType
+                        in
+                        ( newContext
+                        , lengthTest && allMembersTest
+                        )
+
                     ( Type.Union _, _ ) ->
                         -- Cannot go from union to concrete type
-                        -- And we currently require unions to be exact matches
                         ( context, False )
 
                     ( lhsType, Type.Union unionTypes ) ->
-                        let
-                            allMembersTest =
-                                List.map (compatibleTypes context lhsType) unionTypes
-                        in
-                        case List.find Tuple.second allMembersTest of
-                            Just result ->
-                                result
-
-                            Nothing ->
-                                ( context, False )
+                        List.map (compatibleTypes context lhsType) unionTypes
+                            |> List.find Tuple.second
+                            |> Maybe.withDefault ( context, False )
 
                     ( Type.CustomGeneric lName lMembers, Type.CustomGeneric rName rMembers ) ->
                         let
@@ -1216,10 +1250,13 @@ untypedToTypedNode context untypedNode =
         Qualifier.Word name ->
             case Dict.get name context.typedWords of
                 Just def ->
-                    Word def.name def.type_
+                    Word name def.type_
 
                 Nothing ->
-                    Debug.todo "Inconcievable!"
+                    Dict.get name context.untypedWords
+                        |> Maybe.andThen (.metadata >> .type_)
+                        |> Maybe.withDefault { input = [], output = [] }
+                        |> Word name
 
         Qualifier.WordRef ref ->
             WordRef ref

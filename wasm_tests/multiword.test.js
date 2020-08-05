@@ -123,3 +123,36 @@ test('Generic arguments', async () => {
 
     expect(result.stackElement()).toBe(1);
 });
+
+test('Recursive word', async () => {
+    const wat = await compiler.toWat(`
+        defunion: List a
+        : NonEmptyList a 
+        : EmptyList
+
+        deftype: NonEmptyList a
+        : first a
+        : rest List a
+
+        deftype: EmptyList
+
+        def: sum
+        : 0 sum-helper
+
+        defmulti: sum-helper
+        type: (List a) Int -- Int
+        when: NonEmptyList
+          swap dup first> rotate rest> rotate + sum-helper
+        when: EmptyList
+          swap drop
+
+        def: main
+        entry: true
+        : 1 2 3 >EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+          sum
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(6);
+});

@@ -1107,4 +1107,151 @@ suite =
                         Err () ->
                             Expect.fail "Did not expect type check to fail."
             ]
+        , describe "Recursive word definitions"
+            [ test "With type annotation" <|
+                \_ ->
+                    let
+                        listUnion =
+                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "List"
+                                        [ "a" ]
+                                        [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                        , Type.Custom "EmptyList"
+                                        ]
+                                    , QAST.CustomTypeDef "NonEmptyList"
+                                        [ "a" ]
+                                        [ ( "first", Type.Generic "a" )
+                                        , ( "rest", listUnion )
+                                        ]
+                                    , QAST.CustomTypeDef "EmptyList" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">EmptyList"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "EmptyList" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "EmptyList"
+                                                ]
+                                      }
+                                    , { name = ">NonEmptyList"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", listUnion ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "NonEmptyList"
+                                                ]
+                                      }
+                                    , { name = "first>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "NonEmptyList" "first"
+                                                ]
+                                      }
+                                    , { name = ">first"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "NonEmptyList" "first"
+                                                ]
+                                      }
+                                    , { name = "rest>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                                    [ listUnion ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.GetMember "NonEmptyList" "rest"
+                                                ]
+                                      }
+                                    , { name = ">rest"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], listUnion ]
+                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.SetMember "NonEmptyList" "rest"
+                                                ]
+                                      }
+                                    , { name = "sum"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 0
+                                                , QAST.Word "sum-helper"
+                                                ]
+                                      }
+                                    , { name = "sum-helper"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ listUnion, Type.Int ] [ Type.Int ]
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
+                                                  , [ QAST.Builtin Builtin.StackSwap
+                                                    , QAST.Builtin Builtin.StackDuplicate
+                                                    , QAST.Word "first>"
+                                                    , QAST.Builtin Builtin.StackRightRotate
+                                                    , QAST.Word "rest>"
+                                                    , QAST.Builtin Builtin.StackRightRotate
+                                                    , QAST.Builtin Builtin.Plus
+                                                    , QAST.Word "sum-helper"
+                                                    ]
+                                                  )
+                                                , ( QAST.TypeMatch (Type.Custom "EmptyList") []
+                                                  , [ QAST.Builtin Builtin.StackSwap
+                                                    , QAST.Builtin Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer 1
+                                                , QAST.Integer 2
+                                                , QAST.Integer 3
+                                                , QAST.Word ">EmptyList"
+                                                , QAST.Word ">NonEmptyList"
+                                                , QAST.Word ">NonEmptyList"
+                                                , QAST.Word ">NonEmptyList"
+                                                , QAST.Word "sum"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case typeCheck input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err () ->
+                            Expect.fail "Did not expect type check to fail."
+            ]
         ]
