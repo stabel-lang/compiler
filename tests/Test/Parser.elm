@@ -525,6 +525,113 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "Generic with generic members (with type annotation)" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defunion: MaybeBox a
+                            : Box a
+                            : Nil
+
+                            deftype: Box a
+                            : element a
+
+                            deftype: Nil
+
+                            defmulti: if-present
+                            type: (MaybeBox a) a -- a
+                            when: (Box a)
+                              !
+                            when: Nil
+                              drop
+                            """
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ UnionTypeDef "MaybeBox"
+                                        [ "a" ]
+                                        [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef "Nil" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Box"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "Box"
+                                                ]
+                                      }
+                                    , { name = ">element"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    , Type.Generic "a"
+                                                    ]
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.SetMember "Box" "element"
+                                                ]
+                                      }
+                                    , { name = "element>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
+                                                    ]
+                                                    [ Type.Generic "a"
+                                                    ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.GetMember "Box" "element"
+                                                ]
+                                      }
+                                    , { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "if-present"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.CustomGeneric "MaybeBox" [ Type.Generic "a" ], Type.Generic "a" ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                  , [ AST.Word "!" ]
+                                                  )
+                                                , ( TypeMatch (Type.Custom "Nil") []
+                                                  , [ AST.Word "drop" ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case run source of
+                        Err () ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
             ]
         , test "Parser understands quotations" <|
             \_ ->

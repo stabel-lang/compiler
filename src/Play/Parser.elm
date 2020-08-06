@@ -463,6 +463,13 @@ typeLoopParser reverseTypes =
         , Parser.succeed step
             |= genericParser
             |. noiseParser
+        , Parser.succeed step
+            |. Parser.symbol "("
+            |. noiseParser
+            |= typeRefParser
+            |. noiseParser
+            |. Parser.symbol ")"
+            |. noiseParser
         , Parser.succeed (\wordType -> step (Type.Quotation wordType))
             |. Parser.symbol "["
             |. noiseParser
@@ -562,12 +569,21 @@ genericParser =
                     |. Parser.symbol "..."
                 , Parser.succeed (Type.Generic genericName)
                 ]
+
+        validator sym =
+            if String.contains ":" sym then
+                Parser.problem "This is metadata"
+
+            else
+                Parser.succeed sym
     in
     Parser.variable
         { start = \c -> not (c == '-' || Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-        , inner = validSymbolChar
+        , inner = \c -> validSymbolChar c || c == ':'
         , reserved = Set.empty
         }
+        |> Parser.andThen validator
+        |> Parser.backtrackable
         |> Parser.andThen helper
 
 
