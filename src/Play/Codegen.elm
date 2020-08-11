@@ -3,8 +3,8 @@ module Play.Codegen exposing (..)
 import Dict exposing (Dict)
 import List.Extra as List
 import Play.Codegen.BaseModule as BaseModule
-import Play.Data.Builtin as Builtin
-import Play.Data.Type as Type exposing (Type)
+import Play.Data.Builtin as Builtin exposing (Builtin)
+import Play.Data.Type as Type exposing (Type, WordType)
 import Play.TypeChecker as AST exposing (AST)
 import Wasm
 
@@ -13,6 +13,17 @@ type alias TypeInformation =
     { id : Int
     , members : List ( String, Type )
     }
+
+
+type AstNode
+    = IntLiteral Int
+    | Word String WordType
+    | WordRef String
+    | ConstructType String
+    | SetMember String String Type
+    | GetMember String String Type
+    | Builtin Builtin
+    | PromoteInt Int
 
 
 
@@ -29,7 +40,7 @@ codegen ast =
     in
     ast.words
         |> Dict.values
-        |> List.map (toWasmFuncDef typeMetaDict)
+        |> List.map (toWasmFuncDef typeMetaDict ast)
         |> List.foldl Wasm.withFunction BaseModule.baseModule
         |> Ok
 
@@ -60,16 +71,20 @@ typeMeta types =
         |> Dict.fromList
 
 
-toWasmFuncDef : Dict String TypeInformation -> AST.WordDefinition -> Wasm.FunctionDef
-toWasmFuncDef typeInfo def =
+toWasmFuncDef :
+    Dict String TypeInformation
+    -> AST
+    -> AST.WordDefinition
+    -> Wasm.FunctionDef
+toWasmFuncDef typeInfo ast def =
     let
         wasmImplementation =
             case def.implementation of
-                AST.MultiImpl whens defaultImpl ->
-                    [ multiFnToInstructions typeInfo def whens defaultImpl ]
-
                 AST.SoloImpl impl ->
-                    List.map (nodeToInstruction typeInfo) impl
+                    astNodesToInstructions typeInfo ast def impl
+
+                AST.MultiImpl whens defaultImpl ->
+                    [ multiFnToInstructions typeInfo ast def whens defaultImpl ]
 
         numberOfLocals =
             List.filterMap Wasm.maximumLocalIndex wasmImplementation
@@ -87,13 +102,150 @@ toWasmFuncDef typeInfo def =
     }
 
 
+astNodesToInstructions :
+    Dict String TypeInformation
+    -> AST
+    -> AST.WordDefinition
+    -> List AST.AstNode
+    -> List Wasm.Instruction
+astNodesToInstructions typeInfo ast def astNodes =
+    astNodes
+        |> List.foldl (astNodeToCodegenNode ast) ( def.type_.input, [] )
+        |> Tuple.second
+        |> List.reverse
+        |> List.map (nodeToInstruction typeInfo)
+
+
+astNodeToCodegenNode :
+    AST
+    -> AST.AstNode
+    -> ( List Type, List AstNode )
+    -> ( List Type, List AstNode )
+astNodeToCodegenNode ast node ( stack, result ) =
+    let
+        newNode =
+            case node of
+                AST.IntLiteral val ->
+                    IntLiteral val
+
+                AST.Word name type_ ->
+                    Word name type_
+
+                AST.WordRef name ->
+                    WordRef name
+
+                AST.ConstructType typeName ->
+                    ConstructType typeName
+
+                AST.SetMember typeName memberName type_ ->
+                    SetMember typeName memberName type_
+
+                AST.GetMember typeName memberName type_ ->
+                    GetMember typeName memberName type_
+
+                AST.Builtin builtin ->
+                    Builtin builtin
+
+        nodeType =
+            case node of
+                AST.IntLiteral _ ->
+                    { input = []
+                    , output = [ Type.Int ]
+                    }
+
+                AST.Word _ type_ ->
+                    type_
+
+                AST.WordRef name ->
+                    case Dict.get name ast.words of
+                        Just def ->
+                            { input = []
+                            , output = [ Type.Quotation def.type_ ]
+                            }
+
+                        Nothing ->
+                            Debug.todo "help"
+
+                AST.ConstructType typeName ->
+                    case Dict.get typeName ast.types of
+                        Just (AST.CustomTypeDef _ gens members) ->
+                            { input = List.map Tuple.second members
+                            , output = [ typeFromTypeDef typeName gens ]
+                            }
+
+                        _ ->
+                            Debug.todo "help"
+
+                AST.SetMember typeName _ memberType ->
+                    case Dict.get typeName ast.types of
+                        Just (AST.CustomTypeDef _ gens _) ->
+                            let
+                                type_ =
+                                    typeFromTypeDef typeName gens
+                            in
+                            { input = [ type_, memberType ]
+                            , output = [ type_ ]
+                            }
+
+                        _ ->
+                            Debug.todo "help"
+
+                AST.GetMember typeName _ memberType ->
+                    case Dict.get typeName ast.types of
+                        Just (AST.CustomTypeDef _ gens _) ->
+                            let
+                                type_ =
+                                    typeFromTypeDef typeName gens
+                            in
+                            { input = [ type_ ]
+                            , output = [ memberType ]
+                            }
+
+                        _ ->
+                            Debug.todo "help"
+
+                AST.Builtin builtin ->
+                    Builtin.wordType builtin
+
+        typeFromTypeDef typeName gens =
+            if List.isEmpty gens then
+                Type.Custom typeName
+
+            else
+                Type.CustomGeneric typeName (List.map Type.Generic gens)
+
+        intsToPromote =
+            List.map2 Tuple.pair (List.reverse stack) (List.reverse nodeType.input)
+                |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
+                |> List.filterMap maybePromoteInt
+
+        maybePromoteInt ( idx, leftType, rightType ) =
+            case ( leftType, rightType ) of
+                ( Type.Int, Type.Union _ ) ->
+                    Just (PromoteInt idx)
+
+                _ ->
+                    Nothing
+
+        newStack =
+            List.reverse stack
+                |> List.drop (List.length nodeType.input)
+                |> (\s -> List.reverse nodeType.output ++ s)
+                |> List.reverse
+    in
+    ( newStack
+    , newNode :: (intsToPromote ++ result)
+    )
+
+
 multiFnToInstructions :
     Dict String TypeInformation
+    -> AST
     -> AST.WordDefinition
     -> List ( AST.TypeMatch, List AST.AstNode )
     -> List AST.AstNode
     -> Wasm.Instruction
-multiFnToInstructions typeInfo def whens defaultImpl =
+multiFnToInstructions typeInfo ast def whens defaultImpl =
     let
         branches =
             List.foldl buildBranch (Wasm.Batch []) whens
@@ -105,6 +257,17 @@ multiFnToInstructions typeInfo def whens defaultImpl =
 
                 makeInequalityTest t_ localIdx =
                     case t_ of
+                        AST.TypeMatch Type.Int [] ->
+                            Wasm.Batch
+                                [ Wasm.Local_Get localIdx
+                                , Wasm.I32_Load -- Load instance id
+                                , Wasm.I32_Const BaseModule.intBoxId
+                                , Wasm.I32_NotEq -- Types doesn't match?
+                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                                , Wasm.I32_Const selfIndex
+                                , Wasm.Call BaseModule.demoteIntFn
+                                ]
+
                         AST.TypeMatch (Type.Custom name) conditions ->
                             whenSetup localIdx name conditions
 
@@ -181,7 +344,7 @@ multiFnToInstructions typeInfo def whens defaultImpl =
 
                 implementation =
                     nodes
-                        |> List.map (nodeToInstruction typeInfo)
+                        |> astNodesToInstructions typeInfo ast def
                         |> Wasm.Batch
             in
             Wasm.Block
@@ -199,26 +362,26 @@ multiFnToInstructions typeInfo def whens defaultImpl =
         , Wasm.Call BaseModule.stackGetElementFn
         , Wasm.Local_Set 0 -- store instance id in local
         , branches
-        , Wasm.Batch (List.map (nodeToInstruction typeInfo) defaultImpl)
+        , Wasm.Batch (astNodesToInstructions typeInfo ast def defaultImpl)
         ]
 
 
-nodeToInstruction : Dict String TypeInformation -> AST.AstNode -> Wasm.Instruction
+nodeToInstruction : Dict String TypeInformation -> AstNode -> Wasm.Instruction
 nodeToInstruction typeInfo node =
     case node of
-        AST.IntLiteral value ->
+        IntLiteral value ->
             Wasm.Batch
                 [ Wasm.I32_Const value
                 , Wasm.Call BaseModule.stackPushFn
                 ]
 
-        AST.Word value _ ->
+        Word value _ ->
             Wasm.Call value
 
-        AST.WordRef name ->
+        WordRef name ->
             Wasm.FunctionIndex name
 
-        AST.ConstructType typeName ->
+        ConstructType typeName ->
             case Dict.get typeName typeInfo of
                 Just type_ ->
                     let
@@ -262,7 +425,7 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen."
 
-        AST.SetMember typeName memberName memberType ->
+        SetMember typeName memberName memberType ->
             case Dict.get typeName typeInfo of
                 Just type_ ->
                     let
@@ -294,7 +457,7 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen!"
 
-        AST.GetMember typeName memberName memberType ->
+        GetMember typeName memberName memberType ->
             case getMemberType typeInfo typeName memberName of
                 Just memberIndex ->
                     Wasm.Batch
@@ -308,7 +471,7 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen!"
 
-        AST.Builtin builtin ->
+        Builtin builtin ->
             case builtin of
                 Builtin.Plus ->
                     Wasm.Call BaseModule.addIntFn
@@ -342,6 +505,12 @@ nodeToInstruction typeInfo node =
 
                 Builtin.Apply ->
                     Wasm.CallIndirect
+
+        PromoteInt stackPos ->
+            Wasm.Batch
+                [ Wasm.I32_Const stackPos
+                , Wasm.Call BaseModule.promoteIntFn
+                ]
 
 
 getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int

@@ -178,7 +178,7 @@ test('Int case', async () => {
 
     const result = await compiler.run(wat, 'main');
 
-    expect(result.stackElement()).toBe(4);
+    expect(result.stackElement()).toBe(8);
 });
 
 test('Int match', async () => {
