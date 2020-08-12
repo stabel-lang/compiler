@@ -156,3 +156,63 @@ test('Recursive word', async () => {
 
     expect(result.stackElement()).toBe(6);
 });
+
+test('Int case', async () => {
+    const wat = await compiler.toWat(`
+        defunion: Bool
+        : Int
+        : NoInt
+
+        deftype: NoInt
+
+        defmulti: double
+        when: Int
+          2 *
+        when: NoInt
+          drop 0
+
+        def: main
+        entry: true
+        : 4 double
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(8);
+});
+
+test('Int match', async () => {
+    const wat = await compiler.toWat(`
+        defmulti: double
+        when: Int( value 0 )
+          drop 2
+        when: Int
+          2 *
+
+        def: main
+        entry: true
+        : 0 double
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(2);
+});
+
+test('Int match (reverse)', async () => {
+    const wat = await compiler.toWat(`
+        defmulti: double
+        when: Int( value 0 )
+          drop 2
+        when: Int
+          2 *
+
+        def: main
+        entry: true
+        : 6 double
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(12);
+});
