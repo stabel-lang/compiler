@@ -199,6 +199,24 @@ test('Int match', async () => {
     expect(result.stackElement()).toBe(2);
 });
 
+test('Int match (reverse)', async () => {
+    const wat = await compiler.toWat(`
+        defmulti: double
+        when: Int( value 0 )
+          drop 2
+        when: Int
+          2 *
+
+        def: main
+        entry: true
+        : 6 double
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(12);
+});
+
 test('Generic case', async () => {
     const wat = await compiler.toWat(`
         defunion: Maybe a

@@ -257,7 +257,7 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
 
                 makeInequalityTest t_ localIdx =
                     case t_ of
-                        AST.TypeMatch Type.Int [] ->
+                        AST.TypeMatch Type.Int conditions ->
                             Wasm.Batch
                                 [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
@@ -265,6 +265,9 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
                                 , Wasm.I32_Const selfIndex
+                                , conditions
+                                    |> List.concatMap (matchingIntTest localIdx)
+                                    |> Wasm.Batch
                                 , Wasm.Call BaseModule.demoteIntFn
                                 ]
 
@@ -294,6 +297,25 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                             |> List.concatMap (conditionTest localIdx)
                             |> Wasm.Batch
                         ]
+
+                matchingIntTest localIdx ( _, astValue ) =
+                    let
+                        value =
+                            case astValue of
+                                AST.LiteralInt num ->
+                                    num
+
+                                _ ->
+                                    0
+                    in
+                    [ Wasm.Local_Get localIdx
+                    , Wasm.I32_Const BaseModule.wasmPtrSize
+                    , Wasm.I32_Add
+                    , Wasm.I32_Load -- int value
+                    , Wasm.I32_Const value
+                    , Wasm.I32_NotEq -- not same number?
+                    , Wasm.BreakIf 0 -- move to next branch
+                    ]
 
                 conditionTest localIdx ( fieldName, value ) =
                     case value of
