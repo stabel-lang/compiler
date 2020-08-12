@@ -216,37 +216,3 @@ test('Int match (reverse)', async () => {
 
     expect(result.stackElement()).toBe(12);
 });
-
-test('Generic case', async () => {
-    const wat = await compiler.toWat(`
-        defunion: Maybe a
-        : a
-        : Nil
-
-        deftype: Nil
-
-        defmulti: map
-        type: (Maybe a) [ a -- b ] -- (Maybe b)
-        when: a
-          !
-        when: Nil
-          drop
-
-        defmulti: with-default
-        type: (Maybe a) a -- a
-        when: a
-          drop
-        when: Nil
-          swap drop
-
-        def: main
-        entry: true
-        : 10 
-          [ 1 - ] map
-          0 with-default
-    `);
-
-    const result = await compiler.run(wat, 'main');
-
-    expect(result.stackElement()).toBe(9);
-});
