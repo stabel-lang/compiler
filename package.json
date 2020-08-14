@@ -8,6 +8,7 @@
     "elm-format": "^0.8.2",
     "elm-test": "^0.19.1-revision2",
     "jest": "^25.1.0",
+    "strip-indent": "^3.0.0",
     "wabt": "^1.0.13"
   },
   "scripts": {

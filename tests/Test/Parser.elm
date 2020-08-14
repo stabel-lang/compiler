@@ -6,7 +6,13 @@ import Expect
 import Play.Data.Metadata as Metadata
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
+import String.Extra as String
 import Test exposing (Test, describe, test)
+
+
+compile : String -> Result () AST
+compile str =
+    run <| String.unindent str
 
 
 suite : Test
@@ -68,7 +74,7 @@ suite =
                                 ]
                         }
                 in
-                case run source of
+                case compile source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -114,7 +120,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -192,7 +198,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -247,7 +253,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -283,7 +289,7 @@ suite =
                                 ]
                         }
                 in
-                case run source of
+                case compile source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -356,7 +362,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -417,7 +423,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -519,7 +525,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -626,7 +632,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -681,7 +687,7 @@ suite =
                                 ]
                         }
                 in
-                case run source of
+                case compile source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -738,7 +744,7 @@ suite =
                                 ]
                         }
                 in
-                case run source of
+                case compile source of
                     Err () ->
                         Expect.fail "Did not expect parsing to fail"
 
@@ -771,7 +777,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -813,7 +819,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -850,7 +856,7 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.fail "Did not expect parsing to fail"
 
@@ -867,7 +873,7 @@ suite =
                             : >False
                             """
                     in
-                    case run source of
+                    case compile source of
                         Err () ->
                             Expect.pass
 
@@ -878,7 +884,7 @@ suite =
             \_ ->
                 let
                     expectCompiles code =
-                        case run code of
+                        case compile code of
                             Err () ->
                                 Expect.fail "Did not expect compilation to fail."
 
