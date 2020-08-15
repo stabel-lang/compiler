@@ -66,6 +66,192 @@ run sourceCode =
         |> Result.mapError (always ())
 
 
+
+-- ATOMS
+
+
+validSymbolChar : Char -> Bool
+validSymbolChar c =
+    not <| Set.member c invalidSymbolChars
+
+
+invalidSymbolChars : Set Char
+invalidSymbolChars =
+    Set.union whitespaceChars specialChars
+
+
+specialChars : Set Char
+specialChars =
+    Set.fromList
+        [ ':'
+        , '{'
+        , '}'
+        , '['
+        , ']'
+        , '('
+        , ')'
+        , '.'
+        , '#'
+        ]
+
+
+whitespaceChars : Set Char
+whitespaceChars =
+    Set.fromList
+        [ ' '
+        , '\n'
+        , '\u{000D}'
+        , '\t'
+        ]
+
+
+{-| The builtin int parser has a bug where it commits when it comes across an 'e'
+-}
+intParser : Parser Int
+intParser =
+    let
+        helper text =
+            case String.toInt text of
+                Just num ->
+                    Parser.succeed num
+
+                Nothing ->
+                    Parser.problem "Not a valid integer"
+    in
+    Parser.variable
+        { start = Char.isDigit
+        , inner = Char.isDigit
+        , reserved = Set.empty
+        }
+        |. noiseParser
+        |> Parser.andThen helper
+
+
+symbolParser : Parser String
+symbolParser =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        }
+        |. Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol ":"
+                |> Parser.andThen (\_ -> Parser.problem "This is metadata")
+            , Parser.succeed identity
+            ]
+        |. noiseParser
+        |> Parser.backtrackable
+
+
+genericParser : Parser String
+genericParser =
+    Parser.oneOf
+        [ Parser.succeed identity
+            |. Parser.symbol "-"
+            |> Parser.andThen (\_ -> Parser.problem "Generic variables cannot start with -")
+        , symbolParser
+        ]
+        |. noiseParser
+        |> Parser.backtrackable
+
+
+typeNameParser : Parser String
+typeNameParser =
+    Parser.variable
+        { start = Char.isUpper
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        }
+        |. noiseParser
+
+
+genericOrRangeParser : Parser Type
+genericOrRangeParser =
+    let
+        helper value =
+            Parser.oneOf
+                [ Parser.succeed (Type.StackRange value)
+                    |. Parser.symbol "..."
+                    |. noiseParser
+                , Parser.succeed (Type.Generic value)
+                ]
+    in
+    Parser.andThen helper genericParser
+
+
+typeParser : Parser Type
+typeParser =
+    Parser.oneOf
+        [ Parser.succeed Type.Int
+            |. Parser.keyword "Int"
+            |. noiseParser
+        , Parser.succeed Type.Custom
+            |= typeNameParser
+        ]
+
+
+typeRefParser : Parser Type
+typeRefParser =
+    let
+        helper name binds =
+            case binds of
+                [] ->
+                    Type.Custom name
+
+                _ ->
+                    Type.CustomGeneric name binds
+    in
+    Parser.oneOf
+        [ Parser.succeed Type.Int
+            |. Parser.keyword "Int"
+            |. noiseParser
+        , Parser.succeed helper
+            |= typeNameParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed Type.Generic
+            |= genericParser
+        , Parser.succeed identity
+            |. Parser.symbol "("
+            |. noiseParser
+            |= Parser.lazy (\_ -> typeRefParser)
+            |. Parser.symbol ")"
+            |. noiseParser
+        ]
+
+
+typeOrGenericParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+typeOrGenericParser types =
+    Parser.oneOf
+        [ Parser.succeed (\name -> Parser.Loop (Type.Custom name :: types))
+            |= typeNameParser
+        , Parser.succeed (\name -> Parser.Loop (Type.Generic name :: types))
+            |= genericParser
+        , Parser.succeed (Parser.Done (List.reverse types))
+        ]
+
+
+noiseParser : Parser ()
+noiseParser =
+    Parser.loop () noiseParserLoop
+
+
+noiseParserLoop : () -> Parser (Parser.Step () ())
+noiseParserLoop _ =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Loop ())
+            |. Parser.lineComment "#"
+        , Parser.succeed (Parser.Loop ())
+            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
+            |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
+        , Parser.succeed (Parser.Done ())
+        ]
+
+
+
+-- Grammar
+
+
 parser : Parser AST
 parser =
     let
@@ -177,7 +363,6 @@ wordDefinitionParser =
     in
     Parser.succeed joinParseResults
         |= symbolParser
-        |. noiseParser
         |= Parser.loop emptyDef wordMetadataParser
 
 
@@ -228,7 +413,6 @@ multiWordDefinitionParser =
     in
     Parser.succeed joinParseResults
         |= symbolParser
-        |. noiseParser
         |= Parser.loop emptyDef multiWordMetadataParser
 
 
@@ -263,7 +447,6 @@ multiWordMetadataParser def =
             |. Parser.keyword "when:"
             |. noiseParser
             |= typeMatchParser
-            |. noiseParser
             |= implementationParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
             |. Parser.keyword ":"
@@ -277,9 +460,7 @@ typeDefinitionParser : Parser TypeDefinition
 typeDefinitionParser =
     Parser.succeed CustomTypeDef
         |= typeNameParser
-        |. noiseParser
         |= Parser.loop [] typeGenericParser
-        |. noiseParser
         |= Parser.loop [] typeMemberParser
 
 
@@ -287,8 +468,7 @@ typeGenericParser : List String -> Parser (Parser.Step (List String) (List Strin
 typeGenericParser generics =
     Parser.oneOf
         [ Parser.succeed (\name -> Parser.Loop (name :: generics))
-            |= symbolParser
-            |. noiseParser
+            |= genericParser
         , Parser.succeed (Parser.Done (List.reverse generics))
         ]
 
@@ -300,46 +480,7 @@ typeMemberParser types =
             |. Parser.symbol ":"
             |. noiseParser
             |= symbolParser
-            |. noiseParser
             |= typeRefParser
-        , Parser.succeed (Parser.Done (List.reverse types))
-        ]
-
-
-typeRefParser : Parser Type
-typeRefParser =
-    let
-        helper name binds =
-            case binds of
-                [] ->
-                    Type.Custom name
-
-                _ ->
-                    Type.CustomGeneric name binds
-    in
-    Parser.oneOf
-        [ Parser.succeed Type.Int
-            |. Parser.keyword "Int"
-            |. noiseParser
-        , Parser.succeed helper
-            |= typeNameParser
-            |. noiseParser
-            |= Parser.loop [] typeOrGenericParser
-        , Parser.succeed Type.Generic
-            |= symbolParser
-            |. noiseParser
-        ]
-
-
-typeOrGenericParser : List Type -> Parser (Parser.Step (List Type) (List Type))
-typeOrGenericParser types =
-    Parser.oneOf
-        [ Parser.succeed (\name -> Parser.Loop (Type.Custom name :: types))
-            |= typeNameParser
-            |. noiseParser
-        , Parser.succeed (\name -> Parser.Loop (Type.Generic name :: types))
-            |= symbolParser
-            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
@@ -348,9 +489,7 @@ unionTypeDefinitionParser : Parser TypeDefinition
 unionTypeDefinitionParser =
     Parser.succeed UnionTypeDef
         |= typeNameParser
-        |. noiseParser
         |= Parser.loop [] typeGenericParser
-        |. noiseParser
         |= Parser.loop [] unionTypeMemberParser
 
 
@@ -362,82 +501,6 @@ unionTypeMemberParser types =
             |. noiseParser
             |= typeRefParser
         , Parser.succeed (Parser.Done (List.reverse types))
-        ]
-
-
-{-| The builtin int parser has a bug where it commits when it comes across an 'e'
--}
-intParser : Parser Int
-intParser =
-    let
-        helper text =
-            case String.toInt text of
-                Just num ->
-                    Parser.succeed num
-
-                Nothing ->
-                    Parser.problem "Not a valid integer"
-    in
-    Parser.variable
-        { start = Char.isDigit
-        , inner = Char.isDigit
-        , reserved = Set.empty
-        }
-        |> Parser.andThen helper
-
-
-symbolParser : Parser String
-symbolParser =
-    let
-        validator sym =
-            if String.contains ":" sym then
-                Parser.problem "This is metadata"
-
-            else
-                Parser.succeed sym
-    in
-    Parser.backtrackable
-        (Parser.variable
-            { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-            , inner = \c -> validSymbolChar c || c == ':'
-            , reserved = Set.empty
-            }
-            |> Parser.andThen validator
-        )
-
-
-validSymbolChar : Char -> Bool
-validSymbolChar c =
-    not <| Set.member c invalidSymbolChars
-
-
-invalidSymbolChars : Set Char
-invalidSymbolChars =
-    Set.union whitespaceChars specialChars
-
-
-specialChars : Set Char
-specialChars =
-    Set.fromList
-        [ ':'
-        , '{'
-        , '}'
-        , '['
-        , ']'
-        , '('
-        , ')'
-        , '.'
-        , '#'
-        ]
-
-
-whitespaceChars : Set Char
-whitespaceChars =
-    Set.fromList
-        [ ' '
-        , '\n'
-        , '\u{000D}'
-        , '\t'
         ]
 
 
@@ -459,17 +522,10 @@ typeLoopParser reverseTypes =
     Parser.oneOf
         [ Parser.succeed step
             |= typeParser
-            |. noiseParser
         , Parser.succeed step
-            |= genericParser
-            |. noiseParser
+            |= genericOrRangeParser
         , Parser.succeed step
-            |. Parser.symbol "("
-            |. noiseParser
             |= typeRefParser
-            |. noiseParser
-            |. Parser.symbol ")"
-            |. noiseParser
         , Parser.succeed (\wordType -> step (Type.Quotation wordType))
             |. Parser.symbol "["
             |. noiseParser
@@ -478,28 +534,6 @@ typeLoopParser reverseTypes =
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse reverseTypes))
         ]
-
-
-typeParser : Parser Type
-typeParser =
-    let
-        helper value =
-            if value == "Int" then
-                Type.Int
-
-            else
-                Type.Custom value
-    in
-    Parser.map helper typeNameParser
-
-
-typeNameParser : Parser String
-typeNameParser =
-    Parser.variable
-        { start = Char.isUpper
-        , inner = validSymbolChar
-        , reserved = Set.empty
-        }
 
 
 typeMatchParser : Parser TypeMatch
@@ -517,15 +551,9 @@ typeMatchParser =
                 ]
             |. noiseParser
         , Parser.succeed (\sym -> TypeMatch (Type.Generic sym) [])
-            |= symbolParser
-            |. noiseParser
+            |= genericParser
         , Parser.succeed (\typ -> TypeMatch typ [])
-            |. Parser.symbol "("
-            |. noiseParser
             |= typeRefParser
-            |. noiseParser
-            |. Parser.symbol ")"
-            |. noiseParser
         ]
 
 
@@ -534,9 +562,7 @@ typeMatchConditionParser nodes =
     Parser.oneOf
         [ Parser.succeed (\name value -> Parser.Loop (( name, value ) :: nodes))
             |= symbolParser
-            |. noiseParser
             |= typeMatchValueParser
-            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
 
@@ -560,37 +586,9 @@ typeMatchValueParser =
         ]
 
 
-genericParser : Parser Type
-genericParser =
-    let
-        helper genericName =
-            Parser.oneOf
-                [ Parser.succeed (Type.StackRange genericName)
-                    |. Parser.symbol "..."
-                , Parser.succeed (Type.Generic genericName)
-                ]
-
-        validator sym =
-            if String.contains ":" sym then
-                Parser.problem "This is metadata"
-
-            else
-                Parser.succeed sym
-    in
-    Parser.variable
-        { start = \c -> not (c == '-' || Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-        , inner = \c -> validSymbolChar c || c == ':'
-        , reserved = Set.empty
-        }
-        |> Parser.andThen validator
-        |> Parser.backtrackable
-        |> Parser.andThen helper
-
-
 implementationParser : Parser (List AstNode)
 implementationParser =
-    Parser.succeed identity
-        |= Parser.loop [] implementationParserHelp
+    Parser.loop [] implementationParserHelp
 
 
 implementationParserHelp : List AstNode -> Parser (Parser.Step (List AstNode) (List AstNode))
@@ -598,7 +596,6 @@ implementationParserHelp nodes =
     Parser.oneOf
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
-            |. noiseParser
         , Parser.succeed (\quotImpl -> Parser.Loop (Quotation quotImpl :: nodes))
             |. Parser.symbol "["
             |. noiseParser
@@ -616,23 +613,6 @@ nodeParser =
             |= intParser
         , Parser.succeed Word
             |= symbolParser
-        ]
-
-
-noiseParser : Parser ()
-noiseParser =
-    Parser.loop () noiseParserLoop
-
-
-noiseParserLoop : () -> Parser (Parser.Step () ())
-noiseParserLoop _ =
-    Parser.oneOf
-        [ Parser.succeed (Parser.Loop ())
-            |. Parser.lineComment "#"
-        , Parser.succeed (Parser.Loop ())
-            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
-            |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
-        , Parser.succeed (Parser.Done ())
         ]
 
 
