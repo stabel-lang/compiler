@@ -12,10 +12,30 @@ module Play.Parser exposing
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
-import Parser exposing ((|.), (|=), Parser)
+import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Set exposing (Set)
+
+
+type alias Parser a =
+    Parser.Parser () Problem a
+
+
+type Problem
+    = NotInt
+    | NotSymbol
+    | NotMetadata
+    | NotGeneric
+    | NotType
+    | NoProblem
+    | FoundMetadata
+    | ExpectedLeftParen
+    | ExpectedRightParen
+    | ExpectedEnd
+    | ExpectedTypeSeperator
+    | ExpectedLeftBracket
+    | ExpectedRightBracket
 
 
 type alias AST =
@@ -116,12 +136,13 @@ intParser =
                     Parser.succeed num
 
                 Nothing ->
-                    Parser.problem "Not a valid integer"
+                    Parser.problem NotInt
     in
     Parser.variable
         { start = Char.isDigit
         , inner = Char.isDigit
         , reserved = Set.empty
+        , expecting = NotInt
         }
         |. noiseParser
         |> Parser.andThen helper
@@ -133,11 +154,12 @@ symbolParser =
         { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
         , inner = validSymbolChar
         , reserved = Set.empty
+        , expecting = NotSymbol
         }
         |. Parser.oneOf
             [ Parser.succeed identity
-                |. Parser.symbol ":"
-                |> Parser.andThen (\_ -> Parser.problem "This is metadata")
+                |. Parser.symbol (Token ":" NotMetadata)
+                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
             , Parser.succeed identity
             ]
         |. noiseParser
@@ -148,8 +170,8 @@ genericParser : Parser String
 genericParser =
     Parser.oneOf
         [ Parser.succeed identity
-            |. Parser.symbol "-"
-            |> Parser.andThen (\_ -> Parser.problem "Generic variables cannot start with -")
+            |. Parser.symbol (Token "-" NoProblem)
+            |> Parser.andThen (\_ -> Parser.problem NotGeneric)
         , symbolParser
         ]
         |. noiseParser
@@ -162,6 +184,7 @@ typeNameParser =
         { start = Char.isUpper
         , inner = validSymbolChar
         , reserved = Set.empty
+        , expecting = NotType
         }
         |. noiseParser
 
@@ -172,7 +195,7 @@ genericOrRangeParser =
         helper value =
             Parser.oneOf
                 [ Parser.succeed (Type.StackRange value)
-                    |. Parser.symbol "..."
+                    |. Parser.symbol (Token "..." NoProblem)
                     |. noiseParser
                 , Parser.succeed (Type.Generic value)
                 ]
@@ -184,7 +207,7 @@ typeParser : Parser Type
 typeParser =
     Parser.oneOf
         [ Parser.succeed Type.Int
-            |. Parser.keyword "Int"
+            |. Parser.keyword (Token "Int" NoProblem)
             |. noiseParser
         , Parser.succeed Type.Custom
             |= typeNameParser
@@ -204,7 +227,7 @@ typeRefParser =
     in
     Parser.oneOf
         [ Parser.succeed Type.Int
-            |. Parser.keyword "Int"
+            |. Parser.keyword (Token "Int" NoProblem)
             |. noiseParser
         , Parser.succeed helper
             |= typeNameParser
@@ -212,10 +235,10 @@ typeRefParser =
         , Parser.succeed Type.Generic
             |= genericParser
         , Parser.succeed identity
-            |. Parser.symbol "("
+            |. Parser.symbol (Token "(" ExpectedLeftParen)
             |. noiseParser
             |= Parser.lazy (\_ -> typeRefParser)
-            |. Parser.symbol ")"
+            |. Parser.symbol (Token ")" ExpectedRightParen)
             |. noiseParser
         ]
 
@@ -240,9 +263,9 @@ noiseParserLoop : () -> Parser (Parser.Step () ())
 noiseParserLoop _ =
     Parser.oneOf
         [ Parser.succeed (Parser.Loop ())
-            |. Parser.lineComment "#"
+            |. Parser.lineComment (Token "#" NoProblem)
         , Parser.succeed (Parser.Loop ())
-            |. Parser.chompIf (\c -> Set.member c whitespaceChars)
+            |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
             |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
         , Parser.succeed (Parser.Done ())
         ]
@@ -263,7 +286,7 @@ parser =
     Parser.succeed identity
         |. noiseParser
         |= Parser.loop emptyAst definitionParser
-        |. Parser.end
+        |. Parser.end ExpectedEnd
 
 
 definitionParser : AST -> Parser (Parser.Step AST AST)
@@ -277,19 +300,19 @@ definitionParser ast =
     in
     Parser.oneOf
         [ Parser.succeed insertWord
-            |. Parser.keyword "def:"
+            |. Parser.keyword (Token "def:" NoProblem)
             |. noiseParser
             |= wordDefinitionParser
         , Parser.succeed insertWord
-            |. Parser.keyword "defmulti:"
+            |. Parser.keyword (Token "defmulti:" NoProblem)
             |. noiseParser
             |= multiWordDefinitionParser
         , Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
-            |. Parser.keyword "deftype:"
+            |. Parser.keyword (Token "deftype:" NoProblem)
             |. noiseParser
             |= typeDefinitionParser
         , Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
-            |. Parser.keyword "defunion:"
+            |. Parser.keyword (Token "defunion:" NoProblem)
             |. noiseParser
             |= unionTypeDefinitionParser
         , Parser.succeed (Parser.Done ast)
@@ -374,16 +397,16 @@ wordMetadataParser def =
     in
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
-            |. Parser.keyword "type:"
+            |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (Parser.Loop { def | metadata = { metadata | isEntryPoint = True } })
-            |. Parser.keyword "entry:"
+            |. Parser.keyword (Token "entry:" NoProblem)
             |. noiseParser
-            |. Parser.keyword "true"
+            |. Parser.keyword (Token "true" NoProblem)
             |. noiseParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
-            |. Parser.keyword ":"
+            |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
             |= implementationParser
         , Parser.succeed (Parser.Done def)
@@ -440,16 +463,16 @@ multiWordMetadataParser def =
     in
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
-            |. Parser.keyword "type:"
+            |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
-            |. Parser.keyword "when:"
+            |. Parser.keyword (Token "when:" NoProblem)
             |. noiseParser
             |= typeMatchParser
             |= implementationParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
-            |. Parser.keyword ":"
+            |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
             |= implementationParser
         , Parser.succeed (Parser.Done def)
@@ -477,7 +500,7 @@ typeMemberParser : List ( String, Type ) -> Parser (Parser.Step (List ( String, 
 typeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
-            |. Parser.symbol ":"
+            |. Parser.symbol (Token ":" NoProblem)
             |. noiseParser
             |= symbolParser
             |= typeRefParser
@@ -497,7 +520,7 @@ unionTypeMemberParser : List Type -> Parser (Parser.Step (List Type) (List Type)
 unionTypeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
-            |. Parser.symbol ":"
+            |. Parser.symbol (Token ":" NoProblem)
             |. noiseParser
             |= typeRefParser
         , Parser.succeed (Parser.Done (List.reverse types))
@@ -508,7 +531,7 @@ typeSignatureParser : Parser WordType
 typeSignatureParser =
     Parser.succeed (\input output -> { input = input, output = output })
         |= Parser.loop [] typeLoopParser
-        |. Parser.symbol "--"
+        |. Parser.symbol (Token "--" ExpectedTypeSeperator)
         |. noiseParser
         |= Parser.loop [] typeLoopParser
 
@@ -527,10 +550,10 @@ typeLoopParser reverseTypes =
         , Parser.succeed step
             |= typeRefParser
         , Parser.succeed (\wordType -> step (Type.Quotation wordType))
-            |. Parser.symbol "["
+            |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= typeSignatureParser
-            |. Parser.symbol "]"
+            |. Parser.symbol (Token "]" ExpectedRightBracket)
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse reverseTypes))
         ]
@@ -543,10 +566,10 @@ typeMatchParser =
             |= typeParser
             |= Parser.oneOf
                 [ Parser.succeed identity
-                    |. Parser.symbol "("
+                    |. Parser.symbol (Token "(" ExpectedLeftParen)
                     |. noiseParser
                     |= Parser.loop [] typeMatchConditionParser
-                    |. Parser.symbol ")"
+                    |. Parser.symbol (Token ")" ExpectedRightParen)
                 , Parser.succeed []
                 ]
             |. noiseParser
@@ -597,10 +620,10 @@ implementationParserHelp nodes =
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
         , Parser.succeed (\quotImpl -> Parser.Loop (Quotation quotImpl :: nodes))
-            |. Parser.symbol "["
+            |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= implementationParser
-            |. Parser.symbol "]"
+            |. Parser.symbol (Token "]" ExpectedRightBracket)
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
