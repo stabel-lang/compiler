@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type)
+import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
 import Result.Extra as Result
 import Set exposing (Set)
@@ -374,7 +375,7 @@ qualifyMetadata baseName metadata =
             , output = List.map (qualifyMetadataType baseName) output
             }
     in
-    { metadata | type_ = Maybe.map helper metadata.type_ }
+    { metadata | type_ = TypeSignature.map helper metadata.type_ }
 
 
 qualifyMetadataType : String -> Type -> Type

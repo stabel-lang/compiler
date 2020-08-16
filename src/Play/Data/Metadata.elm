@@ -1,11 +1,12 @@
 module Play.Data.Metadata exposing (..)
 
-import Play.Data.Type exposing (Type, WordType)
+import Play.Data.Type exposing (Type)
+import Play.Data.TypeSignature exposing (TypeSignature(..))
 
 
 type alias Metadata =
     { isEntryPoint : Bool
-    , type_ : Maybe WordType
+    , type_ : TypeSignature
     , isQuoted : Bool
     }
 
@@ -13,7 +14,7 @@ type alias Metadata =
 default : Metadata
 default =
     { isEntryPoint = False
-    , type_ = Nothing
+    , type_ = NotProvided
     , isQuoted = False
     }
 
@@ -25,7 +26,12 @@ asEntryPoint meta =
 
 withType : List Type -> List Type -> Metadata -> Metadata
 withType inputs outputs meta =
-    { meta | type_ = Just { input = inputs, output = outputs } }
+    { meta | type_ = UserProvided { input = inputs, output = outputs } }
+
+
+withVerifiedType : List Type -> List Type -> Metadata -> Metadata
+withVerifiedType inputs outputs meta =
+    { meta | type_ = CompilerProvided { input = inputs, output = outputs } }
 
 
 isQuoted : Metadata -> Metadata

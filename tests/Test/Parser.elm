@@ -103,7 +103,7 @@ suite =
                                     [ { name = ">True"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "True" ]
@@ -154,35 +154,35 @@ suite =
                                     [ { name = ">Person"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.ConstructType "Person" ]
                                       }
                                     , { name = ">age"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Person" "age" ]
                                       }
                                     , { name = ">jobs"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Person" "jobs" ]
                                       }
                                     , { name = "age>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
                                       , implementation =
                                             SoloImpl [ AST.GetMember "Person" "age" ]
                                       }
                                     , { name = "jobs>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
                                       , implementation =
                                             SoloImpl [ AST.GetMember "Person" "jobs" ]
                                       }
@@ -226,7 +226,7 @@ suite =
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
@@ -235,7 +235,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
@@ -244,7 +244,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                                     [ Type.Generic "a" ]
                                       , implementation =
@@ -331,7 +331,7 @@ suite =
                                     [ { name = ">True"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "True"
@@ -340,7 +340,7 @@ suite =
                                     , { name = ">False"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "False"
@@ -401,7 +401,7 @@ suite =
                                     [ { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"
@@ -466,7 +466,7 @@ suite =
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
                                             SoloImpl
@@ -476,7 +476,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     , Type.Generic "a"
                                                     ]
@@ -490,7 +490,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     ]
                                                     [ Type.Generic "a"
@@ -503,7 +503,7 @@ suite =
                                     , { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"
@@ -569,7 +569,7 @@ suite =
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
                                             SoloImpl
@@ -579,7 +579,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     , Type.Generic "a"
                                                     ]
@@ -593,7 +593,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     ]
                                                     [ Type.Generic "a"
@@ -606,7 +606,7 @@ suite =
                                     , { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"

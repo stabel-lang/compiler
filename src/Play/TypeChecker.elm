@@ -6,6 +6,7 @@ import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
+import Play.Data.TypeSignature as TypeSignature
 import Play.Qualifier as Qualifier
 import Set exposing (Set)
 
@@ -189,7 +190,10 @@ typeCheckDefinition untypedDef context =
                                 | typedWords =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
-                                        , type_ = Maybe.withDefault inferredType untypedDef.metadata.type_
+                                        , type_ =
+                                            untypedDef.metadata.type_
+                                                |> TypeSignature.toMaybe
+                                                |> Maybe.withDefault inferredType
                                         , metadata = untypedDef.metadata
                                         , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
                                         }
@@ -354,7 +358,7 @@ typeCheckDefinition untypedDef context =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
                                         , type_ =
-                                            case untypedDef.metadata.type_ of
+                                            case TypeSignature.toMaybe untypedDef.metadata.type_ of
                                                 Just annotatedType ->
                                                     { annotatedType
                                                         | input = List.map (resolveUnion newContext) annotatedType.input
@@ -445,7 +449,7 @@ typeCheckImplementation untypedDef impl context =
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context
 verifyTypeSignature inferredType untypedDef context =
-    case untypedDef.metadata.type_ of
+    case TypeSignature.toMaybe untypedDef.metadata.type_ of
         Just annotatedType ->
             let
                 ( _, simplifiedAnnotatedType ) =
@@ -733,7 +737,7 @@ typeCheckNode idx node context =
                         Just untypedDef ->
                             if Set.member name context.callStack then
                                 -- recursive definition!
-                                case untypedDef.metadata.type_ of
+                                case TypeSignature.toMaybe untypedDef.metadata.type_ of
                                     Just annotatedType ->
                                         addStackEffect context <| wordTypeToStackEffects annotatedType
 
@@ -1254,7 +1258,7 @@ untypedToTypedNode context untypedNode =
 
                 Nothing ->
                     Dict.get name context.untypedWords
-                        |> Maybe.andThen (.metadata >> .type_)
+                        |> Maybe.andThen (.metadata >> .type_ >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
                         |> Word name
 

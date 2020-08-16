@@ -15,6 +15,7 @@ import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.Type as Type exposing (Type, WordType)
+import Play.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Set exposing (Set)
 
 
@@ -339,7 +340,7 @@ generateDefaultWordsForType typeDef ast =
                     { name = ">" ++ typeName
                     , metadata =
                         Metadata.default
-                            |> Metadata.withType (List.map Tuple.second typeMembers) [ typeOfType ]
+                            |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
                     , implementation =
                         SoloImpl [ ConstructType typeName ]
                     }
@@ -354,7 +355,7 @@ generateDefaultWordsForType typeDef ast =
                     [ { name = ">" ++ memberName
                       , metadata =
                             Metadata.default
-                                |> Metadata.withType [ typeOfType, memberType ] [ typeOfType ]
+                                |> Metadata.withVerifiedType [ typeOfType, memberType ] [ typeOfType ]
                       , implementation =
                             SoloImpl
                                 [ SetMember typeName memberName ]
@@ -362,7 +363,7 @@ generateDefaultWordsForType typeDef ast =
                     , { name = memberName ++ ">"
                       , metadata =
                             Metadata.default
-                                |> Metadata.withType [ typeOfType ] [ memberType ]
+                                |> Metadata.withVerifiedType [ typeOfType ] [ memberType ]
                       , implementation =
                             SoloImpl
                                 [ GetMember typeName memberName ]
@@ -396,7 +397,7 @@ wordMetadataParser def =
             def.metadata
     in
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = TypeSignature.UserProvided typeSign } })
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
@@ -462,7 +463,7 @@ multiWordMetadataParser def =
                     MultiImpl [] impl
     in
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = Just typeSign } })
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = TypeSignature.UserProvided typeSign } })
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
