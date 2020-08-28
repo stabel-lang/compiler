@@ -103,10 +103,10 @@ qualifyType :
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
-        Parser.CustomTypeDef name generics members ->
+        Parser.CustomTypeDef _ name generics members ->
             Dict.insert name (CustomTypeDef name generics members) acc
 
-        Parser.UnionTypeDef name generics memberTypes ->
+        Parser.UnionTypeDef _ name generics memberTypes ->
             Dict.insert name (UnionTypeDef name generics memberTypes) acc
     )
 
@@ -194,13 +194,13 @@ qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, re
 qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result () TypeMatch
 qualifyMatch qualifiedTypes typeMatch =
     case typeMatch of
-        Parser.TypeMatch Type.Int [] ->
+        Parser.TypeMatch _ Type.Int [] ->
             Ok <| TypeMatch Type.Int []
 
-        Parser.TypeMatch Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
+        Parser.TypeMatch _ Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
             Ok <| TypeMatch Type.Int [ ( "value", LiteralInt val ) ]
 
-        Parser.TypeMatch ((Type.Custom name) as type_) patterns ->
+        Parser.TypeMatch _ ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
                 Just (CustomTypeDef _ gens members) ->
                     let
@@ -277,12 +277,12 @@ qualifyNode :
     -> ( Dict String WordDefinition, List (Result () Node) )
 qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
     case node of
-        Parser.Integer value ->
+        Parser.Integer _ value ->
             ( qualifiedWords
             , Ok (Integer value) :: qualifiedNodes
             )
 
-        Parser.Word value ->
+        Parser.Word _ value ->
             if Dict.member value ast.words then
                 ( qualifiedWords
                 , Ok (Word value) :: qualifiedNodes
@@ -315,7 +315,7 @@ qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
             , Ok (GetMember typeName memberName) :: qualifiedNodes
             )
 
-        Parser.Quotation quotImpl ->
+        Parser.Quotation _ quotImpl ->
             let
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
                     List.foldr (qualifyNode ast currentDefName) ( qualifiedWords, [] ) quotImpl

@@ -14,6 +14,7 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Play.Data.Metadata as Metadata exposing (Metadata)
+import Play.Data.SourceLocation as SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Set exposing (Set)
@@ -46,12 +47,13 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List String) (List ( String, Type ))
-    | UnionTypeDef String (List String) (List Type)
+    = CustomTypeDef SourceLocationRange String (List String) (List ( String, Type ))
+    | UnionTypeDef SourceLocationRange String (List String) (List Type)
 
 
 type alias WordDefinition =
     { name : String
+    , sourceLocation : Maybe SourceLocationRange
     , metadata : Metadata
     , implementation : WordImplementation
     }
@@ -63,7 +65,7 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
@@ -73,12 +75,12 @@ type TypeMatchValue
 
 
 type AstNode
-    = Integer Int
-    | Word String
+    = Integer SourceLocationRange Int
+    | Word SourceLocationRange String
+    | Quotation SourceLocationRange (List AstNode)
     | ConstructType String
     | GetMember String String
     | SetMember String String
-    | Quotation (List AstNode)
 
 
 run : String -> Result () AST
@@ -147,6 +149,14 @@ intParser =
         }
         |. noiseParser
         |> Parser.andThen helper
+
+
+sourceLocationParser : Parser SourceLocation
+sourceLocationParser =
+    Parser.succeed SourceLocation
+        |= Parser.getRow
+        |= Parser.getCol
+        |= Parser.getOffset
 
 
 symbolParser : Parser String
@@ -323,10 +333,10 @@ definitionParser ast =
 generateDefaultWordsForType : TypeDefinition -> AST -> AST
 generateDefaultWordsForType typeDef ast =
     case typeDef of
-        UnionTypeDef _ _ _ ->
+        UnionTypeDef _ _ _ _ ->
             ast
 
-        CustomTypeDef typeName binds typeMembers ->
+        CustomTypeDef _ typeName binds typeMembers ->
             let
                 typeOfType =
                     case binds of
@@ -338,6 +348,7 @@ generateDefaultWordsForType typeDef ast =
 
                 ctorDef =
                     { name = ">" ++ typeName
+                    , sourceLocation = Nothing
                     , metadata =
                         Metadata.default
                             |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
@@ -353,6 +364,7 @@ generateDefaultWordsForType typeDef ast =
 
                 setterGetterPair ( memberName, memberType ) =
                     [ { name = ">" ++ memberName
+                      , sourceLocation = Nothing
                       , metadata =
                             Metadata.default
                                 |> Metadata.withVerifiedType [ typeOfType, memberType ] [ typeOfType ]
@@ -361,6 +373,7 @@ generateDefaultWordsForType typeDef ast =
                                 [ SetMember typeName memberName ]
                       }
                     , { name = memberName ++ ">"
+                      , sourceLocation = Nothing
                       , metadata =
                             Metadata.default
                                 |> Metadata.withVerifiedType [ typeOfType ] [ memberType ]
@@ -376,18 +389,28 @@ generateDefaultWordsForType typeDef ast =
 wordDefinitionParser : Parser WordDefinition
 wordDefinitionParser =
     let
-        joinParseResults name def =
-            { def | name = name }
+        joinParseResults startLocation name def endLocation =
+            { def
+                | name = name
+                , sourceLocation =
+                    Just
+                        { start = startLocation
+                        , end = endLocation
+                        }
+            }
 
         emptyDef =
             { name = ""
+            , sourceLocation = Nothing
             , metadata = Metadata.default
             , implementation = SoloImpl []
             }
     in
     Parser.succeed joinParseResults
+        |= sourceLocationParser
         |= symbolParser
         |= Parser.loop emptyDef wordMetadataParser
+        |= sourceLocationParser
 
 
 wordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
@@ -417,12 +440,20 @@ wordMetadataParser def =
 multiWordDefinitionParser : Parser WordDefinition
 multiWordDefinitionParser =
     let
-        joinParseResults name def =
-            { def | name = name }
-                |> reverseWhens
+        joinParseResults startLocation name def endLocation =
+            reverseWhens <|
+                { def
+                    | name = name
+                    , sourceLocation =
+                        Just
+                            { start = startLocation
+                            , end = endLocation
+                            }
+                }
 
         emptyDef =
             { name = ""
+            , sourceLocation = Nothing
             , metadata = Metadata.default
             , implementation = SoloImpl []
             }
@@ -436,8 +467,10 @@ multiWordDefinitionParser =
                     { def | implementation = MultiImpl (List.reverse whens) impl }
     in
     Parser.succeed joinParseResults
+        |= sourceLocationParser
         |= symbolParser
         |= Parser.loop emptyDef multiWordMetadataParser
+        |= sourceLocationParser
 
 
 multiWordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
@@ -482,10 +515,20 @@ multiWordMetadataParser def =
 
 typeDefinitionParser : Parser TypeDefinition
 typeDefinitionParser =
-    Parser.succeed CustomTypeDef
+    let
+        ctor startLocation typeName generics members endLocation =
+            CustomTypeDef
+                (SourceLocationRange startLocation endLocation)
+                typeName
+                generics
+                members
+    in
+    Parser.succeed ctor
+        |= sourceLocationParser
         |= typeNameParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] typeMemberParser
+        |= sourceLocationParser
 
 
 typeGenericParser : List String -> Parser (Parser.Step (List String) (List String))
@@ -511,10 +554,20 @@ typeMemberParser types =
 
 unionTypeDefinitionParser : Parser TypeDefinition
 unionTypeDefinitionParser =
-    Parser.succeed UnionTypeDef
+    let
+        ctor startLocation typeName generics members endLocation =
+            UnionTypeDef
+                (SourceLocationRange startLocation endLocation)
+                typeName
+                generics
+                members
+    in
+    Parser.succeed ctor
+        |= sourceLocationParser
         |= typeNameParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] unionTypeMemberParser
+        |= sourceLocationParser
 
 
 unionTypeMemberParser : List Type -> Parser (Parser.Step (List Type) (List Type))
@@ -563,7 +616,8 @@ typeLoopParser reverseTypes =
 typeMatchParser : Parser TypeMatch
 typeMatchParser =
     Parser.oneOf
-        [ Parser.succeed TypeMatch
+        [ Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
+            |= sourceLocationParser
             |= typeParser
             |= Parser.oneOf
                 [ Parser.succeed identity
@@ -573,11 +627,16 @@ typeMatchParser =
                     |. Parser.symbol (Token ")" ExpectedRightParen)
                 , Parser.succeed []
                 ]
+            |= sourceLocationParser
             |. noiseParser
-        , Parser.succeed (\sym -> TypeMatch (Type.Generic sym) [])
+        , Parser.succeed (\startLoc sym endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) (Type.Generic sym) [])
+            |= sourceLocationParser
             |= genericParser
-        , Parser.succeed (\typ -> TypeMatch typ [])
+            |= sourceLocationParser
+        , Parser.succeed (\startLoc typ endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) typ [])
+            |= sourceLocationParser
             |= typeRefParser
+            |= sourceLocationParser
         ]
 
 
@@ -594,7 +653,7 @@ typeMatchConditionParser nodes =
 typeMatchValueParser : Parser TypeMatchValue
 typeMatchValueParser =
     let
-        handleNewType ((TypeMatch type_ conditions) as match) =
+        handleNewType ((TypeMatch _ type_ conditions) as match) =
             case conditions of
                 [] ->
                     LiteralType type_
@@ -620,11 +679,13 @@ implementationParserHelp nodes =
     Parser.oneOf
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
-        , Parser.succeed (\quotImpl -> Parser.Loop (Quotation quotImpl :: nodes))
+        , Parser.succeed (\startLoc quotImpl endLoc -> Parser.Loop (Quotation (SourceLocationRange startLoc endLoc) quotImpl :: nodes))
+            |= sourceLocationParser
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= implementationParser
             |. Parser.symbol (Token "]" ExpectedRightBracket)
+            |= sourceLocationParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
@@ -633,18 +694,22 @@ implementationParserHelp nodes =
 nodeParser : Parser AstNode
 nodeParser =
     Parser.oneOf
-        [ Parser.succeed Integer
+        [ Parser.succeed (\startLoc value endLoc -> Integer (SourceLocationRange startLoc endLoc) value)
+            |= sourceLocationParser
             |= intParser
-        , Parser.succeed Word
+            |= sourceLocationParser
+        , Parser.succeed (\startLoc value endLoc -> Word (SourceLocationRange startLoc endLoc) value)
+            |= sourceLocationParser
             |= symbolParser
+            |= sourceLocationParser
         ]
 
 
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ ->
+        CustomTypeDef _ name _ _ ->
             name
 
-        UnionTypeDef name _ _ ->
+        UnionTypeDef _ name _ _ ->
             name
