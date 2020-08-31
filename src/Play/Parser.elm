@@ -16,7 +16,7 @@ import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.SourceLocation as SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
-import Play.Data.TypeSignature as TypeSignature exposing (TypeSignature)
+import Play.Data.TypeSignature as TypeSignature
 import Set exposing (Set)
 
 
