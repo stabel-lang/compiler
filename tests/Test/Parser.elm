@@ -4,7 +4,7 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata
-import Play.Data.SourceLocation exposing (emptyRange)
+import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import String.Extra as String
@@ -960,6 +960,202 @@ suite =
                     # And thats it!
                      # wonder what else we should do...
                     """
+        , test "Correct line information" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defunion: Bool
+                        : True
+                        : False
+
+                        deftype: True
+                        deftype: False
+
+                        defmulti: from-int
+                        type: Int -- Int
+                        when: Int( value 0 )
+                          >False
+                        when: Int
+                          >True
+
+                        def: equal
+                        : - from-int not
+
+                        defmulti: not
+                        when: True
+                          >False
+                        : >True
+                        """
+
+                    -- The ending source location for most definitions now ends where the next definition beings
+                    -- This is not what we want (it includes too much white space), but it'll do for now.
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ UnionTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 2 1 1)
+                                        (SourceLocation 6 1 32)
+                                    )
+                                    "Bool"
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 6 1 32)
+                                        (SourceLocation 7 1 46)
+                                    )
+                                    "True"
+                                    []
+                                    []
+                                , CustomTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 7 1 46)
+                                        (SourceLocation 9 1 62)
+                                    )
+                                    "False"
+                                    []
+                                    []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
+                                  , implementation = SoloImpl [ ConstructType "True" ]
+                                  }
+                                , { name = ">False"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
+                                  , implementation = SoloImpl [ ConstructType "False" ]
+                                  }
+                                , { name = "from-int"
+                                  , sourceLocation =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 9 1 62)
+                                                (SourceLocation 16 1 147)
+                                            )
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 11 7 104)
+                                                        (SourceLocation 11 21 118)
+                                                    )
+                                                    Type.Int
+                                                    [ ( "value", LiteralInt 0 ) ]
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 12 3 121)
+                                                        (SourceLocation 13 1 128)
+                                                    )
+                                                    ">False"
+                                                ]
+                                              )
+                                            , ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 13 7 134)
+                                                        (SourceLocation 14 3 140)
+                                                    )
+                                                    Type.Int
+                                                    []
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 14 3 140)
+                                                        (SourceLocation 16 1 147)
+                                                    )
+                                                    ">True"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "equal"
+                                  , sourceLocation =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 16 1 147)
+                                                (SourceLocation 19 1 176)
+                                            )
+                                  , metadata =
+                                        Metadata.default
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 3 160)
+                                                    (SourceLocation 17 5 162)
+                                                )
+                                                "-"
+                                            , Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 5 162)
+                                                    (SourceLocation 17 14 171)
+                                                )
+                                                "from-int"
+                                            , Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 14 171)
+                                                    (SourceLocation 19 1 176)
+                                                )
+                                                "not"
+                                            ]
+                                  }
+                                , { name = "not"
+                                  , sourceLocation =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 19 1 176)
+                                                (SourceLocation 23 1 218)
+                                            )
+                                  , metadata =
+                                        Metadata.default
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 20 7 196)
+                                                        (SourceLocation 21 3 203)
+                                                    )
+                                                    (Type.Custom "True")
+                                                    []
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 21 3 203)
+                                                        (SourceLocation 22 1 210)
+                                                    )
+                                                    ">False"
+                                                ]
+                                              )
+                                            ]
+                                            [ Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 22 3 212)
+                                                    (SourceLocation 23 1 218)
+                                                )
+                                                ">True"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case compileRetainLocations source of
+                    Err () ->
+                        Expect.fail "Did not expect compilation to fail."
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         ]
 
 

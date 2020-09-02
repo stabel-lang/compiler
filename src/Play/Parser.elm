@@ -310,22 +310,42 @@ definitionParser ast =
             { ast_ | types = Dict.insert (typeDefinitionName typeDef) typeDef ast_.types }
     in
     Parser.oneOf
-        [ Parser.succeed insertWord
-            |. Parser.keyword (Token "def:" NoProblem)
-            |. noiseParser
-            |= wordDefinitionParser
-        , Parser.succeed insertWord
-            |. Parser.keyword (Token "defmulti:" NoProblem)
-            |. noiseParser
-            |= multiWordDefinitionParser
-        , Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
-            |. Parser.keyword (Token "deftype:" NoProblem)
-            |. noiseParser
-            |= typeDefinitionParser
-        , Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
-            |. Parser.keyword (Token "defunion:" NoProblem)
-            |. noiseParser
-            |= unionTypeDefinitionParser
+        [ Parser.succeed identity
+            |= sourceLocationParser
+            |> Parser.andThen
+                (\startLoc ->
+                    Parser.succeed insertWord
+                        |. Parser.keyword (Token "def:" NoProblem)
+                        |. noiseParser
+                        |= wordDefinitionParser startLoc
+                )
+        , Parser.succeed identity
+            |= sourceLocationParser
+            |> Parser.andThen
+                (\startLoc ->
+                    Parser.succeed insertWord
+                        |. Parser.keyword (Token "defmulti:" NoProblem)
+                        |. noiseParser
+                        |= multiWordDefinitionParser startLoc
+                )
+        , Parser.succeed identity
+            |= sourceLocationParser
+            |> Parser.andThen
+                (\startLoc ->
+                    Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
+                        |. Parser.keyword (Token "deftype:" NoProblem)
+                        |. noiseParser
+                        |= typeDefinitionParser startLoc
+                )
+        , Parser.succeed identity
+            |= sourceLocationParser
+            |> Parser.andThen
+                (\startLoc ->
+                    Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
+                        |. Parser.keyword (Token "defunion:" NoProblem)
+                        |. noiseParser
+                        |= unionTypeDefinitionParser startLoc
+                )
         , Parser.succeed (Parser.Done ast)
         ]
 
@@ -386,10 +406,10 @@ generateDefaultWordsForType typeDef ast =
             { ast | words = Dict.union generatedDefs ast.words }
 
 
-wordDefinitionParser : Parser WordDefinition
-wordDefinitionParser =
+wordDefinitionParser : SourceLocation -> Parser WordDefinition
+wordDefinitionParser startLocation =
     let
-        joinParseResults startLocation name def endLocation =
+        joinParseResults name def endLocation =
             { def
                 | name = name
                 , sourceLocation =
@@ -407,7 +427,6 @@ wordDefinitionParser =
             }
     in
     Parser.succeed joinParseResults
-        |= sourceLocationParser
         |= symbolParser
         |= Parser.loop emptyDef wordMetadataParser
         |= sourceLocationParser
@@ -437,10 +456,10 @@ wordMetadataParser def =
         ]
 
 
-multiWordDefinitionParser : Parser WordDefinition
-multiWordDefinitionParser =
+multiWordDefinitionParser : SourceLocation -> Parser WordDefinition
+multiWordDefinitionParser startLocation =
     let
-        joinParseResults startLocation name def endLocation =
+        joinParseResults name def endLocation =
             reverseWhens <|
                 { def
                     | name = name
@@ -467,7 +486,6 @@ multiWordDefinitionParser =
                     { def | implementation = MultiImpl (List.reverse whens) impl }
     in
     Parser.succeed joinParseResults
-        |= sourceLocationParser
         |= symbolParser
         |= Parser.loop emptyDef multiWordMetadataParser
         |= sourceLocationParser
@@ -513,10 +531,10 @@ multiWordMetadataParser def =
         ]
 
 
-typeDefinitionParser : Parser TypeDefinition
-typeDefinitionParser =
+typeDefinitionParser : SourceLocation -> Parser TypeDefinition
+typeDefinitionParser startLocation =
     let
-        ctor startLocation typeName generics members endLocation =
+        ctor typeName generics members endLocation =
             CustomTypeDef
                 (SourceLocationRange startLocation endLocation)
                 typeName
@@ -524,7 +542,6 @@ typeDefinitionParser =
                 members
     in
     Parser.succeed ctor
-        |= sourceLocationParser
         |= typeNameParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] typeMemberParser
@@ -552,10 +569,10 @@ typeMemberParser types =
         ]
 
 
-unionTypeDefinitionParser : Parser TypeDefinition
-unionTypeDefinitionParser =
+unionTypeDefinitionParser : SourceLocation -> Parser TypeDefinition
+unionTypeDefinitionParser startLocation =
     let
-        ctor startLocation typeName generics members endLocation =
+        ctor typeName generics members endLocation =
             UnionTypeDef
                 (SourceLocationRange startLocation endLocation)
                 typeName
@@ -563,7 +580,6 @@ unionTypeDefinitionParser =
                 members
     in
     Parser.succeed ctor
-        |= sourceLocationParser
         |= typeNameParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] unionTypeMemberParser
