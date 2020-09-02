@@ -7,8 +7,8 @@ import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
-import String.Extra as String
 import Test exposing (Test, describe, test)
+import Test.Parser.Util exposing (compile, compileRetainLocations)
 
 
 suite : Test
@@ -910,23 +910,6 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
-            , test "Syntax error" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            defmulti: origo?
-                            when: Pair( 0 0 )
-                              >True
-                            : >False
-                            """
-                    in
-                    case compile source of
-                        Err () ->
-                            Expect.pass
-
-                        Ok _ ->
-                            Expect.fail "Did not expect parsing to succeed"
             ]
         , test "Support code comments" <|
             \_ ->
@@ -1157,91 +1140,3 @@ suite =
                     Ok ast ->
                         Expect.equal expectedAst ast
         ]
-
-
-compile : String -> Result () AST
-compile str =
-    compileRetainLocations str
-        |> Result.map stripLocations
-
-
-compileRetainLocations : String -> Result () AST
-compileRetainLocations str =
-    String.unindent str
-        |> run
-
-
-stripLocations : AST -> AST
-stripLocations ast =
-    { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
-    , words = Dict.map (\_ d -> stripWordLocation d) ast.words
-    }
-
-
-stripTypeLocation : TypeDefinition -> TypeDefinition
-stripTypeLocation typeDef =
-    case typeDef of
-        AST.CustomTypeDef _ name generics members ->
-            AST.CustomTypeDef emptyRange name generics members
-
-        AST.UnionTypeDef _ name generics members ->
-            AST.UnionTypeDef emptyRange name generics members
-
-
-stripWordLocation : WordDefinition -> WordDefinition
-stripWordLocation word =
-    { word
-        | sourceLocation = Nothing
-        , implementation = stripImplementationLocation word.implementation
-    }
-
-
-stripImplementationLocation : WordImplementation -> WordImplementation
-stripImplementationLocation impl =
-    case impl of
-        SoloImpl nodes ->
-            SoloImpl (List.map stripNodeLocation nodes)
-
-        MultiImpl conds default ->
-            MultiImpl
-                (List.map stripMultiWordBranchLocation conds)
-                (List.map stripNodeLocation default)
-
-
-stripNodeLocation : AstNode -> AstNode
-stripNodeLocation node =
-    case node of
-        AST.Integer _ val ->
-            AST.Integer emptyRange val
-
-        AST.Word _ val ->
-            AST.Word emptyRange val
-
-        AST.Quotation _ val ->
-            AST.Quotation emptyRange (List.map stripNodeLocation val)
-
-        _ ->
-            node
-
-
-stripMultiWordBranchLocation : ( TypeMatch, List AstNode ) -> ( TypeMatch, List AstNode )
-stripMultiWordBranchLocation ( typeMatch, nodes ) =
-    ( stripTypeMatchLocation typeMatch
-    , List.map stripNodeLocation nodes
-    )
-
-
-stripTypeMatchLocation : TypeMatch -> TypeMatch
-stripTypeMatchLocation (TypeMatch _ type_ otherConds) =
-    TypeMatch emptyRange type_ <|
-        List.map (Tuple.mapSecond stripRecursiveTypeMatchLocation) otherConds
-
-
-stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue
-stripRecursiveTypeMatchLocation typeMatchValue =
-    case typeMatchValue of
-        RecursiveMatch typeMatch ->
-            RecursiveMatch (stripTypeMatchLocation typeMatch)
-
-        _ ->
-            typeMatchValue
