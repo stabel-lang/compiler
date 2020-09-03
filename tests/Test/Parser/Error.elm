@@ -1,6 +1,7 @@
 module Test.Parser.Error exposing (..)
 
-import Expect
+import Expect exposing (Expectation)
+import Parser.Advanced as ElmParser
 import Play.Parser exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (compile)
@@ -9,69 +10,38 @@ import Test.Parser.Util exposing (compile)
 suite : Test
 suite =
     describe "Parser errors"
-        [ describe "double definitions"
+        [ describe "Double definitions" <|
+            let
+                wordAlreadyDefined name deadend =
+                    case deadend.problem of
+                        WordAlreadyDefined definedName _ _ ->
+                            name == definedName
+
+                        _ ->
+                            False
+            in
             [ test "Word definition" <|
                 \_ ->
-                    let
-                        source =
-                            """
-                            def: not
-                            : drop 0
+                    checkForError (wordAlreadyDefined "not") <|
+                        """
+                        def: not
+                        : drop 0
 
-                            defmulti: not
-                            when: Int ( value 0)
-                              drop 1
-                            : drop 0
-                            """
-
-                        wordAlreadyDefined name deadend =
-                            case deadend.problem of
-                                WordAlreadyDefined definedName _ _ ->
-                                    name == definedName
-
-                                _ ->
-                                    False
-                    in
-                    case compile source of
-                        Err errors ->
-                            if List.any (wordAlreadyDefined "not") errors then
-                                Expect.pass
-
-                            else
-                                Expect.fail "Failed for unexpected reason"
-
-                        Ok _ ->
-                            Expect.fail "Did not expect parsing to succeed"
+                        defmulti: not
+                        when: Int ( value 0)
+                          drop 1
+                        : drop 0
+                        """
             , test "Generated double definitions" <|
                 \_ ->
-                    let
-                        source =
-                            """
-                            def: age>
-                            : 1
+                    checkForError (wordAlreadyDefined "age>") <|
+                        """
+                        def: age>
+                        : 1
 
-                            deftype: Person
-                            : age Int
-                            """
-
-                        wordAlreadyDefined name deadend =
-                            case deadend.problem of
-                                WordAlreadyDefined definedName _ _ ->
-                                    name == definedName
-
-                                _ ->
-                                    False
-                    in
-                    case compile source of
-                        Err errors ->
-                            if List.any (wordAlreadyDefined "age>") errors then
-                                Expect.pass
-
-                            else
-                                Expect.fail "Failed for unexpected reason"
-
-                        Ok _ ->
-                            Expect.fail "Did not expect parsing to succeed"
+                        deftype: Person
+                        : age Int
+                        """
             , test "Type definition" <|
                 \_ ->
                     let
@@ -84,7 +54,7 @@ suite =
                             : Person
                             """
 
-                        wordAlreadyDefined name deadend =
+                        typeAlreadyDefined name deadend =
                             case deadend.problem of
                                 TypeAlreadyDefined definedName _ _ ->
                                     name == definedName
@@ -92,15 +62,66 @@ suite =
                                 _ ->
                                     False
                     in
-                    case compile source of
-                        Err errors ->
-                            if List.any (wordAlreadyDefined "Person") errors then
-                                Expect.pass
+                    checkForError (typeAlreadyDefined "Person") source
+            ]
+        , describe "Unknown metadata" <|
+            let
+                expectedError name deadend =
+                    case deadend.problem of
+                        UnknownMetadata metaName ->
+                            metaName == name
 
-                            else
-                                Expect.fail "Failed for unexpected reason"
-
-                        Ok _ ->
-                            Expect.fail "Did not expect parsing to succeed"
+                        _ ->
+                            False
+            in
+            [ test "word" <|
+                \_ ->
+                    checkForError (expectedError "typ") <|
+                        """
+                        def: inc
+                        # typo
+                        typ: Int -- Int
+                        : 1 +
+                        """
+            , test "multiword" <|
+                \_ ->
+                    checkForError (expectedError "whn") <|
+                        """
+                        defmulti: double
+                        # typo
+                        whn: Int( value 0)
+                          0
+                        : 2 *
+                        """
+            , test "type" <|
+                \_ ->
+                    checkForError (expectedError "age") <|
+                        """
+                        deftype: Person
+                        # wrong syntax
+                        age: Int
+                        """
+            , test "union" <|
+                \_ ->
+                    checkForError (expectedError "member") <|
+                        """
+                        defunion: Gender
+                        member: Male
+                        member: Female
+                        """
             ]
         ]
+
+
+checkForError : (ElmParser.DeadEnd () Problem -> Bool) -> String -> Expectation
+checkForError fn source =
+    case compile source of
+        Err errors ->
+            if List.any fn errors then
+                Expect.pass
+
+            else
+                Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+
+        Ok _ ->
+            Expect.fail "Did not expect parsing to succeed"

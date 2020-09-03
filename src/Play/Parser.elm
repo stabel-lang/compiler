@@ -41,6 +41,7 @@ type Problem
     | ExpectedRightBracket
     | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
     | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
+    | UnknownMetadata String
 
 
 type alias AST =
@@ -177,6 +178,17 @@ symbolParser =
             ]
         |. noiseParser
         |> Parser.backtrackable
+
+
+definitionMetadataParser : Parser String
+definitionMetadataParser =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.fromList [ "def", "defmulti", "deftype", "defunion" ]
+        , expecting = NotSymbol
+        }
+        |. Parser.symbol (Token ":" NotMetadata)
 
 
 genericParser : Parser String
@@ -476,6 +488,9 @@ wordMetadataParser def =
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
             |= implementationParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done def)
         ]
 
@@ -551,6 +566,9 @@ multiWordMetadataParser def =
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
             |= implementationParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done def)
         ]
 
@@ -589,6 +607,9 @@ typeMemberParser types =
             |. noiseParser
             |= symbolParser
             |= typeRefParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
@@ -617,6 +638,9 @@ unionTypeMemberParser types =
             |. Parser.symbol (Token ":" NoProblem)
             |. noiseParser
             |= typeRefParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
