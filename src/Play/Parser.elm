@@ -1,6 +1,7 @@
 module Play.Parser exposing
     ( AST
     , AstNode(..)
+    , Problem(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
@@ -38,6 +39,8 @@ type Problem
     | ExpectedTypeSeperator
     | ExpectedLeftBracket
     | ExpectedRightBracket
+    | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
+    | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
 
 
 type alias AST =
@@ -83,10 +86,9 @@ type AstNode
     | SetMember String String
 
 
-run : String -> Result () AST
+run : String -> Result (List (Parser.DeadEnd () Problem)) AST
 run sourceCode =
     Parser.run parser sourceCode
-        |> Result.mapError (always ())
 
 
 
@@ -304,57 +306,83 @@ definitionParser : AST -> Parser (Parser.Step AST AST)
 definitionParser ast =
     let
         insertWord wordDef =
-            Parser.Loop { ast | words = Dict.insert wordDef.name wordDef ast.words }
+            case maybeInsertWordProblem wordDef of
+                Just problem ->
+                    Parser.problem problem
 
-        insertType typeDef ast_ =
-            { ast_ | types = Dict.insert (typeDefinitionName typeDef) typeDef ast_.types }
+                Nothing ->
+                    { ast | words = Dict.insert wordDef.name wordDef ast.words }
+                        |> Parser.Loop
+                        |> Parser.succeed
+
+        maybeInsertWordProblem wordDef =
+            Dict.get wordDef.name ast.words
+                |> Maybe.map (\prevDef -> WordAlreadyDefined wordDef.name prevDef.sourceLocation wordDef.sourceLocation)
+
+        insertType typeDef =
+            let
+                typeName =
+                    typeDefinitionName typeDef
+            in
+            case Dict.get typeName ast.types of
+                Just previousDefinition ->
+                    Parser.problem <|
+                        TypeAlreadyDefined
+                            typeName
+                            (typeDefinitionLocation previousDefinition)
+                            (typeDefinitionLocation typeDef)
+
+                Nothing ->
+                    let
+                        typeWords =
+                            generateDefaultWordsForType typeDef
+
+                        typeWordsProblem =
+                            List.filterMap maybeInsertWordProblem typeWords
+                                |> List.head
+                    in
+                    case typeWordsProblem of
+                        Just problem ->
+                            Parser.problem problem
+
+                        Nothing ->
+                            { ast
+                                | types = Dict.insert typeName typeDef ast.types
+                                , words = Dict.union (Dict.fromListBy .name typeWords) ast.words
+                            }
+                                |> Parser.Loop
+                                |> Parser.succeed
     in
     Parser.oneOf
-        [ Parser.succeed identity
-            |= sourceLocationParser
-            |> Parser.andThen
-                (\startLoc ->
-                    Parser.succeed insertWord
-                        |. Parser.keyword (Token "def:" NoProblem)
-                        |. noiseParser
-                        |= wordDefinitionParser startLoc
-                )
-        , Parser.succeed identity
-            |= sourceLocationParser
-            |> Parser.andThen
-                (\startLoc ->
-                    Parser.succeed insertWord
-                        |. Parser.keyword (Token "defmulti:" NoProblem)
-                        |. noiseParser
-                        |= multiWordDefinitionParser startLoc
-                )
-        , Parser.succeed identity
-            |= sourceLocationParser
-            |> Parser.andThen
-                (\startLoc ->
-                    Parser.succeed (\typeDef -> ast |> insertType typeDef |> generateDefaultWordsForType typeDef |> Parser.Loop)
-                        |. Parser.keyword (Token "deftype:" NoProblem)
-                        |. noiseParser
-                        |= typeDefinitionParser startLoc
-                )
-        , Parser.succeed identity
-            |= sourceLocationParser
-            |> Parser.andThen
-                (\startLoc ->
-                    Parser.succeed (\typeDef -> ast |> insertType typeDef |> Parser.Loop)
-                        |. Parser.keyword (Token "defunion:" NoProblem)
-                        |. noiseParser
-                        |= unionTypeDefinitionParser startLoc
-                )
+        [ sourceLocationParser
+            |. Parser.keyword (Token "def:" NoProblem)
+            |. noiseParser
+            |> Parser.andThen wordDefinitionParser
+            |> Parser.andThen insertWord
+        , sourceLocationParser
+            |. Parser.keyword (Token "defmulti:" NoProblem)
+            |. noiseParser
+            |> Parser.andThen multiWordDefinitionParser
+            |> Parser.andThen insertWord
+        , sourceLocationParser
+            |. Parser.keyword (Token "deftype:" NoProblem)
+            |. noiseParser
+            |> Parser.andThen typeDefinitionParser
+            |> Parser.andThen insertType
+        , sourceLocationParser
+            |. Parser.keyword (Token "defunion:" NoProblem)
+            |. noiseParser
+            |> Parser.andThen unionTypeDefinitionParser
+            |> Parser.andThen insertType
         , Parser.succeed (Parser.Done ast)
         ]
 
 
-generateDefaultWordsForType : TypeDefinition -> AST -> AST
-generateDefaultWordsForType typeDef ast =
+generateDefaultWordsForType : TypeDefinition -> List WordDefinition
+generateDefaultWordsForType typeDef =
     case typeDef of
         UnionTypeDef _ _ _ _ ->
-            ast
+            []
 
         CustomTypeDef _ typeName binds typeMembers ->
             let
@@ -375,12 +403,6 @@ generateDefaultWordsForType typeDef ast =
                     , implementation =
                         SoloImpl [ ConstructType typeName ]
                     }
-
-                generatedDefs =
-                    typeMembers
-                        |> List.concatMap setterGetterPair
-                        |> (::) ctorDef
-                        |> Dict.fromListBy .name
 
                 setterGetterPair ( memberName, memberType ) =
                     [ { name = ">" ++ memberName
@@ -403,7 +425,9 @@ generateDefaultWordsForType typeDef ast =
                       }
                     ]
             in
-            { ast | words = Dict.union generatedDefs ast.words }
+            typeMembers
+                |> List.concatMap setterGetterPair
+                |> (::) ctorDef
 
 
 wordDefinitionParser : SourceLocation -> Parser WordDefinition
@@ -729,3 +753,13 @@ typeDefinitionName typeDef =
 
         UnionTypeDef _ name _ _ ->
             name
+
+
+typeDefinitionLocation : TypeDefinition -> SourceLocationRange
+typeDefinitionLocation typeDef =
+    case typeDef of
+        CustomTypeDef range _ _ _ ->
+            range
+
+        UnionTypeDef range _ _ _ ->
+            range

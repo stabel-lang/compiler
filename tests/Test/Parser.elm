@@ -74,7 +74,7 @@ suite =
                         }
                 in
                 case compile source of
-                    Err () ->
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -122,7 +122,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -207,7 +207,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -266,7 +266,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -303,7 +303,7 @@ suite =
                         }
                 in
                 case compile source of
-                    Err () ->
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -380,7 +380,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -444,7 +444,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -552,7 +552,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -665,7 +665,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -723,7 +723,7 @@ suite =
                         }
                 in
                 case compile source of
-                    Err () ->
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -782,7 +782,7 @@ suite =
                         }
                 in
                 case compile source of
-                    Err () ->
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -821,7 +821,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -866,7 +866,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -905,7 +905,7 @@ suite =
                             }
                     in
                     case compile source of
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -916,7 +916,7 @@ suite =
                 let
                     expectCompiles code =
                         case compile code of
-                            Err () ->
+                            Err _ ->
                                 Expect.fail "Did not expect compilation to fail."
 
                             Ok _ ->
@@ -1134,7 +1134,7 @@ suite =
                         }
                 in
                 case compileRetainLocations source of
-                    Err () ->
+                    Err _ ->
                         Expect.fail "Did not expect compilation to fail."
 
                     Ok ast ->

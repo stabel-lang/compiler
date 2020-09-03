@@ -5,18 +5,19 @@ module Test.Parser.Util exposing
 
 import Dict
 import Dict.Extra as Dict
+import Parser.Advanced as ElmParser
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Parser as AST exposing (..)
 import String.Extra as String
 
 
-compile : String -> Result () AST
+compile : String -> Result (List (ElmParser.DeadEnd () Problem)) AST
 compile str =
     compileRetainLocations str
         |> Result.map stripLocations
 
 
-compileRetainLocations : String -> Result () AST
+compileRetainLocations : String -> Result (List (ElmParser.DeadEnd () Problem)) AST
 compileRetainLocations str =
     String.unindent str
         |> run
