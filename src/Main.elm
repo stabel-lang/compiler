@@ -42,19 +42,23 @@ update msg _ =
                     , compileFinished ( True, Wasm.toString wasm )
                     )
 
-                Err () ->
+                Err errmsg ->
                     ( ()
-                    , compileFinished ( False, "Compilation failed" )
+                    , compileFinished ( False, "Compilation failed:\n" ++ errmsg )
                     )
 
 
-compile : String -> Result () Wasm.Module
+compile : String -> Result String Wasm.Module
 compile sourceCode =
-    sourceCode
-        |> Parser.run
-        |> Result.andThen Qualifier.qualify
-        |> Result.andThen TypeChecker.typeCheck
-        |> Result.andThen Codegen.codegen
+    case Parser.run sourceCode of
+        Err parserError ->
+            Err <| Debug.toString parserError
+
+        Ok ast ->
+            Qualifier.qualify ast
+                |> Result.andThen TypeChecker.typeCheck
+                |> Result.andThen Codegen.codegen
+                |> Result.mapError Debug.toString
 
 
 subscriptions : Model -> Sub Msg
