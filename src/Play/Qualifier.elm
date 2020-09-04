@@ -329,8 +329,11 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
 
         Parser.Quotation _ quotImpl ->
             let
+                quoteName =
+                    currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
+
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    initQualifyNode currentDefName ast qualifiedWords quotImpl
+                    initQualifyNode quoteName ast qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok [ Word wordRef ] ->
@@ -347,10 +350,6 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                             )
 
                 Ok qualifiedQuotImpl ->
-                    let
-                        quoteName =
-                            currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
-                    in
                     ( availableQuoteId + 1
                     , Dict.insert quoteName
                         { name = quoteName

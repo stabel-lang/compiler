@@ -424,6 +424,82 @@ suite =
 
                         Ok qualifiedAst ->
                             Expect.equal expectedAst qualifiedAst
+            , test "Quotes within quotes is fine" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , sourceLocation = Nothing
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Quotation emptyRange
+                                                    [ AST.Integer emptyRange 1
+                                                    , AST.Quotation emptyRange
+                                                        [ AST.Integer emptyRange 1
+                                                        , AST.Word emptyRange "+"
+                                                        ]
+                                                    , AST.Word emptyRange "!"
+                                                    , AST.Word emptyRange "+"
+                                                    ]
+                                                , AST.Word emptyRange "!"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , WordRef "main__quote1"
+                                                , Builtin Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main__quote1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , WordRef "main__quote1__quote1"
+                                                , Builtin Builtin.Apply
+                                                , Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "main__quote1__quote1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer 1
+                                                , Builtin Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case qualify unqualifiedAst of
+                        Err () ->
+                            Expect.fail "Did not expect qualification to fail"
+
+                        Ok qualifiedAst ->
+                            Expect.equal expectedAst qualifiedAst
             ]
         , describe "Pattern matching"
             [ test "Basic example" <|
