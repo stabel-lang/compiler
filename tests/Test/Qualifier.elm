@@ -322,13 +322,13 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer 1
-                                                , WordRef "main__quot2"
+                                                , WordRef "main__quote2"
                                                 , Word "apply-to-num"
-                                                , WordRef "main__quot1"
+                                                , WordRef "main__quote1"
                                                 , Word "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "main__quot2"
+                                    , { name = "main__quote2"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -338,7 +338,7 @@ suite =
                                                 , Builtin Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "main__quot1"
+                                    , { name = "main__quote1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted

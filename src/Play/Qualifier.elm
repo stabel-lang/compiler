@@ -75,14 +75,10 @@ qualify : Parser.AST -> Result () AST
 qualify ast =
     let
         ( typeErrors, qualifiedTypes ) =
-            ast.types
-                |> Dict.values
-                |> List.foldl (qualifyType ast) ( [], Dict.empty )
+            Dict.foldl (\_ val acc -> qualifyType ast val acc) ( [], Dict.empty ) ast.types
 
         ( wordErrors, qualifiedWords ) =
-            ast.words
-                |> Dict.values
-                |> List.foldl (qualifyDefinition ast qualifiedTypes) ( [], Dict.empty )
+            Dict.foldl (\_ val acc -> qualifyDefinition ast qualifiedTypes val acc) ( [], Dict.empty ) ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -133,8 +129,7 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
-            List.foldr (qualifyNode ast unqualifiedWord.name) ( newWordsAfterWhens, [] ) impl
-                |> Tuple.mapSecond Result.combine
+            initQualifyNode unqualifiedWord.name ast newWordsAfterWhens impl
     in
     case ( qualifiedWhensResult, qualifiedImplementationResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation ) ->
@@ -168,8 +163,7 @@ qualifyWhen :
 qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
-            List.foldr (qualifyNode ast wordName) ( qualifiedWords, [] ) impl
-                |> Tuple.mapSecond Result.combine
+            initQualifyNode wordName ast qualifiedWords impl
 
         qualifiedMatchResult =
             qualifyMatch qualifiedTypes typeMatch
@@ -269,57 +263,74 @@ qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
         Err ()
 
 
+initQualifyNode :
+    String
+    -> Parser.AST
+    -> Dict String WordDefinition
+    -> List Parser.AstNode
+    -> ( Dict String WordDefinition, Result () (List Node) )
+initQualifyNode currentDefName ast qualifiedWords impl =
+    List.foldr (qualifyNode ast currentDefName) ( 1, qualifiedWords, [] ) impl
+        |> (\( _, newQualifiedWords, errors ) -> ( newQualifiedWords, Result.combine errors ))
+
+
 qualifyNode :
     Parser.AST
     -> String
     -> Parser.AstNode
-    -> ( Dict String WordDefinition, List (Result () Node) )
-    -> ( Dict String WordDefinition, List (Result () Node) )
-qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
+    -> ( Int, Dict String WordDefinition, List (Result () Node) )
+    -> ( Int, Dict String WordDefinition, List (Result () Node) )
+qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifiedNodes ) =
     case node of
         Parser.Integer _ value ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (Integer value) :: qualifiedNodes
             )
 
         Parser.Word _ value ->
             if Dict.member value ast.words then
-                ( qualifiedWords
+                ( availableQuoteId
+                , qualifiedWords
                 , Ok (Word value) :: qualifiedNodes
                 )
 
             else
                 case Dict.get value builtinDict of
                     Just builtin ->
-                        ( qualifiedWords
+                        ( availableQuoteId
+                        , qualifiedWords
                         , Ok builtin :: qualifiedNodes
                         )
 
                     Nothing ->
-                        ( qualifiedWords
+                        ( availableQuoteId
+                        , qualifiedWords
                         , Err () :: qualifiedNodes
                         )
 
         Parser.ConstructType typeName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (ConstructType typeName) :: qualifiedNodes
             )
 
         Parser.SetMember typeName memberName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (SetMember typeName memberName) :: qualifiedNodes
             )
 
         Parser.GetMember typeName memberName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (GetMember typeName memberName) :: qualifiedNodes
             )
 
         Parser.Quotation _ quotImpl ->
             let
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    List.foldr (qualifyNode ast currentDefName) ( qualifiedWords, [] ) quotImpl
-                        |> Tuple.mapSecond Result.combine
+                    initQualifyNode currentDefName ast qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok [ Word wordRef ] ->
@@ -328,7 +339,8 @@ qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
                             Debug.todo "Cannot happen"
 
                         Just oldWord ->
-                            ( Dict.insert wordRef
+                            ( availableQuoteId
+                            , Dict.insert wordRef
                                 { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
                                 newWordsAfterQuot
                             , Ok (WordRef wordRef) :: qualifiedNodes
@@ -336,33 +348,24 @@ qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
 
                 Ok qualifiedQuotImpl ->
                     let
-                        quotBaseName =
-                            currentDefName ++ "__" ++ "quot"
-
-                        quotName =
-                            quotBaseName ++ String.fromInt (quotId 1)
-
-                        quotId possibleId =
-                            case Dict.get (quotBaseName ++ String.fromInt possibleId) newWordsAfterQuot of
-                                Just _ ->
-                                    quotId (possibleId + 1)
-
-                                Nothing ->
-                                    possibleId
+                        quoteName =
+                            currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
                     in
-                    ( Dict.insert quotName
-                        { name = quotName
+                    ( availableQuoteId + 1
+                    , Dict.insert quoteName
+                        { name = quoteName
                         , metadata =
                             Metadata.default
                                 |> Metadata.isQuoted
                         , implementation = SoloImpl qualifiedQuotImpl
                         }
                         newWordsAfterQuot
-                    , Ok (WordRef quotName) :: qualifiedNodes
+                    , Ok (WordRef quoteName) :: qualifiedNodes
                     )
 
                 Err () ->
-                    ( qualifiedWords
+                    ( availableQuoteId
+                    , qualifiedWords
                     , Err () :: qualifiedNodes
                     )
 
