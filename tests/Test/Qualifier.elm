@@ -133,10 +133,10 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Generic "a_over", Type.Generic "b_over" ]
-                                                [ Type.Generic "a_over"
-                                                , Type.Generic "b_over"
-                                                , Type.Generic "a_over"
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "a"
+                                                , Type.Generic "b"
+                                                , Type.Generic "a"
                                                 ]
                                   , implementation =
                                         SoloImpl

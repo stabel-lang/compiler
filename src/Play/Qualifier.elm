@@ -136,7 +136,7 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
-                , metadata = qualifyMetadata unqualifiedWord.name unqualifiedWord.metadata
+                , metadata = unqualifiedWord.metadata
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -368,27 +368,6 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                     , qualifiedWords
                     , Err () :: qualifiedNodes
                     )
-
-
-qualifyMetadata : String -> Metadata -> Metadata
-qualifyMetadata baseName metadata =
-    let
-        helper { input, output } =
-            { input = List.map (qualifyMetadataType baseName) input
-            , output = List.map (qualifyMetadataType baseName) output
-            }
-    in
-    { metadata | type_ = TypeSignature.map helper metadata.type_ }
-
-
-qualifyMetadataType : String -> Type -> Type
-qualifyMetadataType baseName type_ =
-    case type_ of
-        Type.Generic id ->
-            Type.Generic (id ++ "_" ++ baseName)
-
-        _ ->
-            type_
 
 
 typeDefinitionName : TypeDefinition -> String
