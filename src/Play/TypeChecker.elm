@@ -5,6 +5,7 @@ import Dict.Extra as Dict
 import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
+import Play.Data.SourceLocation as SourceLocation
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Qualifier as Qualifier
@@ -79,10 +80,10 @@ initContext ast =
             Dict.map
                 (\_ t ->
                     case t of
-                        Qualifier.CustomTypeDef name generics members ->
+                        Qualifier.CustomTypeDef name _ generics members ->
                             CustomTypeDef name generics members
 
-                        Qualifier.UnionTypeDef name generics memberTypes ->
+                        Qualifier.UnionTypeDef name _ generics memberTypes ->
                             UnionTypeDef name generics memberTypes
                 )
                 ast.types
@@ -220,7 +221,7 @@ typeCheckDefinition untypedDef context =
                                             Debug.todo "Default impl doesn't have an input argument"
 
                                         firstType :: _ ->
-                                            ( Qualifier.TypeMatch firstType [], defaultImpl ) :: initialWhens
+                                            ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
                         inferWhenTypes ( _, im ) ( infs, ctx ) =
                             let
@@ -244,7 +245,7 @@ typeCheckDefinition untypedDef context =
                                 |> List.map countOutput
                                 |> areAllEqual
 
-                        typeCheckWhen ( Qualifier.TypeMatch forType _, inf ) =
+                        typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
                             case inf.input of
                                 firstInput :: _ ->
                                     ( typeCompatible firstInput forType
@@ -335,10 +336,10 @@ typeCheckDefinition untypedDef context =
                                 _ ->
                                     result
 
-                        extractType (Qualifier.TypeMatch t_ _) =
+                        extractType (Qualifier.TypeMatch _ t_ _) =
                             t_
 
-                        mapTypeMatch (Qualifier.TypeMatch type_ cond) =
+                        mapTypeMatch (Qualifier.TypeMatch _ type_ cond) =
                             TypeMatch type_ (List.map mapTypeMatchValue cond)
 
                         mapTypeMatchValue ( fieldName, value ) =
@@ -661,10 +662,10 @@ typeCheckNode idx node context =
                     type_
     in
     case node of
-        Qualifier.Integer _ ->
+        Qualifier.Integer _ _ ->
             addStackEffect context [ Push Type.Int ]
 
-        Qualifier.Word name ->
+        Qualifier.Word _ name ->
             case Dict.get name context.typedWords of
                 Just def ->
                     addStackEffect context <| wordTypeToStackEffects def.type_
@@ -699,10 +700,10 @@ typeCheckNode idx node context =
                                     Just def ->
                                         addStackEffect newContext <| wordTypeToStackEffects def.type_
 
-        Qualifier.WordRef ref ->
+        (Qualifier.WordRef _ ref) as wordRef ->
             let
                 contextAfterWordCheck =
-                    typeCheckNode idx (Qualifier.Word ref) context
+                    typeCheckNode idx wordRef context
             in
             case Dict.get ref contextAfterWordCheck.typedWords of
                 Just def ->
@@ -801,7 +802,7 @@ typeCheckNode idx node context =
                 _ ->
                     Debug.todo "inconcievable!"
 
-        Qualifier.Builtin builtin ->
+        Qualifier.Builtin _ builtin ->
             addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
 
 
@@ -1188,10 +1189,10 @@ reverseLookup ( name, aliases ) acc =
 untypedToTypedNode : Context -> Qualifier.Node -> AstNode
 untypedToTypedNode context untypedNode =
     case untypedNode of
-        Qualifier.Integer num ->
+        Qualifier.Integer _ num ->
             IntLiteral num
 
-        Qualifier.Word name ->
+        Qualifier.Word _ name ->
             case Dict.get name context.typedWords of
                 Just def ->
                     Word name def.type_
@@ -1202,7 +1203,7 @@ untypedToTypedNode context untypedNode =
                         |> Maybe.withDefault { input = [], output = [] }
                         |> Word name
 
-        Qualifier.WordRef ref ->
+        Qualifier.WordRef _ ref ->
             WordRef ref
 
         Qualifier.ConstructType typeName ->
@@ -1229,7 +1230,7 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
-        Qualifier.Builtin builtin ->
+        Qualifier.Builtin _ builtin ->
             Builtin builtin
 
 

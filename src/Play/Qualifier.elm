@@ -3,6 +3,7 @@ module Play.Qualifier exposing (..)
 import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
+import Play.Data.SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
@@ -17,8 +18,8 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List String) (List ( String, Type ))
-    | UnionTypeDef String (List String) (List Type)
+    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
+    | UnionTypeDef String SourceLocationRange (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -34,7 +35,7 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
@@ -44,31 +45,30 @@ type TypeMatchValue
 
 
 type Node
-    = Integer Int
-    | Word String
-    | WordRef String
+    = Integer SourceLocationRange Int
+    | Word SourceLocationRange String
+    | WordRef SourceLocationRange String
     | ConstructType String
     | GetMember String String
     | SetMember String String
-    | Builtin Builtin
+    | Builtin SourceLocationRange Builtin
 
 
-builtinDict : Dict String Node
+builtinDict : Dict String Builtin
 builtinDict =
-    [ ( "+", Builtin.Plus )
-    , ( "-", Builtin.Minus )
-    , ( "*", Builtin.Multiply )
-    , ( "/", Builtin.Divide )
-    , ( "=", Builtin.Equal )
-    , ( "swap", Builtin.StackSwap )
-    , ( "dup", Builtin.StackDuplicate )
-    , ( "drop", Builtin.StackDrop )
-    , ( "rotate", Builtin.StackRightRotate )
-    , ( "-rotate", Builtin.StackLeftRotate )
-    , ( "!", Builtin.Apply )
-    ]
-        |> Dict.fromList
-        |> Dict.map (\_ v -> Builtin v)
+    Dict.fromList
+        [ ( "+", Builtin.Plus )
+        , ( "-", Builtin.Minus )
+        , ( "*", Builtin.Multiply )
+        , ( "/", Builtin.Divide )
+        , ( "=", Builtin.Equal )
+        , ( "swap", Builtin.StackSwap )
+        , ( "dup", Builtin.StackDuplicate )
+        , ( "drop", Builtin.StackDrop )
+        , ( "rotate", Builtin.StackRightRotate )
+        , ( "-rotate", Builtin.StackLeftRotate )
+        , ( "!", Builtin.Apply )
+        ]
 
 
 qualify : Parser.AST -> Result () AST
@@ -95,11 +95,11 @@ qualify ast =
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
     case td of
-        CustomTypeDef name generics members ->
-            CustomTypeDef name generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+        CustomTypeDef name range generics members ->
+            CustomTypeDef name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
 
-        UnionTypeDef name generics memberTypes ->
-            UnionTypeDef name generics (List.map (resolveUnion qt) memberTypes)
+        UnionTypeDef name range generics memberTypes ->
+            UnionTypeDef name range generics (List.map (resolveUnion qt) memberTypes)
 
 
 resolveUnion : Dict String TypeDefinition -> Type -> Type
@@ -107,7 +107,7 @@ resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ members) ->
+                Just (UnionTypeDef _ _ _ members) ->
                     Type.Union members
 
                 _ ->
@@ -115,7 +115,7 @@ resolveUnion typeDefs type_ =
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ generics members) ->
+                Just (UnionTypeDef _ _ generics members) ->
                     let
                         genericsMap =
                             List.map2 Tuple.pair generics types
@@ -151,11 +151,11 @@ qualifyType :
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
-        Parser.CustomTypeDef _ name generics members ->
-            Dict.insert name (CustomTypeDef name generics members) acc
+        Parser.CustomTypeDef range name generics members ->
+            Dict.insert name (CustomTypeDef name range generics members) acc
 
-        Parser.UnionTypeDef _ name generics memberTypes ->
-            Dict.insert name (UnionTypeDef name generics memberTypes) acc
+        Parser.UnionTypeDef range name generics memberTypes ->
+            Dict.insert name (UnionTypeDef name range generics memberTypes) acc
     )
 
 
@@ -254,15 +254,15 @@ qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, re
 qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result () TypeMatch
 qualifyMatch qualifiedTypes typeMatch =
     case typeMatch of
-        Parser.TypeMatch _ Type.Int [] ->
-            Ok <| TypeMatch Type.Int []
+        Parser.TypeMatch range Type.Int [] ->
+            Ok <| TypeMatch range Type.Int []
 
-        Parser.TypeMatch _ Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch Type.Int [ ( "value", LiteralInt val ) ]
+        Parser.TypeMatch range Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
+            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
 
-        Parser.TypeMatch _ ((Type.Custom name) as type_) patterns ->
+        Parser.TypeMatch range ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ gens members) ->
+                Just (CustomTypeDef _ _ gens members) ->
                     let
                         memberNames =
                             members
@@ -284,14 +284,14 @@ qualifyMatch qualifiedTypes typeMatch =
                     in
                     case qualifiedPatternsResult of
                         Ok qualifiedPatterns ->
-                            Ok <| TypeMatch actualType qualifiedPatterns
+                            Ok <| TypeMatch range actualType qualifiedPatterns
 
                         Err () ->
                             Err ()
 
-                Just (UnionTypeDef _ _ types) ->
+                Just (UnionTypeDef _ _ _ types) ->
                     if List.isEmpty patterns then
-                        Ok <| TypeMatch (Type.Union types) []
+                        Ok <| TypeMatch range (Type.Union types) []
 
                     else
                         Err ()
@@ -348,17 +348,17 @@ qualifyNode :
     -> ( Int, Dict String WordDefinition, List (Result () Node) )
 qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifiedNodes ) =
     case node of
-        Parser.Integer _ value ->
+        Parser.Integer loc value ->
             ( availableQuoteId
             , qualifiedWords
-            , Ok (Integer value) :: qualifiedNodes
+            , Ok (Integer loc value) :: qualifiedNodes
             )
 
-        Parser.Word _ value ->
+        Parser.Word loc value ->
             if Dict.member value ast.words then
                 ( availableQuoteId
                 , qualifiedWords
-                , Ok (Word value) :: qualifiedNodes
+                , Ok (Word loc value) :: qualifiedNodes
                 )
 
             else
@@ -366,7 +366,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                     Just builtin ->
                         ( availableQuoteId
                         , qualifiedWords
-                        , Ok builtin :: qualifiedNodes
+                        , Ok (Builtin loc builtin) :: qualifiedNodes
                         )
 
                     Nothing ->
@@ -393,7 +393,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
             , Ok (GetMember typeName memberName) :: qualifiedNodes
             )
 
-        Parser.Quotation _ quotImpl ->
+        Parser.Quotation sourceLocation quotImpl ->
             let
                 quoteName =
                     currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
@@ -402,7 +402,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                     initQualifyNode quoteName ast qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
-                Ok [ Word wordRef ] ->
+                Ok [ Word _ wordRef ] ->
                     case Dict.get wordRef newWordsAfterQuot of
                         Nothing ->
                             Debug.todo "Cannot happen"
@@ -412,7 +412,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                             , Dict.insert wordRef
                                 { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
                                 newWordsAfterQuot
-                            , Ok (WordRef wordRef) :: qualifiedNodes
+                            , Ok (WordRef sourceLocation wordRef) :: qualifiedNodes
                             )
 
                 Ok qualifiedQuotImpl ->
@@ -425,7 +425,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                         , implementation = SoloImpl qualifiedQuotImpl
                         }
                         newWordsAfterQuot
-                    , Ok (WordRef quoteName) :: qualifiedNodes
+                    , Ok (WordRef sourceLocation quoteName) :: qualifiedNodes
                     )
 
                 Err () ->
@@ -438,8 +438,8 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ ->
+        CustomTypeDef name _ _ _ ->
             name
 
-        UnionTypeDef name _ _ ->
+        UnionTypeDef name _ _ _ ->
             name

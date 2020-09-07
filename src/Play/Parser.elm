@@ -57,7 +57,6 @@ type TypeDefinition
 
 type alias WordDefinition =
     { name : String
-    , sourceLocation : Maybe SourceLocationRange
     , metadata : Metadata
     , implementation : WordImplementation
     }
@@ -329,7 +328,12 @@ definitionParser ast =
 
         maybeInsertWordProblem wordDef =
             Dict.get wordDef.name ast.words
-                |> Maybe.map (\prevDef -> WordAlreadyDefined wordDef.name prevDef.sourceLocation wordDef.sourceLocation)
+                |> Maybe.map
+                    (\prevDef ->
+                        WordAlreadyDefined wordDef.name
+                            prevDef.metadata.sourceLocationRange
+                            wordDef.metadata.sourceLocationRange
+                    )
 
         insertType typeDef =
             let
@@ -408,7 +412,6 @@ generateDefaultWordsForType typeDef =
 
                 ctorDef =
                     { name = ">" ++ typeName
-                    , sourceLocation = Nothing
                     , metadata =
                         Metadata.default
                             |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
@@ -418,7 +421,6 @@ generateDefaultWordsForType typeDef =
 
                 setterGetterPair ( memberName, memberType ) =
                     [ { name = ">" ++ memberName
-                      , sourceLocation = Nothing
                       , metadata =
                             Metadata.default
                                 |> Metadata.withVerifiedType [ typeOfType, memberType ] [ typeOfType ]
@@ -427,7 +429,6 @@ generateDefaultWordsForType typeDef =
                                 [ SetMember typeName memberName ]
                       }
                     , { name = memberName ++ ">"
-                      , sourceLocation = Nothing
                       , metadata =
                             Metadata.default
                                 |> Metadata.withVerifiedType [ typeOfType ] [ memberType ]
@@ -448,16 +449,16 @@ wordDefinitionParser startLocation =
         joinParseResults name def endLocation =
             { def
                 | name = name
-                , sourceLocation =
-                    Just
+                , metadata =
+                    Metadata.withSourceLocationRange
                         { start = startLocation
                         , end = endLocation
                         }
+                        def.metadata
             }
 
         emptyDef =
             { name = ""
-            , sourceLocation = Nothing
             , metadata = Metadata.default
             , implementation = SoloImpl []
             }
@@ -502,16 +503,16 @@ multiWordDefinitionParser startLocation =
             reverseWhens <|
                 { def
                     | name = name
-                    , sourceLocation =
-                        Just
+                    , metadata =
+                        Metadata.withSourceLocationRange
                             { start = startLocation
                             , end = endLocation
                             }
+                            def.metadata
                 }
 
         emptyDef =
             { name = ""
-            , sourceLocation = Nothing
             , metadata = Metadata.default
             , implementation = SoloImpl []
             }

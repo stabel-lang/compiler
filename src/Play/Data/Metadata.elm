@@ -1,5 +1,6 @@
 module Play.Data.Metadata exposing (..)
 
+import Play.Data.SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type exposing (Type)
 import Play.Data.TypeSignature exposing (TypeSignature(..))
 
@@ -8,6 +9,7 @@ type alias Metadata =
     { isEntryPoint : Bool
     , type_ : TypeSignature
     , isQuoted : Bool
+    , sourceLocationRange : Maybe SourceLocationRange
     }
 
 
@@ -16,6 +18,7 @@ default =
     { isEntryPoint = False
     , type_ = NotProvided
     , isQuoted = False
+    , sourceLocationRange = Nothing
     }
 
 
@@ -37,3 +40,8 @@ withVerifiedType inputs outputs meta =
 isQuoted : Metadata -> Metadata
 isQuoted meta =
     { meta | isQuoted = True }
+
+
+withSourceLocationRange : SourceLocationRange -> Metadata -> Metadata
+withSourceLocationRange range meta =
+    { meta | sourceLocationRange = Just range }
