@@ -3,7 +3,7 @@ module Play.Qualifier exposing (..)
 import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.Type as Type exposing (Type)
+import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
 import Result.Extra as Result
@@ -76,6 +76,7 @@ qualify ast =
     let
         ( typeErrors, qualifiedTypes ) =
             Dict.foldl (\_ val acc -> qualifyType ast val acc) ( [], Dict.empty ) ast.types
+                |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
         ( wordErrors, qualifiedWords ) =
             Dict.foldl (\_ val acc -> qualifyDefinition ast qualifiedTypes val acc) ( [], Dict.empty ) ast.words
@@ -89,6 +90,57 @@ qualify ast =
 
         _ ->
             Err ()
+
+
+resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
+resolveUnionInTypeDefs qt td =
+    case td of
+        CustomTypeDef name generics members ->
+            CustomTypeDef name generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+
+        UnionTypeDef name generics memberTypes ->
+            UnionTypeDef name generics (List.map (resolveUnion qt) memberTypes)
+
+
+resolveUnion : Dict String TypeDefinition -> Type -> Type
+resolveUnion typeDefs type_ =
+    case type_ of
+        Type.Custom typeName ->
+            case Dict.get typeName typeDefs of
+                Just (UnionTypeDef _ _ members) ->
+                    Type.Union members
+
+                _ ->
+                    type_
+
+        Type.CustomGeneric typeName types ->
+            case Dict.get typeName typeDefs of
+                Just (UnionTypeDef _ generics members) ->
+                    let
+                        genericsMap =
+                            List.map2 Tuple.pair generics types
+                                |> Dict.fromList
+
+                        rebindGenerics t =
+                            case t of
+                                Type.Generic val ->
+                                    Dict.get val genericsMap
+                                        |> Maybe.withDefault t
+
+                                Type.CustomGeneric cgName cgMembers ->
+                                    Type.CustomGeneric cgName <|
+                                        List.map rebindGenerics cgMembers
+
+                                _ ->
+                                    t
+                    in
+                    Type.Union (List.map rebindGenerics members)
+
+                _ ->
+                    type_
+
+        _ ->
+            type_
 
 
 qualifyType :
@@ -130,13 +182,20 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
             initQualifyNode unqualifiedWord.name ast newWordsAfterWhens impl
+
+        unqualifiedMetadata =
+            unqualifiedWord.metadata
     in
     case ( qualifiedWhensResult, qualifiedImplementationResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation ) ->
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
-                , metadata = unqualifiedWord.metadata
+                , metadata =
+                    { unqualifiedMetadata
+                        | type_ =
+                            TypeSignature.map (resolveUnions qualifiedTypes) unqualifiedMetadata.type_
+                    }
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -151,6 +210,13 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
             ( () :: errors
             , newWordsAfterImpl
             )
+
+
+resolveUnions : Dict String TypeDefinition -> WordType -> WordType
+resolveUnions typeDefs wt =
+    { input = List.map (resolveUnion typeDefs) wt.input
+    , output = List.map (resolveUnion typeDefs) wt.output
+    }
 
 
 qualifyWhen :

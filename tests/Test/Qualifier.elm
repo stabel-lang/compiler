@@ -666,4 +666,184 @@ suite =
                         Ok qualifiedAst ->
                             Expect.equal expectedAst qualifiedAst
             ]
+        , test "Resolves unions" <|
+            \_ ->
+                let
+                    boolUnion =
+                        Type.Union
+                            [ Type.Custom "True"
+                            , Type.Custom "False"
+                            ]
+
+                    unqualifiedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ AST.UnionTypeDef emptyRange
+                                    "Bool"
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , AST.CustomTypeDef emptyRange "True" [] []
+                                , AST.CustomTypeDef emptyRange "False" [] []
+                                , AST.CustomTypeDef emptyRange
+                                    "Box"
+                                    []
+                                    [ ( "value", Type.Custom "Bool" ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.ConstructType "False"
+                                            ]
+                                  }
+                                , { name = ">Box"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "Bool" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.ConstructType "Box"
+                                            ]
+                                  }
+                                , { name = ">value"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "Bool", Type.Custom "Box" ]
+                                                [ Type.Custom "Box" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.SetMember "Box" "value"
+                                            ]
+                                  }
+                                , { name = "<value"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.GetMember "Box" "value"
+                                            ]
+                                  }
+                                , { name = "true?"
+                                  , sourceLocation = Nothing
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch emptyRange
+                                                    (Type.Custom "Box")
+                                                    [ ( "value", AST.LiteralType (Type.Custom "True") ) ]
+                                              , [ AST.Word emptyRange ">True" ]
+                                              )
+                                            ]
+                                            [ AST.Word emptyRange ">False" ]
+                                  }
+                                ]
+                        }
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef "Bool"
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef "True" [] []
+                                , CustomTypeDef "False" [] []
+                                , CustomTypeDef "Box"
+                                    []
+                                    [ ( "value", boolUnion ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "False"
+                                            ]
+                                  }
+                                , { name = ">Box"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ boolUnion ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "Box"
+                                            ]
+                                  }
+                                , { name = ">value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ boolUnion, Type.Custom "Box" ] [ Type.Custom "Box" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "Box" "value"
+                                            ]
+                                  }
+                                , { name = "<value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "Box" ] [ boolUnion ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "Box" "value"
+                                            ]
+                                  }
+                                , { name = "true?"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Box" ] [ boolUnion ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch (Type.Custom "Box")
+                                                    [ ( "value", LiteralType (Type.Custom "True") ) ]
+                                              , [ Word ">True" ]
+                                              )
+                                            ]
+                                            [ Word ">False" ]
+                                  }
+                                ]
+                        }
+                in
+                case qualify unqualifiedAst of
+                    Err () ->
+                        Expect.fail "Did not expect qualification to fail"
+
+                    Ok qualifiedAst ->
+                        Expect.equal expectedAst qualifiedAst
         ]

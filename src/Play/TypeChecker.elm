@@ -358,15 +358,8 @@ typeCheckDefinition untypedDef context =
                                     Dict.insert untypedDef.name
                                         { name = untypedDef.name
                                         , type_ =
-                                            case TypeSignature.toMaybe untypedDef.metadata.type_ of
-                                                Just annotatedType ->
-                                                    { annotatedType
-                                                        | input = List.map (resolveUnion newContext) annotatedType.input
-                                                        , output = List.map (resolveUnion newContext) annotatedType.output
-                                                    }
-
-                                                Nothing ->
-                                                    inferredType
+                                            TypeSignature.toMaybe untypedDef.metadata.type_
+                                                |> Maybe.withDefault inferredType
                                         , metadata = untypedDef.metadata
                                         , implementation =
                                             MultiImpl
@@ -384,47 +377,6 @@ typeCheckDefinition untypedDef context =
                     in
                     verifyTypeSignature inferredType untypedDef finalContext
                         |> cleanContext
-
-
-resolveUnion : Context -> Type -> Type
-resolveUnion context type_ =
-    case type_ of
-        Type.Custom typeName ->
-            case Dict.get typeName context.types of
-                Just (UnionTypeDef _ _ members) ->
-                    Type.Union members
-
-                _ ->
-                    type_
-
-        Type.CustomGeneric typeName types ->
-            case Dict.get typeName context.types of
-                Just (UnionTypeDef _ generics members) ->
-                    let
-                        genericsMap =
-                            List.map2 Tuple.pair generics types
-                                |> Dict.fromList
-
-                        rebindGenerics t =
-                            case t of
-                                Type.Generic val ->
-                                    Dict.get val genericsMap
-                                        |> Maybe.withDefault t
-
-                                Type.CustomGeneric cgName cgMembers ->
-                                    Type.CustomGeneric cgName <|
-                                        List.map rebindGenerics cgMembers
-
-                                _ ->
-                                    t
-                    in
-                    Type.Union (List.map rebindGenerics members)
-
-                _ ->
-                    type_
-
-        _ ->
-            type_
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -468,23 +420,11 @@ verifyTypeSignature inferredType untypedDef context =
 compatibleWordTypes : WordType -> WordType -> Context -> Bool
 compatibleWordTypes annotated inferred context =
     let
-        annotatedInputTypes =
-            List.map (resolveUnion context) annotated.input
-
-        inferredInputTypes =
-            List.map (resolveUnion context) inferred.input
-
-        annotatedOutputTypes =
-            List.map (resolveUnion context) annotated.output
-
-        inferredOutputTypes =
-            List.map (resolveUnion context) inferred.output
-
         ( inputRangeDict, inputsCompatible ) =
-            compareType_ annotatedInputTypes inferredInputTypes Dict.empty
+            compareType_ annotated.input inferred.input Dict.empty
 
         ( _, outputsCompatible ) =
-            compareType_ annotatedOutputTypes inferredOutputTypes inputRangeDict
+            compareType_ annotated.output inferred.output inputRangeDict
     in
     inputsCompatible && outputsCompatible
 
@@ -964,7 +904,7 @@ compatibleTypes context typeA typeB =
                 ( context, True )
 
             else
-                case ( resolveUnion context boundA, resolveUnion context boundB ) of
+                case ( boundA, boundB ) of
                     ( Type.Union leftUnion, Type.Union rightUnion ) ->
                         -- TODO: Requires unions to be sorted in same order
                         let

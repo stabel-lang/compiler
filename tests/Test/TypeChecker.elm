@@ -441,6 +441,12 @@ suite =
                         Expect.pass
         , describe "Unions and multifunctions" <|
             let
+                boolUnion =
+                    Type.Union
+                        [ Type.Custom "True"
+                        , Type.Custom "False"
+                        ]
+
                 template multiFn =
                     { types =
                         Dict.fromListBy QAST.typeDefinitionName
@@ -526,7 +532,7 @@ suite =
                                 { name = "to-int"
                                 , metadata =
                                     Metadata.default
-                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                        |> Metadata.withType [ boolUnion ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
                                         [ ( QAST.TypeMatch (Type.Custom "False") []
@@ -557,7 +563,7 @@ suite =
                                 { name = "to-int"
                                 , metadata =
                                     Metadata.default
-                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                        |> Metadata.withType [ boolUnion ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
                                         [ ( QAST.TypeMatch (Type.Custom "False") []
@@ -822,7 +828,10 @@ suite =
                 \_ ->
                     let
                         listUnion =
-                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+                            Type.Union
+                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                , Type.Custom "EmptyList"
+                                ]
 
                         input =
                             { types =
@@ -1112,7 +1121,10 @@ suite =
                 \_ ->
                     let
                         listUnion =
-                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+                            Type.Union
+                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                , Type.Custom "EmptyList"
+                                ]
 
                         input =
                             { types =
