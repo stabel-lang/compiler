@@ -36,7 +36,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , sourceLocation = Nothing
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
@@ -45,7 +44,6 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
@@ -56,7 +54,6 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
@@ -100,7 +97,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">True"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
@@ -109,7 +105,6 @@ suite =
                                                 [ AST.ConstructType "True" ]
                                       }
                                     , { name = "as-int"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
@@ -154,15 +149,20 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Person"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.ConstructType "Person" ]
                                       }
+                                    , { name = "age>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl [ AST.GetMember "Person" "age" ]
+                                      }
                                     , { name = ">age"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
@@ -170,23 +170,13 @@ suite =
                                             SoloImpl [ AST.SetMember "Person" "age" ]
                                       }
                                     , { name = ">jobs"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Person" "jobs" ]
                                       }
-                                    , { name = "age>"
-                                      , sourceLocation = Nothing
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
-                                      , implementation =
-                                            SoloImpl [ AST.GetMember "Person" "age" ]
-                                      }
                                     , { name = "jobs>"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
@@ -194,7 +184,6 @@ suite =
                                             SoloImpl [ AST.GetMember "Person" "jobs" ]
                                       }
                                     , { name = "get-age"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
@@ -233,7 +222,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -243,7 +231,6 @@ suite =
                                             SoloImpl [ AST.ConstructType "Box" ]
                                       }
                                     , { name = ">element"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -253,7 +240,6 @@ suite =
                                             SoloImpl [ AST.SetMember "Box" "element" ]
                                       }
                                     , { name = "element>"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -287,7 +273,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -343,7 +328,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">True"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
@@ -353,7 +337,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">False"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
@@ -363,7 +346,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "to-int"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -417,7 +399,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Nil"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
@@ -427,7 +408,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "if-present"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -485,7 +465,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Generic "a" ]
@@ -496,7 +475,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">element"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -511,7 +489,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "element>"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -525,7 +502,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">Nil"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
@@ -535,7 +511,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "if-present"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -594,7 +569,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [ Type.Generic "a" ]
@@ -605,7 +579,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">element"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -620,7 +593,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "element>"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType
@@ -634,7 +606,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">Nil"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
@@ -644,7 +615,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "if-present"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -690,7 +660,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -704,7 +673,6 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
@@ -747,7 +715,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -764,7 +731,6 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
@@ -804,7 +770,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -842,7 +807,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "pair?"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -887,7 +851,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "origo?"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -1006,29 +969,26 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = ">True"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                   , implementation = SoloImpl [ ConstructType "True" ]
                                   }
                                 , { name = ">False"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
                                   , implementation = SoloImpl [ ConstructType "False" ]
                                   }
                                 , { name = "from-int"
-                                  , sourceLocation =
-                                        Just
-                                            (SourceLocationRange
-                                                (SourceLocation 9 1 62)
-                                                (SourceLocation 16 1 147)
-                                            )
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 9 1 62)
+                                                    (SourceLocation 16 1 147)
+                                                )
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch
@@ -1065,14 +1025,13 @@ suite =
                                             []
                                   }
                                 , { name = "equal"
-                                  , sourceLocation =
-                                        Just
-                                            (SourceLocationRange
-                                                (SourceLocation 16 1 147)
-                                                (SourceLocation 19 1 176)
-                                            )
                                   , metadata =
                                         Metadata.default
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 16 1 147)
+                                                    (SourceLocation 19 1 176)
+                                                )
                                   , implementation =
                                         SoloImpl
                                             [ Word
@@ -1096,14 +1055,13 @@ suite =
                                             ]
                                   }
                                 , { name = "not"
-                                  , sourceLocation =
-                                        Just
-                                            (SourceLocationRange
-                                                (SourceLocation 19 1 176)
-                                                (SourceLocation 23 1 218)
-                                            )
                                   , metadata =
                                         Metadata.default
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 19 1 176)
+                                                    (SourceLocation 23 1 218)
+                                                )
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch

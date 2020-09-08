@@ -23,7 +23,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , sourceLocation = Nothing
                                   , metadata = Metadata.default
                                   , implementation =
                                         AST.SoloImpl
@@ -32,7 +31,6 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , sourceLocation = Nothing
                                   , metadata = Metadata.default
                                   , implementation =
                                         AST.SoloImpl
@@ -41,7 +39,6 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.asEntryPoint
@@ -66,16 +63,16 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ Integer 1
-                                            , Builtin Builtin.Plus
+                                            [ Integer emptyRange 1
+                                            , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ Integer 1
-                                            , Builtin Builtin.Minus
+                                            [ Integer emptyRange 1
+                                            , Builtin emptyRange Builtin.Minus
                                             ]
                                   }
                                 , { name = "main"
@@ -84,12 +81,12 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ Integer 1
-                                            , Word "inc"
-                                            , Word "inc"
-                                            , Word "dec"
-                                            , Integer 2
-                                            , Builtin Builtin.Equal
+                                            [ Integer emptyRange 1
+                                            , Word emptyRange "inc"
+                                            , Word emptyRange "inc"
+                                            , Word emptyRange "dec"
+                                            , Integer emptyRange 2
+                                            , Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 ]
@@ -109,7 +106,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -140,9 +136,9 @@ suite =
                                                 ]
                                   , implementation =
                                         SoloImpl
-                                            [ Builtin Builtin.StackSwap
-                                            , Builtin Builtin.StackDuplicate
-                                            , Builtin Builtin.StackRightRotate
+                                            [ Builtin emptyRange Builtin.StackSwap
+                                            , Builtin emptyRange Builtin.StackDuplicate
+                                            , Builtin emptyRange Builtin.StackRightRotate
                                             ]
                                   }
                                 ]
@@ -172,7 +168,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = ">True"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "True" ]
@@ -182,7 +177,6 @@ suite =
                                             ]
                                   }
                                 , { name = ">False"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Custom "False" ]
@@ -192,7 +186,6 @@ suite =
                                             ]
                                   }
                                 , { name = "to-int"
-                                  , sourceLocation = Nothing
                                   , metadata = Metadata.default
                                   , implementation =
                                         AST.MultiImpl
@@ -208,12 +201,13 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" [] []
-                                , CustomTypeDef "False" [] []
+                                , CustomTypeDef "True" emptyRange [] []
+                                , CustomTypeDef "False" emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -239,8 +233,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatch (Type.Custom "False") [], [ Integer 0 ] )
-                                            , ( TypeMatch (Type.Custom "True") [], [ Integer 1 ] )
+                                            [ ( TypeMatch emptyRange (Type.Custom "False") [], [ Integer emptyRange 0 ] )
+                                            , ( TypeMatch emptyRange (Type.Custom "True") [], [ Integer emptyRange 1 ] )
                                             ]
                                             []
                                   }
@@ -262,7 +256,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -276,7 +269,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
@@ -312,7 +304,7 @@ suite =
                                                     [ Type.Int ]
                                       , implementation =
                                             SoloImpl
-                                                [ Builtin Builtin.Apply
+                                                [ Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
@@ -321,11 +313,11 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , WordRef "main__quote2"
-                                                , Word "apply-to-num"
-                                                , WordRef "main__quote1"
-                                                , Word "apply-to-num"
+                                                [ Integer emptyRange 1
+                                                , WordRef emptyRange "main__quote2"
+                                                , Word emptyRange "apply-to-num"
+                                                , WordRef emptyRange "main__quote1"
+                                                , Word emptyRange "apply-to-num"
                                                 ]
                                       }
                                     , { name = "main__quote2"
@@ -334,8 +326,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , Builtin Builtin.Plus
+                                                [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     , { name = "main__quote1"
@@ -344,8 +336,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , Builtin Builtin.Minus
+                                                [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
                                     ]
@@ -365,7 +357,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
@@ -379,7 +370,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "inc"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             AST.SoloImpl
@@ -400,9 +390,9 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , WordRef "inc"
-                                                , Builtin Builtin.Apply
+                                                [ Integer emptyRange 1
+                                                , WordRef emptyRange "inc"
+                                                , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "inc"
@@ -411,8 +401,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , Builtin Builtin.Plus
+                                                [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     ]
@@ -432,7 +422,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
@@ -464,9 +453,9 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , WordRef "main__quote1"
-                                                , Builtin Builtin.Apply
+                                                [ Integer emptyRange 1
+                                                , WordRef emptyRange "main__quote1"
+                                                , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main__quote1"
@@ -475,10 +464,10 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , WordRef "main__quote1__quote1"
-                                                , Builtin Builtin.Apply
-                                                , Builtin Builtin.Plus
+                                                [ Integer emptyRange 1
+                                                , WordRef emptyRange "main__quote1__quote1"
+                                                , Builtin emptyRange Builtin.Apply
+                                                , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     , { name = "main__quote1__quote1"
@@ -487,8 +476,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer 1
-                                                , Builtin Builtin.Plus
+                                                [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     ]
@@ -524,7 +513,6 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">True"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [] [ Type.Custom "True" ]
@@ -534,7 +522,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">False"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [] [ Type.Custom "False" ]
@@ -544,7 +531,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">Box"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Int ] [ Type.Custom "Box" ]
@@ -554,7 +540,6 @@ suite =
                                                 ]
                                       }
                                     , { name = ">value"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Int, Type.Custom "Box" ] [ Type.Custom "Box" ]
@@ -564,7 +549,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "<value"
-                                      , sourceLocation = Nothing
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Custom "Box" ] [ Type.Int ]
@@ -574,7 +558,6 @@ suite =
                                                 ]
                                       }
                                     , { name = "zero?"
-                                      , sourceLocation = Nothing
                                       , metadata = Metadata.default
                                       , implementation =
                                             AST.MultiImpl
@@ -591,13 +574,15 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Bool"
+                                        emptyRange
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , CustomTypeDef "True" [] []
-                                    , CustomTypeDef "False" [] []
+                                    , CustomTypeDef "True" emptyRange [] []
+                                    , CustomTypeDef "False" emptyRange [] []
                                     , CustomTypeDef "Box"
+                                        emptyRange
                                         []
                                         [ ( "value", Type.Int ) ]
                                     ]
@@ -652,9 +637,9 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word ">True" ] )
+                                                [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word emptyRange ">True" ] )
                                                 ]
-                                                [ Word ">False" ]
+                                                [ Word emptyRange ">False" ]
                                       }
                                     ]
                             }
@@ -694,7 +679,6 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = ">True"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
@@ -704,7 +688,6 @@ suite =
                                             ]
                                   }
                                 , { name = ">False"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
@@ -714,7 +697,6 @@ suite =
                                             ]
                                   }
                                 , { name = ">Box"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [ Type.Custom "Bool" ] [ Type.Custom "Box" ]
@@ -724,7 +706,6 @@ suite =
                                             ]
                                   }
                                 , { name = ">value"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
@@ -736,7 +717,6 @@ suite =
                                             ]
                                   }
                                 , { name = "<value"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
@@ -746,7 +726,6 @@ suite =
                                             ]
                                   }
                                 , { name = "true?"
-                                  , sourceLocation = Nothing
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
@@ -767,13 +746,15 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" [] []
-                                , CustomTypeDef "False" [] []
+                                , CustomTypeDef "True" emptyRange [] []
+                                , CustomTypeDef "False" emptyRange [] []
                                 , CustomTypeDef "Box"
+                                    emptyRange
                                     []
                                     [ ( "value", boolUnion ) ]
                                 ]
@@ -830,12 +811,13 @@ suite =
                                             |> Metadata.withType [ Type.Custom "Box" ] [ boolUnion ]
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatch (Type.Custom "Box")
+                                            [ ( TypeMatch emptyRange
+                                                    (Type.Custom "Box")
                                                     [ ( "value", LiteralType (Type.Custom "True") ) ]
-                                              , [ Word ">True" ]
+                                              , [ Word emptyRange ">True" ]
                                               )
                                             ]
-                                            [ Word ">False" ]
+                                            [ Word emptyRange ">False" ]
                                   }
                                 ]
                         }

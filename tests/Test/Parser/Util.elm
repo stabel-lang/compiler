@@ -6,6 +6,7 @@ module Test.Parser.Util exposing
 import Dict
 import Dict.Extra as Dict
 import Parser.Advanced as ElmParser
+import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Parser as AST exposing (..)
 import String.Extra as String
@@ -43,8 +44,8 @@ stripTypeLocation typeDef =
 stripWordLocation : WordDefinition -> WordDefinition
 stripWordLocation word =
     { word
-        | sourceLocation = Nothing
-        , implementation = stripImplementationLocation word.implementation
+        | implementation = stripImplementationLocation word.implementation
+        , metadata = Metadata.clearSourceLocationRange word.metadata
     }
 
 

@@ -45,3 +45,8 @@ isQuoted meta =
 withSourceLocationRange : SourceLocationRange -> Metadata -> Metadata
 withSourceLocationRange range meta =
     { meta | sourceLocationRange = Just range }
+
+
+clearSourceLocationRange : Metadata -> Metadata
+clearSourceLocationRange meta =
+    { meta | sourceLocationRange = Nothing }
