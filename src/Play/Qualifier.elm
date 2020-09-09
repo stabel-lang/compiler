@@ -54,6 +54,14 @@ type Node
     | Builtin SourceLocationRange Builtin
 
 
+type Problem
+    = UnknownWordRef SourceLocationRange String
+    | UnknownTypeRef SourceLocationRange String
+    | UnionTypeMatchWithPatterns SourceLocationRange
+    | InvalidTypeMatch SourceLocationRange
+    | NoSuchMemberOnType String String
+
+
 builtinDict : Dict String Builtin
 builtinDict =
     Dict.fromList
@@ -71,8 +79,8 @@ builtinDict =
         ]
 
 
-qualify : Parser.AST -> Result () AST
-qualify ast =
+run : Parser.AST -> Result (List Problem) AST
+run ast =
     let
         ( typeErrors, qualifiedTypes ) =
             Dict.foldl (\_ val acc -> qualifyType ast val acc) ( [], Dict.empty ) ast.types
@@ -89,7 +97,7 @@ qualify ast =
                 }
 
         _ ->
-            Err ()
+            Err <| typeErrors ++ wordErrors
 
 
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
@@ -146,8 +154,8 @@ resolveUnion typeDefs type_ =
 qualifyType :
     Parser.AST
     -> Parser.TypeDefinition
-    -> ( List (), Dict String TypeDefinition )
-    -> ( List (), Dict String TypeDefinition )
+    -> ( List Problem, Dict String TypeDefinition )
+    -> ( List Problem, Dict String TypeDefinition )
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
@@ -163,8 +171,8 @@ qualifyDefinition :
     Parser.AST
     -> Dict String TypeDefinition
     -> Parser.WordDefinition
-    -> ( List (), Dict String WordDefinition )
-    -> ( List (), Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
 qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
     let
         ( whens, impl ) =
@@ -176,8 +184,7 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                     ( whenImpl, defImpl )
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
-            whens
-                |> List.foldr (qualifyWhen ast qualifiedTypes unqualifiedWord.name) ( acc, [] )
+            List.foldr (qualifyWhen ast qualifiedTypes unqualifiedWord.name) ( acc, [] ) whens
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
@@ -206,8 +213,13 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                 newWordsAfterImpl
             )
 
-        _ ->
-            ( () :: errors
+        ( Err whenError, _ ) ->
+            ( whenError :: errors
+            , newWordsAfterImpl
+            )
+
+        ( _, Err implError ) ->
+            ( implError :: errors
             , newWordsAfterImpl
             )
 
@@ -224,8 +236,8 @@ qualifyWhen :
     -> Dict String TypeDefinition
     -> String
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
 qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
@@ -235,14 +247,14 @@ qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, re
             qualifyMatch qualifiedTypes typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
-        ( Err (), _ ) ->
+        ( Err err, _ ) ->
             ( newWords
-            , Err () :: result
+            , Err err :: result
             )
 
-        ( _, Err () ) ->
+        ( _, Err err ) ->
             ( newWords
-            , Err () :: result
+            , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
@@ -251,7 +263,7 @@ qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, re
             )
 
 
-qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result () TypeMatch
+qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
 qualifyMatch qualifiedTypes typeMatch =
     case typeMatch of
         Parser.TypeMatch range Type.Int [] ->
@@ -271,7 +283,7 @@ qualifyMatch qualifiedTypes typeMatch =
 
                         qualifiedPatternsResult =
                             patterns
-                                |> List.map (qualifyMatchValue qualifiedTypes memberNames)
+                                |> List.map (qualifyMatchValue qualifiedTypes name memberNames)
                                 |> Result.combine
 
                         actualType =
@@ -286,29 +298,30 @@ qualifyMatch qualifiedTypes typeMatch =
                         Ok qualifiedPatterns ->
                             Ok <| TypeMatch range actualType qualifiedPatterns
 
-                        Err () ->
-                            Err ()
+                        Err err ->
+                            Err err
 
                 Just (UnionTypeDef _ _ _ types) ->
                     if List.isEmpty patterns then
                         Ok <| TypeMatch range (Type.Union types) []
 
                     else
-                        Err ()
+                        Err <| UnionTypeMatchWithPatterns range
 
                 Nothing ->
-                    Err ()
+                    Err <| UnknownTypeRef range name
 
-        _ ->
-            Err ()
+        Parser.TypeMatch range _ _ ->
+            Err <| InvalidTypeMatch range
 
 
 qualifyMatchValue :
     Dict String TypeDefinition
+    -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
-    -> Result () ( String, TypeMatchValue )
-qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
+    -> Result Problem ( String, TypeMatchValue )
+qualifyMatchValue qualifiedTypes typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
@@ -319,14 +332,14 @@ qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
 
             Parser.RecursiveMatch typeMatch ->
                 case qualifyMatch qualifiedTypes typeMatch of
-                    Err () ->
-                        Err ()
+                    Err err ->
+                        Err err
 
                     Ok match ->
                         Ok <| ( fieldName, RecursiveMatch match )
 
     else
-        Err ()
+        Err <| NoSuchMemberOnType typeName fieldName
 
 
 initQualifyNode :
@@ -334,7 +347,7 @@ initQualifyNode :
     -> Parser.AST
     -> Dict String WordDefinition
     -> List Parser.AstNode
-    -> ( Dict String WordDefinition, Result () (List Node) )
+    -> ( Dict String WordDefinition, Result Problem (List Node) )
 initQualifyNode currentDefName ast qualifiedWords impl =
     List.foldr (qualifyNode ast currentDefName) ( 1, qualifiedWords, [] ) impl
         |> (\( _, newQualifiedWords, errors ) -> ( newQualifiedWords, Result.combine errors ))
@@ -344,8 +357,8 @@ qualifyNode :
     Parser.AST
     -> String
     -> Parser.AstNode
-    -> ( Int, Dict String WordDefinition, List (Result () Node) )
-    -> ( Int, Dict String WordDefinition, List (Result () Node) )
+    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
+    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
 qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifiedNodes ) =
     case node of
         Parser.Integer loc value ->
@@ -372,7 +385,7 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                     Nothing ->
                         ( availableQuoteId
                         , qualifiedWords
-                        , Err () :: qualifiedNodes
+                        , Err (UnknownWordRef loc value) :: qualifiedNodes
                         )
 
         Parser.ConstructType typeName ->
@@ -428,10 +441,10 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                     , Ok (WordRef sourceLocation quoteName) :: qualifiedNodes
                     )
 
-                Err () ->
+                Err err ->
                     ( availableQuoteId
                     , qualifiedWords
-                    , Err () :: qualifiedNodes
+                    , Err err :: qualifiedNodes
                     )
 
 

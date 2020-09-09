@@ -55,10 +55,14 @@ compile sourceCode =
             Err <| Debug.toString parserError
 
         Ok ast ->
-            Qualifier.qualify ast
-                |> Result.andThen TypeChecker.typeCheck
-                |> Result.andThen Codegen.codegen
-                |> Result.mapError Debug.toString
+            case Qualifier.run ast of
+                Err qualifierErrors ->
+                    Err <| Debug.toString qualifierErrors
+
+                Ok qualifiedAst ->
+                    TypeChecker.typeCheck qualifiedAst
+                        |> Result.andThen Codegen.codegen
+                        |> Result.mapError Debug.toString
 
 
 subscriptions : Model -> Sub Msg

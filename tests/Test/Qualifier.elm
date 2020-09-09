@@ -92,8 +92,8 @@ suite =
                                 ]
                         }
                 in
-                case qualify unqualifiedAst of
-                    Err () ->
+                case run unqualifiedAst of
+                    Err _ ->
                         Expect.fail "Did not expect qualification to fail"
 
                     Ok qualifiedAst ->
@@ -144,8 +144,8 @@ suite =
                                 ]
                         }
                 in
-                case qualify unqualifiedAst of
-                    Err () ->
+                case run unqualifiedAst of
+                    Err _ ->
                         Expect.fail "Did not expect qualification to fail"
 
                     Ok qualifiedAst ->
@@ -241,8 +241,8 @@ suite =
                                 ]
                         }
                 in
-                case qualify unqualifiedAst of
-                    Err () ->
+                case run unqualifiedAst of
+                    Err _ ->
                         Expect.fail "Did not expect qualification to fail"
 
                     Ok qualifiedAst ->
@@ -343,8 +343,8 @@ suite =
                                     ]
                             }
                     in
-                    case qualify unqualifiedAst of
-                        Err () ->
+                    case run unqualifiedAst of
+                        Err _ ->
                             Expect.fail "Did not expect qualification to fail"
 
                         Ok qualifiedAst ->
@@ -408,8 +408,8 @@ suite =
                                     ]
                             }
                     in
-                    case qualify unqualifiedAst of
-                        Err () ->
+                    case run unqualifiedAst of
+                        Err _ ->
                             Expect.fail "Did not expect qualification to fail"
 
                         Ok qualifiedAst ->
@@ -483,8 +483,8 @@ suite =
                                     ]
                             }
                     in
-                    case qualify unqualifiedAst of
-                        Err () ->
+                    case run unqualifiedAst of
+                        Err _ ->
                             Expect.fail "Did not expect qualification to fail"
 
                         Ok qualifiedAst ->
@@ -644,8 +644,8 @@ suite =
                                     ]
                             }
                     in
-                    case qualify unqualifiedAst of
-                        Err () ->
+                    case run unqualifiedAst of
+                        Err _ ->
                             Expect.fail "Did not expect qualification to fail"
 
                         Ok qualifiedAst ->
@@ -822,8 +822,8 @@ suite =
                                 ]
                         }
                 in
-                case qualify unqualifiedAst of
-                    Err () ->
+                case run unqualifiedAst of
+                    Err _ ->
                         Expect.fail "Did not expect qualification to fail"
 
                     Ok qualifiedAst ->
