@@ -700,10 +700,10 @@ typeCheckNode idx node context =
                                     Just def ->
                                         addStackEffect newContext <| wordTypeToStackEffects def.type_
 
-        (Qualifier.WordRef _ ref) as wordRef ->
+        Qualifier.WordRef loc ref ->
             let
                 contextAfterWordCheck =
-                    typeCheckNode idx wordRef context
+                    typeCheckNode idx (Qualifier.Word loc ref) context
             in
             case Dict.get ref contextAfterWordCheck.typedWords of
                 Just def ->
