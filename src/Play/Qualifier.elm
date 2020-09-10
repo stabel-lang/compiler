@@ -3,7 +3,7 @@ module Play.Qualifier exposing (..)
 import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.SourceLocation exposing (SourceLocationRange)
+import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
@@ -190,19 +190,15 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
             initQualifyNode unqualifiedWord.name ast newWordsAfterWhens impl
 
-        unqualifiedMetadata =
-            unqualifiedWord.metadata
+        qualifiedMetadataResult =
+            qualifyMetadata qualifiedTypes unqualifiedWord.metadata
     in
-    case ( qualifiedWhensResult, qualifiedImplementationResult ) of
-        ( Ok qualifiedWhens, Ok qualifiedImplementation ) ->
+    case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
+        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
-                , metadata =
-                    { unqualifiedMetadata
-                        | type_ =
-                            TypeSignature.map (resolveUnions qualifiedTypes) unqualifiedMetadata.type_
-                    }
+                , metadata = qualifiedMetadata
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -213,15 +209,67 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                 newWordsAfterImpl
             )
 
-        ( Err whenError, _ ) ->
+        ( Err whenError, _, _ ) ->
             ( whenError :: errors
             , newWordsAfterImpl
             )
 
-        ( _, Err implError ) ->
+        ( _, Err implError, _ ) ->
             ( implError :: errors
             , newWordsAfterImpl
             )
+
+        ( _, _, Err metaError ) ->
+            ( metaError :: errors
+            , newWordsAfterImpl
+            )
+
+
+qualifyMetadata : Dict String TypeDefinition -> Metadata -> Result Problem Metadata
+qualifyMetadata qualifiedTypes meta =
+    let
+        wordRange =
+            Maybe.withDefault SourceLocation.emptyRange meta.sourceLocationRange
+
+        typeRefErrors =
+            TypeSignature.toMaybe meta.type_
+                |> Maybe.map (\ts -> ts.input ++ ts.output)
+                |> Maybe.withDefault []
+                |> List.filterMap (validateTypeReferences qualifiedTypes wordRange)
+    in
+    case List.head typeRefErrors of
+        Just err ->
+            Err err
+
+        Nothing ->
+            Ok
+                { meta
+                    | type_ =
+                        TypeSignature.map (resolveUnions qualifiedTypes) meta.type_
+                }
+
+
+validateTypeReferences : Dict String TypeDefinition -> SourceLocationRange -> Type -> Maybe Problem
+validateTypeReferences typeDefs wordRange type_ =
+    case type_ of
+        Type.Custom typeName ->
+            case Dict.get typeName typeDefs of
+                Just _ ->
+                    Nothing
+
+                Nothing ->
+                    Just <| UnknownTypeRef wordRange typeName
+
+        Type.CustomGeneric typeName types ->
+            case Dict.get typeName typeDefs of
+                Just _ ->
+                    Nothing
+
+                Nothing ->
+                    Just <| UnknownTypeRef wordRange typeName
+
+        _ ->
+            Nothing
 
 
 resolveUnions : Dict String TypeDefinition -> WordType -> WordType
