@@ -1,7 +1,6 @@
 module Test.Parser.Error exposing (..)
 
 import Expect exposing (Expectation)
-import Parser.Advanced as ElmParser
 import Play.Parser exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (compile)
@@ -12,8 +11,8 @@ suite =
     describe "Parser errors"
         [ describe "Double definitions" <|
             let
-                wordAlreadyDefined name deadend =
-                    case deadend.problem of
+                wordAlreadyDefined name problem =
+                    case problem of
                         WordAlreadyDefined definedName _ _ ->
                             name == definedName
 
@@ -54,8 +53,8 @@ suite =
                             : Person
                             """
 
-                        typeAlreadyDefined name deadend =
-                            case deadend.problem of
+                        typeAlreadyDefined name problem =
+                            case problem of
                                 TypeAlreadyDefined definedName _ _ ->
                                     name == definedName
 
@@ -66,8 +65,8 @@ suite =
             ]
         , describe "Unknown metadata" <|
             let
-                expectedError name deadend =
-                    case deadend.problem of
+                expectedError name problem =
+                    case problem of
                         UnknownMetadata metaName ->
                             metaName == name
 
@@ -113,7 +112,7 @@ suite =
         ]
 
 
-checkForError : (ElmParser.DeadEnd () Problem -> Bool) -> String -> Expectation
+checkForError : (Problem -> Bool) -> String -> Expectation
 checkForError fn source =
     case compile source of
         Err errors ->

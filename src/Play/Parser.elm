@@ -15,7 +15,7 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocation, SourceLocationRange)
+import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Set exposing (Set)
@@ -86,9 +86,10 @@ type AstNode
     | SetMember String String
 
 
-run : String -> Result (List (Parser.DeadEnd () Problem)) AST
+run : String -> Result (List Problem) AST
 run sourceCode =
     Parser.run parser sourceCode
+        |> Result.mapError (List.map .problem)
 
 
 
