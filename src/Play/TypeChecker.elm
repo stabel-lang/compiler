@@ -151,9 +151,7 @@ typeCheckHelper : Context -> Qualifier.AST -> Result () AST
 typeCheckHelper context ast =
     let
         updatedContext =
-            ast.words
-                |> Dict.values
-                |> List.foldl typeCheckDefinition context
+            Dict.foldl (\_ v acc -> typeCheckDefinition v acc) context ast.words
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
@@ -408,7 +406,7 @@ verifyTypeSignature inferredType untypedDef context =
                 ( _, simplifiedAnnotatedType ) =
                     simplifyWordType untypedDef.name ( context, annotatedType )
             in
-            if not <| compatibleWordTypes simplifiedAnnotatedType inferredType context then
+            if not <| compatibleWordTypes simplifiedAnnotatedType inferredType then
                 { context | errors = () :: context.errors }
 
             else
@@ -418,8 +416,8 @@ verifyTypeSignature inferredType untypedDef context =
             context
 
 
-compatibleWordTypes : WordType -> WordType -> Context -> Bool
-compatibleWordTypes annotated inferred context =
+compatibleWordTypes : WordType -> WordType -> Bool
+compatibleWordTypes annotated inferred =
     let
         ( inputRangeDict, inputsCompatible ) =
             compareType_ annotated.input inferred.input Dict.empty
@@ -1207,12 +1205,7 @@ untypedToTypedNode context untypedNode =
             WordRef ref
 
         Qualifier.ConstructType typeName ->
-            case Dict.get typeName context.types of
-                Just _ ->
-                    ConstructType typeName
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
+            ConstructType typeName
 
         Qualifier.SetMember typeName memberName ->
             case getMemberType context.types typeName memberName of
