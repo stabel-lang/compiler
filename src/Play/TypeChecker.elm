@@ -101,7 +101,7 @@ initContext ast =
                             ( Set.fromList generics, mts )
 
                 usedGenerics =
-                    List.map referencedGenerics memberTypes
+                    List.map Type.referencedGenerics memberTypes
                         |> List.foldl Set.union Set.empty
                         |> Set.toList
             in
@@ -120,26 +120,6 @@ initContext ast =
     , callStack = Set.empty
     , errors = List.filterMap genericErrors (Dict.values concreteTypes)
     }
-
-
-referencedGenerics : Type -> Set String
-referencedGenerics t =
-    case t of
-        Type.Generic val ->
-            Set.singleton val
-
-        Type.CustomGeneric _ members ->
-            members
-                |> List.map referencedGenerics
-                |> List.foldl Set.union Set.empty
-
-        Type.Union members ->
-            members
-                |> List.map referencedGenerics
-                |> List.foldl Set.union Set.empty
-
-        _ ->
-            Set.empty
 
 
 typeCheck : Qualifier.AST -> Result () AST
@@ -165,14 +145,6 @@ typeCheckHelper context ast =
 
 typeCheckDefinition : Qualifier.WordDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
-    let
-        cleanContext ctx =
-            { ctx
-                | stackEffects = []
-                , boundGenerics = Dict.empty
-                , boundStackRanges = Dict.empty
-            }
-    in
     case Dict.get untypedDef.name context.typedWords of
         Just _ ->
             cleanContext context
@@ -378,6 +350,15 @@ typeCheckDefinition untypedDef context =
                         |> cleanContext
 
 
+cleanContext : Context -> Context
+cleanContext ctx =
+    { ctx
+        | stackEffects = []
+        , boundGenerics = Dict.empty
+        , boundStackRanges = Dict.empty
+    }
+
+
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
 typeCheckImplementation untypedDef impl context =
     let
@@ -459,7 +440,7 @@ compareType_ lhs rhs rangeDict =
                     rangeDict
 
         ( lhsEl :: lhsRest, (Type.StackRange rangeName) :: rhsNext :: rhsRest ) ->
-            if sameBaseType lhsEl rhsNext then
+            if Type.sameCategory lhsEl rhsNext then
                 compareType_ lhs (rhsNext :: rhsRest) rangeDict
 
             else
@@ -536,10 +517,10 @@ compareType_ lhs rhs rangeDict =
         ( (Type.Union lMembers) :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
             let
                 lSet =
-                    Set.fromList (List.map typeAsStr lMembers)
+                    Set.fromList (List.map Type.toString lMembers)
 
                 rSet =
-                    Set.fromList (List.map typeAsStr rMembers)
+                    Set.fromList (List.map Type.toString rMembers)
 
                 diff =
                     Set.diff rSet lSet
@@ -568,9 +549,9 @@ compareType_ lhs rhs rangeDict =
             let
                 compatible =
                     rMembers
-                        |> List.map typeAsStr
+                        |> List.map Type.toString
                         |> Set.fromList
-                        |> Set.member (typeAsStr lhsEl)
+                        |> Set.member (Type.toString lhsEl)
             in
             if compatible then
                 compareType_ lhsRest rhsRest rangeDict
@@ -589,75 +570,11 @@ compareType_ lhs rhs rangeDict =
             ( rangeDict, False )
 
 
-sameBaseType : Type -> Type -> Bool
-sameBaseType lhs rhs =
-    if lhs == rhs then
-        True
-
-    else
-        case ( lhs, rhs ) of
-            ( Type.Quotation _, Type.Quotation _ ) ->
-                True
-
-            ( Type.Union _, Type.Union _ ) ->
-                True
-
-            _ ->
-                False
-
-
-typeAsStr : Type -> String
-typeAsStr t =
-    case t of
-        Type.Int ->
-            "Int"
-
-        Type.Generic name ->
-            name ++ "_Generic"
-
-        Type.Custom name ->
-            name ++ "_Custom"
-
-        Type.CustomGeneric name _ ->
-            name ++ "_Custom"
-
-        Type.Union _ ->
-            "Union"
-
-        Type.Quotation _ ->
-            "quot"
-
-        Type.StackRange name ->
-            name ++ "..."
-
-
 typeCheckNode : Int -> Qualifier.Node -> Context -> Context
 typeCheckNode idx node context =
     let
         addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ List.map tagGenericEffect effects }
-
-        tagGenericEffect effect =
-            case effect of
-                Push type_ ->
-                    Push <| tagGeneric type_
-
-                Pop type_ ->
-                    Pop <| tagGeneric type_
-
-        tagGeneric type_ =
-            case type_ of
-                Type.Generic genName ->
-                    Type.Generic (genName ++ String.fromInt idx)
-
-                Type.CustomGeneric name generics ->
-                    Type.CustomGeneric name (List.map tagGeneric generics)
-
-                Type.Union members ->
-                    Type.Union (List.map tagGeneric members)
-
-                _ ->
-                    type_
+            { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
     in
     case node of
         Qualifier.Integer _ _ ->
@@ -719,7 +636,7 @@ typeCheckNode idx node context =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -750,7 +667,7 @@ typeCheckNode idx node context =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -781,7 +698,7 @@ typeCheckNode idx node context =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -802,6 +719,32 @@ typeCheckNode idx node context =
 
         Qualifier.Builtin _ builtin ->
             addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
+
+
+tagGenericEffect : Int -> StackEffect -> StackEffect
+tagGenericEffect idx effect =
+    case effect of
+        Push type_ ->
+            Push <| tagGeneric idx type_
+
+        Pop type_ ->
+            Pop <| tagGeneric idx type_
+
+
+tagGeneric : Int -> Type -> Type
+tagGeneric idx type_ =
+    case type_ of
+        Type.Generic genName ->
+            Type.Generic (genName ++ String.fromInt idx)
+
+        Type.CustomGeneric name generics ->
+            Type.CustomGeneric name (List.map (tagGeneric idx) generics)
+
+        Type.Union members ->
+            Type.Union (List.map (tagGeneric idx) members)
+
+        _ ->
+            type_
 
 
 wordTypeToStackEffects : WordType -> List StackEffect
@@ -1075,7 +1018,7 @@ simplifyWordType defName ( context, wordType ) =
 
         aliases =
             oldSignature
-                |> List.filterMap genericName
+                |> List.filterMap Type.genericName
                 -- remove duplicates
                 |> (Set.fromList >> Set.toList)
                 |> List.map (findAliases context)
@@ -1133,16 +1076,6 @@ simplifyWordType defName ( context, wordType ) =
       , output = List.drop inputLength newSignature
       }
     )
-
-
-genericName : Type -> Maybe String
-genericName type_ =
-    case type_ of
-        Type.Generic name ->
-            Just name
-
-        _ ->
-            Nothing
 
 
 findAliases : Context -> String -> ( String, List String )
@@ -1246,13 +1179,3 @@ typeDefName typeDef =
 
         UnionTypeDef name _ _ ->
             name
-
-
-isGeneric : Type -> Bool
-isGeneric t =
-    case t of
-        Type.Generic _ ->
-            True
-
-        _ ->
-            False
