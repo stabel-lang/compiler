@@ -1,5 +1,6 @@
 module Play.Data.Type exposing (..)
 
+import Dict exposing (Dict)
 import Set exposing (Set)
 
 
@@ -95,3 +96,176 @@ toString t =
 
         StackRange name ->
             name ++ "..."
+
+
+compatibleWords : WordType -> WordType -> Bool
+compatibleWords annotated inferred =
+    let
+        ( inputRangeDict, inputsCompatible ) =
+            compare annotated.input inferred.input Dict.empty
+
+        ( _, outputsCompatible ) =
+            compare annotated.output inferred.output inputRangeDict
+    in
+    inputsCompatible && outputsCompatible
+
+
+compare : List Type -> List Type -> Dict String (List Type) -> ( Dict String (List Type), Bool )
+compare lhs rhs rangeDict =
+    case ( lhs, rhs ) of
+        ( [], [] ) ->
+            ( rangeDict, True )
+
+        ( (StackRange lhsName) :: lhsRest, (StackRange rhsName) :: rhsRest ) ->
+            if lhsName == rhsName then
+                compare lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        ( (StackRange _) :: [], [] ) ->
+            ( rangeDict, True )
+
+        ( [], (StackRange _) :: [] ) ->
+            ( rangeDict, True )
+
+        ( lhsEl :: lhsRest, (StackRange rangeName) :: [] ) ->
+            compare lhsRest rhs <|
+                Dict.update rangeName
+                    (\maybeVal ->
+                        maybeVal
+                            |> Maybe.withDefault []
+                            |> (\existing -> existing ++ [ lhsEl ])
+                            |> Just
+                    )
+                    rangeDict
+
+        ( lhsEl :: lhsRest, (StackRange rangeName) :: rhsNext :: rhsRest ) ->
+            if sameCategory lhsEl rhsNext then
+                compare lhs (rhsNext :: rhsRest) rangeDict
+
+            else
+                compare lhsRest rhs <|
+                    Dict.update rangeName
+                        (\maybeVal ->
+                            maybeVal
+                                |> Maybe.withDefault []
+                                |> (\existing -> existing ++ [ lhsEl ])
+                                |> Just
+                        )
+                        rangeDict
+
+        ( (Quotation lhsQuotType) :: lhsRest, (Quotation rhsQuotType) :: rhsRest ) ->
+            let
+                lhsInputRangeApplied =
+                    applyRangeDict rangeDict lhsQuotType.input
+
+                lhsOutputRangeApplied =
+                    applyRangeDict rangeDict lhsQuotType.output
+
+                rhsInputRangeApplied =
+                    applyRangeDict rangeDict rhsQuotType.input
+
+                rhsOutputRangeApplied =
+                    applyRangeDict rangeDict rhsQuotType.output
+
+                applyRangeDict rd types =
+                    List.concatMap
+                        (\type_ ->
+                            case type_ of
+                                StackRange rangeName ->
+                                    case Dict.get rangeName rd of
+                                        Just subst ->
+                                            subst
+
+                                        Nothing ->
+                                            [ type_ ]
+
+                                other ->
+                                    [ other ]
+                        )
+                        types
+
+                ( dictRangePostInputs, inputCompatible ) =
+                    compare lhsInputRangeApplied rhsInputRangeApplied rangeDict
+
+                ( dictRangePostOutputs, outputCompatible ) =
+                    compare lhsOutputRangeApplied rhsOutputRangeApplied dictRangePostInputs
+            in
+            if inputCompatible && outputCompatible then
+                compare lhsRest rhsRest dictRangePostOutputs
+
+            else
+                ( dictRangePostOutputs, False )
+
+        ( (Generic _) :: lhsRest, _ :: rhsRest ) ->
+            compare lhsRest rhsRest rangeDict
+
+        ( _ :: lhsRest, (Generic _) :: rhsRest ) ->
+            compare lhsRest rhsRest rangeDict
+
+        ( (CustomGeneric lName lMembers) :: lhsRest, (CustomGeneric rName rMembers) :: rhsRest ) ->
+            let
+                ( _, compatibleMembers ) =
+                    compare lMembers rMembers Dict.empty
+            in
+            if lName == rName && compatibleMembers then
+                compare lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        ( (Union lMembers) :: lhsRest, (Union rMembers) :: rhsRest ) ->
+            let
+                lSet =
+                    Set.fromList (List.map toString lMembers)
+
+                rSet =
+                    Set.fromList (List.map toString rMembers)
+
+                diff =
+                    Set.diff rSet lSet
+                        |> Set.toList
+            in
+            case diff of
+                [] ->
+                    compare lhsRest rhsRest rangeDict
+
+                [ oneDiff ] ->
+                    -- Likely the default case
+                    if String.endsWith "_Generic" oneDiff then
+                        compare lhsRest rhsRest rangeDict
+
+                    else
+                        ( rangeDict, False )
+
+                _ ->
+                    ( rangeDict, False )
+
+        ( (Union _) :: _, _ ) ->
+            -- Cannot go from union to concrete type
+            ( rangeDict, False )
+
+        ( lhsEl :: lhsRest, (Union rMembers) :: rhsRest ) ->
+            let
+                compatible =
+                    rMembers
+                        |> List.map toString
+                        |> Set.fromList
+                        |> Set.member (toString lhsEl)
+            in
+            if compatible then
+                compare lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        ( lhsEl :: lhsRest, rhsEl :: rhsRest ) ->
+            if lhsEl == rhsEl then
+                compare lhsRest rhsRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        _ ->
+            ( rangeDict, False )
