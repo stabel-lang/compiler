@@ -152,202 +152,10 @@ typeCheckDefinition untypedDef context =
         Nothing ->
             case untypedDef.implementation of
                 Qualifier.SoloImpl impl ->
-                    let
-                        ( inferredType, newContext ) =
-                            typeCheckImplementation untypedDef impl (cleanContext context)
-
-                        finalContext =
-                            { newContext
-                                | typedWords =
-                                    Dict.insert untypedDef.name
-                                        { name = untypedDef.name
-                                        , type_ =
-                                            untypedDef.metadata.type_
-                                                |> TypeSignature.toMaybe
-                                                |> Maybe.withDefault inferredType
-                                        , metadata = untypedDef.metadata
-                                        , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
-                                        }
-                                        newContext.typedWords
-                            }
-                    in
-                    verifyTypeSignature inferredType untypedDef finalContext
-                        |> cleanContext
+                    typeCheckSoloImplementation context untypedDef impl
 
                 Qualifier.MultiImpl initialWhens defaultImpl ->
-                    let
-                        whens =
-                            case defaultImpl of
-                                [] ->
-                                    initialWhens
-
-                                _ ->
-                                    let
-                                        ( inferredDefaultType, _ ) =
-                                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
-                                    in
-                                    case inferredDefaultType.input of
-                                        [] ->
-                                            Debug.todo "Default impl doesn't have an input argument"
-
-                                        firstType :: _ ->
-                                            ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
-
-                        inferWhenTypes ( _, im ) ( infs, ctx ) =
-                            let
-                                ( inf, newCtx ) =
-                                    typeCheckImplementation untypedDef im (cleanContext ctx)
-                            in
-                            ( inf :: infs, newCtx )
-
-                        ( inferredWhenTypes, newContext ) =
-                            List.foldr inferWhenTypes ( [], context ) whens
-
-                        whensAreConsistent =
-                            inferredWhenTypes
-                                |> List.map2 Tuple.pair (List.map Tuple.first whens)
-                                |> List.map typeCheckWhen
-                                |> List.all (\( b, _, _ ) -> b)
-
-                        whensAreCompatible =
-                            inferredWhenTypes
-                                |> List.map stripFirstInput
-                                |> List.map countOutput
-                                |> areAllEqual
-
-                        typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
-                            case inf.input of
-                                firstInput :: _ ->
-                                    ( typeCompatible firstInput forType
-                                    , forType
-                                    , inf
-                                    )
-
-                                [] ->
-                                    ( False, forType, inf )
-
-                        typeCompatible lhs rhs =
-                            case ( lhs, rhs ) of
-                                ( Type.Generic _, _ ) ->
-                                    True
-
-                                ( _, Type.Generic _ ) ->
-                                    True
-
-                                ( Type.CustomGeneric lName _, Type.CustomGeneric rName _ ) ->
-                                    lName == rName
-
-                                _ ->
-                                    lhs == rhs
-
-                        stripFirstInput inf =
-                            case inf.input of
-                                _ :: rem ->
-                                    { inf | input = rem }
-
-                                _ ->
-                                    inf
-
-                        countOutput wordType =
-                            ( wordType.input, List.length wordType.output )
-
-                        areAllEqual ls =
-                            case ls of
-                                [] ->
-                                    True
-
-                                ( fTypes, fCnt ) :: rest ->
-                                    List.all
-                                        (\( nTypes, nCnt ) ->
-                                            (fCnt == nCnt)
-                                                && compatibleTypeList fTypes nTypes
-                                        )
-                                        rest
-
-                        compatibleTypeList aLs bLs =
-                            List.map2 Tuple.pair aLs bLs
-                                |> List.all (\( l, r ) -> typeCompatible l r)
-
-                        inferredType =
-                            List.head inferredWhenTypes
-                                |> Maybe.withDefault { input = [], output = [] }
-                                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractType) whens))
-                                |> joinOutputs (List.map .output inferredWhenTypes)
-
-                        replaceFirstType with inf =
-                            case inf.input of
-                                _ :: rem ->
-                                    { inf | input = with :: rem }
-
-                                _ ->
-                                    inf
-
-                        joinOutputs outputs result =
-                            case outputs of
-                                first :: second :: rest ->
-                                    let
-                                        joined =
-                                            List.map2 unionize first second
-
-                                        unionize lhs rhs =
-                                            case ( lhs, rhs ) of
-                                                _ ->
-                                                    if lhs == rhs then
-                                                        lhs
-
-                                                    else
-                                                        Type.Union [ lhs, rhs ]
-                                    in
-                                    joinOutputs (joined :: rest) result
-
-                                joined :: [] ->
-                                    { result | output = joined }
-
-                                _ ->
-                                    result
-
-                        extractType (Qualifier.TypeMatch _ t_ _) =
-                            t_
-
-                        mapTypeMatch (Qualifier.TypeMatch _ type_ cond) =
-                            TypeMatch type_ (List.map mapTypeMatchValue cond)
-
-                        mapTypeMatchValue ( fieldName, value ) =
-                            case value of
-                                Qualifier.LiteralInt val ->
-                                    ( fieldName, LiteralInt val )
-
-                                Qualifier.LiteralType val ->
-                                    ( fieldName, LiteralType val )
-
-                                Qualifier.RecursiveMatch val ->
-                                    ( fieldName, RecursiveMatch (mapTypeMatch val) )
-
-                        finalContext =
-                            { newContext
-                                | typedWords =
-                                    Dict.insert untypedDef.name
-                                        { name = untypedDef.name
-                                        , type_ =
-                                            TypeSignature.toMaybe untypedDef.metadata.type_
-                                                |> Maybe.withDefault inferredType
-                                        , metadata = untypedDef.metadata
-                                        , implementation =
-                                            MultiImpl
-                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
-                                                (List.map (untypedToTypedNode newContext) defaultImpl)
-                                        }
-                                        newContext.typedWords
-                                , errors =
-                                    if whensAreConsistent && whensAreCompatible then
-                                        newContext.errors
-
-                                    else
-                                        () :: newContext.errors
-                            }
-                    in
-                    verifyTypeSignature inferredType untypedDef finalContext
-                        |> cleanContext
+                    typeCheckMultiImplementation context untypedDef initialWhens defaultImpl
 
 
 cleanContext : Context -> Context
@@ -357,6 +165,172 @@ cleanContext ctx =
         , boundGenerics = Dict.empty
         , boundStackRanges = Dict.empty
     }
+
+
+typeCheckSoloImplementation : Context -> Qualifier.WordDefinition -> List Qualifier.Node -> Context
+typeCheckSoloImplementation context untypedDef impl =
+    let
+        ( inferredType, newContext ) =
+            typeCheckImplementation untypedDef impl (cleanContext context)
+
+        finalContext =
+            { newContext
+                | typedWords =
+                    Dict.insert untypedDef.name
+                        { name = untypedDef.name
+                        , type_ =
+                            untypedDef.metadata.type_
+                                |> TypeSignature.toMaybe
+                                |> Maybe.withDefault inferredType
+                        , metadata = untypedDef.metadata
+                        , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
+                        }
+                        newContext.typedWords
+            }
+    in
+    verifyTypeSignature inferredType untypedDef finalContext
+        |> cleanContext
+
+
+typeCheckMultiImplementation :
+    Context
+    -> Qualifier.WordDefinition
+    -> List ( Qualifier.TypeMatch, List Qualifier.Node )
+    -> List Qualifier.Node
+    -> Context
+typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
+    let
+        whens =
+            case defaultImpl of
+                [] ->
+                    initialWhens
+
+                _ ->
+                    let
+                        ( inferredDefaultType, _ ) =
+                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                    in
+                    case inferredDefaultType.input of
+                        [] ->
+                            Debug.todo "Default impl doesn't have an input argument"
+
+                        firstType :: _ ->
+                            ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
+
+        ( inferredWhenTypes, newContext ) =
+            List.foldr inferWhenTypes ( [], context ) whens
+
+        inferWhenTypes ( _, im ) ( infs, ctx ) =
+            let
+                ( inf, newCtx ) =
+                    typeCheckImplementation untypedDef im (cleanContext ctx)
+            in
+            ( inf :: infs, newCtx )
+
+        whensAreConsistent =
+            inferredWhenTypes
+                |> List.map2 Tuple.pair (List.map Tuple.first whens)
+                |> List.all typeCheckWhen
+
+        typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
+            case inf.input of
+                firstInput :: _ ->
+                    Type.genericlyCompatible firstInput forType
+
+                [] ->
+                    False
+
+        whensAreCompatible =
+            inferredWhenTypes
+                |> List.map (stripFirstInput >> countOutput)
+                |> areAllEqual
+
+        stripFirstInput inf =
+            { inf | input = List.drop 1 inf.input }
+
+        countOutput wordType =
+            ( wordType.input, List.length wordType.output )
+
+        areAllEqual ls =
+            case ls of
+                [] ->
+                    True
+
+                ( fTypes, fCnt ) :: rest ->
+                    List.all
+                        (\( nTypes, nCnt ) ->
+                            (fCnt == nCnt)
+                                && compatibleTypeList fTypes nTypes
+                        )
+                        rest
+
+        compatibleTypeList aLs bLs =
+            List.map2 Type.genericlyCompatible aLs bLs
+                |> List.all identity
+
+        inferredType =
+            List.head inferredWhenTypes
+                |> Maybe.withDefault { input = [], output = [] }
+                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractTypeFromTypeMatch) whens))
+                |> joinOutputs (List.map .output inferredWhenTypes)
+
+        replaceFirstType with inf =
+            case inf.input of
+                _ :: rem ->
+                    { inf | input = with :: rem }
+
+                _ ->
+                    inf
+
+        joinOutputs outputs result =
+            case outputs of
+                first :: second :: rest ->
+                    let
+                        joined =
+                            List.map2 unionize first second
+
+                        unionize lhs rhs =
+                            case ( lhs, rhs ) of
+                                _ ->
+                                    if lhs == rhs then
+                                        lhs
+
+                                    else
+                                        Type.Union [ lhs, rhs ]
+                    in
+                    joinOutputs (joined :: rest) result
+
+                joined :: [] ->
+                    { result | output = joined }
+
+                _ ->
+                    result
+
+        finalContext =
+            { newContext
+                | typedWords =
+                    Dict.insert untypedDef.name
+                        { name = untypedDef.name
+                        , type_ =
+                            TypeSignature.toMaybe untypedDef.metadata.type_
+                                |> Maybe.withDefault inferredType
+                        , metadata = untypedDef.metadata
+                        , implementation =
+                            MultiImpl
+                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
+                                (List.map (untypedToTypedNode newContext) defaultImpl)
+                        }
+                        newContext.typedWords
+                , errors =
+                    if whensAreConsistent && whensAreCompatible then
+                        newContext.errors
+
+                    else
+                        () :: newContext.errors
+            }
+    in
+    verifyTypeSignature inferredType untypedDef finalContext
+        |> cleanContext
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -377,6 +351,29 @@ typeCheckImplementation untypedDef impl context =
     wordTypeFromStackEffects contextWithoutCall
         |> simplifyWordType untypedDef.name
         |> (\( a, b ) -> ( b, a ))
+
+
+extractTypeFromTypeMatch : Qualifier.TypeMatch -> Type
+extractTypeFromTypeMatch (Qualifier.TypeMatch _ t_ _) =
+    t_
+
+
+mapTypeMatch : Qualifier.TypeMatch -> TypeMatch
+mapTypeMatch (Qualifier.TypeMatch _ type_ cond) =
+    TypeMatch type_ (List.map mapTypeMatchValue cond)
+
+
+mapTypeMatchValue : ( String, Qualifier.TypeMatchValue ) -> ( String, TypeMatchValue )
+mapTypeMatchValue ( fieldName, value ) =
+    case value of
+        Qualifier.LiteralInt val ->
+            ( fieldName, LiteralInt val )
+
+        Qualifier.LiteralType val ->
+            ( fieldName, LiteralType val )
+
+        Qualifier.RecursiveMatch val ->
+            ( fieldName, RecursiveMatch (mapTypeMatch val) )
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context

@@ -20,6 +20,26 @@ type alias WordType =
     }
 
 
+isGeneric : Type -> Bool
+isGeneric t =
+    case t of
+        Generic _ ->
+            True
+
+        _ ->
+            False
+
+
+genericName : Type -> Maybe String
+genericName type_ =
+    case type_ of
+        Generic name ->
+            Just name
+
+        _ ->
+            Nothing
+
+
 referencedGenerics : Type -> Set String
 referencedGenerics t =
     case t of
@@ -40,24 +60,20 @@ referencedGenerics t =
             Set.empty
 
 
-isGeneric : Type -> Bool
-isGeneric t =
-    case t of
-        Generic _ ->
+genericlyCompatible : Type -> Type -> Bool
+genericlyCompatible lhs rhs =
+    case ( lhs, rhs ) of
+        ( Generic _, _ ) ->
             True
 
-        _ ->
-            False
+        ( _, Generic _ ) ->
+            True
 
-
-genericName : Type -> Maybe String
-genericName type_ =
-    case type_ of
-        Generic name ->
-            Just name
+        ( CustomGeneric lName _, CustomGeneric rName _ ) ->
+            lName == rName
 
         _ ->
-            Nothing
+            lhs == rhs
 
 
 sameCategory : Type -> Type -> Bool
