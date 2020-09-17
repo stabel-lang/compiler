@@ -44,7 +44,7 @@ update msg _ =
 
                 Err errmsg ->
                     ( ()
-                    , compileFinished ( False, "Compilation failed:\n" ++ errmsg )
+                    , compileFinished ( False, "Compilation failed:\n\n" ++ errmsg )
                     )
 
 
@@ -60,9 +60,13 @@ compile sourceCode =
                     Err <| Debug.toString qualifierErrors
 
                 Ok qualifiedAst ->
-                    TypeChecker.typeCheck qualifiedAst
-                        |> Result.andThen Codegen.codegen
-                        |> Result.mapError Debug.toString
+                    case TypeChecker.run qualifiedAst of
+                        Err typeErrors ->
+                            Err <| Debug.toString typeErrors
+
+                        Ok typedAst ->
+                            Codegen.codegen typedAst
+                                |> Result.mapError Debug.toString
 
 
 subscriptions : Model -> Sub Msg

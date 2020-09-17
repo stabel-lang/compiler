@@ -51,7 +51,7 @@ typeMeta types =
         |> List.filterMap
             (\typeDef ->
                 case typeDef of
-                    AST.CustomTypeDef name _ members ->
+                    AST.CustomTypeDef name _ _ members ->
                         Just
                             ( name
                             , { id = 0
@@ -125,13 +125,13 @@ astNodeToCodegenNode ast node ( stack, result ) =
     let
         newNode =
             case node of
-                AST.IntLiteral val ->
+                AST.IntLiteral _ val ->
                     IntLiteral val
 
-                AST.Word name type_ ->
+                AST.Word _ name type_ ->
                     Word name type_
 
-                AST.WordRef name ->
+                AST.WordRef _ name ->
                     WordRef name
 
                 AST.ConstructType typeName ->
@@ -143,20 +143,20 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 AST.GetMember typeName memberName type_ ->
                     GetMember typeName memberName type_
 
-                AST.Builtin builtin ->
+                AST.Builtin _ builtin ->
                     Builtin builtin
 
         nodeType =
             case node of
-                AST.IntLiteral _ ->
+                AST.IntLiteral _ _ ->
                     { input = []
                     , output = [ Type.Int ]
                     }
 
-                AST.Word _ type_ ->
+                AST.Word _ _ type_ ->
                     type_
 
-                AST.WordRef name ->
+                AST.WordRef _ name ->
                     case Dict.get name ast.words of
                         Just def ->
                             { input = []
@@ -168,7 +168,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.ConstructType typeName ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ gens members) ->
+                        Just (AST.CustomTypeDef _ _ gens members) ->
                             { input = List.map Tuple.second members
                             , output = [ typeFromTypeDef typeName gens ]
                             }
@@ -178,7 +178,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.SetMember typeName _ memberType ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ gens _) ->
+                        Just (AST.CustomTypeDef _ _ gens _) ->
                             let
                                 type_ =
                                     typeFromTypeDef typeName gens
@@ -192,7 +192,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.GetMember typeName _ memberType ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ gens _) ->
+                        Just (AST.CustomTypeDef _ _ gens _) ->
                             let
                                 type_ =
                                     typeFromTypeDef typeName gens
@@ -204,7 +204,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                         _ ->
                             Debug.todo "help"
 
-                AST.Builtin builtin ->
+                AST.Builtin _ builtin ->
                     Builtin.wordType builtin
 
         typeFromTypeDef typeName gens =
@@ -257,7 +257,7 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
 
                 makeInequalityTest t_ localIdx =
                     case t_ of
-                        AST.TypeMatch Type.Int conditions ->
+                        AST.TypeMatch _ Type.Int conditions ->
                             Wasm.Batch
                                 [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
@@ -271,10 +271,10 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                                 , Wasm.Call BaseModule.demoteIntFn
                                 ]
 
-                        AST.TypeMatch (Type.Custom name) conditions ->
+                        AST.TypeMatch _ (Type.Custom name) conditions ->
                             whenSetup localIdx name conditions
 
-                        AST.TypeMatch (Type.CustomGeneric name _) conditions ->
+                        AST.TypeMatch _ (Type.CustomGeneric name _) conditions ->
                             whenSetup localIdx name conditions
 
                         _ ->
