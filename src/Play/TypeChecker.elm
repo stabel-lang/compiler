@@ -587,7 +587,6 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
     case effects of
         [] ->
             ( context
-              -- TODO: Really need to get this list reverse madness figured out and solved properly
             , { wordType
                 | input = wordType.input
                 , output = List.reverse wordType.output
