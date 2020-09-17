@@ -64,8 +64,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Builtin Builtin.Plus
+                                            [ IntLiteral emptyRange 1
+                                            , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
                                 , { name = "dec"
@@ -73,8 +73,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Builtin Builtin.Minus
+                                            [ IntLiteral emptyRange 1
+                                            , Builtin emptyRange Builtin.Minus
                                             ]
                                   }
                                 , { name = "main"
@@ -84,19 +84,19 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , IntLiteral 2
-                                            , Builtin Builtin.Equal
+                                            [ IntLiteral emptyRange 1
+                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , IntLiteral emptyRange 2
+                                            , Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect typecheck to fail."
 
                     Ok typedAst ->
@@ -122,8 +122,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.pass
 
                     Ok _ ->
@@ -168,8 +168,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck source of
-                    Err () ->
+                case run source of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail"
 
                     Ok _ ->
@@ -235,8 +235,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck source of
-                    Err () ->
+                case run source of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail"
 
                     Ok _ ->
@@ -282,8 +282,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -318,8 +318,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -382,8 +382,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -410,11 +410,11 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
+                case run input of
                     Ok _ ->
                         Expect.fail "Expected type check to fail."
 
-                    Err () ->
+                    Err _ ->
                         Expect.pass
         , test "Generic custom type fails if wrong generic is listed" <|
             \_ ->
@@ -438,11 +438,11 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
+                case run input of
                     Ok _ ->
                         Expect.fail "Expected type check to fail."
 
-                    Err () ->
+                    Err _ ->
                         Expect.pass
         , describe "Unions and multifunctions" <|
             let
@@ -524,8 +524,8 @@ suite =
                                         []
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -555,8 +555,8 @@ suite =
                                         []
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -583,8 +583,8 @@ suite =
                                         ]
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -609,8 +609,8 @@ suite =
                                         ]
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -746,8 +746,8 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -828,11 +828,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.fail "Did not expect type check to pass."
 
-                        Err () ->
+                        Err _ ->
                             Expect.pass
             , test "Generic union" <|
                 \_ ->
@@ -965,11 +965,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Expected type check to pass."
             , test "Generic union fails if not generic is listed" <|
                 \_ ->
@@ -999,11 +999,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.fail "Expected type check to fail."
 
-                        Err () ->
+                        Err _ ->
                             Expect.pass
             ]
         , describe "Quotations"
@@ -1057,11 +1057,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             , test "With type annotation" <|
                 \_ ->
@@ -1122,11 +1122,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             ]
         , describe "Recursive word definitions"
@@ -1274,11 +1274,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             ]
         ]
