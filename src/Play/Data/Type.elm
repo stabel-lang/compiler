@@ -114,6 +114,43 @@ toString t =
             name ++ "..."
 
 
+toDisplayString : Type -> String
+toDisplayString t =
+    case t of
+        Int ->
+            "Int"
+
+        Generic name ->
+            name
+
+        Custom name ->
+            name
+
+        CustomGeneric name _ ->
+            name
+
+        Union _ ->
+            "Union"
+
+        Quotation quotType ->
+            "[ " ++ wordTypeToString quotType ++ " ]"
+
+        StackRange name ->
+            name ++ "..."
+
+
+wordTypeToString : WordType -> String
+wordTypeToString wordType =
+    let
+        inputTypeStrings =
+            List.map toDisplayString wordType.input
+
+        outputTypeStrings =
+            List.map toDisplayString wordType.output
+    in
+    String.join " " inputTypeStrings ++ " -- " ++ String.join " " outputTypeStrings
+
+
 compatibleWords : WordType -> WordType -> Bool
 compatibleWords annotated inferred =
     let
