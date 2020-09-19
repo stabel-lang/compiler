@@ -24,3 +24,13 @@ emptyRange =
 toString : SourceLocation -> String
 toString location =
     String.fromInt location.row ++ ":" ++ String.fromInt location.col
+
+
+extractFromString : String -> SourceLocationRange -> String
+extractFromString sourceCode range =
+    sourceCode
+        |> String.slice range.start.offset range.end.offset
+        |> String.trim
+        |> String.lines
+        |> List.indexedMap (\i l -> String.fromInt (range.start.row + i) ++ " | " ++ l)
+        |> String.join "\n"

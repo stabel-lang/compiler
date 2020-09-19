@@ -84,24 +84,14 @@ toString source problem =
                         ++ ": You're trying to define a new word called '"
                         ++ wordName
                         ++ "', but this word has already been defined here:\n\n"
-                        ++ extractFromSource source previousDefinitionRange
+                        ++ SourceLocation.extractFromString source previousDefinitionRange
 
         TypeAlreadyDefined typeName previousDefinitionRange definitionRange ->
             SourceLocation.toString definitionRange.start
                 ++ ": You're trying to define a new type called '"
                 ++ typeName
                 ++ "', but this type has already been defined here:\n\n"
-                ++ extractFromSource source previousDefinitionRange
+                ++ SourceLocation.extractFromString source previousDefinitionRange
 
         UnknownMetadata meta ->
             meta ++ " is not a known metadata label."
-
-
-extractFromSource : String -> SourceLocationRange -> String
-extractFromSource sourceCode range =
-    sourceCode
-        |> String.slice range.start.offset range.end.offset
-        |> String.trim
-        |> String.lines
-        |> List.indexedMap (\i l -> String.fromInt (range.start.row + i) ++ " | " ++ l)
-        |> String.join "\n"

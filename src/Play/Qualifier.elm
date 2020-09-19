@@ -324,7 +324,7 @@ qualifyMatch qualifiedTypes typeMatch =
 
                         qualifiedPatternsResult =
                             patterns
-                                |> List.map (qualifyMatchValue qualifiedTypes name memberNames)
+                                |> List.map (qualifyMatchValue qualifiedTypes range name memberNames)
                                 |> Result.combine
 
                         actualType =
@@ -358,11 +358,12 @@ qualifyMatch qualifiedTypes typeMatch =
 
 qualifyMatchValue :
     Dict String TypeDefinition
+    -> SourceLocationRange
     -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
     -> Result Problem ( String, TypeMatchValue )
-qualifyMatchValue qualifiedTypes typeName memberNames ( fieldName, matchValue ) =
+qualifyMatchValue qualifiedTypes range typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
@@ -380,7 +381,7 @@ qualifyMatchValue qualifiedTypes typeName memberNames ( fieldName, matchValue ) 
                         Ok <| ( fieldName, RecursiveMatch match )
 
     else
-        Err <| NoSuchMemberOnType typeName fieldName
+        Err <| NoSuchMemberOnType range typeName fieldName
 
 
 initQualifyNode :
