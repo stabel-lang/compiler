@@ -1,4 +1,7 @@
-module Play.Parser.Problem exposing (Problem(..))
+module Play.Parser.Problem exposing
+    ( Problem(..)
+    , toString
+    )
 
 import Play.Data.SourceLocation exposing (SourceLocationRange)
 
@@ -20,3 +23,10 @@ type Problem
     | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
     | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
     | UnknownMetadata String
+
+
+toString : Problem -> String
+toString problem =
+    case problem of
+        _ ->
+            "UNKNOWN"

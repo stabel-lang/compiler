@@ -3,8 +3,11 @@ port module Main exposing (main)
 import Platform exposing (Program)
 import Play.Codegen as Codegen
 import Play.Parser as Parser
+import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
+import Play.Qualifier.Problem as QualifierProblem
 import Play.TypeChecker as TypeChecker
+import Play.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
 
 
@@ -51,22 +54,30 @@ update msg _ =
 compile : String -> Result String Wasm.Module
 compile sourceCode =
     case Parser.run sourceCode of
-        Err parserError ->
-            Err <| Debug.toString parserError
+        Err parserErrors ->
+            formatErrors ParserProblem.toString parserErrors
 
         Ok ast ->
             case Qualifier.run ast of
                 Err qualifierErrors ->
-                    Err <| Debug.toString qualifierErrors
+                    formatErrors QualifierProblem.toString qualifierErrors
 
                 Ok qualifiedAst ->
                     case TypeChecker.run qualifiedAst of
                         Err typeErrors ->
-                            Err <| Debug.toString typeErrors
+                            formatErrors TypeCheckerProblem.toString typeErrors
 
                         Ok typedAst ->
                             Codegen.codegen typedAst
                                 |> Result.mapError Debug.toString
+
+
+formatErrors : (a -> String) -> List a -> Result String b
+formatErrors fn problems =
+    problems
+        |> List.map fn
+        |> String.join "\n\n"
+        |> Err
 
 
 subscriptions : Model -> Sub Msg

@@ -1,4 +1,7 @@
-module Play.TypeChecker.Problem exposing (Problem(..))
+module Play.TypeChecker.Problem exposing
+    ( Problem(..)
+    , toString
+    )
 
 import Play.Data.SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type exposing (Type, WordType)
@@ -11,3 +14,10 @@ type Problem
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
+
+
+toString : Problem -> String
+toString problem =
+    case problem of
+        _ ->
+            "UNKNOWN"
