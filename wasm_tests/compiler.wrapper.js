@@ -1,5 +1,6 @@
 const Compiler = require('./compiler.js');
 const wabt = require('wabt')();
+const stripIndent = require('strip-indent');
 
 exports.toWat = function toWat(sourceCode) {
     return new Promise((resolve, reject) => {
@@ -13,7 +14,7 @@ exports.toWat = function toWat(sourceCode) {
             }
         });
 
-        compiler.ports.compileString.send(sourceCode);
+        compiler.ports.compileString.send(stripIndent(sourceCode));
     });
 }
 

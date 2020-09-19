@@ -3,8 +3,11 @@ port module Main exposing (main)
 import Platform exposing (Program)
 import Play.Codegen as Codegen
 import Play.Parser as Parser
+import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
+import Play.Qualifier.Problem as QualifierProblem
 import Play.TypeChecker as TypeChecker
+import Play.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
 
 
@@ -42,19 +45,39 @@ update msg _ =
                     , compileFinished ( True, Wasm.toString wasm )
                     )
 
-                Err () ->
+                Err errmsg ->
                     ( ()
-                    , compileFinished ( False, "Compilation failed" )
+                    , compileFinished ( False, "Compilation failed:\n\n" ++ errmsg )
                     )
 
 
-compile : String -> Result () Wasm.Module
+compile : String -> Result String Wasm.Module
 compile sourceCode =
-    sourceCode
-        |> Parser.run
-        |> Result.andThen Qualifier.qualify
-        |> Result.andThen TypeChecker.typeCheck
-        |> Result.andThen Codegen.codegen
+    case Parser.run sourceCode of
+        Err parserErrors ->
+            formatErrors (ParserProblem.toString sourceCode) parserErrors
+
+        Ok ast ->
+            case Qualifier.run ast of
+                Err qualifierErrors ->
+                    formatErrors (QualifierProblem.toString sourceCode) qualifierErrors
+
+                Ok qualifiedAst ->
+                    case TypeChecker.run qualifiedAst of
+                        Err typeErrors ->
+                            formatErrors (TypeCheckerProblem.toString sourceCode) typeErrors
+
+                        Ok typedAst ->
+                            Codegen.codegen typedAst
+                                |> Result.mapError Debug.toString
+
+
+formatErrors : (a -> String) -> List a -> Result String b
+formatErrors fn problems =
+    problems
+        |> List.map fn
+        |> String.join "\n\n"
+        |> Err
 
 
 subscriptions : Model -> Sub Msg

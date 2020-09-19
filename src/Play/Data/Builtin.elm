@@ -46,37 +46,37 @@ wordType builtin =
             }
 
         StackDuplicate ->
-            { input = [ Type.Generic "a_dup" ]
-            , output = [ Type.Generic "a_dup", Type.Generic "a_dup" ]
+            { input = [ Type.Generic "a" ]
+            , output = [ Type.Generic "a", Type.Generic "a" ]
             }
 
         StackDrop ->
-            { input = [ Type.Generic "a_drop" ]
+            { input = [ Type.Generic "a" ]
             , output = []
             }
 
         StackSwap ->
-            { input = [ Type.Generic "a_swap", Type.Generic "b_swap" ]
-            , output = [ Type.Generic "b_swap", Type.Generic "a_swap" ]
+            { input = [ Type.Generic "a", Type.Generic "b" ]
+            , output = [ Type.Generic "b", Type.Generic "a" ]
             }
 
         StackRightRotate ->
-            { input = [ Type.Generic "a_rot", Type.Generic "b_rot", Type.Generic "c_rot" ]
-            , output = [ Type.Generic "c_rot", Type.Generic "a_rot", Type.Generic "b_rot" ]
+            { input = [ Type.Generic "a", Type.Generic "b", Type.Generic "c" ]
+            , output = [ Type.Generic "c", Type.Generic "a", Type.Generic "b" ]
             }
 
         StackLeftRotate ->
-            { input = [ Type.Generic "a__rot", Type.Generic "b__rot", Type.Generic "c__rot" ]
-            , output = [ Type.Generic "b__rot", Type.Generic "c__rot", Type.Generic "a__rot" ]
+            { input = [ Type.Generic "a", Type.Generic "b", Type.Generic "c" ]
+            , output = [ Type.Generic "b", Type.Generic "c", Type.Generic "a" ]
             }
 
         Apply ->
             { input =
-                [ Type.StackRange "a__apply"
+                [ Type.StackRange "a"
                 , Type.Quotation
-                    { input = [ Type.StackRange "a__apply" ]
-                    , output = [ Type.StackRange "b__apply" ]
+                    { input = [ Type.StackRange "a" ]
+                    , output = [ Type.StackRange "b" ]
                     }
                 ]
-            , output = [ Type.StackRange "b__apply" ]
+            , output = [ Type.StackRange "b" ]
             }

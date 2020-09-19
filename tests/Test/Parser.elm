@@ -4,9 +4,11 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata
+import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Test exposing (Test, describe, test)
+import Test.Parser.Util exposing (compile, compileRetainLocations)
 
 
 suite : Test
@@ -37,8 +39,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Integer 1
-                                            , AST.Word "+"
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Word emptyRange "+"
                                             ]
                                   }
                                 , { name = "dec"
@@ -47,8 +49,8 @@ suite =
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Integer 1
-                                            , AST.Word "-"
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Word emptyRange "-"
                                             ]
                                   }
                                 , { name = "main"
@@ -57,19 +59,19 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Integer 1
-                                            , AST.Word "inc"
-                                            , AST.Word "inc"
-                                            , AST.Word "dec"
-                                            , AST.Integer 2
-                                            , AST.Word "="
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Word emptyRange "inc"
+                                            , AST.Word emptyRange "inc"
+                                            , AST.Word emptyRange "dec"
+                                            , AST.Integer emptyRange 2
+                                            , AST.Word emptyRange "="
                                             ]
                                   }
                                 ]
                         }
                 in
-                case run source of
-                    Err () ->
+                case compile source of
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -90,14 +92,14 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef "True" [] []
+                                    [ CustomTypeDef emptyRange "True" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">True"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "True" ]
@@ -108,14 +110,14 @@ suite =
                                                 |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
                                       , implementation =
                                             SoloImpl
-                                                [ AST.Integer 1
+                                                [ AST.Integer emptyRange 1
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -137,7 +139,8 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef "Person"
+                                    [ CustomTypeDef emptyRange
+                                        "Person"
                                         []
                                         [ ( "age", Type.Int )
                                         , ( "jobs", Type.Int )
@@ -148,35 +151,35 @@ suite =
                                     [ { name = ">Person"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.ConstructType "Person" ]
+                                      }
+                                    , { name = "age>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl [ AST.GetMember "Person" "age" ]
                                       }
                                     , { name = ">age"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Person" "age" ]
                                       }
                                     , { name = ">jobs"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Person" "jobs" ]
-                                      }
-                                    , { name = "age>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                      , implementation =
-                                            SoloImpl [ AST.GetMember "Person" "age" ]
                                       }
                                     , { name = "jobs>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
                                       , implementation =
                                             SoloImpl [ AST.GetMember "Person" "jobs" ]
                                       }
@@ -186,14 +189,14 @@ suite =
                                                 |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
                                       , implementation =
                                             SoloImpl
-                                                [ AST.Word "age>"
+                                                [ AST.Word emptyRange "age>"
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -210,7 +213,8 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef "Box"
+                                    [ CustomTypeDef emptyRange
+                                        "Box"
                                         [ "a" ]
                                         [ ( "element", Type.Generic "a" )
                                         ]
@@ -220,7 +224,7 @@ suite =
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
@@ -229,7 +233,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
@@ -238,7 +242,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                                     [ Type.Generic "a" ]
                                       , implementation =
@@ -247,8 +251,8 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -276,15 +280,15 @@ suite =
                                                 [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word "dup"
-                                            , AST.Word "rotate"
+                                            [ AST.Word emptyRange "dup"
+                                            , AST.Word emptyRange "rotate"
                                             ]
                                   }
                                 ]
                         }
                 in
-                case run source of
-                    Err () ->
+                case compile source of
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -312,20 +316,21 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef "Bool"
+                                    [ UnionTypeDef emptyRange
+                                        "Bool"
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , CustomTypeDef "True" [] []
-                                    , CustomTypeDef "False" [] []
+                                    , CustomTypeDef emptyRange "True" [] []
+                                    , CustomTypeDef emptyRange "False" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">True"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "True"
@@ -334,7 +339,7 @@ suite =
                                     , { name = ">False"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "False"
@@ -344,11 +349,11 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.Custom "True") []
-                                                  , [ AST.Word "drop", AST.Integer 1 ]
+                                                [ ( TypeMatch emptyRange (Type.Custom "True") []
+                                                  , [ AST.Word emptyRange "drop", AST.Integer emptyRange 1 ]
                                                   )
-                                                , ( TypeMatch (Type.Custom "False") []
-                                                  , [ AST.Word "drop", AST.Integer 0 ]
+                                                , ( TypeMatch emptyRange (Type.Custom "False") []
+                                                  , [ AST.Word emptyRange "drop", AST.Integer emptyRange 0 ]
                                                   )
                                                 ]
                                                 []
@@ -356,8 +361,8 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -383,19 +388,20 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef "Maybe"
+                                    [ UnionTypeDef emptyRange
+                                        "Maybe"
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nil"
                                         ]
-                                    , CustomTypeDef "Nil" [] []
+                                    , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"
@@ -405,11 +411,11 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.Generic "a") []
-                                                  , [ AST.Word "!" ]
+                                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch (Type.Custom "Nil") []
-                                                  , [ AST.Word "drop" ]
+                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -417,8 +423,8 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -447,20 +453,21 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef "MaybeBox"
+                                    [ UnionTypeDef emptyRange
+                                        "MaybeBox"
                                         [ "a" ]
                                         [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                         , Type.Custom "Nil"
                                         ]
-                                    , CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
-                                    , CustomTypeDef "Nil" [] []
+                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
                                             SoloImpl
@@ -470,7 +477,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     , Type.Generic "a"
                                                     ]
@@ -484,7 +491,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     ]
                                                     [ Type.Generic "a"
@@ -497,7 +504,7 @@ suite =
                                     , { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"
@@ -507,11 +514,11 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
-                                                  , [ AST.Word "!" ]
+                                                [ ( TypeMatch emptyRange (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                  , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch (Type.Custom "Nil") []
-                                                  , [ AST.Word "drop" ]
+                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -519,8 +526,8 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -550,20 +557,21 @@ suite =
                         expectedAst =
                             { types =
                                 Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef "MaybeBox"
+                                    [ UnionTypeDef emptyRange
+                                        "MaybeBox"
                                         [ "a" ]
                                         [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                         , Type.Custom "Nil"
                                         ]
-                                    , CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
-                                    , CustomTypeDef "Nil" [] []
+                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [ Type.Generic "a" ]
+                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
                                       , implementation =
                                             SoloImpl
@@ -573,7 +581,7 @@ suite =
                                     , { name = ">element"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     , Type.Generic "a"
                                                     ]
@@ -587,7 +595,7 @@ suite =
                                     , { name = "element>"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType
+                                                |> Metadata.withVerifiedType
                                                     [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
                                                     ]
                                                     [ Type.Generic "a"
@@ -600,7 +608,7 @@ suite =
                                     , { name = ">Nil"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ConstructType "Nil"
@@ -614,11 +622,11 @@ suite =
                                                     [ Type.Generic "a" ]
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
-                                                  , [ AST.Word "!" ]
+                                                [ ( TypeMatch emptyRange (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                  , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch (Type.Custom "Nil") []
-                                                  , [ AST.Word "drop" ]
+                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -626,8 +634,8 @@ suite =
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -661,7 +669,7 @@ suite =
                                                 [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word "!"
+                                            [ AST.Word emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
@@ -670,19 +678,20 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Integer 1
+                                            [ AST.Integer emptyRange 1
                                             , AST.Quotation
-                                                [ AST.Integer 1
-                                                , AST.Word "+"
+                                                emptyRange
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "+"
                                                 ]
-                                            , AST.Word "apply-to-num"
+                                            , AST.Word emptyRange "apply-to-num"
                                             ]
                                   }
                                 ]
                         }
                 in
-                case run source of
-                    Err () ->
+                case compile source of
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -718,7 +727,7 @@ suite =
                                                 [ Type.StackRange "b" ]
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word "!"
+                                            [ AST.Word emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
@@ -727,19 +736,19 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Integer 1
-                                            , AST.Quotation
-                                                [ AST.Integer 1
-                                                , AST.Word "+"
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Quotation emptyRange
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "+"
                                                 ]
-                                            , AST.Word "apply-to-num"
+                                            , AST.Word emptyRange "apply-to-num"
                                             ]
                                   }
                                 ]
                         }
                 in
-                case run source of
-                    Err () ->
+                case compile source of
+                    Err _ ->
                         Expect.fail "Did not expect parsing to fail"
 
                     Ok ast ->
@@ -764,15 +773,20 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch Type.Int [ ( "value", AST.LiteralInt 0 ) ], [ AST.Word ">True" ] )
+                                                [ ( TypeMatch emptyRange
+                                                        Type.Int
+                                                        [ ( "value", AST.LiteralInt 0 )
+                                                        ]
+                                                  , [ AST.Word emptyRange ">True" ]
+                                                  )
                                                 ]
-                                                [ AST.Word ">False" ]
+                                                [ AST.Word emptyRange ">False" ]
                                       }
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -796,25 +810,27 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.Custom "List")
+                                                [ ( TypeMatch emptyRange
+                                                        (Type.Custom "List")
                                                         [ ( "tail"
                                                           , AST.RecursiveMatch
-                                                                (TypeMatch (Type.Custom "List")
+                                                                (TypeMatch emptyRange
+                                                                    (Type.Custom "List")
                                                                     [ ( "tail", AST.LiteralType (Type.Custom "Nil") )
                                                                     ]
                                                                 )
                                                           )
                                                         ]
-                                                  , [ AST.Word ">True" ]
+                                                  , [ AST.Word emptyRange ">True" ]
                                                   )
                                                 ]
-                                                [ AST.Word ">False" ]
+                                                [ AST.Word emptyRange ">False" ]
                                       }
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
@@ -838,48 +854,32 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch (Type.Custom "Pair")
+                                                [ ( TypeMatch emptyRange
+                                                        (Type.Custom "Pair")
                                                         [ ( "first", AST.LiteralInt 0 )
                                                         , ( "second", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word ">True" ]
+                                                  , [ AST.Word emptyRange ">True" ]
                                                   )
                                                 ]
-                                                [ AST.Word ">False" ]
+                                                [ AST.Word emptyRange ">False" ]
                                       }
                                     ]
                             }
                     in
-                    case run source of
-                        Err () ->
+                    case compile source of
+                        Err _ ->
                             Expect.fail "Did not expect parsing to fail"
 
                         Ok ast ->
                             Expect.equal expectedAst ast
-            , test "Syntax error" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            defmulti: origo?
-                            when: Pair( 0 0 )
-                              >True
-                            : >False
-                            """
-                    in
-                    case run source of
-                        Err () ->
-                            Expect.pass
-
-                        Ok _ ->
-                            Expect.fail "Did not expect parsing to succeed"
             ]
         , test "Support code comments" <|
             \_ ->
                 let
                     expectCompiles code =
-                        case run code of
-                            Err () ->
+                        case compile code of
+                            Err _ ->
                                 Expect.fail "Did not expect compilation to fail."
 
                             Ok _ ->
@@ -906,4 +906,195 @@ suite =
                     # And thats it!
                      # wonder what else we should do...
                     """
+        , test "Correct line information" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defunion: Bool
+                        : True
+                        : False
+
+                        deftype: True
+                        deftype: False
+
+                        defmulti: from-int
+                        type: Int -- Int
+                        when: Int( value 0 )
+                          >False
+                        when: Int
+                          >True
+
+                        def: equal
+                        : - from-int not
+
+                        defmulti: not
+                        when: True
+                          >False
+                        : >True
+                        """
+
+                    -- The ending source location for most definitions now ends where the next definition beings
+                    -- This is not what we want (it includes too much white space), but it'll do for now.
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ UnionTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 2 1 1)
+                                        (SourceLocation 6 1 32)
+                                    )
+                                    "Bool"
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 6 1 32)
+                                        (SourceLocation 7 1 46)
+                                    )
+                                    "True"
+                                    []
+                                    []
+                                , CustomTypeDef
+                                    (SourceLocationRange
+                                        (SourceLocation 7 1 46)
+                                        (SourceLocation 9 1 62)
+                                    )
+                                    "False"
+                                    []
+                                    []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
+                                  , implementation = SoloImpl [ ConstructType "True" ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
+                                  , implementation = SoloImpl [ ConstructType "False" ]
+                                  }
+                                , { name = "from-int"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 9 1 62)
+                                                    (SourceLocation 16 1 147)
+                                                )
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 11 7 104)
+                                                        (SourceLocation 11 21 118)
+                                                    )
+                                                    Type.Int
+                                                    [ ( "value", LiteralInt 0 ) ]
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 12 3 121)
+                                                        (SourceLocation 13 1 128)
+                                                    )
+                                                    ">False"
+                                                ]
+                                              )
+                                            , ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 13 7 134)
+                                                        (SourceLocation 14 3 140)
+                                                    )
+                                                    Type.Int
+                                                    []
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 14 3 140)
+                                                        (SourceLocation 16 1 147)
+                                                    )
+                                                    ">True"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "equal"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 16 1 147)
+                                                    (SourceLocation 19 1 176)
+                                                )
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 3 160)
+                                                    (SourceLocation 17 5 162)
+                                                )
+                                                "-"
+                                            , Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 5 162)
+                                                    (SourceLocation 17 14 171)
+                                                )
+                                                "from-int"
+                                            , Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 17 14 171)
+                                                    (SourceLocation 19 1 176)
+                                                )
+                                                "not"
+                                            ]
+                                  }
+                                , { name = "not"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withSourceLocationRange
+                                                (SourceLocationRange
+                                                    (SourceLocation 19 1 176)
+                                                    (SourceLocation 23 1 218)
+                                                )
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch
+                                                    (SourceLocationRange
+                                                        (SourceLocation 20 7 196)
+                                                        (SourceLocation 21 3 203)
+                                                    )
+                                                    (Type.Custom "True")
+                                                    []
+                                              , [ Word
+                                                    (SourceLocationRange
+                                                        (SourceLocation 21 3 203)
+                                                        (SourceLocation 22 1 210)
+                                                    )
+                                                    ">False"
+                                                ]
+                                              )
+                                            ]
+                                            [ Word
+                                                (SourceLocationRange
+                                                    (SourceLocation 22 3 212)
+                                                    (SourceLocation 23 1 218)
+                                                )
+                                                ">True"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case compileRetainLocations source of
+                    Err _ ->
+                        Expect.fail "Did not expect compilation to fail."
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         ]

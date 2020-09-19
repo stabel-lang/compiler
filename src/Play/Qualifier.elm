@@ -3,8 +3,11 @@ module Play.Qualifier exposing (..)
 import Dict exposing (Dict)
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.Type as Type exposing (Type)
+import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Play.Data.Type as Type exposing (Type, WordType)
+import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
+import Play.Qualifier.Problem exposing (Problem(..))
 import Result.Extra as Result
 import Set exposing (Set)
 
@@ -16,8 +19,8 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List String) (List ( String, Type ))
-    | UnionTypeDef String (List String) (List Type)
+    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
+    | UnionTypeDef String SourceLocationRange (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -33,7 +36,7 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
@@ -43,45 +46,41 @@ type TypeMatchValue
 
 
 type Node
-    = Integer Int
-    | Word String
-    | WordRef String
+    = Integer SourceLocationRange Int
+    | Word SourceLocationRange String
+    | WordRef SourceLocationRange String
     | ConstructType String
     | GetMember String String
     | SetMember String String
-    | Builtin Builtin
+    | Builtin SourceLocationRange Builtin
 
 
-builtinDict : Dict String Node
+builtinDict : Dict String Builtin
 builtinDict =
-    [ ( "+", Builtin.Plus )
-    , ( "-", Builtin.Minus )
-    , ( "*", Builtin.Multiply )
-    , ( "/", Builtin.Divide )
-    , ( "=", Builtin.Equal )
-    , ( "swap", Builtin.StackSwap )
-    , ( "dup", Builtin.StackDuplicate )
-    , ( "drop", Builtin.StackDrop )
-    , ( "rotate", Builtin.StackRightRotate )
-    , ( "-rotate", Builtin.StackLeftRotate )
-    , ( "!", Builtin.Apply )
-    ]
-        |> Dict.fromList
-        |> Dict.map (\_ v -> Builtin v)
+    Dict.fromList
+        [ ( "+", Builtin.Plus )
+        , ( "-", Builtin.Minus )
+        , ( "*", Builtin.Multiply )
+        , ( "/", Builtin.Divide )
+        , ( "=", Builtin.Equal )
+        , ( "swap", Builtin.StackSwap )
+        , ( "dup", Builtin.StackDuplicate )
+        , ( "drop", Builtin.StackDrop )
+        , ( "rotate", Builtin.StackRightRotate )
+        , ( "-rotate", Builtin.StackLeftRotate )
+        , ( "!", Builtin.Apply )
+        ]
 
 
-qualify : Parser.AST -> Result () AST
-qualify ast =
+run : Parser.AST -> Result (List Problem) AST
+run ast =
     let
         ( typeErrors, qualifiedTypes ) =
-            ast.types
-                |> Dict.values
-                |> List.foldl (qualifyType ast) ( [], Dict.empty )
+            Dict.foldl (\_ val acc -> qualifyType ast val acc) ( [], Dict.empty ) ast.types
+                |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
         ( wordErrors, qualifiedWords ) =
-            ast.words
-                |> Dict.values
-                |> List.foldl (qualifyDefinition ast qualifiedTypes) ( [], Dict.empty )
+            Dict.foldl (\_ val acc -> qualifyDefinition ast qualifiedTypes val acc) ( [], Dict.empty ) ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -91,22 +90,73 @@ qualify ast =
                 }
 
         _ ->
-            Err ()
+            Err <| typeErrors ++ wordErrors
+
+
+resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
+resolveUnionInTypeDefs qt td =
+    case td of
+        CustomTypeDef name range generics members ->
+            CustomTypeDef name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+
+        UnionTypeDef name range generics memberTypes ->
+            UnionTypeDef name range generics (List.map (resolveUnion qt) memberTypes)
+
+
+resolveUnion : Dict String TypeDefinition -> Type -> Type
+resolveUnion typeDefs type_ =
+    case type_ of
+        Type.Custom typeName ->
+            case Dict.get typeName typeDefs of
+                Just (UnionTypeDef _ _ _ members) ->
+                    Type.Union members
+
+                _ ->
+                    type_
+
+        Type.CustomGeneric typeName types ->
+            case Dict.get typeName typeDefs of
+                Just (UnionTypeDef _ _ generics members) ->
+                    let
+                        genericsMap =
+                            List.map2 Tuple.pair generics types
+                                |> Dict.fromList
+
+                        rebindGenerics t =
+                            case t of
+                                Type.Generic val ->
+                                    Dict.get val genericsMap
+                                        |> Maybe.withDefault t
+
+                                Type.CustomGeneric cgName cgMembers ->
+                                    Type.CustomGeneric cgName <|
+                                        List.map rebindGenerics cgMembers
+
+                                _ ->
+                                    t
+                    in
+                    Type.Union (List.map rebindGenerics members)
+
+                _ ->
+                    type_
+
+        _ ->
+            type_
 
 
 qualifyType :
     Parser.AST
     -> Parser.TypeDefinition
-    -> ( List (), Dict String TypeDefinition )
-    -> ( List (), Dict String TypeDefinition )
+    -> ( List Problem, Dict String TypeDefinition )
+    -> ( List Problem, Dict String TypeDefinition )
 qualifyType ast typeDef ( errors, acc ) =
     ( errors
     , case typeDef of
-        Parser.CustomTypeDef name generics members ->
-            Dict.insert name (CustomTypeDef name generics members) acc
+        Parser.CustomTypeDef range name generics members ->
+            Dict.insert name (CustomTypeDef name range generics members) acc
 
-        Parser.UnionTypeDef name generics memberTypes ->
-            Dict.insert name (UnionTypeDef name generics memberTypes) acc
+        Parser.UnionTypeDef range name generics memberTypes ->
+            Dict.insert name (UnionTypeDef name range generics memberTypes) acc
     )
 
 
@@ -114,8 +164,8 @@ qualifyDefinition :
     Parser.AST
     -> Dict String TypeDefinition
     -> Parser.WordDefinition
-    -> ( List (), Dict String WordDefinition )
-    -> ( List (), Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
 qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
     let
         ( whens, impl ) =
@@ -127,20 +177,21 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                     ( whenImpl, defImpl )
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
-            whens
-                |> List.foldr (qualifyWhen ast qualifiedTypes unqualifiedWord.name) ( acc, [] )
+            List.foldr (qualifyWhen ast qualifiedTypes unqualifiedWord.name) ( acc, [] ) whens
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
-            List.foldr (qualifyNode ast unqualifiedWord.name) ( newWordsAfterWhens, [] ) impl
-                |> Tuple.mapSecond Result.combine
+            initQualifyNode unqualifiedWord.name ast newWordsAfterWhens impl
+
+        qualifiedMetadataResult =
+            qualifyMetadata qualifiedTypes unqualifiedWord.metadata
     in
-    case ( qualifiedWhensResult, qualifiedImplementationResult ) of
-        ( Ok qualifiedWhens, Ok qualifiedImplementation ) ->
+    case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
+        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
             ( errors
             , Dict.insert unqualifiedWord.name
                 { name = unqualifiedWord.name
-                , metadata = qualifyMetadata unqualifiedWord.name unqualifiedWord.metadata
+                , metadata = qualifiedMetadata
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -151,10 +202,74 @@ qualifyDefinition ast qualifiedTypes unqualifiedWord ( errors, acc ) =
                 newWordsAfterImpl
             )
 
-        _ ->
-            ( () :: errors
+        ( Err whenError, _, _ ) ->
+            ( whenError :: errors
             , newWordsAfterImpl
             )
+
+        ( _, Err implError, _ ) ->
+            ( implError :: errors
+            , newWordsAfterImpl
+            )
+
+        ( _, _, Err metaError ) ->
+            ( metaError :: errors
+            , newWordsAfterImpl
+            )
+
+
+qualifyMetadata : Dict String TypeDefinition -> Metadata -> Result Problem Metadata
+qualifyMetadata qualifiedTypes meta =
+    let
+        wordRange =
+            Maybe.withDefault SourceLocation.emptyRange meta.sourceLocationRange
+
+        typeRefErrors =
+            TypeSignature.toMaybe meta.type_
+                |> Maybe.map (\ts -> ts.input ++ ts.output)
+                |> Maybe.withDefault []
+                |> List.filterMap (validateTypeReferences qualifiedTypes wordRange)
+    in
+    case List.head typeRefErrors of
+        Just err ->
+            Err err
+
+        Nothing ->
+            Ok
+                { meta
+                    | type_ =
+                        TypeSignature.map (resolveUnions qualifiedTypes) meta.type_
+                }
+
+
+validateTypeReferences : Dict String TypeDefinition -> SourceLocationRange -> Type -> Maybe Problem
+validateTypeReferences typeDefs wordRange type_ =
+    case type_ of
+        Type.Custom typeName ->
+            case Dict.get typeName typeDefs of
+                Just _ ->
+                    Nothing
+
+                Nothing ->
+                    Just <| UnknownTypeRef wordRange typeName
+
+        Type.CustomGeneric typeName types ->
+            case Dict.get typeName typeDefs of
+                Just _ ->
+                    Nothing
+
+                Nothing ->
+                    Just <| UnknownTypeRef wordRange typeName
+
+        _ ->
+            Nothing
+
+
+resolveUnions : Dict String TypeDefinition -> WordType -> WordType
+resolveUnions typeDefs wt =
+    { input = List.map (resolveUnion typeDefs) wt.input
+    , output = List.map (resolveUnion typeDefs) wt.output
+    }
 
 
 qualifyWhen :
@@ -162,26 +277,25 @@ qualifyWhen :
     -> Dict String TypeDefinition
     -> String
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, List (Result () ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
 qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
-            List.foldr (qualifyNode ast wordName) ( qualifiedWords, [] ) impl
-                |> Tuple.mapSecond Result.combine
+            initQualifyNode wordName ast qualifiedWords impl
 
         qualifiedMatchResult =
             qualifyMatch qualifiedTypes typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
-        ( Err (), _ ) ->
+        ( Err err, _ ) ->
             ( newWords
-            , Err () :: result
+            , Err err :: result
             )
 
-        ( _, Err () ) ->
+        ( _, Err err ) ->
             ( newWords
-            , Err () :: result
+            , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
@@ -190,18 +304,18 @@ qualifyWhen ast qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, re
             )
 
 
-qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result () TypeMatch
+qualifyMatch : Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
 qualifyMatch qualifiedTypes typeMatch =
     case typeMatch of
-        Parser.TypeMatch Type.Int [] ->
-            Ok <| TypeMatch Type.Int []
+        Parser.TypeMatch range Type.Int [] ->
+            Ok <| TypeMatch range Type.Int []
 
-        Parser.TypeMatch Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch Type.Int [ ( "value", LiteralInt val ) ]
+        Parser.TypeMatch range Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
+            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
 
-        Parser.TypeMatch ((Type.Custom name) as type_) patterns ->
+        Parser.TypeMatch range ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ gens members) ->
+                Just (CustomTypeDef _ _ gens members) ->
                     let
                         memberNames =
                             members
@@ -210,7 +324,7 @@ qualifyMatch qualifiedTypes typeMatch =
 
                         qualifiedPatternsResult =
                             patterns
-                                |> List.map (qualifyMatchValue qualifiedTypes memberNames)
+                                |> List.map (qualifyMatchValue qualifiedTypes range name memberNames)
                                 |> Result.combine
 
                         actualType =
@@ -223,31 +337,33 @@ qualifyMatch qualifiedTypes typeMatch =
                     in
                     case qualifiedPatternsResult of
                         Ok qualifiedPatterns ->
-                            Ok <| TypeMatch actualType qualifiedPatterns
+                            Ok <| TypeMatch range actualType qualifiedPatterns
 
-                        Err () ->
-                            Err ()
+                        Err err ->
+                            Err err
 
-                Just (UnionTypeDef _ _ types) ->
+                Just (UnionTypeDef _ _ _ types) ->
                     if List.isEmpty patterns then
-                        Ok <| TypeMatch (Type.Union types) []
+                        Ok <| TypeMatch range (Type.Union types) []
 
                     else
-                        Err ()
+                        Err <| UnionTypeMatchWithPatterns range
 
                 Nothing ->
-                    Err ()
+                    Err <| UnknownTypeRef range name
 
-        _ ->
-            Err ()
+        Parser.TypeMatch range _ _ ->
+            Err <| InvalidTypeMatch range
 
 
 qualifyMatchValue :
     Dict String TypeDefinition
+    -> SourceLocationRange
+    -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
-    -> Result () ( String, TypeMatchValue )
-qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
+    -> Result Problem ( String, TypeMatchValue )
+qualifyMatchValue qualifiedTypes range typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
@@ -258,140 +374,127 @@ qualifyMatchValue qualifiedTypes memberNames ( fieldName, matchValue ) =
 
             Parser.RecursiveMatch typeMatch ->
                 case qualifyMatch qualifiedTypes typeMatch of
-                    Err () ->
-                        Err ()
+                    Err err ->
+                        Err err
 
                     Ok match ->
                         Ok <| ( fieldName, RecursiveMatch match )
 
     else
-        Err ()
+        Err <| NoSuchMemberOnType range typeName fieldName
+
+
+initQualifyNode :
+    String
+    -> Parser.AST
+    -> Dict String WordDefinition
+    -> List Parser.AstNode
+    -> ( Dict String WordDefinition, Result Problem (List Node) )
+initQualifyNode currentDefName ast qualifiedWords impl =
+    List.foldr (qualifyNode ast currentDefName) ( 1, qualifiedWords, [] ) impl
+        |> (\( _, newQualifiedWords, errors ) -> ( newQualifiedWords, Result.combine errors ))
 
 
 qualifyNode :
     Parser.AST
     -> String
     -> Parser.AstNode
-    -> ( Dict String WordDefinition, List (Result () Node) )
-    -> ( Dict String WordDefinition, List (Result () Node) )
-qualifyNode ast currentDefName node ( qualifiedWords, qualifiedNodes ) =
+    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
+    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
+qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifiedNodes ) =
     case node of
-        Parser.Integer value ->
-            ( qualifiedWords
-            , Ok (Integer value) :: qualifiedNodes
+        Parser.Integer loc value ->
+            ( availableQuoteId
+            , qualifiedWords
+            , Ok (Integer loc value) :: qualifiedNodes
             )
 
-        Parser.Word value ->
+        Parser.Word loc value ->
             if Dict.member value ast.words then
-                ( qualifiedWords
-                , Ok (Word value) :: qualifiedNodes
+                ( availableQuoteId
+                , qualifiedWords
+                , Ok (Word loc value) :: qualifiedNodes
                 )
 
             else
                 case Dict.get value builtinDict of
                     Just builtin ->
-                        ( qualifiedWords
-                        , Ok builtin :: qualifiedNodes
+                        ( availableQuoteId
+                        , qualifiedWords
+                        , Ok (Builtin loc builtin) :: qualifiedNodes
                         )
 
                     Nothing ->
-                        ( qualifiedWords
-                        , Err () :: qualifiedNodes
+                        ( availableQuoteId
+                        , qualifiedWords
+                        , Err (UnknownWordRef loc value) :: qualifiedNodes
                         )
 
         Parser.ConstructType typeName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (ConstructType typeName) :: qualifiedNodes
             )
 
         Parser.SetMember typeName memberName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (SetMember typeName memberName) :: qualifiedNodes
             )
 
         Parser.GetMember typeName memberName ->
-            ( qualifiedWords
+            ( availableQuoteId
+            , qualifiedWords
             , Ok (GetMember typeName memberName) :: qualifiedNodes
             )
 
-        Parser.Quotation quotImpl ->
+        Parser.Quotation sourceLocation quotImpl ->
             let
+                quoteName =
+                    currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
+
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    List.foldr (qualifyNode ast currentDefName) ( qualifiedWords, [] ) quotImpl
-                        |> Tuple.mapSecond Result.combine
+                    initQualifyNode quoteName ast qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
-                Ok [ Word wordRef ] ->
+                Ok [ Word _ wordRef ] ->
                     case Dict.get wordRef newWordsAfterQuot of
                         Nothing ->
                             Debug.todo "Cannot happen"
 
                         Just oldWord ->
-                            ( Dict.insert wordRef
+                            ( availableQuoteId
+                            , Dict.insert wordRef
                                 { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
                                 newWordsAfterQuot
-                            , Ok (WordRef wordRef) :: qualifiedNodes
+                            , Ok (WordRef sourceLocation wordRef) :: qualifiedNodes
                             )
 
                 Ok qualifiedQuotImpl ->
-                    let
-                        quotBaseName =
-                            currentDefName ++ "__" ++ "quot"
-
-                        quotName =
-                            quotBaseName ++ String.fromInt (quotId 1)
-
-                        quotId possibleId =
-                            case Dict.get (quotBaseName ++ String.fromInt possibleId) newWordsAfterQuot of
-                                Just _ ->
-                                    quotId (possibleId + 1)
-
-                                Nothing ->
-                                    possibleId
-                    in
-                    ( Dict.insert quotName
-                        { name = quotName
+                    ( availableQuoteId + 1
+                    , Dict.insert quoteName
+                        { name = quoteName
                         , metadata =
                             Metadata.default
                                 |> Metadata.isQuoted
                         , implementation = SoloImpl qualifiedQuotImpl
                         }
                         newWordsAfterQuot
-                    , Ok (WordRef quotName) :: qualifiedNodes
+                    , Ok (WordRef sourceLocation quoteName) :: qualifiedNodes
                     )
 
-                Err () ->
-                    ( qualifiedWords
-                    , Err () :: qualifiedNodes
+                Err err ->
+                    ( availableQuoteId
+                    , qualifiedWords
+                    , Err err :: qualifiedNodes
                     )
-
-
-qualifyMetadata : String -> Metadata -> Metadata
-qualifyMetadata baseName metadata =
-    let
-        helper { input, output } =
-            { input = List.map (qualifyMetadataType baseName) input
-            , output = List.map (qualifyMetadataType baseName) output
-            }
-    in
-    { metadata | type_ = Maybe.map helper metadata.type_ }
-
-
-qualifyMetadataType : String -> Type -> Type
-qualifyMetadataType baseName type_ =
-    case type_ of
-        Type.Generic id ->
-            Type.Generic (id ++ "_" ++ baseName)
-
-        _ ->
-            type_
 
 
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ ->
+        CustomTypeDef name _ _ _ ->
             name
 
-        UnionTypeDef name _ _ ->
+        UnionTypeDef name _ _ _ ->
             name

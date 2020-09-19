@@ -5,6 +5,7 @@ import Dict.Extra as Dict
 import Expect
 import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata exposing (Metadata)
+import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
@@ -25,16 +26,16 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Builtin Builtin.Plus
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Builtin emptyRange Builtin.Plus
                                             ]
                                   }
                                 , { name = "dec"
                                   , metadata = Metadata.default
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Builtin Builtin.Minus
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Builtin emptyRange Builtin.Minus
                                             ]
                                   }
                                 , { name = "main"
@@ -43,12 +44,12 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Word "inc"
-                                            , QAST.Word "inc"
-                                            , QAST.Word "dec"
-                                            , QAST.Integer 2
-                                            , QAST.Builtin Builtin.Equal
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Word emptyRange "inc"
+                                            , QAST.Word emptyRange "inc"
+                                            , QAST.Word emptyRange "dec"
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 ]
@@ -63,8 +64,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Builtin Builtin.Plus
+                                            [ IntLiteral emptyRange 1
+                                            , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
                                 , { name = "dec"
@@ -72,8 +73,8 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Builtin Builtin.Minus
+                                            [ IntLiteral emptyRange 1
+                                            , Builtin emptyRange Builtin.Minus
                                             ]
                                   }
                                 , { name = "main"
@@ -83,19 +84,19 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
-                                            [ IntLiteral 1
-                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word "dec" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , IntLiteral 2
-                                            , Builtin Builtin.Equal
+                                            [ IntLiteral emptyRange 1
+                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , Word emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
+                                            , IntLiteral emptyRange 2
+                                            , Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect typecheck to fail."
 
                     Ok typedAst ->
@@ -113,16 +114,16 @@ suite =
                                             |> Metadata.withType [ Type.Int ] []
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Integer 2
-                                            , QAST.Builtin Builtin.Equal
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.pass
 
                     Ok _ ->
@@ -133,7 +134,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "True" [] []
+                                [ QAST.CustomTypeDef "True" emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -151,7 +152,7 @@ suite =
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
+                                            [ QAST.Integer emptyRange 1
                                             ]
                                   }
                                 , { name = "main"
@@ -160,15 +161,15 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word ">True"
-                                            , QAST.Word "as-int"
+                                            [ QAST.Word emptyRange ">True"
+                                            , QAST.Word emptyRange "as-int"
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck source of
-                    Err () ->
+                case run source of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail"
 
                     Ok _ ->
@@ -179,7 +180,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Person" [] [ ( "age", Type.Int ) ]
+                                [ QAST.CustomTypeDef "Person" emptyRange [] [ ( "age", Type.Int ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -213,10 +214,10 @@ suite =
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word "age>"
-                                            , QAST.Integer 1
-                                            , QAST.Builtin Builtin.Plus
-                                            , QAST.Word ">Person"
+                                            [ QAST.Word emptyRange "age>"
+                                            , QAST.Integer emptyRange 1
+                                            , QAST.Builtin emptyRange Builtin.Plus
+                                            , QAST.Word emptyRange ">Person"
                                             ]
                                   }
                                 , { name = "main"
@@ -225,17 +226,17 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Word ">Person"
-                                            , QAST.Word "inc-age"
-                                            , QAST.Word "age>"
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Word emptyRange ">Person"
+                                            , QAST.Word emptyRange "inc-age"
+                                            , QAST.Word emptyRange "age>"
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck source of
-                    Err () ->
+                case run source of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail"
 
                     Ok _ ->
@@ -253,13 +254,13 @@ suite =
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 1
-                                            , QAST.Integer 2
-                                            , QAST.Word "over"
-                                            , QAST.Builtin Builtin.Plus
-                                            , QAST.Builtin Builtin.Minus
-                                            , QAST.Integer 2
-                                            , QAST.Builtin Builtin.Equal
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Word emptyRange "over"
+                                            , QAST.Builtin emptyRange Builtin.Plus
+                                            , QAST.Builtin emptyRange Builtin.Minus
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 , { name = "over"
@@ -269,20 +270,20 @@ suite =
                                                 -- Most would start at a and increment, but we need to check that
                                                 -- the typechecker cares about the relationship between these generic
                                                 -- variables, not the names themselves
-                                                [ Type.Generic "b_over", Type.Generic "c_over" ]
-                                                [ Type.Generic "b_over", Type.Generic "c_over", Type.Generic "b_over" ]
+                                                [ Type.Generic "b", Type.Generic "c" ]
+                                                [ Type.Generic "b", Type.Generic "c", Type.Generic "b" ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Builtin Builtin.StackSwap
-                                            , QAST.Builtin Builtin.StackDuplicate
-                                            , QAST.Builtin Builtin.StackRightRotate
+                                            [ QAST.Builtin emptyRange Builtin.StackSwap
+                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
+                                            , QAST.Builtin emptyRange Builtin.StackRightRotate
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -300,8 +301,8 @@ suite =
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 5
-                                            , QAST.Word "square"
+                                            [ QAST.Integer emptyRange 5
+                                            , QAST.Word emptyRange "square"
                                             ]
                                   }
                                 , { name = "square"
@@ -310,15 +311,15 @@ suite =
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Builtin Builtin.StackDuplicate
-                                            , QAST.Builtin Builtin.Multiply
+                                            [ QAST.Builtin emptyRange Builtin.StackDuplicate
+                                            , QAST.Builtin emptyRange Builtin.Multiply
                                             ]
                                   }
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -329,7 +330,11 @@ suite =
                     input =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ] ]
+                                [ QAST.CustomTypeDef "Box"
+                                    emptyRange
+                                    [ "a" ]
+                                    [ ( "element", Type.Generic "a" ) ]
+                                ]
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "main"
@@ -338,13 +343,13 @@ suite =
                                             |> Metadata.withType [] [ Type.Int ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Integer 5
-                                            , QAST.Word ">Box"
-                                            , QAST.Word "element>"
-                                            , QAST.Integer 10
-                                            , QAST.Builtin Builtin.Plus
-                                            , QAST.Integer 15
-                                            , QAST.Builtin Builtin.Equal
+                                            [ QAST.Integer emptyRange 5
+                                            , QAST.Word emptyRange ">Box"
+                                            , QAST.Word emptyRange "element>"
+                                            , QAST.Integer emptyRange 10
+                                            , QAST.Builtin emptyRange Builtin.Plus
+                                            , QAST.Integer emptyRange 15
+                                            , QAST.Builtin emptyRange Builtin.Equal
                                             ]
                                   }
                                 , { name = ">Box"
@@ -377,8 +382,8 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
-                    Err () ->
+                case run input of
+                    Err _ ->
                         Expect.fail "Did not expect type check to fail."
 
                     Ok _ ->
@@ -389,7 +394,7 @@ suite =
                     input =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box" [] [ ( "element", Type.Generic "a" ) ]
+                                [ QAST.CustomTypeDef "Box" emptyRange [] [ ( "element", Type.Generic "a" ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -405,11 +410,11 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
+                case run input of
                     Ok _ ->
                         Expect.fail "Expected type check to fail."
 
-                    Err () ->
+                    Err _ ->
                         Expect.pass
         , test "Generic custom type fails if wrong generic is listed" <|
             \_ ->
@@ -417,7 +422,7 @@ suite =
                     input =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box" [ "a" ] [ ( "element", Type.Generic "b" ) ]
+                                [ QAST.CustomTypeDef "Box" emptyRange [ "a" ] [ ( "element", Type.Generic "b" ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -433,24 +438,31 @@ suite =
                                 ]
                         }
                 in
-                case typeCheck input of
+                case run input of
                     Ok _ ->
                         Expect.fail "Expected type check to fail."
 
-                    Err () ->
+                    Err _ ->
                         Expect.pass
         , describe "Unions and multifunctions" <|
             let
+                boolUnion =
+                    Type.Union
+                        [ Type.Custom "True"
+                        , Type.Custom "False"
+                        ]
+
                 template multiFn =
                     { types =
                         Dict.fromListBy QAST.typeDefinitionName
                             [ QAST.UnionTypeDef "Bool"
+                                emptyRange
                                 []
                                 [ Type.Custom "True"
                                 , Type.Custom "False"
                                 ]
-                            , QAST.CustomTypeDef "True" [] []
-                            , QAST.CustomTypeDef "False" [] []
+                            , QAST.CustomTypeDef "True" emptyRange [] []
+                            , QAST.CustomTypeDef "False" emptyRange [] []
                             ]
                     , words =
                         Dict.fromListBy .name
@@ -479,11 +491,11 @@ suite =
                                         |> Metadata.asEntryPoint
                               , implementation =
                                     QAST.SoloImpl
-                                        [ QAST.Word ">True"
-                                        , QAST.Word "to-int"
-                                        , QAST.Word ">False"
-                                        , QAST.Word "to-int"
-                                        , QAST.Builtin Builtin.Equal
+                                        [ QAST.Word emptyRange ">True"
+                                        , QAST.Word emptyRange "to-int"
+                                        , QAST.Word emptyRange ">False"
+                                        , QAST.Word emptyRange "to-int"
+                                        , QAST.Builtin emptyRange Builtin.Equal
                                         ]
                               }
                             ]
@@ -498,22 +510,22 @@ suite =
                                 , metadata = Metadata.default
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( QAST.TypeMatch (Type.Custom "False") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 0
+                                        [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 0
                                             ]
                                           )
-                                        , ( QAST.TypeMatch (Type.Custom "True") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 1
+                                        , ( QAST.TypeMatch emptyRange (Type.Custom "True") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 1
                                             ]
                                           )
                                         ]
                                         []
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -526,25 +538,25 @@ suite =
                                 { name = "to-int"
                                 , metadata =
                                     Metadata.default
-                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                        |> Metadata.withType [ boolUnion ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( QAST.TypeMatch (Type.Custom "False") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 0
+                                        [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 0
                                             ]
                                           )
-                                        , ( QAST.TypeMatch (Type.Custom "True") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 1
+                                        , ( QAST.TypeMatch emptyRange (Type.Custom "True") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 1
                                             ]
                                           )
                                         ]
                                         []
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -557,22 +569,22 @@ suite =
                                 { name = "to-int"
                                 , metadata =
                                     Metadata.default
-                                        |> Metadata.withType [ Type.Custom "Bool" ] [ Type.Int ]
+                                        |> Metadata.withType [ boolUnion ] [ Type.Int ]
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( QAST.TypeMatch (Type.Custom "False") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 0
+                                        [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 0
                                             ]
                                           )
                                         ]
-                                        [ QAST.Builtin Builtin.StackDrop
-                                        , QAST.Integer 1
+                                        [ QAST.Builtin emptyRange Builtin.StackDrop
+                                        , QAST.Integer emptyRange 1
                                         ]
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -586,19 +598,19 @@ suite =
                                 , metadata = Metadata.default
                                 , implementation =
                                     QAST.MultiImpl
-                                        [ ( QAST.TypeMatch (Type.Custom "False") []
-                                          , [ QAST.Builtin Builtin.StackDrop
-                                            , QAST.Integer 0
+                                        [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
+                                          , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                            , QAST.Integer emptyRange 0
                                             ]
                                           )
                                         ]
-                                        [ QAST.Builtin Builtin.StackDrop
-                                        , QAST.Integer 1
+                                        [ QAST.Builtin emptyRange Builtin.StackDrop
+                                        , QAST.Integer emptyRange 1
                                         ]
                                 }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -610,14 +622,17 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Beings"
+                                        emptyRange
                                         []
                                         [ Type.Custom "Person"
                                         , Type.Custom "Dog"
                                         ]
                                     , QAST.CustomTypeDef "Person"
+                                        emptyRange
                                         []
                                         [ ( "age", Type.Int ) ]
                                     , QAST.CustomTypeDef "Dog"
+                                        emptyRange
                                         []
                                         [ ( "man-years", Type.Int ) ]
                                     ]
@@ -681,14 +696,14 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.Custom "Person") []
-                                                  , [ QAST.Word ">age"
+                                                [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
+                                                  , [ QAST.Word emptyRange ">age"
                                                     ]
                                                   )
-                                                , ( QAST.TypeMatch (Type.Custom "Dog") []
-                                                  , [ QAST.Integer 4
-                                                    , QAST.Builtin Builtin.Multiply
-                                                    , QAST.Word ">man-years"
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Dog") []
+                                                  , [ QAST.Integer emptyRange 4
+                                                    , QAST.Builtin emptyRange Builtin.Multiply
+                                                    , QAST.Word emptyRange ">man-years"
                                                     ]
                                                   )
                                                 ]
@@ -698,11 +713,11 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.Custom "Person") []
-                                                  , [ QAST.Word "age>" ]
+                                                [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
+                                                  , [ QAST.Word emptyRange "age>" ]
                                                   )
-                                                , ( QAST.TypeMatch (Type.Custom "Dog") []
-                                                  , [ QAST.Word "man-years>" ]
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Dog") []
+                                                  , [ QAST.Word emptyRange "man-years>" ]
                                                   )
                                                 ]
                                                 []
@@ -713,26 +728,26 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 18
-                                                , QAST.Word ">Person"
-                                                , QAST.Integer 10
-                                                , QAST.Word "add-to-age"
-                                                , QAST.Integer 0
-                                                , QAST.Word ">Dog"
-                                                , QAST.Integer 2
-                                                , QAST.Word "add-to-age"
-                                                , QAST.Word "get-man-age"
-                                                , QAST.Builtin Builtin.StackSwap
-                                                , QAST.Word "get-man-age"
-                                                , QAST.Builtin Builtin.StackSwap
-                                                , QAST.Builtin Builtin.Minus
+                                                [ QAST.Integer emptyRange 18
+                                                , QAST.Word emptyRange ">Person"
+                                                , QAST.Integer emptyRange 10
+                                                , QAST.Word emptyRange "add-to-age"
+                                                , QAST.Integer emptyRange 0
+                                                , QAST.Word emptyRange ">Dog"
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Word emptyRange "add-to-age"
+                                                , QAST.Word emptyRange "get-man-age"
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Word emptyRange "get-man-age"
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
-                        Err () ->
+                    case run input of
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
 
                         Ok _ ->
@@ -744,12 +759,13 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Bool"
+                                        emptyRange
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , QAST.CustomTypeDef "True" [] []
-                                    , QAST.CustomTypeDef "False" [] []
+                                    , QAST.CustomTypeDef "True" emptyRange [] []
+                                    , QAST.CustomTypeDef "False" emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -775,14 +791,14 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.Custom "True") []
-                                                  , [ QAST.Builtin Builtin.StackDrop
-                                                    , QAST.Word ">False"
+                                                [ ( QAST.TypeMatch emptyRange (Type.Custom "True") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    , QAST.Word emptyRange ">False"
                                                     ]
                                                   )
-                                                , ( QAST.TypeMatch (Type.Custom "False") []
-                                                  , [ QAST.Builtin Builtin.StackDrop
-                                                    , QAST.Word ">True"
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "False") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    , QAST.Word emptyRange ">True"
                                                     ]
                                                   )
                                                 ]
@@ -794,8 +810,8 @@ suite =
                                                 |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Builtin Builtin.StackDrop
-                                                , QAST.Integer 1
+                                                [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                , QAST.Integer emptyRange 1
                                                 ]
                                       }
                                     , { name = "main"
@@ -804,40 +820,45 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Word ">True"
-                                                , QAST.Word "not"
-                                                , QAST.Word "true-to-int"
+                                                [ QAST.Word emptyRange ">True"
+                                                , QAST.Word emptyRange "not"
+                                                , QAST.Word emptyRange "true-to-int"
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.fail "Did not expect type check to pass."
 
-                        Err () ->
+                        Err _ ->
                             Expect.pass
             , test "Generic union" <|
                 \_ ->
                     let
                         listUnion =
-                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+                            Type.Union
+                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                , Type.Custom "EmptyList"
+                                ]
 
                         input =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "List"
+                                        emptyRange
                                         [ "a" ]
                                         [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                                         , Type.Custom "EmptyList"
                                         ]
                                     , QAST.CustomTypeDef "NonEmptyList"
+                                        emptyRange
                                         [ "a" ]
                                         [ ( "first", Type.Generic "a" )
                                         , ( "rest", listUnion )
                                         ]
-                                    , QAST.CustomTypeDef "EmptyList" [] []
+                                    , QAST.CustomTypeDef "EmptyList" emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -913,14 +934,14 @@ suite =
                                                     [ Type.Generic "a" ]
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
-                                                  , [ QAST.Builtin Builtin.StackDrop
-                                                    , QAST.Word "first>"
+                                                [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    , QAST.Word emptyRange "first>"
                                                     ]
                                                   )
-                                                , ( QAST.TypeMatch (Type.Custom "EmptyList") []
-                                                  , [ QAST.Builtin Builtin.StackSwap
-                                                    , QAST.Builtin Builtin.StackDrop
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "EmptyList") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                    , QAST.Builtin emptyRange Builtin.StackDrop
                                                     ]
                                                   )
                                                 ]
@@ -932,23 +953,23 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Word ">EmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Integer 0
-                                                , QAST.Word "first-or-default"
-                                                , QAST.Integer 1
-                                                , QAST.Builtin Builtin.Equal
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Word emptyRange ">EmptyList"
+                                                , QAST.Word emptyRange ">NonEmptyList"
+                                                , QAST.Integer emptyRange 0
+                                                , QAST.Word emptyRange "first-or-default"
+                                                , QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Equal
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Expected type check to pass."
             , test "Generic union fails if not generic is listed" <|
                 \_ ->
@@ -957,11 +978,12 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Maybe"
+                                        emptyRange
                                         [ "a" ]
                                         [ Type.Generic "b"
                                         , Type.Custom "Nothing"
                                         ]
-                                    , QAST.CustomTypeDef "Nothing" [] []
+                                    , QAST.CustomTypeDef "Nothing" emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -977,11 +999,11 @@ suite =
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.fail "Expected type check to fail."
 
-                        Err () ->
+                        Err _ ->
                             Expect.pass
             ]
         , describe "Quotations"
@@ -996,7 +1018,7 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Builtin Builtin.Apply
+                                                [ QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
@@ -1005,11 +1027,11 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.WordRef "main__quot2"
-                                                , QAST.Word "apply-to-num"
-                                                , QAST.WordRef "main__quot1"
-                                                , QAST.Word "apply-to-num"
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.WordRef emptyRange "main__quot2"
+                                                , QAST.Word emptyRange "apply-to-num"
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "apply-to-num"
                                                 ]
                                       }
                                     , { name = "main__quot2"
@@ -1018,8 +1040,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Builtin Builtin.Plus
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     , { name = "main__quot1"
@@ -1028,18 +1050,18 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Builtin Builtin.Minus
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             , test "With type annotation" <|
                 \_ ->
@@ -1061,7 +1083,7 @@ suite =
                                                     [ Type.Int ]
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Builtin Builtin.Apply
+                                                [ QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
@@ -1070,11 +1092,11 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.WordRef "main__quot2"
-                                                , QAST.Word "apply-to-num"
-                                                , QAST.WordRef "main__quot1"
-                                                , QAST.Word "apply-to-num"
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.WordRef emptyRange "main__quot2"
+                                                , QAST.Word emptyRange "apply-to-num"
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "apply-to-num"
                                                 ]
                                       }
                                     , { name = "main__quot2"
@@ -1083,8 +1105,8 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Builtin Builtin.Plus
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     , { name = "main__quot1"
@@ -1093,18 +1115,18 @@ suite =
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Builtin Builtin.Minus
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             ]
         , describe "Recursive word definitions"
@@ -1112,22 +1134,27 @@ suite =
                 \_ ->
                     let
                         listUnion =
-                            Type.CustomGeneric "List" [ Type.Generic "a" ]
+                            Type.Union
+                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                , Type.Custom "EmptyList"
+                                ]
 
                         input =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "List"
+                                        emptyRange
                                         [ "a" ]
                                         [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                                         , Type.Custom "EmptyList"
                                         ]
                                     , QAST.CustomTypeDef "NonEmptyList"
+                                        emptyRange
                                         [ "a" ]
                                         [ ( "first", Type.Generic "a" )
                                         , ( "rest", listUnion )
                                         ]
-                                    , QAST.CustomTypeDef "EmptyList" [] []
+                                    , QAST.CustomTypeDef "EmptyList" emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -1199,8 +1226,8 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 0
-                                                , QAST.Word "sum-helper"
+                                                [ QAST.Integer emptyRange 0
+                                                , QAST.Word emptyRange "sum-helper"
                                                 ]
                                       }
                                     , { name = "sum-helper"
@@ -1209,20 +1236,20 @@ suite =
                                                 |> Metadata.withType [ listUnion, Type.Int ] [ Type.Int ]
                                       , implementation =
                                             QAST.MultiImpl
-                                                [ ( QAST.TypeMatch (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
-                                                  , [ QAST.Builtin Builtin.StackSwap
-                                                    , QAST.Builtin Builtin.StackDuplicate
-                                                    , QAST.Word "first>"
-                                                    , QAST.Builtin Builtin.StackRightRotate
-                                                    , QAST.Word "rest>"
-                                                    , QAST.Builtin Builtin.StackRightRotate
-                                                    , QAST.Builtin Builtin.Plus
-                                                    , QAST.Word "sum-helper"
+                                                [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                    , QAST.Builtin emptyRange Builtin.StackDuplicate
+                                                    , QAST.Word emptyRange "first>"
+                                                    , QAST.Builtin emptyRange Builtin.StackRightRotate
+                                                    , QAST.Word emptyRange "rest>"
+                                                    , QAST.Builtin emptyRange Builtin.StackRightRotate
+                                                    , QAST.Builtin emptyRange Builtin.Plus
+                                                    , QAST.Word emptyRange "sum-helper"
                                                     ]
                                                   )
-                                                , ( QAST.TypeMatch (Type.Custom "EmptyList") []
-                                                  , [ QAST.Builtin Builtin.StackSwap
-                                                    , QAST.Builtin Builtin.StackDrop
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "EmptyList") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                    , QAST.Builtin emptyRange Builtin.StackDrop
                                                     ]
                                                   )
                                                 ]
@@ -1234,24 +1261,24 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Integer 1
-                                                , QAST.Integer 2
-                                                , QAST.Integer 3
-                                                , QAST.Word ">EmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Word ">NonEmptyList"
-                                                , QAST.Word "sum"
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Integer emptyRange 3
+                                                , QAST.Word emptyRange ">EmptyList"
+                                                , QAST.Word emptyRange ">NonEmptyList"
+                                                , QAST.Word emptyRange ">NonEmptyList"
+                                                , QAST.Word emptyRange ">NonEmptyList"
+                                                , QAST.Word emptyRange "sum"
                                                 ]
                                       }
                                     ]
                             }
                     in
-                    case typeCheck input of
+                    case run input of
                         Ok _ ->
                             Expect.pass
 
-                        Err () ->
+                        Err _ ->
                             Expect.fail "Did not expect type check to fail."
             ]
         ]

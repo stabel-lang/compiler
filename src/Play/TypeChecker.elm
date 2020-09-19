@@ -5,8 +5,11 @@ import Dict.Extra as Dict
 import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
+import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
+import Play.Data.TypeSignature as TypeSignature
 import Play.Qualifier as Qualifier
+import Play.TypeChecker.Problem exposing (Problem(..))
 import Set exposing (Set)
 
 
@@ -17,8 +20,8 @@ type alias AST =
 
 
 type TypeDefinition
-    = CustomTypeDef String (List String) (List ( String, Type ))
-    | UnionTypeDef String (List String) (List Type)
+    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
+    | UnionTypeDef String SourceLocationRange (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -35,7 +38,7 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
@@ -45,13 +48,13 @@ type TypeMatchValue
 
 
 type AstNode
-    = IntLiteral Int
-    | Word String WordType
-    | WordRef String
+    = IntLiteral SourceLocationRange Int
+    | Word SourceLocationRange String WordType
+    | WordRef SourceLocationRange String
     | ConstructType String
     | SetMember String String Type
     | GetMember String String Type
-    | Builtin Builtin
+    | Builtin SourceLocationRange Builtin
 
 
 type alias Context =
@@ -62,7 +65,7 @@ type alias Context =
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
     , callStack : Set String
-    , errors : List ()
+    , errors : List Problem
     }
 
 
@@ -78,36 +81,45 @@ initContext ast =
             Dict.map
                 (\_ t ->
                     case t of
-                        Qualifier.CustomTypeDef name generics members ->
-                            CustomTypeDef name generics members
+                        Qualifier.CustomTypeDef name range generics members ->
+                            CustomTypeDef name range generics members
 
-                        Qualifier.UnionTypeDef name generics memberTypes ->
-                            UnionTypeDef name generics memberTypes
+                        Qualifier.UnionTypeDef name range generics memberTypes ->
+                            UnionTypeDef name range generics memberTypes
                 )
                 ast.types
 
         genericErrors t =
             let
-                ( listedGenerics, memberTypes ) =
-                    case t of
-                        CustomTypeDef _ generics members ->
-                            ( Set.fromList generics
-                            , List.map Tuple.second members
-                            )
-
-                        UnionTypeDef _ generics mts ->
-                            ( Set.fromList generics, mts )
-
-                usedGenerics =
-                    List.map referencedGenerics memberTypes
+                collectReferencedGenerics memberTypes =
+                    List.map Type.referencedGenerics memberTypes
                         |> List.foldl Set.union Set.empty
                         |> Set.toList
-            in
-            if List.all (\gen -> Set.member gen listedGenerics) usedGenerics then
-                Nothing
 
-            else
-                Just ()
+                collectUndeclaredGenericProblems range listedGenerics memberTypes =
+                    memberTypes
+                        |> List.filter (\gen -> not (Set.member gen listedGenerics))
+                        |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
+            in
+            case t of
+                CustomTypeDef name range generics members ->
+                    let
+                        listedGenerics_ =
+                            Set.fromList generics
+                    in
+                    members
+                        |> List.map Tuple.second
+                        |> collectReferencedGenerics
+                        |> collectUndeclaredGenericProblems range listedGenerics_
+
+                UnionTypeDef name range generics mts ->
+                    let
+                        listedGenerics_ =
+                            Set.fromList generics
+                    in
+                    mts
+                        |> collectReferencedGenerics
+                        |> collectUndeclaredGenericProblems range listedGenerics_
     in
     { types = concreteTypes
     , typedWords = Dict.empty
@@ -116,42 +128,20 @@ initContext ast =
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
     , callStack = Set.empty
-    , errors = List.filterMap genericErrors (Dict.values concreteTypes)
+    , errors = List.concatMap genericErrors (Dict.values concreteTypes)
     }
 
 
-referencedGenerics : Type -> Set String
-referencedGenerics t =
-    case t of
-        Type.Generic val ->
-            Set.singleton val
-
-        Type.CustomGeneric _ members ->
-            members
-                |> List.map referencedGenerics
-                |> List.foldl Set.union Set.empty
-
-        Type.Union members ->
-            members
-                |> List.map referencedGenerics
-                |> List.foldl Set.union Set.empty
-
-        _ ->
-            Set.empty
-
-
-typeCheck : Qualifier.AST -> Result () AST
-typeCheck ast =
+run : Qualifier.AST -> Result (List Problem) AST
+run ast =
     typeCheckHelper (initContext ast) ast
 
 
-typeCheckHelper : Context -> Qualifier.AST -> Result () AST
+typeCheckHelper : Context -> Qualifier.AST -> Result (List Problem) AST
 typeCheckHelper context ast =
     let
         updatedContext =
-            ast.words
-                |> Dict.values
-                |> List.foldl typeCheckDefinition context
+            Dict.foldl (\_ v acc -> typeCheckDefinition v acc) context ast.words
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
@@ -160,19 +150,11 @@ typeCheckHelper context ast =
             }
 
     else
-        Err ()
+        Err updatedContext.errors
 
 
 typeCheckDefinition : Qualifier.WordDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
-    let
-        cleanContext ctx =
-            { ctx
-                | stackEffects = []
-                , boundGenerics = Dict.empty
-                , boundStackRanges = Dict.empty
-            }
-    in
     case Dict.get untypedDef.name context.typedWords of
         Just _ ->
             cleanContext context
@@ -180,247 +162,191 @@ typeCheckDefinition untypedDef context =
         Nothing ->
             case untypedDef.implementation of
                 Qualifier.SoloImpl impl ->
-                    let
-                        ( inferredType, newContext ) =
-                            typeCheckImplementation untypedDef impl (cleanContext context)
-
-                        finalContext =
-                            { newContext
-                                | typedWords =
-                                    Dict.insert untypedDef.name
-                                        { name = untypedDef.name
-                                        , type_ = Maybe.withDefault inferredType untypedDef.metadata.type_
-                                        , metadata = untypedDef.metadata
-                                        , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
-                                        }
-                                        newContext.typedWords
-                            }
-                    in
-                    verifyTypeSignature inferredType untypedDef finalContext
-                        |> cleanContext
+                    typeCheckSoloImplementation context untypedDef impl
 
                 Qualifier.MultiImpl initialWhens defaultImpl ->
+                    typeCheckMultiImplementation context untypedDef initialWhens defaultImpl
+
+
+cleanContext : Context -> Context
+cleanContext ctx =
+    { ctx
+        | stackEffects = []
+        , boundGenerics = Dict.empty
+        , boundStackRanges = Dict.empty
+    }
+
+
+typeCheckSoloImplementation : Context -> Qualifier.WordDefinition -> List Qualifier.Node -> Context
+typeCheckSoloImplementation context untypedDef impl =
+    let
+        ( inferredType, newContext ) =
+            typeCheckImplementation untypedDef impl (cleanContext context)
+
+        finalContext =
+            { newContext
+                | typedWords =
+                    Dict.insert untypedDef.name
+                        { name = untypedDef.name
+                        , type_ =
+                            untypedDef.metadata.type_
+                                |> TypeSignature.toMaybe
+                                |> Maybe.withDefault inferredType
+                        , metadata = untypedDef.metadata
+                        , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
+                        }
+                        newContext.typedWords
+            }
+    in
+    verifyTypeSignature inferredType untypedDef finalContext
+        |> cleanContext
+
+
+typeCheckMultiImplementation :
+    Context
+    -> Qualifier.WordDefinition
+    -> List ( Qualifier.TypeMatch, List Qualifier.Node )
+    -> List Qualifier.Node
+    -> Context
+typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
+    let
+        whens =
+            case defaultImpl of
+                [] ->
+                    initialWhens
+
+                _ ->
                     let
-                        whens =
-                            case defaultImpl of
-                                [] ->
-                                    initialWhens
+                        ( inferredDefaultType, _ ) =
+                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                    in
+                    case inferredDefaultType.input of
+                        [] ->
+                            Debug.todo "Default impl doesn't have an input argument"
 
-                                _ ->
-                                    let
-                                        ( inferredDefaultType, _ ) =
-                                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
-                                    in
-                                    case inferredDefaultType.input of
-                                        [] ->
-                                            Debug.todo "Default impl doesn't have an input argument"
+                        firstType :: _ ->
+                            ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
-                                        firstType :: _ ->
-                                            ( Qualifier.TypeMatch firstType [], defaultImpl ) :: initialWhens
+        ( inferredWhenTypes, newContext ) =
+            List.foldr inferWhenTypes ( [], context ) whens
 
-                        inferWhenTypes ( _, im ) ( infs, ctx ) =
-                            let
-                                ( inf, newCtx ) =
-                                    typeCheckImplementation untypedDef im (cleanContext ctx)
-                            in
-                            ( inf :: infs, newCtx )
+        inferWhenTypes ( _, im ) ( infs, ctx ) =
+            let
+                ( inf, newCtx ) =
+                    typeCheckImplementation untypedDef im (cleanContext ctx)
+            in
+            ( inf :: infs, newCtx )
 
-                        ( inferredWhenTypes, newContext ) =
-                            List.foldr inferWhenTypes ( [], context ) whens
+        whensAreConsistent =
+            inferredWhenTypes
+                |> List.map2 Tuple.pair (List.map Tuple.first whens)
+                |> List.all typeCheckWhen
 
-                        whensAreConsistent =
-                            inferredWhenTypes
-                                |> List.map2 Tuple.pair (List.map Tuple.first whens)
-                                |> List.map typeCheckWhen
-                                |> List.all (\( b, _, _ ) -> b)
+        typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
+            case inf.input of
+                firstInput :: _ ->
+                    Type.genericlyCompatible firstInput forType
 
-                        whensAreCompatible =
-                            inferredWhenTypes
-                                |> List.map stripFirstInput
-                                |> List.map countOutput
-                                |> areAllEqual
+                [] ->
+                    False
 
-                        typeCheckWhen ( Qualifier.TypeMatch forType _, inf ) =
-                            case inf.input of
-                                firstInput :: _ ->
-                                    ( typeCompatible firstInput forType
-                                    , forType
-                                    , inf
-                                    )
+        whensAreCompatible =
+            inferredWhenTypes
+                |> List.map (stripFirstInput >> countOutput)
+                |> areAllEqual
 
-                                [] ->
-                                    ( False, forType, inf )
+        stripFirstInput inf =
+            { inf | input = List.drop 1 inf.input }
 
-                        typeCompatible lhs rhs =
+        countOutput wordType =
+            ( wordType.input, List.length wordType.output )
+
+        areAllEqual ls =
+            case ls of
+                [] ->
+                    True
+
+                ( fTypes, fCnt ) :: rest ->
+                    List.all
+                        (\( nTypes, nCnt ) ->
+                            (fCnt == nCnt)
+                                && compatibleTypeList fTypes nTypes
+                        )
+                        rest
+
+        compatibleTypeList aLs bLs =
+            List.map2 Type.genericlyCompatible aLs bLs
+                |> List.all identity
+
+        inferredType =
+            List.head inferredWhenTypes
+                |> Maybe.withDefault { input = [], output = [] }
+                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractTypeFromTypeMatch) whens))
+                |> joinOutputs (List.map .output inferredWhenTypes)
+
+        replaceFirstType with inf =
+            case inf.input of
+                _ :: rem ->
+                    { inf | input = with :: rem }
+
+                _ ->
+                    inf
+
+        joinOutputs outputs result =
+            case outputs of
+                first :: second :: rest ->
+                    let
+                        joined =
+                            List.map2 unionize first second
+
+                        unionize lhs rhs =
                             case ( lhs, rhs ) of
-                                ( Type.Generic _, _ ) ->
-                                    True
-
-                                ( _, Type.Generic _ ) ->
-                                    True
-
-                                ( Type.CustomGeneric lName _, Type.CustomGeneric rName _ ) ->
-                                    lName == rName
-
                                 _ ->
-                                    lhs == rhs
-
-                        stripFirstInput inf =
-                            case inf.input of
-                                _ :: rem ->
-                                    { inf | input = rem }
-
-                                _ ->
-                                    inf
-
-                        countOutput wordType =
-                            ( wordType.input, List.length wordType.output )
-
-                        areAllEqual ls =
-                            case ls of
-                                [] ->
-                                    True
-
-                                ( fTypes, fCnt ) :: rest ->
-                                    List.all
-                                        (\( nTypes, nCnt ) ->
-                                            (fCnt == nCnt)
-                                                && compatibleTypeList fTypes nTypes
-                                        )
-                                        rest
-
-                        compatibleTypeList aLs bLs =
-                            List.map2 Tuple.pair aLs bLs
-                                |> List.all (\( l, r ) -> typeCompatible l r)
-
-                        inferredType =
-                            List.head inferredWhenTypes
-                                |> Maybe.withDefault { input = [], output = [] }
-                                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractType) whens))
-                                |> joinOutputs (List.map .output inferredWhenTypes)
-
-                        replaceFirstType with inf =
-                            case inf.input of
-                                _ :: rem ->
-                                    { inf | input = with :: rem }
-
-                                _ ->
-                                    inf
-
-                        joinOutputs outputs result =
-                            case outputs of
-                                first :: second :: rest ->
-                                    let
-                                        joined =
-                                            List.map2 unionize first second
-
-                                        unionize lhs rhs =
-                                            case ( lhs, rhs ) of
-                                                _ ->
-                                                    if lhs == rhs then
-                                                        lhs
-
-                                                    else
-                                                        Type.Union [ lhs, rhs ]
-                                    in
-                                    joinOutputs (joined :: rest) result
-
-                                joined :: [] ->
-                                    { result | output = joined }
-
-                                _ ->
-                                    result
-
-                        extractType (Qualifier.TypeMatch t_ _) =
-                            t_
-
-                        mapTypeMatch (Qualifier.TypeMatch type_ cond) =
-                            TypeMatch type_ (List.map mapTypeMatchValue cond)
-
-                        mapTypeMatchValue ( fieldName, value ) =
-                            case value of
-                                Qualifier.LiteralInt val ->
-                                    ( fieldName, LiteralInt val )
-
-                                Qualifier.LiteralType val ->
-                                    ( fieldName, LiteralType val )
-
-                                Qualifier.RecursiveMatch val ->
-                                    ( fieldName, RecursiveMatch (mapTypeMatch val) )
-
-                        finalContext =
-                            { newContext
-                                | typedWords =
-                                    Dict.insert untypedDef.name
-                                        { name = untypedDef.name
-                                        , type_ =
-                                            case untypedDef.metadata.type_ of
-                                                Just annotatedType ->
-                                                    { annotatedType
-                                                        | input = List.map (resolveUnion newContext) annotatedType.input
-                                                        , output = List.map (resolveUnion newContext) annotatedType.output
-                                                    }
-
-                                                Nothing ->
-                                                    inferredType
-                                        , metadata = untypedDef.metadata
-                                        , implementation =
-                                            MultiImpl
-                                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
-                                                (List.map (untypedToTypedNode newContext) defaultImpl)
-                                        }
-                                        newContext.typedWords
-                                , errors =
-                                    if whensAreConsistent && whensAreCompatible then
-                                        newContext.errors
+                                    if lhs == rhs then
+                                        lhs
 
                                     else
-                                        () :: newContext.errors
-                            }
+                                        Type.Union [ lhs, rhs ]
                     in
-                    verifyTypeSignature inferredType untypedDef finalContext
-                        |> cleanContext
+                    joinOutputs (joined :: rest) result
 
-
-resolveUnion : Context -> Type -> Type
-resolveUnion context type_ =
-    case type_ of
-        Type.Custom typeName ->
-            case Dict.get typeName context.types of
-                Just (UnionTypeDef _ _ members) ->
-                    Type.Union members
+                joined :: [] ->
+                    { result | output = joined }
 
                 _ ->
-                    type_
+                    result
 
-        Type.CustomGeneric typeName types ->
-            case Dict.get typeName context.types of
-                Just (UnionTypeDef _ generics members) ->
-                    let
-                        genericsMap =
-                            List.map2 Tuple.pair generics types
-                                |> Dict.fromList
+        finalContext =
+            { newContext
+                | typedWords =
+                    Dict.insert untypedDef.name
+                        { name = untypedDef.name
+                        , type_ =
+                            TypeSignature.toMaybe untypedDef.metadata.type_
+                                |> Maybe.withDefault inferredType
+                        , metadata = untypedDef.metadata
+                        , implementation =
+                            MultiImpl
+                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
+                                (List.map (untypedToTypedNode newContext) defaultImpl)
+                        }
+                        newContext.typedWords
+                , errors =
+                    if whensAreConsistent && whensAreCompatible then
+                        newContext.errors
 
-                        rebindGenerics t =
-                            case t of
-                                Type.Generic val ->
-                                    Dict.get val genericsMap
-                                        |> Maybe.withDefault t
-
-                                Type.CustomGeneric cgName cgMembers ->
-                                    Type.CustomGeneric cgName <|
-                                        List.map rebindGenerics cgMembers
-
-                                _ ->
-                                    t
-                    in
-                    Type.Union (List.map rebindGenerics members)
-
-                _ ->
-                    type_
-
-        _ ->
-            type_
+                    else
+                        let
+                            error =
+                                InconsistentWhens
+                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                                    untypedDef.name
+                        in
+                        error :: newContext.errors
+            }
+    in
+    verifyTypeSignature inferredType untypedDef finalContext
+        |> cleanContext
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -438,21 +364,52 @@ typeCheckImplementation untypedDef impl context =
         contextWithoutCall =
             { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
     in
-    wordTypeFromStackEffects contextWithoutCall
+    wordTypeFromStackEffects untypedDef contextWithoutCall
         |> simplifyWordType untypedDef.name
         |> (\( a, b ) -> ( b, a ))
 
 
+extractTypeFromTypeMatch : Qualifier.TypeMatch -> Type
+extractTypeFromTypeMatch (Qualifier.TypeMatch _ t_ _) =
+    t_
+
+
+mapTypeMatch : Qualifier.TypeMatch -> TypeMatch
+mapTypeMatch (Qualifier.TypeMatch range type_ cond) =
+    TypeMatch range type_ (List.map mapTypeMatchValue cond)
+
+
+mapTypeMatchValue : ( String, Qualifier.TypeMatchValue ) -> ( String, TypeMatchValue )
+mapTypeMatchValue ( fieldName, value ) =
+    case value of
+        Qualifier.LiteralInt val ->
+            ( fieldName, LiteralInt val )
+
+        Qualifier.LiteralType val ->
+            ( fieldName, LiteralType val )
+
+        Qualifier.RecursiveMatch val ->
+            ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
+
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context
 verifyTypeSignature inferredType untypedDef context =
-    case untypedDef.metadata.type_ of
+    case TypeSignature.toMaybe untypedDef.metadata.type_ of
         Just annotatedType ->
             let
                 ( _, simplifiedAnnotatedType ) =
                     simplifyWordType untypedDef.name ( context, annotatedType )
             in
-            if not <| compatibleWordTypes simplifiedAnnotatedType inferredType context then
-                { context | errors = () :: context.errors }
+            if not <| Type.compatibleWords simplifiedAnnotatedType inferredType then
+                let
+                    range =
+                        untypedDef.metadata.sourceLocationRange
+                            |> Maybe.withDefault SourceLocation.emptyRange
+
+                    problem =
+                        TypeError range untypedDef.name simplifiedAnnotatedType inferredType
+                in
+                { context | errors = problem :: context.errors }
 
             else
                 context
@@ -461,266 +418,17 @@ verifyTypeSignature inferredType untypedDef context =
             context
 
 
-compatibleWordTypes : WordType -> WordType -> Context -> Bool
-compatibleWordTypes annotated inferred context =
-    let
-        annotatedInputTypes =
-            List.map (resolveUnion context) annotated.input
-
-        inferredInputTypes =
-            List.map (resolveUnion context) inferred.input
-
-        annotatedOutputTypes =
-            List.map (resolveUnion context) annotated.output
-
-        inferredOutputTypes =
-            List.map (resolveUnion context) inferred.output
-
-        ( inputRangeDict, inputsCompatible ) =
-            compareType_ annotatedInputTypes inferredInputTypes Dict.empty
-
-        ( _, outputsCompatible ) =
-            compareType_ annotatedOutputTypes inferredOutputTypes inputRangeDict
-    in
-    inputsCompatible && outputsCompatible
-
-
-compareType_ : List Type -> List Type -> Dict String (List Type) -> ( Dict String (List Type), Bool )
-compareType_ lhs rhs rangeDict =
-    case ( lhs, rhs ) of
-        ( [], [] ) ->
-            ( rangeDict, True )
-
-        ( (Type.StackRange lhsName) :: lhsRest, (Type.StackRange rhsName) :: rhsRest ) ->
-            if lhsName == rhsName then
-                compareType_ lhsRest rhsRest rangeDict
-
-            else
-                ( rangeDict, False )
-
-        ( (Type.StackRange _) :: [], [] ) ->
-            ( rangeDict, True )
-
-        ( [], (Type.StackRange _) :: [] ) ->
-            ( rangeDict, True )
-
-        ( lhsEl :: lhsRest, (Type.StackRange rangeName) :: [] ) ->
-            compareType_ lhsRest rhs <|
-                Dict.update rangeName
-                    (\maybeVal ->
-                        maybeVal
-                            |> Maybe.withDefault []
-                            |> (\existing -> existing ++ [ lhsEl ])
-                            |> Just
-                    )
-                    rangeDict
-
-        ( lhsEl :: lhsRest, (Type.StackRange rangeName) :: rhsNext :: rhsRest ) ->
-            if sameBaseType lhsEl rhsNext then
-                compareType_ lhs (rhsNext :: rhsRest) rangeDict
-
-            else
-                compareType_ lhsRest rhs <|
-                    Dict.update rangeName
-                        (\maybeVal ->
-                            maybeVal
-                                |> Maybe.withDefault []
-                                |> (\existing -> existing ++ [ lhsEl ])
-                                |> Just
-                        )
-                        rangeDict
-
-        ( (Type.Quotation lhsQuotType) :: lhsRest, (Type.Quotation rhsQuotType) :: rhsRest ) ->
-            let
-                lhsInputRangeApplied =
-                    applyRangeDict rangeDict lhsQuotType.input
-
-                lhsOutputRangeApplied =
-                    applyRangeDict rangeDict lhsQuotType.output
-
-                rhsInputRangeApplied =
-                    applyRangeDict rangeDict rhsQuotType.input
-
-                rhsOutputRangeApplied =
-                    applyRangeDict rangeDict rhsQuotType.output
-
-                applyRangeDict rd types =
-                    List.concatMap
-                        (\type_ ->
-                            case type_ of
-                                Type.StackRange rangeName ->
-                                    case Dict.get rangeName rd of
-                                        Just subst ->
-                                            subst
-
-                                        Nothing ->
-                                            [ type_ ]
-
-                                other ->
-                                    [ other ]
-                        )
-                        types
-
-                ( dictRangePostInputs, inputCompatible ) =
-                    compareType_ lhsInputRangeApplied rhsInputRangeApplied rangeDict
-
-                ( dictRangePostOutputs, outputCompatible ) =
-                    compareType_ lhsOutputRangeApplied rhsOutputRangeApplied dictRangePostInputs
-            in
-            if inputCompatible && outputCompatible then
-                compareType_ lhsRest rhsRest dictRangePostOutputs
-
-            else
-                ( dictRangePostOutputs, False )
-
-        ( (Type.Generic _) :: lhsRest, _ :: rhsRest ) ->
-            compareType_ lhsRest rhsRest rangeDict
-
-        ( _ :: lhsRest, (Type.Generic _) :: rhsRest ) ->
-            compareType_ lhsRest rhsRest rangeDict
-
-        ( (Type.CustomGeneric lName lMembers) :: lhsRest, (Type.CustomGeneric rName rMembers) :: rhsRest ) ->
-            let
-                ( _, compatibleMembers ) =
-                    compareType_ lMembers rMembers Dict.empty
-            in
-            if lName == rName && compatibleMembers then
-                compareType_ lhsRest rhsRest rangeDict
-
-            else
-                ( rangeDict, False )
-
-        ( (Type.Union lMembers) :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
-            let
-                lSet =
-                    Set.fromList (List.map typeAsStr lMembers)
-
-                rSet =
-                    Set.fromList (List.map typeAsStr rMembers)
-
-                diff =
-                    Set.diff rSet lSet
-                        |> Set.toList
-            in
-            case diff of
-                [] ->
-                    compareType_ lhsRest rhsRest rangeDict
-
-                [ oneDiff ] ->
-                    -- Likely the default case
-                    if String.endsWith "_Generic" oneDiff then
-                        compareType_ lhsRest rhsRest rangeDict
-
-                    else
-                        ( rangeDict, False )
-
-                _ ->
-                    ( rangeDict, False )
-
-        ( (Type.Union _) :: _, _ ) ->
-            -- Cannot go from union to concrete type
-            ( rangeDict, False )
-
-        ( lhsEl :: lhsRest, (Type.Union rMembers) :: rhsRest ) ->
-            let
-                compatible =
-                    rMembers
-                        |> List.map typeAsStr
-                        |> Set.fromList
-                        |> Set.member (typeAsStr lhsEl)
-            in
-            if compatible then
-                compareType_ lhsRest rhsRest rangeDict
-
-            else
-                ( rangeDict, False )
-
-        ( lhsEl :: lhsRest, rhsEl :: rhsRest ) ->
-            if lhsEl == rhsEl then
-                compareType_ lhsRest rhsRest rangeDict
-
-            else
-                ( rangeDict, False )
-
-        _ ->
-            ( rangeDict, False )
-
-
-sameBaseType : Type -> Type -> Bool
-sameBaseType lhs rhs =
-    if lhs == rhs then
-        True
-
-    else
-        case ( lhs, rhs ) of
-            ( Type.Quotation _, Type.Quotation _ ) ->
-                True
-
-            ( Type.Union _, Type.Union _ ) ->
-                True
-
-            _ ->
-                False
-
-
-typeAsStr : Type -> String
-typeAsStr t =
-    case t of
-        Type.Int ->
-            "Int"
-
-        Type.Generic name ->
-            name ++ "_Generic"
-
-        Type.Custom name ->
-            name ++ "_Custom"
-
-        Type.CustomGeneric name _ ->
-            name ++ "_Custom"
-
-        Type.Union _ ->
-            "Union"
-
-        Type.Quotation _ ->
-            "quot"
-
-        Type.StackRange name ->
-            name ++ "..."
-
-
 typeCheckNode : Int -> Qualifier.Node -> Context -> Context
 typeCheckNode idx node context =
     let
         addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ List.map tagGenericEffect effects }
-
-        tagGenericEffect effect =
-            case effect of
-                Push type_ ->
-                    Push <| tagGeneric type_
-
-                Pop type_ ->
-                    Pop <| tagGeneric type_
-
-        tagGeneric type_ =
-            case type_ of
-                Type.Generic genName ->
-                    Type.Generic (genName ++ String.fromInt idx)
-
-                Type.CustomGeneric name generics ->
-                    Type.CustomGeneric name (List.map tagGeneric generics)
-
-                Type.Union members ->
-                    Type.Union (List.map tagGeneric members)
-
-                _ ->
-                    type_
+            { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
     in
     case node of
-        Qualifier.Integer _ ->
+        Qualifier.Integer _ _ ->
             addStackEffect context [ Push Type.Int ]
 
-        Qualifier.Word name ->
+        Qualifier.Word _ name ->
             case Dict.get name context.typedWords of
                 Just def ->
                     addStackEffect context <| wordTypeToStackEffects def.type_
@@ -733,12 +441,18 @@ typeCheckNode idx node context =
                         Just untypedDef ->
                             if Set.member name context.callStack then
                                 -- recursive definition!
-                                case untypedDef.metadata.type_ of
+                                case TypeSignature.toMaybe untypedDef.metadata.type_ of
                                     Just annotatedType ->
                                         addStackEffect context <| wordTypeToStackEffects annotatedType
 
                                     Nothing ->
-                                        { context | errors = () :: context.errors }
+                                        let
+                                            problem =
+                                                MissingTypeAnnotationInRecursiveCallStack
+                                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                                                    untypedDef.name
+                                        in
+                                        { context | errors = problem :: context.errors }
 
                             else
                                 let
@@ -755,10 +469,10 @@ typeCheckNode idx node context =
                                     Just def ->
                                         addStackEffect newContext <| wordTypeToStackEffects def.type_
 
-        Qualifier.WordRef ref ->
+        Qualifier.WordRef loc ref ->
             let
                 contextAfterWordCheck =
-                    typeCheckNode idx (Qualifier.Word ref) context
+                    typeCheckNode idx (Qualifier.Word loc ref) context
             in
             case Dict.get ref contextAfterWordCheck.typedWords of
                 Just def ->
@@ -770,13 +484,13 @@ typeCheckNode idx node context =
 
         Qualifier.ConstructType typeName ->
             case Dict.get typeName context.types of
-                Just (CustomTypeDef _ _ members) ->
+                Just (CustomTypeDef _ _ _ members) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -801,13 +515,13 @@ typeCheckNode idx node context =
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ _ members), Just memberType ) ->
+                ( Just (CustomTypeDef _ _ _ members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -832,13 +546,13 @@ typeCheckNode idx node context =
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ _ members), Just memberType ) ->
+                ( Just (CustomTypeDef _ _ _ members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
 
                         genericMembers =
-                            List.filter isGeneric memberTypes
+                            List.filter Type.isGeneric memberTypes
 
                         typeInQuestion =
                             case genericMembers of
@@ -857,8 +571,34 @@ typeCheckNode idx node context =
                 _ ->
                     Debug.todo "inconcievable!"
 
-        Qualifier.Builtin builtin ->
+        Qualifier.Builtin _ builtin ->
             addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
+
+
+tagGenericEffect : Int -> StackEffect -> StackEffect
+tagGenericEffect idx effect =
+    case effect of
+        Push type_ ->
+            Push <| tagGeneric idx type_
+
+        Pop type_ ->
+            Pop <| tagGeneric idx type_
+
+
+tagGeneric : Int -> Type -> Type
+tagGeneric idx type_ =
+    case type_ of
+        Type.Generic genName ->
+            Type.Generic (genName ++ String.fromInt idx)
+
+        Type.CustomGeneric name generics ->
+            Type.CustomGeneric name (List.map (tagGeneric idx) generics)
+
+        Type.Union members ->
+            Type.Union (List.map (tagGeneric idx) members)
+
+        _ ->
+            type_
 
 
 wordTypeToStackEffects : WordType -> List StackEffect
@@ -867,17 +607,24 @@ wordTypeToStackEffects wordType =
         ++ List.map Push wordType.output
 
 
-wordTypeFromStackEffects : Context -> ( Context, WordType )
-wordTypeFromStackEffects context =
-    wordTypeFromStackEffectsHelper context.stackEffects ( context, { input = [], output = [] } )
+wordTypeFromStackEffects : Qualifier.WordDefinition -> Context -> ( Context, WordType )
+wordTypeFromStackEffects untypedDef context =
+    wordTypeFromStackEffectsHelper untypedDef context.stackEffects ( context, { input = [], output = [] } )
 
 
-wordTypeFromStackEffectsHelper : List StackEffect -> ( Context, WordType ) -> ( Context, WordType )
-wordTypeFromStackEffectsHelper effects ( context, wordType ) =
+wordTypeFromStackEffectsHelper : Qualifier.WordDefinition -> List StackEffect -> ( Context, WordType ) -> ( Context, WordType )
+wordTypeFromStackEffectsHelper untypedDef effects ( context, wordType ) =
+    let
+        problem expected actual =
+            UnexpectedType
+                (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                untypedDef.name
+                expected
+                actual
+    in
     case effects of
         [] ->
             ( context
-              -- TODO: Really need to get this list reverse madness figured out and solved properly
             , { wordType
                 | input = wordType.input
                 , output = List.reverse wordType.output
@@ -887,17 +634,17 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
         (Pop ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
             case Dict.get rangeName context.boundStackRanges of
                 Just needToPop ->
-                    wordTypeFromStackEffectsHelper (List.map Pop needToPop ++ remainingEffects) ( context, wordType )
+                    wordTypeFromStackEffectsHelper untypedDef (List.map Pop needToPop ++ remainingEffects) ( context, wordType )
 
                 Nothing ->
                     case wordType.output of
                         [] ->
-                            wordTypeFromStackEffectsHelper remainingEffects <|
+                            wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
                                 ( context, { wordType | input = type_ :: wordType.input } )
 
                         availableType :: remainingOutput ->
-                            if availableType /= Type.StackRange rangeName then
-                                ( { context | errors = () :: context.errors }, wordType )
+                            if availableType /= type_ then
+                                ( { context | errors = problem type_ availableType :: context.errors }, wordType )
 
                             else
                                 ( context, { wordType | output = remainingOutput } )
@@ -905,7 +652,7 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
         (Pop type_) :: remainingEffects ->
             case wordType.output of
                 [] ->
-                    wordTypeFromStackEffectsHelper remainingEffects <|
+                    wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
                         ( context, { wordType | input = type_ :: wordType.input } )
 
                 availableType :: remainingOutput ->
@@ -914,25 +661,25 @@ wordTypeFromStackEffectsHelper effects ( context, wordType ) =
                             compatibleTypes context availableType type_
                     in
                     if not compatible then
-                        ( { newContext | errors = () :: context.errors }, wordType )
+                        ( { newContext | errors = problem type_ availableType :: context.errors }, wordType )
 
                     else
-                        wordTypeFromStackEffectsHelper remainingEffects <|
+                        wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
                             ( newContext, { wordType | output = remainingOutput } )
 
         (Push ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
             case Dict.get rangeName context.boundStackRanges of
                 Just range ->
-                    wordTypeFromStackEffectsHelper
+                    wordTypeFromStackEffectsHelper untypedDef
                         (List.map Push range ++ remainingEffects)
                         ( context, wordType )
 
                 Nothing ->
-                    wordTypeFromStackEffectsHelper remainingEffects <|
+                    wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
                         ( context, { wordType | output = type_ :: wordType.output } )
 
         (Push type_) :: remainingEffects ->
-            wordTypeFromStackEffectsHelper remainingEffects <|
+            wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
                 ( context, { wordType | output = type_ :: wordType.output } )
 
 
@@ -960,7 +707,7 @@ compatibleTypes context typeA typeB =
                 ( context, True )
 
             else
-                case ( resolveUnion context boundA, resolveUnion context boundB ) of
+                case ( boundA, boundB ) of
                     ( Type.Union leftUnion, Type.Union rightUnion ) ->
                         -- TODO: Requires unions to be sorted in same order
                         let
@@ -1132,7 +879,7 @@ simplifyWordType defName ( context, wordType ) =
 
         aliases =
             oldSignature
-                |> List.filterMap genericName
+                |> List.filterMap Type.genericName
                 -- remove duplicates
                 |> (Set.fromList >> Set.toList)
                 |> List.map (findAliases context)
@@ -1192,16 +939,6 @@ simplifyWordType defName ( context, wordType ) =
     )
 
 
-genericName : Type -> Maybe String
-genericName type_ =
-    case type_ of
-        Type.Generic name ->
-            Just name
-
-        _ ->
-            Nothing
-
-
 findAliases : Context -> String -> ( String, List String )
 findAliases context generic =
     ( generic
@@ -1244,30 +981,25 @@ reverseLookup ( name, aliases ) acc =
 untypedToTypedNode : Context -> Qualifier.Node -> AstNode
 untypedToTypedNode context untypedNode =
     case untypedNode of
-        Qualifier.Integer num ->
-            IntLiteral num
+        Qualifier.Integer range num ->
+            IntLiteral range num
 
-        Qualifier.Word name ->
+        Qualifier.Word range name ->
             case Dict.get name context.typedWords of
                 Just def ->
-                    Word name def.type_
+                    Word range name def.type_
 
                 Nothing ->
                     Dict.get name context.untypedWords
-                        |> Maybe.andThen (.metadata >> .type_)
+                        |> Maybe.andThen (.metadata >> .type_ >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
-                        |> Word name
+                        |> Word range name
 
-        Qualifier.WordRef ref ->
-            WordRef ref
+        Qualifier.WordRef range ref ->
+            WordRef range ref
 
         Qualifier.ConstructType typeName ->
-            case Dict.get typeName context.types of
-                Just _ ->
-                    ConstructType typeName
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
+            ConstructType typeName
 
         Qualifier.SetMember typeName memberName ->
             case getMemberType context.types typeName memberName of
@@ -1285,14 +1017,14 @@ untypedToTypedNode context untypedNode =
                 Nothing ->
                     Debug.todo "Inconcievable!"
 
-        Qualifier.Builtin builtin ->
-            Builtin builtin
+        Qualifier.Builtin range builtin ->
+            Builtin range builtin
 
 
 getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
 getMemberType typeDict typeName memberName =
     case Dict.get typeName typeDict of
-        Just (CustomTypeDef _ _ members) ->
+        Just (CustomTypeDef _ _ _ members) ->
             List.find (\( name, _ ) -> name == memberName) members
                 |> Maybe.map Tuple.second
 
@@ -1303,18 +1035,8 @@ getMemberType typeDict typeName memberName =
 typeDefName : TypeDefinition -> String
 typeDefName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ ->
+        CustomTypeDef name _ _ _ ->
             name
 
-        UnionTypeDef name _ _ ->
+        UnionTypeDef name _ _ _ ->
             name
-
-
-isGeneric : Type -> Bool
-isGeneric t =
-    case t of
-        Type.Generic _ ->
-            True
-
-        _ ->
-            False
