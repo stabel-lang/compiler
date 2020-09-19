@@ -7,6 +7,7 @@ import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Parser as Parser
+import Play.Qualifier.Problem exposing (Problem(..))
 import Result.Extra as Result
 import Set exposing (Set)
 
@@ -52,14 +53,6 @@ type Node
     | GetMember String String
     | SetMember String String
     | Builtin SourceLocationRange Builtin
-
-
-type Problem
-    = UnknownWordRef SourceLocationRange String
-    | UnknownTypeRef SourceLocationRange String
-    | UnionTypeMatchWithPatterns SourceLocationRange
-    | InvalidTypeMatch SourceLocationRange
-    | NoSuchMemberOnType String String
 
 
 builtinDict : Dict String Builtin

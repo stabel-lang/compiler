@@ -9,6 +9,7 @@ import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
 import Play.Qualifier as Qualifier
+import Play.TypeChecker.Problem exposing (Problem(..))
 import Set exposing (Set)
 
 
@@ -54,14 +55,6 @@ type AstNode
     | SetMember String String Type
     | GetMember String String Type
     | Builtin SourceLocationRange Builtin
-
-
-type Problem
-    = UndeclaredGeneric SourceLocationRange String (Set String)
-    | TypeError SourceLocationRange String WordType WordType
-    | UnexpectedType SourceLocationRange String Type Type
-    | InconsistentWhens SourceLocationRange String
-    | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
 
 
 type alias Context =

@@ -8,6 +8,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
+import Play.Qualifier.Problem exposing (Problem(..))
 import Test exposing (Test, describe, test)
 
 

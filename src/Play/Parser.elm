@@ -1,7 +1,6 @@
 module Play.Parser exposing
     ( AST
     , AstNode(..)
-    , Problem(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
@@ -18,30 +17,12 @@ import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
 import Play.Data.TypeSignature as TypeSignature
+import Play.Parser.Problem exposing (..)
 import Set exposing (Set)
 
 
 type alias Parser a =
     Parser.Parser () Problem a
-
-
-type Problem
-    = NotInt
-    | NotSymbol
-    | NotMetadata
-    | NotGeneric
-    | NotType
-    | NoProblem
-    | FoundMetadata
-    | ExpectedLeftParen
-    | ExpectedRightParen
-    | ExpectedEnd
-    | ExpectedTypeSeperator
-    | ExpectedLeftBracket
-    | ExpectedRightBracket
-    | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
-    | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
-    | UnknownMetadata String
 
 
 type alias AST =

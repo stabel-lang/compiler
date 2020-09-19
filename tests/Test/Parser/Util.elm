@@ -8,6 +8,7 @@ import Dict.Extra as Dict
 import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Parser as AST exposing (..)
+import Play.Parser.Problem exposing (Problem)
 import String.Extra as String
 
 

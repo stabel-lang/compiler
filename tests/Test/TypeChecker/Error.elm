@@ -8,6 +8,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Qualifier exposing (..)
 import Play.TypeChecker as TypeChecker
+import Play.TypeChecker.Problem as Problem
 import Test exposing (Test, describe, test)
 
 
@@ -41,7 +42,7 @@ suite =
 
                     undeclaredGenericError generic problem =
                         case problem of
-                            TypeChecker.UndeclaredGeneric _ problemGeneric _ ->
+                            Problem.UndeclaredGeneric _ problemGeneric _ ->
                                 generic == problemGeneric
 
                             _ ->
@@ -71,7 +72,7 @@ suite =
 
                     undeclaredGenericError problem =
                         case problem of
-                            TypeChecker.TypeError _ "main" provided inferred ->
+                            Problem.TypeError _ "main" provided inferred ->
                                 (provided == { input = [], output = [ Type.Int ] })
                                     && (inferred == { input = [], output = [ Type.Int, Type.Int ] })
 
@@ -132,7 +133,7 @@ suite =
 
                     undeclaredGenericError problem =
                         case problem of
-                            TypeChecker.UnexpectedType _ "main" (Type.Custom "IntBox") Type.Int ->
+                            Problem.UnexpectedType _ "main" (Type.Custom "IntBox") Type.Int ->
                                 True
 
                             _ ->
@@ -142,7 +143,7 @@ suite =
         ]
 
 
-checkForError : (TypeChecker.Problem -> Bool) -> AST -> Expectation
+checkForError : (Problem.Problem -> Bool) -> AST -> Expectation
 checkForError fn source =
     case TypeChecker.run source of
         Err errors ->
