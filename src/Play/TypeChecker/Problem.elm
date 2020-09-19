@@ -16,8 +16,8 @@ type Problem
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
 
 
-toString : Problem -> String
-toString problem =
+toString : String -> Problem -> String
+toString source problem =
     case problem of
         _ ->
             "UNKNOWN"

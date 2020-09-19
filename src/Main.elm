@@ -55,17 +55,17 @@ compile : String -> Result String Wasm.Module
 compile sourceCode =
     case Parser.run sourceCode of
         Err parserErrors ->
-            formatErrors ParserProblem.toString parserErrors
+            formatErrors (ParserProblem.toString sourceCode) parserErrors
 
         Ok ast ->
             case Qualifier.run ast of
                 Err qualifierErrors ->
-                    formatErrors QualifierProblem.toString qualifierErrors
+                    formatErrors (QualifierProblem.toString sourceCode) qualifierErrors
 
                 Ok qualifiedAst ->
                     case TypeChecker.run qualifiedAst of
                         Err typeErrors ->
-                            formatErrors TypeCheckerProblem.toString typeErrors
+                            formatErrors (TypeCheckerProblem.toString sourceCode) typeErrors
 
                         Ok typedAst ->
                             Codegen.codegen typedAst

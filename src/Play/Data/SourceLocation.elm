@@ -19,3 +19,8 @@ emptyRange =
     SourceLocationRange
         (SourceLocation 0 0 0)
         (SourceLocation 0 0 0)
+
+
+toString : SourceLocation -> String
+toString location =
+    String.fromInt location.row ++ ":" ++ String.fromInt location.col
