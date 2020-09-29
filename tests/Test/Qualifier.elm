@@ -650,6 +650,89 @@ suite =
 
                         Ok qualifiedAst ->
                             Expect.equal expectedAst qualifiedAst
+            , test "Generic cases are allowed" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ AST.UnionTypeDef emptyRange
+                                        "Maybe"
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nothing"
+                                        ]
+                                    , AST.CustomTypeDef emptyRange "Nothing" [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nothing"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ConstructType "Nothing"
+                                                ]
+                                      }
+                                    , { name = "with-default"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ AST.Word emptyRange "drop" ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "swap"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromListBy typeDefinitionName
+                                    [ UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nothing"
+                                        ]
+                                    , CustomTypeDef "Nothing" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nothing"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "Nothing"
+                                                ]
+                                      }
+                                    , { name = "with-default"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackSwap
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run unqualifiedAst of
+                        Err _ ->
+                            Expect.fail "Did not expect qualification to fail"
+
+                        Ok qualifiedAst ->
+                            Expect.equal expectedAst qualifiedAst
             ]
         , test "Resolves unions" <|
             \_ ->

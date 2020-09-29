@@ -313,6 +313,9 @@ qualifyMatch qualifiedTypes typeMatch =
         Parser.TypeMatch range Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
             Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
 
+        Parser.TypeMatch range ((Type.Generic _) as type_) [] ->
+            Ok <| TypeMatch range type_ []
+
         Parser.TypeMatch range ((Type.Custom name) as type_) patterns ->
             case Dict.get name qualifiedTypes of
                 Just (CustomTypeDef _ _ gens members) ->
