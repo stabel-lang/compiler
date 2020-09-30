@@ -229,6 +229,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         ( inferredWhenTypes, newContext ) =
             List.foldr inferWhenTypes ( [], context ) whens
+                |> Tuple.mapFirst normalizeWhenTypes
 
         inferWhenTypes ( _, im ) ( infs, ctx ) =
             let
@@ -279,10 +280,11 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> List.all identity
 
         inferredType =
-            List.head inferredWhenTypes
+            List.head (Debug.log "infWhens" inferredWhenTypes)
                 |> Maybe.withDefault { input = [], output = [] }
                 |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractTypeFromTypeMatch) whens))
                 |> joinOutputs (List.map .output inferredWhenTypes)
+                |> Debug.log "inf"
 
         replaceFirstType with inf =
             case inf.input of
@@ -347,6 +349,49 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     in
     verifyTypeSignature inferredType untypedDef finalContext
         |> cleanContext
+
+
+normalizeWhenTypes : List WordType -> List WordType
+normalizeWhenTypes whenTypes =
+    let
+        maybeLongestInputWhenType =
+            List.sortBy (.input >> List.length) whenTypes
+                |> List.reverse
+                |> List.head
+
+        matchInputLength toMatch wordType =
+            let
+                diff =
+                    List.length toMatch.input - List.length wordType.input
+
+                padding =
+                    List.take diff toMatch.input
+                        |> List.map padGeneric
+            in
+            case padding of
+                [] ->
+                    wordType
+
+                elements ->
+                    { wordType
+                        | input = elements ++ wordType.input
+                        , output = elements ++ wordType.output
+                    }
+
+        padGeneric t =
+            case t of
+                Type.Generic val ->
+                    Type.Generic ("*" ++ val)
+
+                _ ->
+                    t
+    in
+    case maybeLongestInputWhenType of
+        Just longestInputWT ->
+            List.map (matchInputLength longestInputWT) whenTypes
+
+        Nothing ->
+            whenTypes
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
