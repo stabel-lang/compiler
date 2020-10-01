@@ -228,15 +228,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
         ( inferredWhenTypes, newContext ) =
-            List.foldr inferWhenTypes ( [], context ) whens
+            List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
                 |> Tuple.mapFirst normalizeWhenTypes
-
-        inferWhenTypes ( _, im ) ( infs, ctx ) =
-            let
-                ( inf, newCtx ) =
-                    typeCheckImplementation untypedDef im (cleanContext ctx)
-            in
-            ( inf :: infs, newCtx )
+                |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
 
         whensAreConsistent =
             inferredWhenTypes
@@ -351,6 +345,19 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         |> cleanContext
 
 
+inferWhenTypes :
+    Qualifier.WordDefinition
+    -> ( Qualifier.TypeMatch, List Qualifier.Node )
+    -> ( List WordType, Context )
+    -> ( List WordType, Context )
+inferWhenTypes untypedDef ( _, im ) ( infs, ctx ) =
+    let
+        ( inf, newCtx ) =
+            typeCheckImplementation untypedDef im (cleanContext ctx)
+    in
+    ( inf :: infs, newCtx )
+
+
 normalizeWhenTypes : List WordType -> List WordType
 normalizeWhenTypes whenTypes =
     let
@@ -392,6 +399,13 @@ normalizeWhenTypes whenTypes =
 
         Nothing ->
             whenTypes
+
+
+simplifyWhenWordTypes : List WordType -> Context -> ( List WordType, Context )
+simplifyWhenWordTypes wordTypes context =
+    ( List.map (\wt -> Tuple.second (simplifyWordType ( context, wt ))) wordTypes
+    , context
+    )
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
