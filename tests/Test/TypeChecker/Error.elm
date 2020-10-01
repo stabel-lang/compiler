@@ -3,6 +3,7 @@ module Test.TypeChecker.Error exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
@@ -140,6 +141,36 @@ suite =
                                 False
                 in
                 checkForError undeclaredGenericError ast
+        , test "An inferred concrete output type should not successfully type check against a generic variable" <|
+            \_ ->
+                let
+                    ast =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "in" ] [ Type.Generic "out" ]
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 1
+                                            , Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    typeError problem =
+                        case problem of
+                            Problem.TypeError _ "main" _ _ ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError typeError ast
         ]
 
 
@@ -154,4 +185,4 @@ checkForError fn source =
                 Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
 
         Ok _ ->
-            Expect.fail "Did not expect parsing to succeed"
+            Expect.fail "Did not expect type checking to succeed"
