@@ -410,7 +410,7 @@ typeCheckImplementation untypedDef impl context =
             { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
     in
     wordTypeFromStackEffects untypedDef contextWithoutCall
-        |> simplifyWordType untypedDef.name
+        |> simplifyWordType
         |> (\( a, b ) -> ( b, a ))
 
 
@@ -443,7 +443,7 @@ verifyTypeSignature inferredType untypedDef context =
         Just annotatedType ->
             let
                 ( _, simplifiedAnnotatedType ) =
-                    simplifyWordType untypedDef.name ( context, annotatedType )
+                    simplifyWordType ( context, annotatedType )
             in
             if not <| Type.compatibleWords simplifiedAnnotatedType inferredType then
                 let
@@ -913,8 +913,8 @@ replaceStackRange boundRanges types =
         types
 
 
-simplifyWordType : String -> ( Context, WordType ) -> ( Context, WordType )
-simplifyWordType defName ( context, wordType ) =
+simplifyWordType : ( Context, WordType ) -> ( Context, WordType )
+simplifyWordType ( context, wordType ) =
     let
         oldSignature =
             wordType.input ++ wordType.output
@@ -964,7 +964,7 @@ simplifyWordType defName ( context, wordType ) =
                         Nothing ->
                             let
                                 newName =
-                                    String.fromChar nextId ++ "_" ++ defName
+                                    String.fromChar nextId
                             in
                             ( nextId
                                 |> Char.toCode
