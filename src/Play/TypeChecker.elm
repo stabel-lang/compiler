@@ -276,7 +276,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         inferredType =
             List.head (Debug.log "infWhens" inferredWhenTypes)
                 |> Maybe.withDefault { input = [], output = [] }
-                |> replaceFirstType (Type.Union (List.map (Tuple.first >> extractTypeFromTypeMatch) whens))
+                |> replaceFirstType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
                 |> Debug.log "inf"
 
@@ -320,6 +320,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         , type_ =
                             TypeSignature.toMaybe untypedDef.metadata.type_
                                 |> Maybe.withDefault inferredType
+                                |> Debug.log "type"
                         , metadata = untypedDef.metadata
                         , implementation =
                             MultiImpl
@@ -406,6 +407,23 @@ simplifyWhenWordTypes wordTypes context =
     ( List.map (\wt -> Tuple.second (simplifyWordType ( context, wt ))) wordTypes
     , context
     )
+
+
+unionOfTypeMatches : List ( Qualifier.TypeMatch, a ) -> Type
+unionOfTypeMatches whenBranches =
+    let
+        uniqueTypes =
+            whenBranches
+                |> List.map (Tuple.first >> extractTypeFromTypeMatch)
+                |> List.gatherEquals
+                |> List.map Tuple.first
+    in
+    case uniqueTypes of
+        [ singleType ] ->
+            singleType
+
+        _ ->
+            Type.Union uniqueTypes
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -965,6 +983,9 @@ simplifyWordType ( context, wordType ) =
                                 Nothing ->
                                     type_
 
+                Type.Union members ->
+                    Type.Union (List.map reduceGenericName members)
+
                 _ ->
                     type_
 
@@ -987,6 +1008,13 @@ simplifyWordType ( context, wordType ) =
                             , Dict.insert genName newName seenGenerics
                             , Type.Generic newName :: acc
                             )
+
+                Type.Union members ->
+                    let
+                        ( newNextId, newSeenGenerics, newMembers ) =
+                            List.foldl renameGenerics ( nextId, seenGenerics, [] ) members
+                    in
+                    ( newNextId, newSeenGenerics, Type.Union newMembers :: acc )
 
                 _ ->
                     ( nextId, seenGenerics, type_ :: acc )
