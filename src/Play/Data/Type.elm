@@ -306,22 +306,10 @@ compatibleTypeLists annotated inferred rangeDict =
                     ( rangeDict, False )
 
         ( (Union _) :: _, _ ) ->
-            -- Cannot go from union to concrete type
             ( rangeDict, False )
 
-        ( annotatedEl :: annotatedRest, (Union rMembers) :: inferredRest ) ->
-            let
-                compatible =
-                    rMembers
-                        |> List.map toString
-                        |> Set.fromList
-                        |> Set.member (toString annotatedEl)
-            in
-            if compatible then
-                compatibleTypeLists annotatedRest inferredRest rangeDict
-
-            else
-                ( rangeDict, False )
+        ( _, (Union _) :: _ ) ->
+            ( rangeDict, False )
 
         ( annotatedEl :: annotatedRest, inferredEl :: inferredRest ) ->
             if annotatedEl == inferredEl then

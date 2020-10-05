@@ -171,93 +171,92 @@ suite =
                                 False
                 in
                 checkForError typeError ast
-        , Test.only <|
-            test "An inferred union output type should not successfully type check against a generic variable" <|
-                \_ ->
-                    let
-                        ast =
-                            { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Bool"
-                                        emptyRange
-                                        []
-                                        [ Type.Custom "True"
-                                        , Type.Custom "False"
-                                        ]
-                                    , CustomTypeDef "True" emptyRange [] []
-                                    , CustomTypeDef "False" emptyRange [] []
+        , test "An inferred union output type should not successfully type check against a generic variable" <|
+            \_ ->
+                let
+                    ast =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef "Bool"
+                                    emptyRange
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
                                     ]
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Generic "out" ]
-                                                |> Metadata.asEntryPoint
-                                      , implementation =
-                                            SoloImpl
-                                                [ Integer emptyRange 0
-                                                , Word emptyRange "true-or-false"
-                                                ]
-                                      }
-                                    , { name = "true-or-false"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Int ]
-                                                    [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ]
-                                      , implementation =
-                                            MultiImpl
-                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
-                                                  , [ Builtin emptyRange Builtin.StackDrop
-                                                    , Word emptyRange ">False"
-                                                    ]
-                                                  )
-                                                , ( TypeMatch emptyRange Type.Int []
-                                                  , [ Builtin emptyRange Builtin.StackDrop
-                                                    , Word emptyRange ">True"
-                                                    ]
-                                                  )
-                                                ]
-                                                []
-                                      }
-                                    , { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "True"
-                                                ]
-                                      }
-                                    , { name = ">False"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "False"
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case TypeChecker.run ast of
-                        Err errors ->
-                            Expect.equalLists
-                                [ Problem.TypeError emptyRange
-                                    "main"
-                                    { input = [], output = [ Type.Generic "a" ] }
-                                    { input = [], output = [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ] }
-                                , Problem.TypeError emptyRange
-                                    "true-or-false"
-                                    { input = [ Type.Int ], output = [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ] }
-                                    { input = [ Type.Int ], output = [ Type.Union [ Type.Custom "True", Type.Custom "False" ] ] }
+                                , CustomTypeDef "True" emptyRange [] []
+                                , CustomTypeDef "False" emptyRange [] []
                                 ]
-                                errors
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Generic "out" ]
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 0
+                                            , Word emptyRange "true-or-false"
+                                            ]
+                                  }
+                                , { name = "true-or-false"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Int ]
+                                                [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
+                                              , [ Builtin emptyRange Builtin.StackDrop
+                                                , Word emptyRange ">False"
+                                                ]
+                                              )
+                                            , ( TypeMatch emptyRange Type.Int []
+                                              , [ Builtin emptyRange Builtin.StackDrop
+                                                , Word emptyRange ">True"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "False"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case TypeChecker.run ast of
+                    Err errors ->
+                        Expect.equalLists
+                            [ Problem.TypeError emptyRange
+                                "main"
+                                { input = [], output = [ Type.Generic "a" ] }
+                                { input = [], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
+                            , Problem.TypeError emptyRange
+                                "true-or-false"
+                                { input = [ Type.Int ], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
+                                { input = [ Type.Int ], output = [ Type.Union [ Type.Custom "False", Type.Custom "True" ] ] }
+                            ]
+                            errors
 
-                        Ok _ ->
-                            Expect.fail "Did not expect type checking to succeed"
+                    Ok _ ->
+                        Expect.fail "Did not expect type checking to succeed"
         ]
 
 
