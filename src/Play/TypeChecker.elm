@@ -7,7 +7,7 @@ import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata exposing (Metadata)
 import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type as Type exposing (Type, WordType)
-import Play.Data.TypeSignature as TypeSignature
+import Play.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Play.Qualifier as Qualifier
 import Play.TypeChecker.Problem exposing (Problem(..))
 import Set exposing (Set)
@@ -231,6 +231,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
             List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
+                |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.metadata.type_) whenTypes)
 
         whensAreConsistent =
             inferredWhenTypes
@@ -279,38 +280,6 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> replaceFirstType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
                 |> Debug.log "inf"
-
-        replaceFirstType with inf =
-            case inf.input of
-                _ :: rem ->
-                    { inf | input = with :: rem }
-
-                _ ->
-                    inf
-
-        joinOutputs outputs result =
-            case outputs of
-                first :: second :: rest ->
-                    let
-                        joined =
-                            List.map2 unionize first second
-
-                        unionize lhs rhs =
-                            case ( lhs, rhs ) of
-                                _ ->
-                                    if lhs == rhs then
-                                        lhs
-
-                                    else
-                                        Type.Union [ lhs, rhs ]
-                    in
-                    joinOutputs (joined :: rest) result
-
-                joined :: [] ->
-                    { result | output = joined }
-
-                _ ->
-                    result
 
         finalContext =
             { newContext
@@ -424,6 +393,90 @@ unionOfTypeMatches whenBranches =
 
         _ ->
             Type.Union uniqueTypes
+
+
+replaceFirstType : Type -> WordType -> WordType
+replaceFirstType with inf =
+    case inf.input of
+        _ :: rem ->
+            { inf | input = with :: rem }
+
+        _ ->
+            inf
+
+
+joinOutputs : List (List Type) -> WordType -> WordType
+joinOutputs outputs result =
+    case outputs of
+        first :: second :: rest ->
+            let
+                joined =
+                    List.map2 unionize first second
+
+                unionize lhs rhs =
+                    case ( lhs, rhs ) of
+                        _ ->
+                            if lhs == rhs then
+                                lhs
+
+                            else
+                                Type.Union [ lhs, rhs ]
+            in
+            joinOutputs (joined :: rest) result
+
+        joined :: [] ->
+            { result | output = joined }
+
+        _ ->
+            result
+
+
+constrainGenerics : TypeSignature -> WordType -> WordType
+constrainGenerics typeSignature inferredType =
+    case TypeSignature.toMaybe typeSignature of
+        Nothing ->
+            inferredType
+
+        Just annotatedType ->
+            let
+                ( remappedGenerics, constrainedInputs ) =
+                    constrainGenericsHelper Dict.empty annotatedType.input inferredType.input []
+
+                ( _, constrainedOutputs ) =
+                    constrainGenericsHelper remappedGenerics annotatedType.output inferredType.output []
+            in
+            { input = constrainedInputs
+            , output = constrainedOutputs
+            }
+
+
+constrainGenericsHelper : Dict String String -> List Type -> List Type -> List Type -> ( Dict String String, List Type )
+constrainGenericsHelper remappedGenerics annotated inferred acc =
+    case ( annotated, inferred ) of
+        ( [], _ ) ->
+            ( remappedGenerics, List.reverse acc )
+
+        ( _, [] ) ->
+            ( remappedGenerics, List.reverse acc )
+
+        ( (Type.Generic annGen) :: annotatedRest, ((Type.Generic infGen) as inferredEl) :: inferredRest ) ->
+            if annGen == infGen then
+                constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
+
+            else
+                case Dict.get infGen remappedGenerics of
+                    Just val ->
+                        constrainGenericsHelper remappedGenerics annotatedRest inferredRest (Type.Generic val :: acc)
+
+                    Nothing ->
+                        constrainGenericsHelper
+                            (Dict.insert infGen annGen remappedGenerics)
+                            annotatedRest
+                            inferredRest
+                            (Type.Generic annGen :: acc)
+
+        ( _ :: annotatedRest, inferredEl :: inferredRest ) ->
+            constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
 
 
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
@@ -1012,7 +1065,7 @@ simplifyWordType ( context, wordType ) =
                 Type.Union members ->
                     let
                         ( newNextId, newSeenGenerics, newMembers ) =
-                            List.foldl renameGenerics ( nextId, seenGenerics, [] ) members
+                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
                     in
                     ( newNextId, newSeenGenerics, Type.Union newMembers :: acc )
 
