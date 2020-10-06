@@ -231,6 +231,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
             List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
+                |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.metadata.type_) whenTypes)
 
         whensAreConsistent =
@@ -241,7 +242,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
             case inf.input of
                 firstInput :: _ ->
-                    Type.genericlyCompatible firstInput forType
+                    Type.genericlyCompatible (Debug.log "first" firstInput) (Debug.log "forType" forType)
 
                 [] ->
                     False
@@ -376,6 +377,67 @@ simplifyWhenWordTypes wordTypes context =
     ( List.map (\wt -> Tuple.second (simplifyWordType ( context, wt ))) wordTypes
     , context
     )
+
+
+equalizeWhenTypes : List WordType -> List WordType
+equalizeWhenTypes wordTypes =
+    equalizeWhenTypesHelper wordTypes Dict.empty []
+
+
+equalizeWhenTypesHelper : List WordType -> Dict String Type -> List WordType -> List WordType
+equalizeWhenTypesHelper types remappedGenerics acc =
+    case types of
+        [] ->
+            List.reverse acc
+
+        lastType :: [] ->
+            List.reverse (lastType :: acc)
+
+        firstType :: secondType :: remaining ->
+            let
+                constrainAndZip lhs rhs =
+                    case ( lhs, rhs ) of
+                        ( Type.Generic _, Type.Generic _ ) ->
+                            ( lhs, rhs )
+
+                        ( Type.Generic _, other ) ->
+                            ( other, other )
+
+                        ( other, Type.Generic _ ) ->
+                            ( other, other )
+
+                        _ ->
+                            ( lhs, rhs )
+
+                unzip ( left, right ) ( leftAcc, rightAcc ) =
+                    ( left :: leftAcc, right :: rightAcc )
+
+                constrainedInputs =
+                    List.map2 constrainAndZip firstType.input secondType.input
+
+                constrainedOutputs =
+                    List.map2 constrainAndZip firstType.output secondType.output
+
+                ( unzippedFirstInputs, unzippedSecondInputs ) =
+                    List.foldr unzip ( [], [] ) constrainedInputs
+
+                ( unzippedFirstOutputs, unzippedSecondOutputs ) =
+                    List.foldr unzip ( [], [] ) constrainedOutputs
+
+                newFirstType =
+                    { input = unzippedFirstInputs
+                    , output = unzippedFirstOutputs
+                    }
+
+                newSecondType =
+                    { input = unzippedSecondInputs
+                    , output = unzippedSecondOutputs
+                    }
+            in
+            equalizeWhenTypesHelper
+                remaining
+                remappedGenerics
+                (newSecondType :: newFirstType :: acc)
 
 
 unionOfTypeMatches : List ( Qualifier.TypeMatch, a ) -> Type
