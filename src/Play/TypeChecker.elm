@@ -229,6 +229,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         ( inferredWhenTypes, newContext ) =
             List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
+                |> Tuple.mapFirst (Debug.log "a")
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst equalizeWhenTypes
@@ -242,7 +243,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
             case inf.input of
                 firstInput :: _ ->
-                    Type.genericlyCompatible (Debug.log "first" firstInput) (Debug.log "forType" forType)
+                    Debug.log "?" (Type.genericlyCompatible (Debug.log "first" firstInput) (Debug.log "forType" forType))
 
                 [] ->
                     False
@@ -1101,6 +1102,9 @@ simplifyWordType ( context, wordType ) =
                 Type.Union members ->
                     Type.Union (List.map reduceGenericName members)
 
+                Type.CustomGeneric name members ->
+                    Type.CustomGeneric name (List.map reduceGenericName members)
+
                 _ ->
                     type_
 
@@ -1130,6 +1134,13 @@ simplifyWordType ( context, wordType ) =
                             List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
                     in
                     ( newNextId, newSeenGenerics, Type.Union newMembers :: acc )
+
+                Type.CustomGeneric name members ->
+                    let
+                        ( newNextId, newSeenGenerics, newMembers ) =
+                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
+                    in
+                    ( newNextId, newSeenGenerics, Type.CustomGeneric name newMembers :: acc )
 
                 _ ->
                     ( nextId, seenGenerics, type_ :: acc )
