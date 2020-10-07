@@ -229,21 +229,32 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         ( inferredWhenTypes, newContext ) =
             List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
-                |> Tuple.mapFirst (Debug.log "a")
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
+                |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.metadata.type_) whenTypes)
 
+        replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
+            case typeSignature.input of
+                (Type.Generic _) :: rest ->
+                    { typeSignature | input = matchType :: rest }
+
+                _ ->
+                    typeSignature
+
+        whenPatterns =
+            List.map Tuple.first whens
+
         whensAreConsistent =
             inferredWhenTypes
-                |> List.map2 Tuple.pair (List.map Tuple.first whens)
+                |> List.map2 Tuple.pair whenPatterns
                 |> List.all typeCheckWhen
 
         typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
             case inf.input of
                 firstInput :: _ ->
-                    Debug.log "?" (Type.genericlyCompatible (Debug.log "first" firstInput) (Debug.log "forType" forType))
+                    Type.genericlyCompatible firstInput forType
 
                 [] ->
                     False
@@ -277,11 +288,10 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> List.all identity
 
         inferredType =
-            List.head (Debug.log "infWhens" inferredWhenTypes)
+            List.head inferredWhenTypes
                 |> Maybe.withDefault { input = [], output = [] }
                 |> replaceFirstType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
-                |> Debug.log "inf"
 
         finalContext =
             { newContext
@@ -291,7 +301,6 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         , type_ =
                             TypeSignature.toMaybe untypedDef.metadata.type_
                                 |> Maybe.withDefault inferredType
-                                |> Debug.log "type"
                         , metadata = untypedDef.metadata
                         , implementation =
                             MultiImpl
