@@ -1265,6 +1265,144 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            , test "With generics" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "map"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a"
+                                                    , Type.Quotation
+                                                        { input = [ Type.Generic "a" ]
+                                                        , output = [ Type.Generic "b" ]
+                                                        }
+                                                    ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "map"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
+            , test "Within multiwords" <|
+                \_ ->
+                    let
+                        maybeUnion genericName =
+                            Type.Union
+                                [ Type.Generic genericName
+                                , Type.Custom "Nil"
+                                ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , QAST.CustomTypeDef "Nil" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "map"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ maybeUnion "a"
+                                                    , Type.Quotation
+                                                        { input = [ Type.Generic "a" ]
+                                                        , output = [ Type.Generic "b" ]
+                                                        }
+                                                    ]
+                                                    [ maybeUnion "b" ]
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ QAST.Builtin emptyRange Builtin.Apply
+                                                    ]
+                                                  )
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Word emptyRange ">Nil"
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "map"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
             ]
         , describe "Recursive word definitions"
             [ test "With type annotation" <|
