@@ -1074,11 +1074,27 @@ compatibleTypes context typeA typeB =
 
                             actualOutputRequirement =
                                 replaceStackRange boundRanges rhs.output
+
+                            contextWithBoundRanges =
+                                { context | boundStackRanges = Dict.union context.boundStackRanges boundRanges }
+
+                            ( contextAfterInputCheck, inputsCompatible ) =
+                                List.map2 Tuple.pair lhs.input actualInputRequirement
+                                    |> List.foldl foldHelper ( contextWithBoundRanges, True )
+
+                            ( contextAfterOutputCheck, outputsCompatible ) =
+                                List.map2 Tuple.pair lhs.output actualOutputRequirement
+                                    |> List.foldl foldHelper ( contextAfterInputCheck, True )
+
+                            foldHelper ( lType, rType ) (( currCtx, isCompatible ) as acc) =
+                                if not isCompatible then
+                                    acc
+
+                                else
+                                    compatibleTypes currCtx lType rType
                         in
-                        ( { context
-                            | boundStackRanges = Dict.union context.boundStackRanges boundRanges
-                          }
-                        , lhs.input == actualInputRequirement && lhs.output == actualOutputRequirement
+                        ( contextAfterOutputCheck
+                        , inputsCompatible && outputsCompatible
                         )
 
                     _ ->
