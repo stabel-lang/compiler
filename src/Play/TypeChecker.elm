@@ -237,11 +237,39 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
             case typeSignature.input of
-                (Type.Generic _) :: rest ->
-                    { typeSignature | input = matchType :: rest }
+                ((Type.Generic _) as toReplace) :: _ ->
+                    { input = List.map (replaceType toReplace matchType) typeSignature.input
+                    , output = List.map (replaceType toReplace matchType) typeSignature.output
+                    }
+
+                ((Type.StackRange _) as toReplace) :: _ ->
+                    { input = List.map (replaceType toReplace matchType) typeSignature.input
+                    , output = List.map (replaceType toReplace matchType) typeSignature.output
+                    }
 
                 _ ->
                     typeSignature
+
+        replaceType type_ with el =
+            case el of
+                Type.CustomGeneric name members ->
+                    Type.CustomGeneric name (List.map (replaceType type_ with) members)
+
+                Type.Union members ->
+                    Type.Union (List.map (replaceType type_ with) members)
+
+                Type.Quotation quotType ->
+                    Type.Quotation
+                        { input = List.map (replaceType type_ with) quotType.input
+                        , output = List.map (replaceType type_ with) quotType.output
+                        }
+
+                _ ->
+                    if type_ == el then
+                        with
+
+                    else
+                        el
 
         whenPatterns =
             List.map Tuple.first whens
@@ -391,7 +419,26 @@ simplifyWhenWordTypes wordTypes context =
 
 equalizeWhenTypes : List WordType -> List WordType
 equalizeWhenTypes wordTypes =
-    equalizeWhenTypesHelper wordTypes Dict.empty []
+    let
+        splitFirstInputType wordType =
+            case wordType.input of
+                first :: rest ->
+                    Just ( first, { wordType | input = rest } )
+
+                _ ->
+                    -- Should never happen
+                    Nothing
+
+        joinSplitWordType ( firstType, wordType ) =
+            { wordType | input = firstType :: wordType.input }
+    in
+    List.filterMap splitFirstInputType wordTypes
+        |> List.foldr
+            (\( firstType, wordType ) ( typeAcc, wordTypeAcc ) -> ( firstType :: typeAcc, wordType :: wordTypeAcc ))
+            ( [], [] )
+        |> Tuple.mapSecond (\lobotomizedWordTypes -> equalizeWhenTypesHelper lobotomizedWordTypes Dict.empty [])
+        |> (\( firstTypes, equalizedWhenTypes ) -> List.map2 Tuple.pair firstTypes equalizedWhenTypes)
+        |> List.map joinSplitWordType
 
 
 equalizeWhenTypesHelper : List WordType -> Dict String Type -> List WordType -> List WordType
@@ -522,7 +569,7 @@ constrainGenerics typeSignature inferredType =
             }
 
 
-constrainGenericsHelper : Dict String String -> List Type -> List Type -> List Type -> ( Dict String String, List Type )
+constrainGenericsHelper : Dict String Type -> List Type -> List Type -> List Type -> ( Dict String Type, List Type )
 constrainGenericsHelper remappedGenerics annotated inferred acc =
     case ( annotated, inferred ) of
         ( [], _ ) ->
@@ -531,21 +578,69 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
         ( _, [] ) ->
             ( remappedGenerics, List.reverse acc )
 
-        ( (Type.Generic annGen) :: annotatedRest, ((Type.Generic infGen) as inferredEl) :: inferredRest ) ->
+        ( ((Type.Generic annGen) as annotatedEl) :: annotatedRest, ((Type.Generic infGen) as inferredEl) :: inferredRest ) ->
             if annGen == infGen then
                 constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
 
             else
                 case Dict.get infGen remappedGenerics of
                     Just val ->
-                        constrainGenericsHelper remappedGenerics annotatedRest inferredRest (Type.Generic val :: acc)
+                        constrainGenericsHelper remappedGenerics annotatedRest inferredRest (val :: acc)
 
                     Nothing ->
                         constrainGenericsHelper
-                            (Dict.insert infGen annGen remappedGenerics)
+                            (Dict.insert infGen annotatedEl remappedGenerics)
                             annotatedRest
                             inferredRest
-                            (Type.Generic annGen :: acc)
+                            (annotatedEl :: acc)
+
+        ( ((Type.StackRange annGen) as annotatedEl) :: annotatedRest, ((Type.StackRange infGen) as inferredEl) :: inferredRest ) ->
+            if annGen == infGen then
+                constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
+
+            else
+                case Dict.get infGen remappedGenerics of
+                    Just val ->
+                        constrainGenericsHelper remappedGenerics annotatedRest inferredRest (val :: acc)
+
+                    Nothing ->
+                        constrainGenericsHelper
+                            (Dict.insert infGen annotatedEl remappedGenerics)
+                            annotatedRest
+                            inferredRest
+                            (annotatedEl :: acc)
+
+        ( (_ as annotatedEl) :: annotatedRest, (Type.StackRange infGen) :: inferredRest ) ->
+            case Dict.get infGen remappedGenerics of
+                Just val ->
+                    constrainGenericsHelper remappedGenerics annotatedRest inferredRest (val :: acc)
+
+                Nothing ->
+                    constrainGenericsHelper
+                        (Dict.insert infGen annotatedEl remappedGenerics)
+                        annotatedRest
+                        inferredRest
+                        (annotatedEl :: acc)
+
+        ( (Type.Quotation annotatedQuote) :: annotatedRest, (Type.Quotation inferredQuote) :: inferredRest ) ->
+            let
+                ( quoteRemappedGens, constrainedInputs ) =
+                    constrainGenericsHelper remappedGenerics annotatedQuote.input inferredQuote.input []
+
+                ( quoteRemappedGens2, constrainedOutputs ) =
+                    constrainGenericsHelper quoteRemappedGens annotatedQuote.output inferredQuote.output []
+
+                constrainedQuote =
+                    Type.Quotation
+                        { input = constrainedInputs
+                        , output = constrainedOutputs
+                        }
+            in
+            constrainGenericsHelper
+                (Dict.union quoteRemappedGens2 remappedGenerics)
+                annotatedRest
+                inferredRest
+                (constrainedQuote :: acc)
 
         ( _ :: annotatedRest, inferredEl :: inferredRest ) ->
             constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
