@@ -768,12 +768,18 @@ typeCheckNode idx node context =
 
         Qualifier.WordRef loc ref ->
             let
+                stackEffectsBeforeWordCheck =
+                    context.stackEffects
+
                 contextAfterWordCheck =
                     typeCheckNode idx (Qualifier.Word loc ref) context
+
+                newContext =
+                    { contextAfterWordCheck | stackEffects = stackEffectsBeforeWordCheck }
             in
-            case Dict.get ref contextAfterWordCheck.typedWords of
+            case Dict.get ref newContext.typedWords of
                 Just def ->
-                    addStackEffect contextAfterWordCheck <|
+                    addStackEffect newContext <|
                         [ Push <| Type.Quotation def.type_ ]
 
                 _ ->
