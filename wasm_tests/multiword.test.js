@@ -217,6 +217,28 @@ test('Int match (reverse)', async () => {
     expect(result.stackElement()).toBe(12);
 });
 
+test('Correct Int boxing behaviour', async () => {
+    const wat = await compiler.toWat(`
+        defmulti: add
+        when: Int( value 0 )
+          swap 
+          drop 2
+          swap
+          +
+        when: Int
+          +
+
+        def: main
+        entry: true
+        : 10 6 add
+    `);
+
+    console.log(wat);
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(16);
+});
+
 test('Generic case', async () => {
     const wat = await compiler.toWat(`
         defunion: Maybe a
