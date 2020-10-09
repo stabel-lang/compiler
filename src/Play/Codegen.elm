@@ -153,7 +153,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     , output = [ Type.Int ]
                     }
 
-                AST.Word _ _ type_ ->
+                AST.Word _ name type_ ->
                     type_
 
                 AST.WordRef _ name ->
@@ -218,6 +218,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
             List.map2 Tuple.pair (List.reverse stack) (List.reverse nodeType.input)
                 |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
                 |> List.filterMap maybePromoteInt
+                |> maybeCons maybePromoteLeadingInt
 
         maybePromoteInt ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
@@ -226,6 +227,44 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 _ ->
                     Nothing
+
+        maybePromoteLeadingInt =
+            case ( List.head <| List.reverse stack, isMultiWord newNode, List.head <| List.reverse nodeType.input ) of
+                ( Just Type.Int, True, Just (Type.Union _) ) ->
+                    -- Already handled by maybePromoteInt
+                    Nothing
+
+                ( Just Type.Int, True, Just _ ) ->
+                    Just (PromoteInt 0)
+
+                _ ->
+                    Nothing
+
+        isMultiWord possibleMultiWordNode =
+            case possibleMultiWordNode of
+                Word name _ ->
+                    case Dict.get name ast.words of
+                        Just def ->
+                            case def.implementation of
+                                AST.SoloImpl _ ->
+                                    False
+
+                                AST.MultiImpl _ _ ->
+                                    True
+
+                        Nothing ->
+                            False
+
+                _ ->
+                    False
+
+        maybeCons maybeBox list =
+            case maybeBox of
+                Just value ->
+                    value :: list
+
+                Nothing ->
+                    list
 
         newStack =
             List.reverse stack
@@ -264,10 +303,10 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                                 , Wasm.I32_Const BaseModule.intBoxId
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                                , Wasm.I32_Const selfIndex
                                 , conditions
                                     |> List.concatMap (matchingIntTest localIdx)
                                     |> Wasm.Batch
+                                , Wasm.I32_Const selfIndex
                                 , Wasm.Call BaseModule.demoteIntFn
                                 ]
 
