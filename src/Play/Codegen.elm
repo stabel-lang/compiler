@@ -235,7 +235,11 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     Nothing
 
                 ( Just Type.Int, True, Just _ ) ->
-                    Just (PromoteInt 0)
+                    let
+                        idx =
+                            max 0 (List.length nodeType.input - 1)
+                    in
+                    Just (PromoteInt idx)
 
                 _ ->
                     Nothing

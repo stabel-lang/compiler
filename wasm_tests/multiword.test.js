@@ -233,7 +233,6 @@ test('Correct Int boxing behaviour', async () => {
         : 10 6 add
     `);
 
-    console.log(wat);
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(16);
