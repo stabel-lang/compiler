@@ -238,6 +238,28 @@ test('Correct Int boxing behaviour', async () => {
     expect(result.stackElement()).toBe(16);
 });
 
+test('Correct Int boxing behaviour when mismatch between word input size and stack size', async () => {
+    const wat = await compiler.toWat(`
+        deftype: Nil
+
+        defmulti: inc-zero
+        when: Int( value 0 )
+          swap 
+          drop 1
+          swap
+        when: Int
+
+        def: main
+        entry: true
+        : 0 >Nil inc-zero
+          drop 
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});
+
 test('Generic case', async () => {
     const wat = await compiler.toWat(`
         defunion: Maybe a

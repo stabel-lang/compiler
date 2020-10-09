@@ -214,8 +214,13 @@ astNodeToCodegenNode ast node ( stack, result ) =
             else
                 Type.CustomGeneric typeName (List.map Type.Generic gens)
 
+        stackInScope =
+            List.reverse stack
+                |> List.take (List.length nodeType.input)
+                |> List.reverse
+
         intsToPromote =
-            List.map2 Tuple.pair (List.reverse stack) (List.reverse nodeType.input)
+            List.map2 Tuple.pair (List.reverse stackInScope) (List.reverse nodeType.input)
                 |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
                 |> List.filterMap maybePromoteInt
                 |> maybeCons maybePromoteLeadingInt
@@ -229,7 +234,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     Nothing
 
         maybePromoteLeadingInt =
-            case ( List.head <| List.reverse stack, isMultiWord newNode, List.head <| List.reverse nodeType.input ) of
+            case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
                 ( Just Type.Int, True, Just (Type.Union _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
