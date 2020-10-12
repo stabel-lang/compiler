@@ -227,24 +227,33 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
         maybeBox ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
-                ( Type.Int, Type.Union _ ) ->
-                    Just (Box idx -1)
+                ( _, Type.Union members ) ->
+                    case List.find (\( t, _ ) -> t == leftType) (unionBoxMap members) of
+                        Just ( _, id ) ->
+                            Just (Box idx id)
+
+                        Nothing ->
+                            Nothing
 
                 _ ->
                     Nothing
 
         maybeBoxLeadingElement =
             case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
-                ( Just Type.Int, True, Just (Type.Union _) ) ->
+                ( Just _, True, Just (Type.Union _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
 
-                ( Just Type.Int, True, Just _ ) ->
-                    let
-                        idx =
-                            max 0 (List.length nodeType.input - 1)
-                    in
-                    Just (Box idx -1)
+                ( Just _, True, Just nodeLeadingType ) ->
+                    if requiresBoxingInPatternMatch nodeLeadingType then
+                        let
+                            idx =
+                                max 0 (List.length nodeType.input - 1)
+                        in
+                        Just (Box idx -1)
+
+                    else
+                        Nothing
 
                 _ ->
                     Nothing
@@ -286,6 +295,35 @@ astNodeToCodegenNode ast node ( stack, result ) =
     )
 
 
+unionBoxMap : List Type -> List ( Type, Int )
+unionBoxMap union =
+    let
+        helper t ( nextId, mapping ) =
+            if requiresBoxingInPatternMatch t then
+                ( nextId - 1
+                , ( t, nextId ) :: mapping
+                )
+
+            else
+                ( nextId, mapping )
+    in
+    List.foldl helper ( -1, [] ) union
+        |> Tuple.second
+
+
+requiresBoxingInPatternMatch : Type -> Bool
+requiresBoxingInPatternMatch type_ =
+    case type_ of
+        Type.Int ->
+            True
+
+        Type.Generic _ ->
+            True
+
+        _ ->
+            False
+
+
 multiFnToInstructions :
     Dict String TypeInformation
     -> AST
@@ -295,6 +333,24 @@ multiFnToInstructions :
     -> Wasm.Instruction
 multiFnToInstructions typeInfo ast def whens defaultImpl =
     let
+        boxMap =
+            def.type_.input
+                |> List.head
+                |> Maybe.map createBoxMap
+                |> Maybe.withDefault []
+
+        createBoxMap t_ =
+            case t_ of
+                Type.Union members ->
+                    unionBoxMap members
+
+                _ ->
+                    if requiresBoxingInPatternMatch t_ then
+                        [ ( t_, -1 ) ]
+
+                    else
+                        []
+
         branches =
             List.foldl buildBranch (Wasm.Batch []) whens
 
@@ -304,12 +360,21 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                     makeInequalityTest type_ 0
 
                 makeInequalityTest t_ localIdx =
-                    case t_ of
-                        AST.TypeMatch _ Type.Int conditions ->
+                    let
+                        (AST.TypeMatch _ typeFromTypeMatch _) =
+                            t_
+
+                        maybeBoxId =
+                            boxMap
+                                |> List.find (\( boxedType, _ ) -> boxedType == typeFromTypeMatch)
+                                |> Maybe.map Tuple.second
+                    in
+                    case ( t_, maybeBoxId ) of
+                        ( AST.TypeMatch _ Type.Int conditions, Just boxId ) ->
                             Wasm.Batch
                                 [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const -1
+                                , Wasm.I32_Const boxId
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
                                 , conditions
@@ -319,14 +384,25 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                                 , Wasm.Call BaseModule.unboxFn
                                 ]
 
-                        AST.TypeMatch _ (Type.Custom name) conditions ->
+                        ( AST.TypeMatch _ _ [], Just boxId ) ->
+                            Wasm.Batch
+                                [ Wasm.Local_Get localIdx
+                                , Wasm.I32_Load -- Load instance id
+                                , Wasm.I32_Const boxId
+                                , Wasm.I32_NotEq -- Types doesn't match?
+                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                                , Wasm.I32_Const selfIndex
+                                , Wasm.Call BaseModule.unboxFn
+                                ]
+
+                        ( AST.TypeMatch _ (Type.Custom name) conditions, Nothing ) ->
                             whenSetup localIdx name conditions
 
-                        AST.TypeMatch _ (Type.CustomGeneric name _) conditions ->
+                        ( AST.TypeMatch _ (Type.CustomGeneric name _) conditions, Nothing ) ->
                             whenSetup localIdx name conditions
 
                         _ ->
-                            Debug.todo "Only supports custom types in when clauses"
+                            Debug.todo <| "Not supported in pattern match: " ++ Debug.toString t_
 
                 whenSetup localIdx typeName conditions =
                     let
