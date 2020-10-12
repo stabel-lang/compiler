@@ -32,11 +32,6 @@ initialHeapPositionOffset =
     stackPositionOffset + wasmPtrSize
 
 
-intBoxId : Int
-intBoxId =
-    -1
-
-
 
 -- Bultin function names
 
@@ -121,14 +116,14 @@ stackReplaceElementFn =
     "__stack_replace"
 
 
-promoteIntFn : String
-promoteIntFn =
-    "__promote_int"
+boxFn : String
+boxFn =
+    "__box"
 
 
-demoteIntFn : String
-demoteIntFn =
-    "__demote_int"
+unboxFn : String
+unboxFn =
+    "__unbox"
 
 
 
@@ -452,10 +447,10 @@ baseModule =
                 ]
             }
         |> Wasm.withFunction
-            { name = promoteIntFn
+            { name = boxFn
             , exported = False
             , isIndirectlyCalled = False
-            , args = [ Wasm.Int32 ]
+            , args = [ Wasm.Int32, Wasm.Int32 ]
             , results = []
             , locals = [ Wasm.Int32 ]
             , instructions =
@@ -466,22 +461,22 @@ baseModule =
                 in
                 [ Wasm.I32_Const typeSize
                 , Wasm.Call allocFn
-                , Wasm.Local_Tee 1
-                , Wasm.I32_Const intBoxId
-                , Wasm.I32_Store
+                , Wasm.Local_Tee 2
                 , Wasm.Local_Get 1
+                , Wasm.I32_Store
+                , Wasm.Local_Get 2
                 , Wasm.I32_Const wasmPtrSize
                 , Wasm.I32_Add
                 , Wasm.Local_Get 0
                 , Wasm.Call stackGetElementFn
                 , Wasm.I32_Store
                 , Wasm.Local_Get 0
-                , Wasm.Local_Get 1
+                , Wasm.Local_Get 2
                 , Wasm.Call stackReplaceElementFn
                 ]
             }
         |> Wasm.withFunction
-            { name = demoteIntFn
+            { name = unboxFn
             , exported = False
             , isIndirectlyCalled = False
             , args = [ Wasm.Int32 ]

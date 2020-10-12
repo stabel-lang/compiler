@@ -23,7 +23,7 @@ type AstNode
     | SetMember String String Type
     | GetMember String String Type
     | Builtin Builtin
-    | PromoteInt Int
+    | Box Int Int -- stackIdx typeId
 
 
 
@@ -219,21 +219,21 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 |> List.take (List.length nodeType.input)
                 |> List.reverse
 
-        intsToPromote =
+        stackElementsToBox =
             List.map2 Tuple.pair (List.reverse stackInScope) (List.reverse nodeType.input)
                 |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
-                |> List.filterMap maybePromoteInt
-                |> maybeCons maybePromoteLeadingInt
+                |> List.filterMap maybeBox
+                |> maybeCons maybeBoxLeadingElement
 
-        maybePromoteInt ( idx, leftType, rightType ) =
+        maybeBox ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
                 ( Type.Int, Type.Union _ ) ->
-                    Just (PromoteInt idx)
+                    Just (Box idx -1)
 
                 _ ->
                     Nothing
 
-        maybePromoteLeadingInt =
+        maybeBoxLeadingElement =
             case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
                 ( Just Type.Int, True, Just (Type.Union _) ) ->
                     -- Already handled by maybePromoteInt
@@ -244,7 +244,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                         idx =
                             max 0 (List.length nodeType.input - 1)
                     in
-                    Just (PromoteInt idx)
+                    Just (Box idx -1)
 
                 _ ->
                     Nothing
@@ -267,8 +267,8 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 _ ->
                     False
 
-        maybeCons maybeBox list =
-            case maybeBox of
+        maybeCons maybeBoxElement list =
+            case maybeBoxElement of
                 Just value ->
                     value :: list
 
@@ -282,7 +282,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 |> List.reverse
     in
     ( newStack
-    , newNode :: (intsToPromote ++ result)
+    , newNode :: (stackElementsToBox ++ result)
     )
 
 
@@ -309,14 +309,14 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                             Wasm.Batch
                                 [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const BaseModule.intBoxId
+                                , Wasm.I32_Const -1
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
                                 , conditions
                                     |> List.concatMap (matchingIntTest localIdx)
                                     |> Wasm.Batch
                                 , Wasm.I32_Const selfIndex
-                                , Wasm.Call BaseModule.demoteIntFn
+                                , Wasm.Call BaseModule.unboxFn
                                 ]
 
                         AST.TypeMatch _ (Type.Custom name) conditions ->
@@ -576,10 +576,11 @@ nodeToInstruction typeInfo node =
                 Builtin.Apply ->
                     Wasm.CallIndirect
 
-        PromoteInt stackPos ->
+        Box stackPos id ->
             Wasm.Batch
                 [ Wasm.I32_Const stackPos
-                , Wasm.Call BaseModule.promoteIntFn
+                , Wasm.I32_Const id
+                , Wasm.Call BaseModule.boxFn
                 ]
 
 
