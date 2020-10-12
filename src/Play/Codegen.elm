@@ -286,6 +286,31 @@ astNodeToCodegenNode ast node ( stack, result ) =
     )
 
 
+unionBoxMap : List Type -> List ( Type, Int )
+unionBoxMap union =
+    let
+        helper t ( nextId, mapping ) =
+            if requiresBoxingInPatternMatch t then
+                ( nextId - 1
+                , ( t, nextId ) :: mapping
+                )
+
+            else
+                ( nextId, mapping )
+    in
+    List.foldl helper ( -1, [] ) union
+
+
+requiresBoxingInPatternMatch : Type -> Bool
+requiresBoxingInPatternMatch type_ =
+    case type_ of
+        Type.Int ->
+            True
+
+        _ ->
+            False
+
+
 multiFnToInstructions :
     Dict String TypeInformation
     -> AST
