@@ -650,7 +650,7 @@ nodeToInstruction typeInfo node =
                     Wasm.Call BaseModule.leftRotFn
 
                 Builtin.Apply ->
-                    Wasm.CallIndirect
+                    Wasm.Call BaseModule.callQuoteFn
 
         Box stackPos id ->
             Wasm.Batch

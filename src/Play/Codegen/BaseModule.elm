@@ -126,6 +126,11 @@ unboxFn =
     "__unbox"
 
 
+callQuoteFn : String
+callQuoteFn =
+    "__call_quote"
+
+
 
 -- Base module
 
@@ -490,5 +495,17 @@ baseModule =
                 , Wasm.I32_Add
                 , Wasm.I32_Load
                 , Wasm.Call stackReplaceElementFn
+                ]
+            }
+        |> Wasm.withFunction
+            { name = callQuoteFn
+            , exported = False
+            , isIndirectlyCalled = False
+            , args = []
+            , results = []
+            , locals = []
+            , instructions =
+                [ Wasm.Call stackPopFn
+                , Wasm.CallIndirect
                 ]
             }
