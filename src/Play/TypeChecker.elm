@@ -193,13 +193,26 @@ typeCheckSoloImplementation context untypedDef impl =
                                 |> TypeSignature.toMaybe
                                 |> Maybe.withDefault inferredType
                         , metadata = untypedDef.metadata
-                        , implementation = SoloImpl (List.map (untypedToTypedNode newContext) impl)
+                        , implementation = SoloImpl (untypedToTypedImplementation newContext impl)
                         }
                         newContext.typedWords
             }
     in
     verifyTypeSignature inferredType untypedDef finalContext
         |> cleanContext
+
+
+untypedToTypedImplementation : Context -> List Qualifier.Node -> List AstNode
+untypedToTypedImplementation context impl =
+    let
+        helper node ( idx, res ) =
+            ( idx + 1
+            , untypedToTypedNode idx context node :: res
+            )
+    in
+    List.foldl helper ( 0, [] ) impl
+        |> Tuple.second
+        |> List.reverse
 
 
 typeCheckMultiImplementation :
@@ -332,8 +345,8 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         , metadata = untypedDef.metadata
                         , implementation =
                             MultiImpl
-                                (List.map (Tuple.mapBoth mapTypeMatch (List.map (untypedToTypedNode newContext))) initialWhens)
-                                (List.map (untypedToTypedNode newContext) defaultImpl)
+                                (List.map (Tuple.mapBoth mapTypeMatch (untypedToTypedImplementation newContext)) initialWhens)
+                                (untypedToTypedImplementation newContext defaultImpl)
                         }
                         newContext.typedWords
                 , errors =
@@ -1317,8 +1330,8 @@ reverseLookup ( name, aliases ) acc =
         |> List.foldl (\alias newAcc -> Dict.insert alias targetName newAcc) acc
 
 
-untypedToTypedNode : Context -> Qualifier.Node -> AstNode
-untypedToTypedNode context untypedNode =
+untypedToTypedNode : Int -> Context -> Qualifier.Node -> AstNode
+untypedToTypedNode idx context untypedNode =
     case untypedNode of
         Qualifier.Integer range num ->
             IntLiteral range num
@@ -1326,7 +1339,34 @@ untypedToTypedNode context untypedNode =
         Qualifier.Word range name ->
             case Dict.get name context.typedWords of
                 Just def ->
-                    Word range name def.type_
+                    let
+                        resolvedWordType =
+                            { input =
+                                def.type_.input
+                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
+                            , output =
+                                def.type_.output
+                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
+                            }
+
+                        replaceGenericWithBoundValue t =
+                            let
+                                boundType =
+                                    case getGenericBinding context t of
+                                        Just boundValue ->
+                                            boundValue
+
+                                        Nothing ->
+                                            t
+                            in
+                            case boundType of
+                                Type.Union members ->
+                                    Type.Union (List.map replaceGenericWithBoundValue members)
+
+                                _ ->
+                                    boundType
+                    in
+                    Word range name resolvedWordType
 
                 Nothing ->
                     Dict.get name context.untypedWords

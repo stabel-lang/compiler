@@ -1090,12 +1090,16 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
-                                                [ Word emptyRange ">Nil" { input = [], output = [ Type.Custom "Nil" ] }
+                                                [ Word emptyRange
+                                                    ">Nil"
+                                                    { input = []
+                                                    , output = [ Type.Custom "Nil" ]
+                                                    }
                                                 , IntLiteral emptyRange 1
                                                 , Word emptyRange
                                                     "with-default"
-                                                    { input = [ maybeUnion, Type.Generic "a" ]
-                                                    , output = [ Type.Generic "a" ]
+                                                    { input = [ Type.Union [ Type.Int, Type.Custom "Nil" ], Type.Int ]
+                                                    , output = [ Type.Int ]
                                                     }
                                                 ]
                                       }
@@ -1555,5 +1559,88 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            ]
+        , describe "Correct node types"
+            [ test "Simple case" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Word emptyRange "drop-first"
+                                                ]
+                                      }
+                                    , { name = "drop-first"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", Type.Generic "b" ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedResult =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , type_ =
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ IntLiteral emptyRange 1
+                                                , IntLiteral emptyRange 2
+                                                , Word emptyRange
+                                                    "drop-first"
+                                                    { input = [ Type.Int, Type.Int ]
+                                                    , output = [ Type.Int ]
+                                                    }
+                                                ]
+                                      }
+                                    , { name = "drop-first"
+                                      , type_ =
+                                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                                            , output = [ Type.Generic "b" ]
+                                            }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", Type.Generic "b" ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin emptyRange Builtin.StackSwap
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok result ->
+                            Expect.equal expectedResult result
+
+                        Err errs ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString errs
             ]
         ]
