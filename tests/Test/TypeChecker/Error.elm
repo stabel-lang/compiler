@@ -3,6 +3,7 @@ module Test.TypeChecker.Error exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Play.Data.Builtin as Builtin
 import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
@@ -140,6 +141,122 @@ suite =
                                 False
                 in
                 checkForError undeclaredGenericError ast
+        , test "An inferred concrete output type should not successfully type check against a generic variable" <|
+            \_ ->
+                let
+                    ast =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Generic "in" ] [ Type.Generic "out" ]
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 1
+                                            , Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    typeError problem =
+                        case problem of
+                            Problem.TypeError _ "main" _ _ ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError typeError ast
+        , test "An inferred union output type should not successfully type check against a generic variable" <|
+            \_ ->
+                let
+                    ast =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef "Bool"
+                                    emptyRange
+                                    []
+                                    [ Type.Custom "True"
+                                    , Type.Custom "False"
+                                    ]
+                                , CustomTypeDef "True" emptyRange [] []
+                                , CustomTypeDef "False" emptyRange [] []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Generic "out" ]
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 0
+                                            , Word emptyRange "true-or-false"
+                                            ]
+                                  }
+                                , { name = "true-or-false"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Int ]
+                                                [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
+                                              , [ Builtin emptyRange Builtin.StackDrop
+                                                , Word emptyRange ">False"
+                                                ]
+                                              )
+                                            , ( TypeMatch emptyRange Type.Int []
+                                              , [ Builtin emptyRange Builtin.StackDrop
+                                                , Word emptyRange ">True"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = ">True"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "True"
+                                            ]
+                                  }
+                                , { name = ">False"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ ConstructType "False"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case TypeChecker.run ast of
+                    Err errors ->
+                        Expect.equalLists
+                            [ Problem.TypeError emptyRange
+                                "main"
+                                { input = [], output = [ Type.Generic "a" ] }
+                                { input = [], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
+                            , Problem.TypeError emptyRange
+                                "true-or-false"
+                                { input = [ Type.Int ], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
+                                { input = [ Type.Int ], output = [ Type.Union [ Type.Custom "False", Type.Custom "True" ] ] }
+                            ]
+                            errors
+
+                    Ok _ ->
+                        Expect.fail "Did not expect type checking to succeed"
         ]
 
 
@@ -154,4 +271,4 @@ checkForError fn source =
                 Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
 
         Ok _ ->
-            Expect.fail "Did not expect parsing to succeed"
+            Expect.fail "Did not expect type checking to succeed"

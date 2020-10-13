@@ -971,6 +971,147 @@ suite =
 
                         Err _ ->
                             Expect.fail "Expected type check to pass."
+            , test "Union with generic branch" <|
+                \_ ->
+                    let
+                        maybeUnion =
+                            Type.Union
+                                [ Type.Generic "a"
+                                , Type.Custom "Nil"
+                                ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , QAST.CustomTypeDef "Nil" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "with-default"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ maybeUnion, Type.Generic "a" ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                    , QAST.Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Word emptyRange ">Nil"
+                                                , QAST.Integer emptyRange 1
+                                                , QAST.Word emptyRange "with-default"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedResult =
+                            { types =
+                                Dict.fromListBy typeDefName
+                                    [ UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , CustomTypeDef "Nil" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , type_ = { input = [], output = [ Type.Custom "Nil" ] }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "with-default"
+                                      , type_ =
+                                            { input = [ maybeUnion, Type.Generic "a" ]
+                                            , output = [ Type.Generic "a" ]
+                                            }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ maybeUnion, Type.Generic "a" ]
+                                                    [ Type.Generic "a" ]
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ Builtin emptyRange Builtin.StackSwap
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , type_ = { input = [], output = [ Type.Int ] }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Word emptyRange
+                                                    ">Nil"
+                                                    { input = []
+                                                    , output = [ Type.Custom "Nil" ]
+                                                    }
+                                                , IntLiteral emptyRange 1
+                                                , Word emptyRange
+                                                    "with-default"
+                                                    { input = [ Type.Union [ Type.Int, Type.Custom "Nil" ], Type.Int ]
+                                                    , output = [ Type.Int ]
+                                                    }
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok typedAst ->
+                            Expect.equal expectedResult typedAst
+
+                        Err errs ->
+                            Expect.fail <| "Expected type check to pass, failed with: " ++ Debug.toString errs
             , test "Generic union fails if not generic is listed" <|
                 \_ ->
                     let
@@ -1128,6 +1269,144 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            , test "With generics" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "map"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a"
+                                                    , Type.Quotation
+                                                        { input = [ Type.Generic "a" ]
+                                                        , output = [ Type.Generic "b" ]
+                                                        }
+                                                    ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "map"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
+            , test "Within multiwords" <|
+                \_ ->
+                    let
+                        maybeUnion genericName =
+                            Type.Union
+                                [ Type.Generic genericName
+                                , Type.Custom "Nil"
+                                ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy QAST.typeDefinitionName
+                                    [ QAST.UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , QAST.CustomTypeDef "Nil" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = "map"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ maybeUnion "a"
+                                                    , Type.Quotation
+                                                        { input = [ Type.Generic "a" ]
+                                                        , output = [ Type.Generic "b" ]
+                                                        }
+                                                    ]
+                                                    [ maybeUnion "b" ]
+                                      , implementation =
+                                            QAST.MultiImpl
+                                                [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
+                                                  , [ QAST.Builtin emptyRange Builtin.Apply
+                                                    ]
+                                                  )
+                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Word emptyRange ">Nil"
+                                                , QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "map"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Builtin emptyRange Builtin.Minus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
             ]
         , describe "Recursive word definitions"
             [ test "With type annotation" <|
@@ -1280,5 +1559,88 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            ]
+        , describe "Correct node types"
+            [ test "Simple case" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Word emptyRange "drop-first"
+                                                ]
+                                      }
+                                    , { name = "drop-first"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", Type.Generic "b" ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedResult =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , type_ =
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ IntLiteral emptyRange 1
+                                                , IntLiteral emptyRange 2
+                                                , Word emptyRange
+                                                    "drop-first"
+                                                    { input = [ Type.Int, Type.Int ]
+                                                    , output = [ Type.Int ]
+                                                    }
+                                                ]
+                                      }
+                                    , { name = "drop-first"
+                                      , type_ =
+                                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                                            , output = [ Type.Generic "b" ]
+                                            }
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Generic "a", Type.Generic "b" ]
+                                                    [ Type.Generic "b" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin emptyRange Builtin.StackSwap
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok result ->
+                            Expect.equal expectedResult result
+
+                        Err errs ->
+                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString errs
             ]
         ]

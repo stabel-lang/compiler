@@ -23,7 +23,7 @@ type AstNode
     | SetMember String String Type
     | GetMember String String Type
     | Builtin Builtin
-    | PromoteInt Int
+    | Box Int Int -- stackIdx typeId
 
 
 
@@ -153,7 +153,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     , output = [ Type.Int ]
                     }
 
-                AST.Word _ _ type_ ->
+                AST.Word _ name type_ ->
                     type_
 
                 AST.WordRef _ name ->
@@ -214,18 +214,75 @@ astNodeToCodegenNode ast node ( stack, result ) =
             else
                 Type.CustomGeneric typeName (List.map Type.Generic gens)
 
-        intsToPromote =
-            List.map2 Tuple.pair (List.reverse stack) (List.reverse nodeType.input)
-                |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
-                |> List.filterMap maybePromoteInt
+        stackInScope =
+            List.reverse stack
+                |> List.take (List.length nodeType.input)
+                |> List.reverse
 
-        maybePromoteInt ( idx, leftType, rightType ) =
+        stackElementsToBox =
+            List.map2 Tuple.pair (List.reverse stackInScope) (List.reverse nodeType.input)
+                |> List.indexedMap (\i ( l, r ) -> ( i, l, r ))
+                |> List.filterMap maybeBox
+                |> maybeCons maybeBoxLeadingElement
+
+        maybeBox ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
-                ( Type.Int, Type.Union _ ) ->
-                    Just (PromoteInt idx)
+                ( _, Type.Union members ) ->
+                    case List.find (\( t, _ ) -> t == leftType) (unionBoxMap members) of
+                        Just ( _, id ) ->
+                            Just (Box idx id)
+
+                        Nothing ->
+                            Nothing
 
                 _ ->
                     Nothing
+
+        maybeBoxLeadingElement =
+            case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
+                ( Just _, True, Just (Type.Union _) ) ->
+                    -- Already handled by maybePromoteInt
+                    Nothing
+
+                ( Just _, True, Just nodeLeadingType ) ->
+                    if requiresBoxingInPatternMatch nodeLeadingType then
+                        let
+                            idx =
+                                max 0 (List.length nodeType.input - 1)
+                        in
+                        Just (Box idx -1)
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+        isMultiWord possibleMultiWordNode =
+            case possibleMultiWordNode of
+                Word name _ ->
+                    case Dict.get name ast.words of
+                        Just def ->
+                            case def.implementation of
+                                AST.SoloImpl _ ->
+                                    False
+
+                                AST.MultiImpl _ _ ->
+                                    True
+
+                        Nothing ->
+                            False
+
+                _ ->
+                    False
+
+        maybeCons maybeBoxElement list =
+            case maybeBoxElement of
+                Just value ->
+                    value :: list
+
+                Nothing ->
+                    list
 
         newStack =
             List.reverse stack
@@ -234,8 +291,37 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 |> List.reverse
     in
     ( newStack
-    , newNode :: (intsToPromote ++ result)
+    , newNode :: (stackElementsToBox ++ result)
     )
+
+
+unionBoxMap : List Type -> List ( Type, Int )
+unionBoxMap union =
+    let
+        helper t ( nextId, mapping ) =
+            if requiresBoxingInPatternMatch t then
+                ( nextId - 1
+                , ( t, nextId ) :: mapping
+                )
+
+            else
+                ( nextId, mapping )
+    in
+    List.foldl helper ( -1, [] ) union
+        |> Tuple.second
+
+
+requiresBoxingInPatternMatch : Type -> Bool
+requiresBoxingInPatternMatch type_ =
+    case type_ of
+        Type.Int ->
+            True
+
+        Type.Generic _ ->
+            True
+
+        _ ->
+            False
 
 
 multiFnToInstructions :
@@ -247,6 +333,24 @@ multiFnToInstructions :
     -> Wasm.Instruction
 multiFnToInstructions typeInfo ast def whens defaultImpl =
     let
+        boxMap =
+            def.type_.input
+                |> List.head
+                |> Maybe.map createBoxMap
+                |> Maybe.withDefault []
+
+        createBoxMap t_ =
+            case t_ of
+                Type.Union members ->
+                    unionBoxMap members
+
+                _ ->
+                    if requiresBoxingInPatternMatch t_ then
+                        [ ( t_, -1 ) ]
+
+                    else
+                        []
+
         branches =
             List.foldl buildBranch (Wasm.Batch []) whens
 
@@ -256,29 +360,49 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                     makeInequalityTest type_ 0
 
                 makeInequalityTest t_ localIdx =
-                    case t_ of
-                        AST.TypeMatch _ Type.Int conditions ->
+                    let
+                        (AST.TypeMatch _ typeFromTypeMatch _) =
+                            t_
+
+                        maybeBoxId =
+                            boxMap
+                                |> List.find (\( boxedType, _ ) -> boxedType == typeFromTypeMatch)
+                                |> Maybe.map Tuple.second
+                    in
+                    case ( t_, maybeBoxId ) of
+                        ( AST.TypeMatch _ Type.Int conditions, Just boxId ) ->
                             Wasm.Batch
                                 [ Wasm.Local_Get localIdx
                                 , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const BaseModule.intBoxId
+                                , Wasm.I32_Const boxId
                                 , Wasm.I32_NotEq -- Types doesn't match?
                                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                                , Wasm.I32_Const selfIndex
                                 , conditions
                                     |> List.concatMap (matchingIntTest localIdx)
                                     |> Wasm.Batch
-                                , Wasm.Call BaseModule.demoteIntFn
+                                , Wasm.I32_Const selfIndex
+                                , Wasm.Call BaseModule.unboxFn
                                 ]
 
-                        AST.TypeMatch _ (Type.Custom name) conditions ->
+                        ( AST.TypeMatch _ _ [], Just boxId ) ->
+                            Wasm.Batch
+                                [ Wasm.Local_Get localIdx
+                                , Wasm.I32_Load -- Load instance id
+                                , Wasm.I32_Const boxId
+                                , Wasm.I32_NotEq -- Types doesn't match?
+                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                                , Wasm.I32_Const selfIndex
+                                , Wasm.Call BaseModule.unboxFn
+                                ]
+
+                        ( AST.TypeMatch _ (Type.Custom name) conditions, Nothing ) ->
                             whenSetup localIdx name conditions
 
-                        AST.TypeMatch _ (Type.CustomGeneric name _) conditions ->
+                        ( AST.TypeMatch _ (Type.CustomGeneric name _) conditions, Nothing ) ->
                             whenSetup localIdx name conditions
 
                         _ ->
-                            Debug.todo "Only supports custom types in when clauses"
+                            Debug.todo <| "Not supported in pattern match: " ++ Debug.toString t_
 
                 whenSetup localIdx typeName conditions =
                     let
@@ -526,12 +650,13 @@ nodeToInstruction typeInfo node =
                     Wasm.Call BaseModule.leftRotFn
 
                 Builtin.Apply ->
-                    Wasm.CallIndirect
+                    Wasm.Call BaseModule.callQuoteFn
 
-        PromoteInt stackPos ->
+        Box stackPos id ->
             Wasm.Batch
                 [ Wasm.I32_Const stackPos
-                , Wasm.Call BaseModule.promoteIntFn
+                , Wasm.I32_Const id
+                , Wasm.Call BaseModule.boxFn
                 ]
 
 

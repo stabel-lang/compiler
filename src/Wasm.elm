@@ -365,14 +365,17 @@ formatInstruction ((Module module_) as fullModule) ins =
                     Debug.todo "Did not expect this"
 
         CallIndirect ->
-            Str <| "call_indirect"
+            Str "call_indirect"
 
         FunctionIndex word ->
             case List.findIndex (\f -> f.name == word) module_.functions of
                 Just idx ->
                     case List.findIndex ((==) idx) module_.quotables of
                         Just quoteIdx ->
-                            Str <| "(i32.const " ++ String.fromInt quoteIdx ++ ") ;; $" ++ word
+                            BatchFormat
+                                [ Str <| "(i32.const " ++ String.fromInt quoteIdx ++ ") ;; $" ++ word
+                                , Str "(call $__stack_push)" -- TODO: WASM module should have no knowledge of runtime
+                                ]
 
                         Nothing ->
                             Debug.todo "Did not expect this"

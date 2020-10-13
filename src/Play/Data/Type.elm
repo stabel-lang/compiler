@@ -1,4 +1,14 @@
-module Play.Data.Type exposing (..)
+module Play.Data.Type exposing
+    ( Type(..)
+    , WordType
+    , compatibleWords
+    , genericName
+    , genericlyCompatible
+    , isGeneric
+    , referencedGenerics
+    , toDisplayString
+    , wordTypeToString
+    )
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -155,23 +165,23 @@ compatibleWords : WordType -> WordType -> Bool
 compatibleWords annotated inferred =
     let
         ( inputRangeDict, inputsCompatible ) =
-            compare annotated.input inferred.input Dict.empty
+            compatibleTypeLists annotated.input inferred.input Dict.empty
 
         ( _, outputsCompatible ) =
-            compare annotated.output inferred.output inputRangeDict
+            compatibleTypeLists annotated.output inferred.output inputRangeDict
     in
     inputsCompatible && outputsCompatible
 
 
-compare : List Type -> List Type -> Dict String (List Type) -> ( Dict String (List Type), Bool )
-compare lhs rhs rangeDict =
-    case ( lhs, rhs ) of
+compatibleTypeLists : List Type -> List Type -> Dict String (List Type) -> ( Dict String (List Type), Bool )
+compatibleTypeLists annotated inferred rangeDict =
+    case ( annotated, inferred ) of
         ( [], [] ) ->
             ( rangeDict, True )
 
-        ( (StackRange lhsName) :: lhsRest, (StackRange rhsName) :: rhsRest ) ->
-            if lhsName == rhsName then
-                compare lhsRest rhsRest rangeDict
+        ( (StackRange annotatedName) :: annotatedRest, (StackRange inferredName) :: inferredRest ) ->
+            if annotatedName == inferredName then
+                compatibleTypeLists annotatedRest inferredRest rangeDict
 
             else
                 ( rangeDict, False )
@@ -182,45 +192,45 @@ compare lhs rhs rangeDict =
         ( [], (StackRange _) :: [] ) ->
             ( rangeDict, True )
 
-        ( lhsEl :: lhsRest, (StackRange rangeName) :: [] ) ->
-            compare lhsRest rhs <|
+        ( annotatedEl :: annotatedRest, (StackRange rangeName) :: [] ) ->
+            compatibleTypeLists annotatedRest inferred <|
                 Dict.update rangeName
                     (\maybeVal ->
                         maybeVal
                             |> Maybe.withDefault []
-                            |> (\existing -> existing ++ [ lhsEl ])
+                            |> (\existing -> existing ++ [ annotatedEl ])
                             |> Just
                     )
                     rangeDict
 
-        ( lhsEl :: lhsRest, (StackRange rangeName) :: rhsNext :: rhsRest ) ->
-            if sameCategory lhsEl rhsNext then
-                compare lhs (rhsNext :: rhsRest) rangeDict
+        ( annotatedEl :: annotatedRest, (StackRange rangeName) :: inferredNext :: inferredRest ) ->
+            if sameCategory annotatedEl inferredNext then
+                compatibleTypeLists annotated (inferredNext :: inferredRest) rangeDict
 
             else
-                compare lhsRest rhs <|
+                compatibleTypeLists annotatedRest inferred <|
                     Dict.update rangeName
                         (\maybeVal ->
                             maybeVal
                                 |> Maybe.withDefault []
-                                |> (\existing -> existing ++ [ lhsEl ])
+                                |> (\existing -> existing ++ [ annotatedEl ])
                                 |> Just
                         )
                         rangeDict
 
-        ( (Quotation lhsQuotType) :: lhsRest, (Quotation rhsQuotType) :: rhsRest ) ->
+        ( (Quotation annotatedQuotType) :: annotatedRest, (Quotation inferredQuotType) :: inferredRest ) ->
             let
-                lhsInputRangeApplied =
-                    applyRangeDict rangeDict lhsQuotType.input
+                annotatedInputRangeApplied =
+                    applyRangeDict rangeDict annotatedQuotType.input
 
-                lhsOutputRangeApplied =
-                    applyRangeDict rangeDict lhsQuotType.output
+                annotatedOutputRangeApplied =
+                    applyRangeDict rangeDict annotatedQuotType.output
 
-                rhsInputRangeApplied =
-                    applyRangeDict rangeDict rhsQuotType.input
+                inferredInputRangeApplied =
+                    applyRangeDict rangeDict inferredQuotType.input
 
-                rhsOutputRangeApplied =
-                    applyRangeDict rangeDict rhsQuotType.output
+                inferredOutputRangeApplied =
+                    applyRangeDict rangeDict inferredQuotType.output
 
                 applyRangeDict rd types =
                     List.concatMap
@@ -240,35 +250,35 @@ compare lhs rhs rangeDict =
                         types
 
                 ( dictRangePostInputs, inputCompatible ) =
-                    compare lhsInputRangeApplied rhsInputRangeApplied rangeDict
+                    compatibleTypeLists annotatedInputRangeApplied inferredInputRangeApplied rangeDict
 
                 ( dictRangePostOutputs, outputCompatible ) =
-                    compare lhsOutputRangeApplied rhsOutputRangeApplied dictRangePostInputs
+                    compatibleTypeLists annotatedOutputRangeApplied inferredOutputRangeApplied dictRangePostInputs
             in
             if inputCompatible && outputCompatible then
-                compare lhsRest rhsRest dictRangePostOutputs
+                compatibleTypeLists annotatedRest inferredRest dictRangePostOutputs
 
             else
                 ( dictRangePostOutputs, False )
 
-        ( (Generic _) :: lhsRest, _ :: rhsRest ) ->
-            compare lhsRest rhsRest rangeDict
+        ( (Generic _) :: annotatedRest, (Generic _) :: inferredRest ) ->
+            compatibleTypeLists annotatedRest inferredRest rangeDict
 
-        ( _ :: lhsRest, (Generic _) :: rhsRest ) ->
-            compare lhsRest rhsRest rangeDict
+        ( _ :: annotatedRest, (Generic _) :: inferredRest ) ->
+            compatibleTypeLists annotatedRest inferredRest rangeDict
 
-        ( (CustomGeneric lName lMembers) :: lhsRest, (CustomGeneric rName rMembers) :: rhsRest ) ->
+        ( (CustomGeneric lName lMembers) :: annotatedRest, (CustomGeneric rName rMembers) :: inferredRest ) ->
             let
                 ( _, compatibleMembers ) =
-                    compare lMembers rMembers Dict.empty
+                    compatibleTypeLists lMembers rMembers Dict.empty
             in
             if lName == rName && compatibleMembers then
-                compare lhsRest rhsRest rangeDict
+                compatibleTypeLists annotatedRest inferredRest rangeDict
 
             else
                 ( rangeDict, False )
 
-        ( (Union lMembers) :: lhsRest, (Union rMembers) :: rhsRest ) ->
+        ( (Union lMembers) :: annotatedRest, (Union rMembers) :: inferredRest ) ->
             let
                 lSet =
                     Set.fromList (List.map toString lMembers)
@@ -282,12 +292,12 @@ compare lhs rhs rangeDict =
             in
             case diff of
                 [] ->
-                    compare lhsRest rhsRest rangeDict
+                    compatibleTypeLists annotatedRest inferredRest rangeDict
 
                 [ oneDiff ] ->
                     -- Likely the default case
                     if String.endsWith "_Generic" oneDiff then
-                        compare lhsRest rhsRest rangeDict
+                        compatibleTypeLists annotatedRest inferredRest rangeDict
 
                     else
                         ( rangeDict, False )
@@ -296,26 +306,14 @@ compare lhs rhs rangeDict =
                     ( rangeDict, False )
 
         ( (Union _) :: _, _ ) ->
-            -- Cannot go from union to concrete type
             ( rangeDict, False )
 
-        ( lhsEl :: lhsRest, (Union rMembers) :: rhsRest ) ->
-            let
-                compatible =
-                    rMembers
-                        |> List.map toString
-                        |> Set.fromList
-                        |> Set.member (toString lhsEl)
-            in
-            if compatible then
-                compare lhsRest rhsRest rangeDict
+        ( _, (Union _) :: _ ) ->
+            ( rangeDict, False )
 
-            else
-                ( rangeDict, False )
-
-        ( lhsEl :: lhsRest, rhsEl :: rhsRest ) ->
-            if lhsEl == rhsEl then
-                compare lhsRest rhsRest rangeDict
+        ( annotatedEl :: annotatedRest, inferredEl :: inferredRest ) ->
+            if annotatedEl == inferredEl then
+                compatibleTypeLists annotatedRest inferredRest rangeDict
 
             else
                 ( rangeDict, False )

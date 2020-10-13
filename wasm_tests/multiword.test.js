@@ -216,3 +216,80 @@ test('Int match (reverse)', async () => {
 
     expect(result.stackElement()).toBe(12);
 });
+
+test('Correct Int boxing behaviour', async () => {
+    const wat = await compiler.toWat(`
+        defmulti: add
+        when: Int( value 0 )
+          swap 
+          drop 2
+          swap
+          +
+        when: Int
+          +
+
+        def: main
+        entry: true
+        : 10 6 add
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(16);
+});
+
+test('Correct Int boxing behaviour when mismatch between word input size and stack size', async () => {
+    const wat = await compiler.toWat(`
+        deftype: Nil
+
+        defmulti: inc-zero
+        when: Int( value 0 )
+          swap 
+          drop 1
+          swap
+        when: Int
+
+        def: main
+        entry: true
+        : 0 >Nil inc-zero
+          drop 
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});
+
+test('Generic case', async () => {
+    const wat = await compiler.toWat(`
+        defunion: Maybe a
+        : a
+        : Nil
+
+        deftype: Nil
+
+        defmulti: map
+        type: (Maybe a) [ a -- b ] -- (Maybe b)
+        when: a
+          !
+        when: Nil
+          drop
+
+        defmulti: with-default
+        type: (Maybe a) a -- a
+        when: a
+          drop
+        when: Nil
+          swap drop
+
+        def: main
+        entry: true
+        : 10
+          [ 1 - ] map
+          0 with-default
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(9);
+});
