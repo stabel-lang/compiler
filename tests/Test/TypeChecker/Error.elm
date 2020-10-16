@@ -257,6 +257,42 @@ suite =
 
                     Ok _ ->
                         Expect.fail "Did not expect type checking to succeed"
+        , test "Simple exhaustiveness failure" <|
+            \_ ->
+                let
+                    ast =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 2
+                                            , Word emptyRange "mword"
+                                            ]
+                                  }
+                                , { name = "mword"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        MultiImpl
+                                            []
+                                            []
+                                  }
+                                ]
+                        }
+
+                    inexhaustiveError problem =
+                        case problem of
+                            Problem.InexhaustiveMultiWord _ [ Type.Int ] ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError inexhaustiveError ast
         ]
 
 

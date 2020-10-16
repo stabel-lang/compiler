@@ -334,14 +334,34 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> replaceFirstType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
 
+        exposedType =
+            TypeSignature.toMaybe untypedDef.metadata.type_
+                |> Maybe.withDefault inferredType
+
+        maybeConsistencyError =
+            if whensAreConsistent && whensAreCompatible then
+                Nothing
+
+            else
+                let
+                    error =
+                        InconsistentWhens
+                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                            untypedDef.name
+                in
+                Just error
+
+        maybeInexhaustiveError =
+            inexhaustivenessCheck
+                (List.head exposedType.input |> Maybe.withDefault Type.Int)
+                whenPatterns
+
         finalContext =
             { newContext
                 | typedWords =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
-                        , type_ =
-                            TypeSignature.toMaybe untypedDef.metadata.type_
-                                |> Maybe.withDefault inferredType
+                        , type_ = exposedType
                         , metadata = untypedDef.metadata
                         , implementation =
                             MultiImpl
@@ -349,18 +369,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                                 (untypedToTypedImplementation newContext defaultImpl)
                         }
                         newContext.typedWords
-                , errors =
-                    if whensAreConsistent && whensAreCompatible then
-                        newContext.errors
-
-                    else
-                        let
-                            error =
-                                InconsistentWhens
-                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
-                                    untypedDef.name
-                        in
-                        error :: newContext.errors
+                , errors = List.filterMap identity [ maybeConsistencyError, maybeInexhaustiveError ] ++ newContext.errors
             }
     in
     verifyTypeSignature inferredType untypedDef finalContext
@@ -700,6 +709,11 @@ mapTypeMatchValue ( fieldName, value ) =
 
         Qualifier.RecursiveMatch val ->
             ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
+
+inexhaustivenessCheck : Type -> List Qualifier.TypeMatch -> Maybe Problem
+inexhaustivenessCheck leadType patterns =
+    Nothing
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context

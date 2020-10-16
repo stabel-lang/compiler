@@ -14,6 +14,7 @@ type Problem
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
+    | InexhaustiveMultiWord SourceLocationRange (List Type)
 
 
 toString : String -> Problem -> String
@@ -60,3 +61,6 @@ toString source problem =
                 ++ "We require a type annotation for '"
                 ++ name
                 ++ "' as we're unable to infer the type of a recursive call."
+
+        InexhaustiveMultiWord range missingTypes ->
+            "TODO"
