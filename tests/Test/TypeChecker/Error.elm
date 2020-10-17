@@ -278,7 +278,12 @@ suite =
                                   , metadata = Metadata.default
                                   , implementation =
                                         MultiImpl
-                                            []
+                                            [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
+                                              , [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                              )
+                                            ]
                                             []
                                   }
                                 ]
