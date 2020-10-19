@@ -353,7 +353,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         maybeInexhaustiveError =
             inexhaustivenessCheck
-                (List.head exposedType.input |> Maybe.withDefault Type.Int)
+                (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
                 whenPatterns
 
         finalContext =
@@ -711,9 +711,69 @@ mapTypeMatchValue ( fieldName, value ) =
             ( fieldName, RecursiveMatch (mapTypeMatch val) )
 
 
-inexhaustivenessCheck : Type -> List Qualifier.TypeMatch -> Maybe Problem
-inexhaustivenessCheck leadType patterns =
-    Nothing
+inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
+inexhaustivenessCheck range patterns =
+    let
+        inexhaustiveStates =
+            inexhaustivenessCheckHelper patterns []
+                |> List.filter (\( _, state ) -> state /= Total)
+                |> List.map Tuple.first
+                |> List.map (List.reverse >> List.head)
+                |> List.map (Maybe.withDefault Type.Int)
+    in
+    case inexhaustiveStates of
+        [] ->
+            Nothing
+
+        _ ->
+            Just (InexhaustiveMultiWord range inexhaustiveStates)
+
+
+type InexhaustiveState
+    = Total
+    | SeenInt
+    | SeenType Type
+
+
+inexhaustivenessCheckHelper : List Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
+inexhaustivenessCheckHelper typeMatches acc =
+    case typeMatches of
+        [] ->
+            acc
+
+        (Qualifier.TypeMatch _ t conds) :: rest ->
+            let
+                typeList =
+                    [ t ]
+
+                state =
+                    case ( t, conds ) of
+                        ( _, [] ) ->
+                            Total
+
+                        ( Type.Int, _ ) ->
+                            SeenInt
+
+                        _ ->
+                            SeenType t
+            in
+            if List.find (\( toMatch, _ ) -> toMatch == typeList) acc == Nothing then
+                inexhaustivenessCheckHelper rest (( [ t ], state ) :: acc)
+
+            else
+                let
+                    updatedStates =
+                        List.map
+                            (\( toMatch, originalState ) ->
+                                if toMatch == typeList && originalState /= Total then
+                                    ( typeList, state )
+
+                                else
+                                    ( toMatch, originalState )
+                            )
+                            acc
+                in
+                inexhaustivenessCheckHelper rest updatedStates
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context
