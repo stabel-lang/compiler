@@ -257,47 +257,131 @@ suite =
 
                     Ok _ ->
                         Expect.fail "Did not expect type checking to succeed"
-        , test "Simple exhaustiveness failure" <|
-            \_ ->
-                let
-                    ast =
-                        { types = Dict.empty
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer emptyRange 2
-                                            , Word emptyRange "mword"
-                                            ]
-                                  }
-                                , { name = "mword"
-                                  , metadata = Metadata.default
-                                  , implementation =
-                                        MultiImpl
-                                            [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
-                                              , [ Integer emptyRange 1
-                                                , Builtin emptyRange Builtin.Plus
+        , describe "Inexhaustiveness checking"
+            [ test "Simple example" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Word emptyRange "mword"
                                                 ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                ]
-                        }
+                                      }
+                                    , { name = "mword"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
+                                                  , [ Integer emptyRange 1
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
 
-                    inexhaustiveError problem =
-                        case problem of
-                            Problem.InexhaustiveMultiWord _ [ Type.Int ] ->
-                                True
+                        inexhaustiveError problem =
+                            case problem of
+                                Problem.InexhaustiveMultiWord _ [ [ Type.Int ] ] ->
+                                    True
 
-                            _ ->
-                                False
-                in
-                checkForError inexhaustiveError ast
+                                _ ->
+                                    False
+                    in
+                    checkForError inexhaustiveError ast
+            , test "Nested" <|
+                \_ ->
+                    let
+                        ast =
+                            { types =
+                                Dict.fromListBy typeDefinitionName
+                                    [ CustomTypeDef "IntBox"
+                                        emptyRange
+                                        []
+                                        [ ( "value", Type.Int ) ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                                |> Metadata.withType [] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange ">IntBox"
+                                                , Word emptyRange "mword"
+                                                , Word emptyRange "value>"
+                                                ]
+                                      }
+                                    , { name = "mword"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange
+                                                        (Type.Custom "IntBox")
+                                                        [ ( "value>"
+                                                          , RecursiveMatch
+                                                                (TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ])
+                                                          )
+                                                        ]
+                                                  , [ Word emptyRange "value>"
+                                                    , Integer emptyRange 1
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    , Word emptyRange ">IntBox"
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = ">IntBox"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "IntBox" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "IntBox" ]
+                                      }
+                                    , { name = ">value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox", Type.Int ] [ Type.Custom "IntBox" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ SetMember "IntBox" "value" ]
+                                      }
+                                    , { name = "value>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ GetMember "IntBox" "value" ]
+                                      }
+                                    ]
+                            }
+
+                        inexhaustiveError problem =
+                            case problem of
+                                Problem.InexhaustiveMultiWord _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    checkForError inexhaustiveError ast
+            ]
         ]
 
 

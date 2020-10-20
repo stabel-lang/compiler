@@ -14,7 +14,7 @@ type Problem
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
-    | InexhaustiveMultiWord SourceLocationRange (List Type)
+    | InexhaustiveMultiWord SourceLocationRange (List (List Type))
 
 
 toString : String -> Problem -> String

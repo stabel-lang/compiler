@@ -715,11 +715,9 @@ inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe
 inexhaustivenessCheck range patterns =
     let
         inexhaustiveStates =
-            inexhaustivenessCheckHelper patterns []
+            List.foldl (inexhaustivenessCheckHelper []) [] patterns
                 |> List.filter (\( _, state ) -> state /= Total)
                 |> List.map Tuple.first
-                |> List.map (List.reverse >> List.head)
-                |> List.map (Maybe.withDefault Type.Int)
     in
     case inexhaustiveStates of
         [] ->
@@ -735,45 +733,58 @@ type InexhaustiveState
     | SeenType Type
 
 
-inexhaustivenessCheckHelper : List Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
-inexhaustivenessCheckHelper typeMatches acc =
-    case typeMatches of
-        [] ->
-            acc
+inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
+inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
+    let
+        typeList =
+            typePrefix ++ [ t ]
 
-        (Qualifier.TypeMatch _ t conds) :: rest ->
-            let
-                typeList =
-                    [ t ]
+        subcases =
+            conds
+                |> List.map Tuple.second
+                |> List.filterMap isRecursiveMatch
+                |> List.foldl (inexhaustivenessCheckHelper typeList) acc
 
-                state =
-                    case ( t, conds ) of
-                        ( _, [] ) ->
-                            Total
+        isRecursiveMatch match =
+            case match of
+                Qualifier.RecursiveMatch cond ->
+                    Just cond
 
-                        ( Type.Int, _ ) ->
-                            SeenInt
+                _ ->
+                    Nothing
 
-                        _ ->
-                            SeenType t
-            in
-            if List.find (\( toMatch, _ ) -> toMatch == typeList) acc == Nothing then
-                inexhaustivenessCheckHelper rest (( [ t ], state ) :: acc)
+        state =
+            case ( t, conds, subcases ) of
+                ( _, [], _ ) ->
+                    Total
 
-            else
-                let
-                    updatedStates =
-                        List.map
-                            (\( toMatch, originalState ) ->
-                                if toMatch == typeList && originalState /= Total then
-                                    ( typeList, state )
+                ( Type.Int, _, _ ) ->
+                    SeenInt
 
-                                else
-                                    ( toMatch, originalState )
-                            )
-                            acc
-                in
-                inexhaustivenessCheckHelper rest updatedStates
+                _ ->
+                    if List.all (Tuple.second >> (==) Total) subcases then
+                        Total
+
+                    else
+                        SeenType t
+    in
+    if List.find (\( toMatch, _ ) -> toMatch == typeList) acc == Nothing then
+        ( typeList, state ) :: subcases ++ acc
+
+    else
+        let
+            updatedStates =
+                List.map
+                    (\( toMatch, originalState ) ->
+                        if toMatch == typeList && originalState /= Total then
+                            ( typeList, state )
+
+                        else
+                            ( toMatch, originalState )
+                    )
+                    acc
+        in
+        subcases ++ updatedStates
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context
