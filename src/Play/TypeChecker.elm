@@ -738,53 +738,61 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
     let
         typeList =
             typePrefix ++ [ t ]
-
-        subcases =
-            conds
-                |> List.map Tuple.second
-                |> List.filterMap isRecursiveMatch
-                |> List.foldl (inexhaustivenessCheckHelper typeList) acc
-
-        isRecursiveMatch match =
-            case match of
-                Qualifier.RecursiveMatch cond ->
-                    Just cond
-
-                _ ->
-                    Nothing
-
-        state =
-            case ( t, conds, subcases ) of
-                ( _, [], _ ) ->
-                    Total
-
-                ( Type.Int, _, _ ) ->
-                    SeenInt
-
-                _ ->
-                    if List.all (Tuple.second >> (==) Total) subcases then
-                        Total
-
-                    else
-                        SeenType t
     in
-    if List.find (\( toMatch, _ ) -> toMatch == typeList) acc == Nothing then
-        ( typeList, state ) :: subcases ++ acc
+    if List.any (\( toMatch, state ) -> typeList == toMatch && state == Total) acc then
+        acc
 
     else
         let
-            updatedStates =
-                List.map
-                    (\( toMatch, originalState ) ->
-                        if toMatch == typeList && originalState /= Total then
-                            ( typeList, state )
+            subcases =
+                conds
+                    |> List.map Tuple.second
+                    |> List.filterMap isRecursiveMatch
+                    |> List.foldl (inexhaustivenessCheckHelper typeList) acc
+
+            isRecursiveMatch match =
+                case match of
+                    Qualifier.RecursiveMatch cond ->
+                        Just cond
+
+                    _ ->
+                        Nothing
+
+            toAdd =
+                case ( t, conds, subcases ) of
+                    ( _, [], _ ) ->
+                        [ ( typeList, Total ) ]
+
+                    ( Type.Int, _, _ ) ->
+                        [ ( typeList, SeenInt ) ]
+
+                    _ ->
+                        if List.all (Tuple.second >> (==) Total) subcases then
+                            [ ( typeList, Total ) ]
 
                         else
-                            ( toMatch, originalState )
-                    )
+                            subcases
+
+            modifiedAcc =
+                if toAdd /= [ ( typeList, Total ) ] then
                     acc
+
+                else
+                    List.filter
+                        (\( toMatch, _ ) ->
+                            List.take (List.length typeList) toMatch /= typeList
+                        )
+                        acc
         in
-        subcases ++ updatedStates
+        if List.find (\( toMatch, _ ) -> toMatch == typeList) modifiedAcc == Nothing then
+            toAdd ++ modifiedAcc
+
+        else
+            let
+                updatedStates =
+                    List.filter (\( toMatch, _ ) -> toMatch /= typeList) modifiedAcc
+            in
+            toAdd ++ updatedStates
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context

@@ -381,6 +381,92 @@ suite =
                                     False
                     in
                     checkForError inexhaustiveError ast
+            , test "A total branch should remove any earlier seen branch" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Word emptyRange "mword"
+                                                ]
+                                      }
+                                    , { name = "mword"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
+                                                  , [ Integer emptyRange 1
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange Type.Int []
+                                                  , [ Builtin emptyRange Builtin.StackDuplicate
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case TypeChecker.run ast of
+                        Err errors ->
+                            Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+
+                        Ok _ ->
+                            Expect.pass
+            , test "A total branch should prevent addition of later partial branch" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Word emptyRange "mword"
+                                                ]
+                                      }
+                                    , { name = "mword"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int []
+                                                  , [ Builtin emptyRange Builtin.StackDuplicate
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
+                                                  , [ Integer emptyRange 1
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                    in
+                    case TypeChecker.run ast of
+                        Err errors ->
+                            Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+
+                        Ok _ ->
+                            Expect.pass
             ]
         ]
 
