@@ -63,4 +63,11 @@ toString source problem =
                 ++ "' as we're unable to infer the type of a recursive call."
 
         InexhaustiveMultiWord range missingTypes ->
-            "TODO"
+            let
+                formatTypePattern tp =
+                    String.join " -> " (List.map Type.toDisplayString tp)
+            in
+            SourceLocation.extractFromString source range
+                ++ "\n\n"
+                ++ "This multiword doesn't handle all potential patterns. Missing patterns for:\n\n"
+                ++ String.join "\n" (List.map formatTypePattern missingTypes)
