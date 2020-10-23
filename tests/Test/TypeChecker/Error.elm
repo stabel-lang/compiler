@@ -299,6 +299,46 @@ suite =
                                     False
                     in
                     checkForError inexhaustiveError ast
+            , test "Default clause is exhaustive" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Word emptyRange "mword"
+                                                ]
+                                      }
+                                    , { name = "mword"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
+                                                  , [ Integer emptyRange 1
+                                                    , Builtin emptyRange Builtin.Plus
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Integer emptyRange 0
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case TypeChecker.run ast of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errs
             , test "Nested" <|
                 \_ ->
                     let
@@ -467,6 +507,115 @@ suite =
 
                         Ok _ ->
                             Expect.pass
+            , test "Test with non-int type as pattern" <|
+                \_ ->
+                    let
+                        maybeUnion =
+                            Type.Union
+                                [ Type.Custom "IntBox"
+                                , Type.Custom "Nil"
+                                ]
+
+                        input =
+                            { types =
+                                Dict.fromListBy typeDefinitionName
+                                    [ UnionTypeDef "Maybe"
+                                        emptyRange
+                                        [ "a" ]
+                                        [ Type.Generic "a"
+                                        , Type.Custom "Nil"
+                                        ]
+                                    , CustomTypeDef "IntBox"
+                                        emptyRange
+                                        []
+                                        [ ( "value", Type.Int ) ]
+                                    , CustomTypeDef "Nil" emptyRange [] []
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = ">Nil"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "Nil"
+                                                ]
+                                      }
+                                    , { name = ">IntBox"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "IntBox" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ ConstructType "IntBox" ]
+                                      }
+                                    , { name = ">value"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox", Type.Int ] [ Type.Custom "IntBox" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ SetMember "IntBox" "value" ]
+                                      }
+                                    , { name = "value>"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox" ] [ Type.Int ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ GetMember "IntBox" "value" ]
+                                      }
+                                    , { name = "with-default"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ maybeUnion, Type.Int ]
+                                                    [ Type.Int ]
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange
+                                                        (Type.Custom "IntBox")
+                                                        [ ( "value>"
+                                                          , RecursiveMatch <|
+                                                                TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 0 ) ]
+                                                          )
+                                                        ]
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Word emptyRange "value>"
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                  , [ Builtin emptyRange Builtin.StackSwap
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            SoloImpl
+                                                [ Word emptyRange ">Nil"
+                                                , Integer emptyRange 1
+                                                , Word emptyRange "with-default"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inexhaustiveError problem =
+                            case problem of
+                                Problem.InexhaustiveMultiWord _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    checkForError inexhaustiveError input
             ]
         ]
 
