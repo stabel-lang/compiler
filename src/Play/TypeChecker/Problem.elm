@@ -14,6 +14,7 @@ type Problem
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
+    | InexhaustiveMultiWord SourceLocationRange (List (List Type))
 
 
 toString : String -> Problem -> String
@@ -60,3 +61,13 @@ toString source problem =
                 ++ "We require a type annotation for '"
                 ++ name
                 ++ "' as we're unable to infer the type of a recursive call."
+
+        InexhaustiveMultiWord range missingTypes ->
+            let
+                formatTypePattern tp =
+                    String.join " -> " (List.map Type.toDisplayString tp)
+            in
+            SourceLocation.extractFromString source range
+                ++ "\n\n"
+                ++ "This multiword doesn't handle all potential patterns. Missing patterns for:\n\n"
+                ++ String.join "\n" (List.map formatTypePattern missingTypes)

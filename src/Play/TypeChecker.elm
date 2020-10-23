@@ -334,14 +334,34 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> replaceFirstType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
 
+        exposedType =
+            TypeSignature.toMaybe untypedDef.metadata.type_
+                |> Maybe.withDefault inferredType
+
+        maybeConsistencyError =
+            if whensAreConsistent && whensAreCompatible then
+                Nothing
+
+            else
+                let
+                    error =
+                        InconsistentWhens
+                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                            untypedDef.name
+                in
+                Just error
+
+        maybeInexhaustiveError =
+            inexhaustivenessCheck
+                (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                whenPatterns
+
         finalContext =
             { newContext
                 | typedWords =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
-                        , type_ =
-                            TypeSignature.toMaybe untypedDef.metadata.type_
-                                |> Maybe.withDefault inferredType
+                        , type_ = exposedType
                         , metadata = untypedDef.metadata
                         , implementation =
                             MultiImpl
@@ -349,18 +369,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                                 (untypedToTypedImplementation newContext defaultImpl)
                         }
                         newContext.typedWords
-                , errors =
-                    if whensAreConsistent && whensAreCompatible then
-                        newContext.errors
-
-                    else
-                        let
-                            error =
-                                InconsistentWhens
-                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
-                                    untypedDef.name
-                        in
-                        error :: newContext.errors
+                , errors = List.filterMap identity [ maybeConsistencyError, maybeInexhaustiveError ] ++ newContext.errors
             }
     in
     verifyTypeSignature inferredType untypedDef finalContext
@@ -700,6 +709,90 @@ mapTypeMatchValue ( fieldName, value ) =
 
         Qualifier.RecursiveMatch val ->
             ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
+
+inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
+inexhaustivenessCheck range patterns =
+    let
+        inexhaustiveStates =
+            List.foldl (inexhaustivenessCheckHelper []) [] patterns
+                |> List.filter (\( _, state ) -> state /= Total)
+                |> List.map Tuple.first
+    in
+    case inexhaustiveStates of
+        [] ->
+            Nothing
+
+        _ ->
+            Just (InexhaustiveMultiWord range inexhaustiveStates)
+
+
+type InexhaustiveState
+    = Total
+    | SeenInt
+    | SeenType Type
+
+
+inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
+inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
+    let
+        typeList =
+            typePrefix ++ [ t ]
+    in
+    if List.any (\( toMatch, state ) -> typeList == toMatch && state == Total) acc then
+        acc
+
+    else
+        let
+            subcases =
+                conds
+                    |> List.map Tuple.second
+                    |> List.filterMap isRecursiveMatch
+                    |> List.foldl (inexhaustivenessCheckHelper typeList) acc
+
+            isRecursiveMatch match =
+                case match of
+                    Qualifier.RecursiveMatch cond ->
+                        Just cond
+
+                    _ ->
+                        Nothing
+
+            toAdd =
+                case ( t, conds, subcases ) of
+                    ( _, [], _ ) ->
+                        [ ( typeList, Total ) ]
+
+                    ( Type.Int, _, _ ) ->
+                        [ ( typeList, SeenInt ) ]
+
+                    _ ->
+                        if List.all (Tuple.second >> (==) Total) subcases then
+                            [ ( typeList, Total ) ]
+
+                        else
+                            subcases
+
+            modifiedAcc =
+                if toAdd /= [ ( typeList, Total ) ] then
+                    acc
+
+                else
+                    List.filter
+                        (\( toMatch, _ ) ->
+                            List.take (List.length typeList) toMatch /= typeList
+                        )
+                        acc
+        in
+        if List.find (\( toMatch, _ ) -> toMatch == typeList) modifiedAcc == Nothing then
+            toAdd ++ modifiedAcc
+
+        else
+            let
+                updatedStates =
+                    List.filter (\( toMatch, _ ) -> toMatch /= typeList) modifiedAcc
+            in
+            toAdd ++ updatedStates
 
 
 verifyTypeSignature : WordType -> Qualifier.WordDefinition -> Context -> Context
