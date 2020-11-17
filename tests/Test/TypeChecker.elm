@@ -9,6 +9,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
+import Play.TypeChecker.Problem as Problem
 import Test exposing (Test, describe, test)
 
 
@@ -385,6 +386,119 @@ suite =
                 case run input of
                     Err _ ->
                         Expect.fail "Did not expect type check to fail."
+
+                    Ok _ ->
+                        Expect.pass
+        , test "Generic types with rotations and quotations" <|
+            \_ ->
+                let
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Coordinate"
+                                    emptyRange
+                                    []
+                                    [ ( "x", Type.Int )
+                                    , ( "y", Type.Int )
+                                    ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Word emptyRange ">Coordinate"
+                                            , QAST.WordRef emptyRange "main__quot1"
+                                            , QAST.Word emptyRange "update-x"
+                                            , QAST.Word emptyRange "x>"
+                                            ]
+                                  }
+                                , { name = "main__quot1"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                , { name = "update-x"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "Coordinate"
+                                                , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                                ]
+                                                [ Type.Custom "Coordinate" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin emptyRange Builtin.StackSwap
+                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
+                                            , QAST.Word emptyRange "x>"
+                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
+                                            , QAST.Builtin emptyRange Builtin.Apply
+                                            , QAST.Word emptyRange ">x"
+                                            ]
+                                  }
+                                , { name = ">Coordinate"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Coordinate" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.ConstructType "Coordinate"
+                                            ]
+                                  }
+                                , { name = ">x"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "Coordinate", Type.Int ]
+                                                [ Type.Custom "Coordinate" ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.SetMember "Coordinate" "x" ]
+                                  }
+                                , { name = "x>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "Coordinate" ]
+                                                [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.GetMember "Coordinate" "x" ]
+                                  }
+                                , { name = ">y"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "Coordinate", Type.Int ]
+                                                [ Type.Custom "Coordinate" ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.SetMember "Coordinate" "y" ]
+                                  }
+                                , { name = "y>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "Coordinate" ]
+                                                [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl [ QAST.GetMember "Coordinate" "y" ]
+                                  }
+                                ]
+                        }
+                in
+                case run input of
+                    Err err ->
+                        err
+                            |> List.map (Problem.toString "")
+                            |> String.join "\n"
+                            |> (++) "Did not expect type check to fail.\n"
+                            |> Expect.fail
 
                     Ok _ ->
                         Expect.pass
