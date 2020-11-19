@@ -223,6 +223,17 @@ typeCheckMultiImplementation :
     -> Context
 typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     let
+        untypedDefMetadata =
+            untypedDef.metadata
+
+        untypedDefNoTypeAnnotation =
+            { untypedDef
+                | metadata =
+                    { untypedDefMetadata
+                        | type_ = TypeSignature.NotProvided
+                    }
+            }
+
         whens =
             case defaultImpl of
                 [] ->
@@ -231,7 +242,10 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 _ ->
                     let
                         ( inferredDefaultType, _ ) =
-                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                            typeCheckImplementation
+                                untypedDefNoTypeAnnotation
+                                defaultImpl
+                                (cleanContext context)
                     in
                     case inferredDefaultType.input of
                         [] ->
@@ -241,7 +255,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
         ( inferredWhenTypes, newContext ) =
-            List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
+            List.foldr (inferWhenTypes untypedDefNoTypeAnnotation) ( [], context ) whens
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
@@ -671,8 +685,23 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
 typeCheckImplementation : Qualifier.WordDefinition -> List Qualifier.Node -> Context -> ( WordType, Context )
 typeCheckImplementation untypedDef impl context =
     let
+        startingStackEffects =
+            untypedDef.metadata.type_
+                |> TypeSignature.toMaybe
+                |> Maybe.map reverseWordType
+                |> Maybe.withDefault Type.emptyWordType
+                |> wordTypeToStackEffects
+
+        reverseWordType wt =
+            { input = []
+            , output = wt.input
+            }
+
         contextWithCall =
-            { context | callStack = Set.insert untypedDef.name context.callStack }
+            { context
+                | callStack = Set.insert untypedDef.name context.callStack
+                , stackEffects = startingStackEffects
+            }
 
         ( _, contextWithStackEffects ) =
             List.foldl
@@ -682,8 +711,15 @@ typeCheckImplementation untypedDef impl context =
 
         contextWithoutCall =
             { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
+
+        annotatedInput =
+            untypedDef.metadata.type_
+                |> TypeSignature.toMaybe
+                |> Maybe.map .input
+                |> Maybe.withDefault []
     in
     wordTypeFromStackEffects untypedDef contextWithoutCall
+        |> (\( ctx, wt ) -> ( ctx, { wt | input = wt.input ++ annotatedInput } ))
         |> simplifyWordType
         |> (\( a, b ) -> ( b, a ))
 
