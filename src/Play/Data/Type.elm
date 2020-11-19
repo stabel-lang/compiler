@@ -2,6 +2,7 @@ module Play.Data.Type exposing
     ( Type(..)
     , WordType
     , compatibleWords
+    , emptyWordType
     , genericName
     , genericlyCompatible
     , isGeneric
@@ -27,6 +28,13 @@ type Type
 type alias WordType =
     { input : List Type
     , output : List Type
+    }
+
+
+emptyWordType : WordType
+emptyWordType =
+    { input = []
+    , output = []
     }
 
 
