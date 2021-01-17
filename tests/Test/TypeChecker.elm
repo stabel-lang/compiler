@@ -4,13 +4,14 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Play.Data.Builtin as Builtin
-import Play.Data.Metadata as Metadata exposing (Metadata)
+import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Qualifier as QAST
 import Play.TypeChecker exposing (..)
 import Play.TypeChecker.Problem as Problem
 import Test exposing (Test, describe, test)
+import Test.Qualifier.Util as QualifierUtil
 
 
 suite : Test
@@ -139,15 +140,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "True" ]
-                                  }
-                                , { name = "as-int"
+                                [ { name = "as-int"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [] [ Type.Int ]
@@ -168,6 +161,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run source of
                     Err _ ->
@@ -185,31 +179,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">Person"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int ] [ Type.Custom "Person" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "Person" ]
-                                  }
-                                , { name = ">age"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.SetMember "Person" "age" ]
-                                  }
-                                , { name = "age>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.GetMember "Person" "age" ]
-                                  }
-                                , { name = "inc-age"
+                                [ { name = "inc-age"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
@@ -235,6 +205,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run source of
                     Err _ ->
@@ -353,35 +324,9 @@ suite =
                                             , QAST.Builtin emptyRange Builtin.Equal
                                             ]
                                   }
-                                , { name = ">Box"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "Box"
-                                            ]
-                                  }
-                                , { name = ">element"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
-                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.SetMember "Box" "element" ]
-                                  }
-                                , { name = "element>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                                [ Type.Generic "a" ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.GetMember "Box" "element" ]
-                                  }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run input of
                     Err _ ->
@@ -444,53 +389,9 @@ suite =
                                             , QAST.Word emptyRange ">x"
                                             ]
                                   }
-                                , { name = ">Coordinate"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int, Type.Int ] [ Type.Custom "Coordinate" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "Coordinate"
-                                            ]
-                                  }
-                                , { name = ">x"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "Coordinate", Type.Int ]
-                                                [ Type.Custom "Coordinate" ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.SetMember "Coordinate" "x" ]
-                                  }
-                                , { name = "x>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "Coordinate" ]
-                                                [ Type.Int ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.GetMember "Coordinate" "x" ]
-                                  }
-                                , { name = ">y"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "Coordinate", Type.Int ]
-                                                [ Type.Custom "Coordinate" ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.SetMember "Coordinate" "y" ]
-                                  }
-                                , { name = "y>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "Coordinate" ]
-                                                [ Type.Int ]
-                                  , implementation =
-                                        QAST.SoloImpl [ QAST.GetMember "Coordinate" "y" ]
-                                  }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run input of
                     Err err ->
@@ -511,18 +412,9 @@ suite =
                                 [ QAST.CustomTypeDef "Box" emptyRange [] [ ( "element", Type.Generic "a" ) ]
                                 ]
                         , words =
-                            Dict.fromListBy .name
-                                [ { name = ">Box"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Generic "a" ] [ Type.Custom "Box" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "Box"
-                                            ]
-                                  }
-                                ]
+                            Dict.empty
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run input of
                     Ok _ ->
@@ -539,18 +431,9 @@ suite =
                                 [ QAST.CustomTypeDef "Box" emptyRange [ "a" ] [ ( "element", Type.Generic "b" ) ]
                                 ]
                         , words =
-                            Dict.fromListBy .name
-                                [ { name = ">Box"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Generic "b" ] [ Type.Custom "Box" ]
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.ConstructType "Box"
-                                            ]
-                                  }
-                                ]
+                            Dict.empty
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run input of
                     Ok _ ->
@@ -580,25 +463,7 @@ suite =
                             ]
                     , words =
                         Dict.fromListBy .name
-                            [ { name = ">True"
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.withType [] [ Type.Custom "True" ]
-                              , implementation =
-                                    QAST.SoloImpl
-                                        [ QAST.ConstructType "True"
-                                        ]
-                              }
-                            , { name = ">False"
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.withType [] [ Type.Custom "False" ]
-                              , implementation =
-                                    QAST.SoloImpl
-                                        [ QAST.ConstructType "False"
-                                        ]
-                              }
-                            , multiFn
+                            [ multiFn
                             , { name = "main"
                               , metadata =
                                     Metadata.default
@@ -614,6 +479,7 @@ suite =
                               }
                             ]
                     }
+                        |> QualifierUtil.addFunctionsForStructs
             in
             [ test "Simplest case" <|
                 \_ ->
@@ -752,61 +618,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Person"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Person" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "Person"
-                                                ]
-                                      }
-                                    , { name = ">Dog"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Dog" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "Dog"
-                                                ]
-                                      }
-                                    , { name = "age>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "Person" "age"
-                                                ]
-                                      }
-                                    , { name = "man-years>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Dog" ] [ Type.Int ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "Dog" "man-years"
-                                                ]
-                                      }
-                                    , { name = ">age"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "Person" "age"
-                                                ]
-                                      }
-                                    , { name = ">man-years"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Dog", Type.Int ] [ Type.Custom "Dog" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "Dog" "man-years"
-                                                ]
-                                      }
-                                    , { name = "add-to-age"
+                                    [ { name = "add-to-age"
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
@@ -859,6 +671,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Err _ ->
@@ -883,25 +696,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "True"
-                                                ]
-                                      }
-                                    , { name = ">False"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "False"
-                                                ]
-                                      }
-                                    , { name = "not"
+                                    [ { name = "not"
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.MultiImpl
@@ -941,6 +736,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Ok _ ->
@@ -976,71 +772,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">EmptyList"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "EmptyList" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "EmptyList"
-                                                ]
-                                      }
-                                    , { name = ">NonEmptyList"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Generic "a", listUnion ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "NonEmptyList"
-                                                ]
-                                      }
-                                    , { name = "first>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                                    [ Type.Generic "a" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "NonEmptyList" "first"
-                                                ]
-                                      }
-                                    , { name = ">first"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "NonEmptyList" "first"
-                                                ]
-                                      }
-                                    , { name = "rest>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                                    [ listUnion ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "NonEmptyList" "rest"
-                                                ]
-                                      }
-                                    , { name = ">rest"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], listUnion ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "NonEmptyList" "rest"
-                                                ]
-                                      }
-                                    , { name = "first-or-default"
+                                    [ { name = "first-or-default"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -1078,6 +810,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Ok _ ->
@@ -1107,16 +840,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "Nil"
-                                                ]
-                                      }
-                                    , { name = "with-default"
+                                    [ { name = "with-default"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -1149,6 +873,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
 
                         expectedResult =
                             { types =
@@ -1167,7 +892,7 @@ suite =
                                       , type_ = { input = [], output = [ Type.Custom "Nil" ] }
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
                                       , implementation =
                                             SoloImpl
                                                 [ ConstructType "Nil"
@@ -1241,18 +966,9 @@ suite =
                                     , QAST.CustomTypeDef "Nothing" emptyRange [] []
                                     ]
                             , words =
-                                Dict.fromListBy .name
-                                    [ { name = ">Nothing"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "Nothing"
-                                                ]
-                                      }
-                                    ]
+                                Dict.empty
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Ok _ ->
@@ -1458,16 +1174,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "Nil"
-                                                ]
-                                      }
-                                    , { name = "map"
+                                    [ { name = "map"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -1514,6 +1221,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Ok _ ->
@@ -1551,71 +1259,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">EmptyList"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "EmptyList" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "EmptyList"
-                                                ]
-                                      }
-                                    , { name = ">NonEmptyList"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Generic "a", listUnion ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.ConstructType "NonEmptyList"
-                                                ]
-                                      }
-                                    , { name = "first>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                                    [ Type.Generic "a" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "NonEmptyList" "first"
-                                                ]
-                                      }
-                                    , { name = ">first"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "NonEmptyList" "first"
-                                                ]
-                                      }
-                                    , { name = "rest>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                                    [ listUnion ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.GetMember "NonEmptyList" "rest"
-                                                ]
-                                      }
-                                    , { name = ">rest"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ], listUnion ]
-                                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.SetMember "NonEmptyList" "rest"
-                                                ]
-                                      }
-                                    , { name = "sum"
+                                    [ { name = "sum"
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.SoloImpl
@@ -1666,6 +1310,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run input of
                         Ok _ ->

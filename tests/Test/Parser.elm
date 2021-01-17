@@ -8,7 +8,7 @@ import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, e
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Parser.Util exposing (compile, compileRetainLocations)
+import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations)
 
 
 suite : Test
@@ -96,15 +96,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "True" ]
-                                      }
-                                    , { name = "as-int"
+                                    [ { name = "as-int"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
@@ -115,6 +107,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->
@@ -148,42 +141,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Person"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Int, Type.Int ] [ Type.Custom "Person" ]
-                                      , implementation =
-                                            SoloImpl [ AST.ConstructType "Person" ]
-                                      }
-                                    , { name = "age>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
-                                      , implementation =
-                                            SoloImpl [ AST.GetMember "Person" "age" ]
-                                      }
-                                    , { name = ">age"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                      , implementation =
-                                            SoloImpl [ AST.SetMember "Person" "age" ]
-                                      }
-                                    , { name = ">jobs"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "Person", Type.Int ] [ Type.Custom "Person" ]
-                                      , implementation =
-                                            SoloImpl [ AST.SetMember "Person" "jobs" ]
-                                      }
-                                    , { name = "jobs>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "Person" ] [ Type.Int ]
-                                      , implementation =
-                                            SoloImpl [ AST.GetMember "Person" "jobs" ]
-                                      }
-                                    , { name = "get-age"
+                                    [ { name = "get-age"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
@@ -194,6 +152,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->
@@ -327,25 +286,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "True"
-                                                ]
-                                      }
-                                    , { name = ">False"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "False"
-                                                ]
-                                      }
-                                    , { name = "to-int"
+                                    [ { name = "to-int"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -360,6 +301,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->
@@ -398,16 +340,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "Nil"
-                                                ]
-                                      }
-                                    , { name = "if-present"
+                                    [ { name = "if-present"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -422,6 +355,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->
@@ -464,53 +398,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Box"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "Box"
-                                                ]
-                                      }
-                                    , { name = ">element"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    , Type.Generic "a"
-                                                    ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.SetMember "Box" "element"
-                                                ]
-                                      }
-                                    , { name = "element>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    ]
-                                                    [ Type.Generic "a"
-                                                    ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.GetMember "Box" "element"
-                                                ]
-                                      }
-                                    , { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "Nil"
-                                                ]
-                                      }
-                                    , { name = "if-present"
+                                    [ { name = "if-present"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -525,6 +413,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->
@@ -568,53 +457,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Box"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "Box"
-                                                ]
-                                      }
-                                    , { name = ">element"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    , Type.Generic "a"
-                                                    ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.SetMember "Box" "element"
-                                                ]
-                                      }
-                                    , { name = "element>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                                    ]
-                                                    [ Type.Generic "a"
-                                                    ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.GetMember "Box" "element"
-                                                ]
-                                      }
-                                    , { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ConstructType "Nil"
-                                                ]
-                                      }
-                                    , { name = "if-present"
+                                    [ { name = "if-present"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
@@ -633,6 +476,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> addFunctionsForStructs
                     in
                     case compile source of
                         Err _ ->

@@ -10,6 +10,8 @@ import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
 import Test exposing (Test, describe, test)
+import Test.Parser.Util as ParserUtil
+import Test.Qualifier.Util as QualifierUtil
 
 
 suite : Test
@@ -167,25 +169,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.ConstructType "True"
-                                            ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.ConstructType "False"
-                                            ]
-                                  }
-                                , { name = "to-int"
+                                [ { name = "to-int"
                                   , metadata = Metadata.default
                                   , implementation =
                                         AST.MultiImpl
@@ -196,6 +180,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> ParserUtil.addFunctionsForStructs
 
                     expectedAst =
                         { types =
@@ -211,25 +196,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "True"
-                                            ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "False"
-                                            ]
-                                  }
-                                , { name = "to-int"
+                                [ { name = "to-int"
                                   , metadata = Metadata.default
                                   , implementation =
                                         MultiImpl
@@ -240,6 +207,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run unqualifiedAst of
                     Err _ ->
@@ -512,52 +480,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.ConstructType "True"
-                                                ]
-                                      }
-                                    , { name = ">False"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.ConstructType "False"
-                                                ]
-                                      }
-                                    , { name = ">Box"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Box" ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.ConstructType "Box"
-                                                ]
-                                      }
-                                    , { name = ">value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int, Type.Custom "Box" ] [ Type.Custom "Box" ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.SetMember "Box" "value"
-                                                ]
-                                      }
-                                    , { name = "<value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Box" ] [ Type.Int ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.GetMember "Box" "value"
-                                                ]
-                                      }
-                                    , { name = "zero?"
+                                    [ { name = "zero?"
                                       , metadata = Metadata.default
                                       , implementation =
                                             AST.MultiImpl
@@ -569,6 +492,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> ParserUtil.addFunctionsForStructs
 
                         expectedAst =
                             { types =
@@ -588,52 +512,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">True"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "True" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "True"
-                                                ]
-                                      }
-                                    , { name = ">False"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "False" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "False"
-                                                ]
-                                      }
-                                    , { name = ">Box"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int ] [ Type.Custom "Box" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "Box"
-                                                ]
-                                      }
-                                    , { name = ">value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Int, Type.Custom "Box" ] [ Type.Custom "Box" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ SetMember "Box" "value"
-                                                ]
-                                      }
-                                    , { name = "<value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Box" ] [ Type.Int ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ GetMember "Box" "value"
-                                                ]
-                                      }
-                                    , { name = "zero?"
+                                    [ { name = "zero?"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -643,6 +522,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run unqualifiedAst of
                         Err _ ->
@@ -666,16 +546,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nothing"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.ConstructType "Nothing"
-                                                ]
-                                      }
-                                    , { name = "with-default"
+                                    [ { name = "with-default"
                                       , metadata = Metadata.default
                                       , implementation =
                                             AST.MultiImpl
@@ -689,6 +560,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> ParserUtil.addFunctionsForStructs
 
                         expectedAst =
                             { types =
@@ -703,16 +575,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nothing"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nothing" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ ConstructType "Nothing"
-                                                ]
-                                      }
-                                    , { name = "with-default"
+                                    [ { name = "with-default"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
@@ -726,6 +589,7 @@ suite =
                                       }
                                     ]
                             }
+                                |> QualifierUtil.addFunctionsForStructs
                     in
                     case run unqualifiedAst of
                         Err _ ->
@@ -761,54 +625,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.ConstructType "True"
-                                            ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.ConstructType "False"
-                                            ]
-                                  }
-                                , { name = ">Box"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "Bool" ] [ Type.Custom "Box" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.ConstructType "Box"
-                                            ]
-                                  }
-                                , { name = ">value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "Bool", Type.Custom "Box" ]
-                                                [ Type.Custom "Box" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.SetMember "Box" "value"
-                                            ]
-                                  }
-                                , { name = "<value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.GetMember "Box" "value"
-                                            ]
-                                  }
-                                , { name = "true?"
+                                [ { name = "true?"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
@@ -824,6 +641,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> ParserUtil.addFunctionsForStructs
 
                     expectedAst =
                         { types =
@@ -843,52 +661,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "True"
-                                            ]
-                                  }
-                                , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "False"
-                                            ]
-                                  }
-                                , { name = ">Box"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ boolUnion ] [ Type.Custom "Box" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "Box"
-                                            ]
-                                  }
-                                , { name = ">value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ boolUnion, Type.Custom "Box" ] [ Type.Custom "Box" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "Box" "value"
-                                            ]
-                                  }
-                                , { name = "<value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "Box" ] [ boolUnion ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "Box" "value"
-                                            ]
-                                  }
-                                , { name = "true?"
+                                [ { name = "true?"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType [ Type.Custom "Box" ] [ boolUnion ]
@@ -904,6 +677,7 @@ suite =
                                   }
                                 ]
                         }
+                            |> QualifierUtil.addFunctionsForStructs
                 in
                 case run unqualifiedAst of
                     Err _ ->
