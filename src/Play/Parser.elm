@@ -166,7 +166,7 @@ definitionMetadataParser =
     Parser.variable
         { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
         , inner = validSymbolChar
-        , reserved = Set.fromList [ "def", "defmulti", "deftype", "defunion" ]
+        , reserved = Set.fromList [ "def", "defmulti", "defstruct", "defunion" ]
         , expecting = NotSymbol
         }
         |. Parser.symbol (Token ":" NotMetadata)
@@ -363,7 +363,7 @@ definitionParser ast =
             |> Parser.andThen multiWordDefinitionParser
             |> Parser.andThen insertWord
         , sourceLocationParser
-            |. Parser.keyword (Token "deftype:" NoProblem)
+            |. Parser.keyword (Token "defstruct:" NoProblem)
             |. noiseParser
             |> Parser.andThen typeDefinitionParser
             |> Parser.andThen insertType

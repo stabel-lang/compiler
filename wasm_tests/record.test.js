@@ -2,8 +2,8 @@ const compiler = require('./compiler.wrapper');
 
 test('Enum type', async () => {
     const wat = await compiler.toWat(`
-       deftype: True 
-       deftype: False
+       defstruct: True 
+       defstruct: False
 
        def: main
        entry: true
@@ -18,7 +18,7 @@ test('Enum type', async () => {
 
 test('Compound type', async () => {
     const wat = await compiler.toWat(`
-        deftype: Person
+        defstruct: Person
         : age Int
 
         def: inc-age

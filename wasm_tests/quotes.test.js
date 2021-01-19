@@ -20,7 +20,7 @@ test('Basic quotation', async () => {
 
 test('Basic quotation', async () => {
     const wat = await compiler.toWat(`
-        deftype: Coordinate
+        defstruct: Coordinate
         : x Int
         : y Int
 

@@ -6,8 +6,8 @@ test('Simple case', async () => {
         : True
         : False
 
-        deftype: True
-        deftype: False
+        defstruct: True
+        defstruct: False
 
         defmulti: to-int
         when: True
@@ -32,8 +32,8 @@ test('Default branch', async () => {
         : True 
         : False
 
-        deftype: True
-        deftype: False
+        defstruct: True
+        defstruct: False
 
         defmulti: to-int
         when: True
@@ -58,10 +58,10 @@ test('Multiple arguments', async () => {
         : Person 
         : Dog
 
-        deftype: Person
+        defstruct: Person
         : age Int
 
-        deftype: Dog
+        defstruct: Dog
         : man-years Int
 
         defmulti: add-to-age
@@ -101,11 +101,11 @@ test('Generic arguments', async () => {
         : NonEmptyList a 
         : EmptyList
 
-        deftype: NonEmptyList a
+        defstruct: NonEmptyList a
         : first a
         : rest List a
 
-        deftype: EmptyList
+        defstruct: EmptyList
 
         defmulti: first-or-default
         when: NonEmptyList
@@ -130,11 +130,11 @@ test('Recursive word', async () => {
         : NonEmptyList a 
         : EmptyList
 
-        deftype: NonEmptyList a
+        defstruct: NonEmptyList a
         : first a
         : rest List a
 
-        deftype: EmptyList
+        defstruct: EmptyList
 
         def: sum
         : 0 sum-helper
@@ -163,7 +163,7 @@ test('Int case', async () => {
         : Int
         : NoInt
 
-        deftype: NoInt
+        defstruct: NoInt
 
         defmulti: double
         when: Int
@@ -240,7 +240,7 @@ test('Correct Int boxing behaviour', async () => {
 
 test('Correct Int boxing behaviour when mismatch between word input size and stack size', async () => {
     const wat = await compiler.toWat(`
-        deftype: Nil
+        defstruct: Nil
 
         defmulti: inc-zero
         when: Int( value 0 )
@@ -266,7 +266,7 @@ test('Generic case', async () => {
         : a
         : Nil
 
-        deftype: Nil
+        defstruct: Nil
 
         defmulti: map
         type: (Maybe a) [ a -- b ] -- (Maybe b)

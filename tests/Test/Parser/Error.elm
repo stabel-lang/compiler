@@ -39,7 +39,7 @@ suite =
                         def: age>
                         : 1
 
-                        deftype: Person
+                        defstruct: Person
                         : age Int
                         """
             , test "Type definition" <|
@@ -47,7 +47,7 @@ suite =
                     let
                         source =
                             """
-                            deftype: Person
+                            defstruct: Person
                             : age Int
 
                             defunion: Person
@@ -97,7 +97,7 @@ suite =
                 \_ ->
                     checkForError (expectedError "age") <|
                         """
-                        deftype: Person
+                        defstruct: Person
                         # wrong syntax
                         age: Int
                         """
