@@ -485,10 +485,10 @@ suite =
                                       , implementation =
                                             AST.MultiImpl
                                                 [ ( AST.TypeMatch emptyRange (Type.Custom "Box") [ ( "value", AST.LiteralInt 0 ) ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -516,9 +516,9 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word emptyRange ">True" ] )
+                                                [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word emptyRange "True" ] )
                                                 ]
-                                                [ Word emptyRange ">False" ]
+                                                [ Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -634,10 +634,10 @@ suite =
                                             [ ( AST.TypeMatch emptyRange
                                                     (Type.Custom "Box")
                                                     [ ( "value", AST.LiteralType (Type.Custom "True") ) ]
-                                              , [ AST.Word emptyRange ">True" ]
+                                              , [ AST.Word emptyRange "True" ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange ">False" ]
+                                            [ AST.Word emptyRange "False" ]
                                   }
                                 ]
                         }
@@ -670,10 +670,10 @@ suite =
                                             [ ( TypeMatch emptyRange
                                                     (Type.Custom "Box")
                                                     [ ( "value", LiteralType (Type.Custom "True") ) ]
-                                              , [ Word emptyRange ">True" ]
+                                              , [ Word emptyRange "True" ]
                                               )
                                             ]
-                                            [ Word emptyRange ">False" ]
+                                            [ Word emptyRange "False" ]
                                   }
                                 ]
                         }

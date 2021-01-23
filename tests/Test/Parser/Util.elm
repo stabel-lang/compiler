@@ -127,7 +127,12 @@ addFunctionsForStructsHelper name generics members ast =
                 Type.CustomGeneric name (List.map Type.Generic generics)
 
         ctor =
-            { name = ">" ++ name
+            { name =
+                if List.isEmpty members then
+                    name
+
+                else
+                    ">" ++ name
             , metadata =
                 Metadata.default
                     |> Metadata.withVerifiedType (List.map Tuple.second members) [ selfType ]

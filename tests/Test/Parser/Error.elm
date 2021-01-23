@@ -110,6 +110,13 @@ suite =
                         member: Female
                         """
             ]
+        , test "Only compiler can create functions which names begins with an upper case letter" <|
+            \_ ->
+                checkForError ((==) NotSymbol) <|
+                    """
+                    def: Person
+                    : 1
+                    """
         ]
 
 

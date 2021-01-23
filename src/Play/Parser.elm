@@ -161,6 +161,24 @@ symbolParser =
         |> Parser.backtrackable
 
 
+symbolImplParser : Parser String
+symbolImplParser =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        , expecting = NotSymbol
+        }
+        |. Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token ":" NotMetadata)
+                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
+            , Parser.succeed identity
+            ]
+        |. noiseParser
+        |> Parser.backtrackable
+
+
 definitionMetadataParser : Parser String
 definitionMetadataParser =
     Parser.variable
@@ -393,7 +411,12 @@ generateDefaultWordsForType typeDef =
                             Type.CustomGeneric typeName (List.map Type.Generic binds)
 
                 ctorDef =
-                    { name = ">" ++ typeName
+                    { name =
+                        if List.isEmpty typeMembers then
+                            typeName
+
+                        else
+                            ">" ++ typeName
                     , metadata =
                         Metadata.default
                             |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
@@ -747,7 +770,7 @@ nodeParser =
             |= sourceLocationParser
         , Parser.succeed (\startLoc value endLoc -> Word (SourceLocationRange startLoc endLoc) value)
             |= sourceLocationParser
-            |= symbolParser
+            |= symbolImplParser
             |= sourceLocationParser
         ]
 

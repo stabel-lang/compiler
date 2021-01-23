@@ -17,7 +17,9 @@ test('Simple case', async () => {
 
         def: main
         entry: true
-        : >True to-int >False to-int -
+        : True to-int 
+          False to-int 
+          -
     `);
 
     const result = await compiler.run(wat, 'main');
@@ -42,8 +44,8 @@ test('Default branch', async () => {
 
         def: main
         entry: true
-        : >True to-int 
-          >False to-int 
+        : True to-int 
+          False to-int 
           -
     `);
 
@@ -115,7 +117,7 @@ test('Generic arguments', async () => {
 
         def: main
         entry: true
-        : 1 >EmptyList >NonEmptyList
+        : 1 EmptyList >NonEmptyList
           0 first-or-default
     `);
 
@@ -148,7 +150,7 @@ test('Recursive word', async () => {
 
         def: main
         entry: true
-        : 1 2 3 >EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+        : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
           sum
     `);
 
@@ -159,7 +161,7 @@ test('Recursive word', async () => {
 
 test('Int case', async () => {
     const wat = await compiler.toWat(`
-        defunion: Bool
+        defunion: IntParseResult
         : Int
         : NoInt
 
@@ -251,7 +253,7 @@ test('Correct Int boxing behaviour when mismatch between word input size and sta
 
         def: main
         entry: true
-        : 0 >Nil inc-zero
+        : 0 Nil inc-zero
           drop 
     `);
 

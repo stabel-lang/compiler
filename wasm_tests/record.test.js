@@ -7,7 +7,7 @@ test('Enum type', async () => {
 
        def: main
        entry: true
-       : >True
+       : True
     `);
 
     const result = await compiler.run(wat, 'main');

@@ -605,8 +605,8 @@ suite =
                             """
                             defmulti: zero?
                             when: Int( value 0 )
-                              >True
-                            : >False
+                              True
+                            : False
                             """
 
                         expectedAst =
@@ -621,10 +621,10 @@ suite =
                                                         Type.Int
                                                         [ ( "value", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -642,8 +642,8 @@ suite =
                             """
                             defmulti: pair?
                             when: List( tail List( tail Nil ) )
-                              >True
-                            : >False
+                              True
+                            : False
                             """
 
                         expectedAst =
@@ -665,10 +665,10 @@ suite =
                                                                 )
                                                           )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -686,8 +686,8 @@ suite =
                             """
                             defmulti: origo?
                             when: Pair( first 0 second 0 )
-                              >True
-                            : >False
+                              True
+                            : False
                             """
 
                         expectedAst =
@@ -703,10 +703,10 @@ suite =
                                                         [ ( "first", AST.LiteralInt 0 )
                                                         , ( "second", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }

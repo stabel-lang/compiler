@@ -155,7 +155,7 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange ">True"
+                                            [ QAST.Word emptyRange "True"
                                             , QAST.Word emptyRange "as-int"
                                             ]
                                   }
@@ -470,9 +470,9 @@ suite =
                                         |> Metadata.asEntryPoint
                               , implementation =
                                     QAST.SoloImpl
-                                        [ QAST.Word emptyRange ">True"
+                                        [ QAST.Word emptyRange "True"
                                         , QAST.Word emptyRange "to-int"
-                                        , QAST.Word emptyRange ">False"
+                                        , QAST.Word emptyRange "False"
                                         , QAST.Word emptyRange "to-int"
                                         , QAST.Builtin emptyRange Builtin.Equal
                                         ]
@@ -702,12 +702,12 @@ suite =
                                             QAST.MultiImpl
                                                 [ ( QAST.TypeMatch emptyRange (Type.Custom "True") []
                                                   , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                    , QAST.Word emptyRange ">False"
+                                                    , QAST.Word emptyRange "False"
                                                     ]
                                                   )
                                                 , ( QAST.TypeMatch emptyRange (Type.Custom "False") []
                                                   , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                    , QAST.Word emptyRange ">True"
+                                                    , QAST.Word emptyRange "True"
                                                     ]
                                                   )
                                                 ]
@@ -729,7 +729,7 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Word emptyRange ">True"
+                                                [ QAST.Word emptyRange "True"
                                                 , QAST.Word emptyRange "not"
                                                 , QAST.Word emptyRange "true-to-int"
                                                 ]
@@ -800,7 +800,7 @@ suite =
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
-                                                , QAST.Word emptyRange ">EmptyList"
+                                                , QAST.Word emptyRange "EmptyList"
                                                 , QAST.Word emptyRange ">NonEmptyList"
                                                 , QAST.Integer emptyRange 0
                                                 , QAST.Word emptyRange "first-or-default"
@@ -866,7 +866,7 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Word emptyRange ">Nil"
+                                                [ QAST.Word emptyRange "Nil"
                                                 , QAST.Integer emptyRange 1
                                                 , QAST.Word emptyRange "with-default"
                                                 ]
@@ -888,7 +888,7 @@ suite =
                                     ]
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = ">Nil"
+                                    [ { name = "Nil"
                                       , type_ = { input = [], output = [ Type.Custom "Nil" ] }
                                       , metadata =
                                             Metadata.default
@@ -930,7 +930,7 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Word emptyRange
-                                                    ">Nil"
+                                                    "Nil"
                                                     { input = []
                                                     , output = [ Type.Custom "Nil" ]
                                                     }
@@ -1204,7 +1204,7 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Word emptyRange ">Nil"
+                                                [ QAST.Word emptyRange "Nil"
                                                 , QAST.WordRef emptyRange "main__quot1"
                                                 , QAST.Word emptyRange "map"
                                                 ]
@@ -1301,7 +1301,7 @@ suite =
                                                 [ QAST.Integer emptyRange 1
                                                 , QAST.Integer emptyRange 2
                                                 , QAST.Integer emptyRange 3
-                                                , QAST.Word emptyRange ">EmptyList"
+                                                , QAST.Word emptyRange "EmptyList"
                                                 , QAST.Word emptyRange ">NonEmptyList"
                                                 , QAST.Word emptyRange ">NonEmptyList"
                                                 , QAST.Word emptyRange ">NonEmptyList"
