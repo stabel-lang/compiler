@@ -8,7 +8,7 @@ import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, e
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations)
+import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations, expectCompiles)
 
 
 suite : Test
@@ -82,7 +82,7 @@ suite =
                     let
                         source =
                             """
-                            deftype: True
+                            defstruct: True
                             
                             def: as-int
                             type: True -- Int
@@ -120,7 +120,7 @@ suite =
                     let
                         source =
                             """
-                            deftype: Person
+                            defstruct: Person
                             : age Int
                             : jobs Int
 
@@ -165,7 +165,7 @@ suite =
                     let
                         source =
                             """
-                            deftype: Box a
+                            defstruct: Box a
                             : element a
                             """
 
@@ -262,13 +262,13 @@ suite =
                             : True 
                             : False 
 
-                            deftype: True
-                            deftype: False
+                            defstruct: True
+                            defstruct: False
 
                             defmulti: to-int
-                            when: True
+                            : True
                               drop 1
-                            when: False
+                            : False
                               drop 0
                             """
 
@@ -318,12 +318,12 @@ suite =
                             : a
                             : Nil
 
-                            deftype: Nil
+                            defstruct: Nil
 
                             defmulti: if-present
-                            when: a
+                            : a
                               !
-                            when: Nil
+                            : Nil
                               drop
                             """
 
@@ -372,15 +372,15 @@ suite =
                             : Box a
                             : Nil
 
-                            deftype: Box a
+                            defstruct: Box a
                             : element a
 
-                            deftype: Nil
+                            defstruct: Nil
 
                             defmulti: if-present
-                            when: (Box a)
+                            : (Box a)
                               !
-                            when: Nil
+                            : Nil
                               drop
                             """
 
@@ -430,16 +430,16 @@ suite =
                             : Box a
                             : Nil
 
-                            deftype: Box a
+                            defstruct: Box a
                             : element a
 
-                            deftype: Nil
+                            defstruct: Nil
 
                             defmulti: if-present
                             type: (MaybeBox a) a -- a
-                            when: (Box a)
+                            : (Box a)
                               !
-                            when: Nil
+                            : Nil
                               drop
                             """
 
@@ -604,9 +604,9 @@ suite =
                         source =
                             """
                             defmulti: zero?
-                            when: Int( value 0 )
-                              >True
-                            : >False
+                            : Int( value 0 )
+                              True
+                            else: False
                             """
 
                         expectedAst =
@@ -621,10 +621,10 @@ suite =
                                                         Type.Int
                                                         [ ( "value", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -641,9 +641,9 @@ suite =
                         source =
                             """
                             defmulti: pair?
-                            when: List( tail List( tail Nil ) )
-                              >True
-                            : >False
+                            : List( tail List( tail Nil ) )
+                              True
+                            else: False
                             """
 
                         expectedAst =
@@ -665,10 +665,10 @@ suite =
                                                                 )
                                                           )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -685,9 +685,9 @@ suite =
                         source =
                             """
                             defmulti: origo?
-                            when: Pair( first 0 second 0 )
-                              >True
-                            : >False
+                            : Pair( first 0 second 0 )
+                              True
+                            else: False
                             """
 
                         expectedAst =
@@ -703,10 +703,10 @@ suite =
                                                         [ ( "first", AST.LiteralInt 0 )
                                                         , ( "second", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange ">True" ]
+                                                  , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange ">False" ]
+                                                [ AST.Word emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -720,15 +720,6 @@ suite =
             ]
         , test "Support code comments" <|
             \_ ->
-                let
-                    expectCompiles code =
-                        case compile code of
-                            Err _ ->
-                                Expect.fail "Did not expect compilation to fail."
-
-                            Ok _ ->
-                                Expect.pass
-                in
                 expectCompiles
                     """
                     # Increments the passed in value by one
@@ -750,6 +741,12 @@ suite =
                     # And thats it!
                      # wonder what else we should do...
                     """
+        , test "definition without implementation should be legal" <|
+            \_ ->
+                expectCompiles
+                    """
+                    def: someword
+                    """
         , test "Correct line information" <|
             \_ ->
                 let
@@ -759,23 +756,23 @@ suite =
                         : True
                         : False
 
-                        deftype: True
-                        deftype: False
+                        defstruct: True
+                        defstruct: False
 
                         defmulti: from-int
                         type: Int -- Int
-                        when: Int( value 0 )
-                          >False
-                        when: Int
-                          >True
+                        : Int( value 0 )
+                          False
+                        : Int
+                          True
 
                         def: equal
                         : - from-int not
 
                         defmulti: not
-                        when: True
-                          >False
-                        : >True
+                        : True
+                          False
+                        else: True
                         """
 
                     -- The ending source location for most definitions now ends where the next definition beings
@@ -796,15 +793,15 @@ suite =
                                 , CustomTypeDef
                                     (SourceLocationRange
                                         (SourceLocation 6 1 32)
-                                        (SourceLocation 7 1 46)
+                                        (SourceLocation 7 1 48)
                                     )
                                     "True"
                                     []
                                     []
                                 , CustomTypeDef
                                     (SourceLocationRange
-                                        (SourceLocation 7 1 46)
-                                        (SourceLocation 9 1 62)
+                                        (SourceLocation 7 1 48)
+                                        (SourceLocation 9 1 66)
                                     )
                                     "False"
                                     []
@@ -812,13 +809,13 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = ">True"
+                                [ { name = "True"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
                                   , implementation = SoloImpl [ ConstructType "True" ]
                                   }
-                                , { name = ">False"
+                                , { name = "False"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
@@ -830,39 +827,39 @@ suite =
                                             |> Metadata.withType [ Type.Int ] [ Type.Int ]
                                             |> Metadata.withSourceLocationRange
                                                 (SourceLocationRange
-                                                    (SourceLocation 9 1 62)
-                                                    (SourceLocation 16 1 147)
+                                                    (SourceLocation 9 1 66)
+                                                    (SourceLocation 16 1 141)
                                                 )
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 11 7 104)
-                                                        (SourceLocation 11 21 118)
+                                                        (SourceLocation 11 3 104)
+                                                        (SourceLocation 11 17 118)
                                                     )
                                                     Type.Int
                                                     [ ( "value", LiteralInt 0 ) ]
                                               , [ Word
                                                     (SourceLocationRange
                                                         (SourceLocation 12 3 121)
-                                                        (SourceLocation 13 1 128)
+                                                        (SourceLocation 13 1 127)
                                                     )
-                                                    ">False"
+                                                    "False"
                                                 ]
                                               )
                                             , ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 13 7 134)
-                                                        (SourceLocation 14 3 140)
+                                                        (SourceLocation 13 3 129)
+                                                        (SourceLocation 14 3 135)
                                                     )
                                                     Type.Int
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
-                                                        (SourceLocation 14 3 140)
-                                                        (SourceLocation 16 1 147)
+                                                        (SourceLocation 14 3 135)
+                                                        (SourceLocation 16 1 141)
                                                     )
-                                                    ">True"
+                                                    "True"
                                                 ]
                                               )
                                             ]
@@ -873,27 +870,27 @@ suite =
                                         Metadata.default
                                             |> Metadata.withSourceLocationRange
                                                 (SourceLocationRange
-                                                    (SourceLocation 16 1 147)
-                                                    (SourceLocation 19 1 176)
+                                                    (SourceLocation 16 1 141)
+                                                    (SourceLocation 19 1 170)
                                                 )
                                   , implementation =
                                         SoloImpl
                                             [ Word
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 3 160)
-                                                    (SourceLocation 17 5 162)
+                                                    (SourceLocation 17 3 154)
+                                                    (SourceLocation 17 5 156)
                                                 )
                                                 "-"
                                             , Word
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 5 162)
-                                                    (SourceLocation 17 14 171)
+                                                    (SourceLocation 17 5 156)
+                                                    (SourceLocation 17 14 165)
                                                 )
                                                 "from-int"
                                             , Word
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 14 171)
-                                                    (SourceLocation 19 1 176)
+                                                    (SourceLocation 17 14 165)
+                                                    (SourceLocation 19 1 170)
                                                 )
                                                 "not"
                                             ]
@@ -903,33 +900,33 @@ suite =
                                         Metadata.default
                                             |> Metadata.withSourceLocationRange
                                                 (SourceLocationRange
-                                                    (SourceLocation 19 1 176)
-                                                    (SourceLocation 23 1 218)
+                                                    (SourceLocation 19 1 170)
+                                                    (SourceLocation 23 1 210)
                                                 )
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 20 7 196)
-                                                        (SourceLocation 21 3 203)
+                                                        (SourceLocation 20 3 186)
+                                                        (SourceLocation 21 3 193)
                                                     )
                                                     (Type.Custom "True")
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
-                                                        (SourceLocation 21 3 203)
-                                                        (SourceLocation 22 1 210)
+                                                        (SourceLocation 21 3 193)
+                                                        (SourceLocation 22 1 199)
                                                     )
-                                                    ">False"
+                                                    "False"
                                                 ]
                                               )
                                             ]
                                             [ Word
                                                 (SourceLocationRange
-                                                    (SourceLocation 22 3 212)
-                                                    (SourceLocation 23 1 218)
+                                                    (SourceLocation 22 7 205)
+                                                    (SourceLocation 23 1 210)
                                                 )
-                                                ">True"
+                                                "True"
                                             ]
                                   }
                                 ]

@@ -161,12 +161,30 @@ symbolParser =
         |> Parser.backtrackable
 
 
+symbolImplParser : Parser String
+symbolImplParser =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        , expecting = NotSymbol
+        }
+        |. Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token ":" NotMetadata)
+                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
+            , Parser.succeed identity
+            ]
+        |. noiseParser
+        |> Parser.backtrackable
+
+
 definitionMetadataParser : Parser String
 definitionMetadataParser =
     Parser.variable
         { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
         , inner = validSymbolChar
-        , reserved = Set.fromList [ "def", "defmulti", "deftype", "defunion" ]
+        , reserved = Set.fromList [ "def", "defmulti", "defstruct", "defunion" ]
         , expecting = NotSymbol
         }
         |. Parser.symbol (Token ":" NotMetadata)
@@ -363,7 +381,7 @@ definitionParser ast =
             |> Parser.andThen multiWordDefinitionParser
             |> Parser.andThen insertWord
         , sourceLocationParser
-            |. Parser.keyword (Token "deftype:" NoProblem)
+            |. Parser.keyword (Token "defstruct:" NoProblem)
             |. noiseParser
             |> Parser.andThen typeDefinitionParser
             |> Parser.andThen insertType
@@ -393,7 +411,12 @@ generateDefaultWordsForType typeDef =
                             Type.CustomGeneric typeName (List.map Type.Generic binds)
 
                 ctorDef =
-                    { name = ">" ++ typeName
+                    { name =
+                        if List.isEmpty typeMembers then
+                            typeName
+
+                        else
+                            ">" ++ typeName
                     , metadata =
                         Metadata.default
                             |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
@@ -540,14 +563,14 @@ multiWordMetadataParser def =
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
-        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
-            |. Parser.keyword (Token "when:" NoProblem)
-            |. noiseParser
-            |= typeMatchParser
-            |= implementationParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
+            |. Parser.keyword (Token "else:" NoProblem)
+            |. noiseParser
+            |= implementationParser
+        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
+            |= typeMatchParser
             |= implementationParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
@@ -747,7 +770,7 @@ nodeParser =
             |= sourceLocationParser
         , Parser.succeed (\startLoc value endLoc -> Word (SourceLocationRange startLoc endLoc) value)
             |= sourceLocationParser
-            |= symbolParser
+            |= symbolImplParser
             |= sourceLocationParser
         ]
 

@@ -6,18 +6,20 @@ test('Simple case', async () => {
         : True
         : False
 
-        deftype: True
-        deftype: False
+        defstruct: True
+        defstruct: False
 
         defmulti: to-int
-        when: True
+        : True
           drop 100
-        when: False
+        : False
           drop 75
 
         def: main
         entry: true
-        : >True to-int >False to-int -
+        : True to-int 
+          False to-int 
+          -
     `);
 
     const result = await compiler.run(wat, 'main');
@@ -32,18 +34,18 @@ test('Default branch', async () => {
         : True 
         : False
 
-        deftype: True
-        deftype: False
+        defstruct: True
+        defstruct: False
 
         defmulti: to-int
-        when: True
+        : True
           drop 100
-        : drop 75
+        else: drop 75
 
         def: main
         entry: true
-        : >True to-int 
-          >False to-int 
+        : True to-int 
+          False to-int 
           -
     `);
 
@@ -58,27 +60,27 @@ test('Multiple arguments', async () => {
         : Person 
         : Dog
 
-        deftype: Person
+        defstruct: Person
         : age Int
 
-        deftype: Dog
+        defstruct: Dog
         : man-years Int
 
         defmulti: add-to-age
-        when: Person
+        : Person
           swap dup age>
           -rotate +
           >age
-        when: Dog
+        : Dog
           4 * 
           swap dup man-years>
           -rotate +
           >man-years
 
         defmulti: get-man-age
-        when: Person
+        : Person
           age>
-        when: Dog
+        : Dog
           man-years>
 
         def: main
@@ -101,21 +103,21 @@ test('Generic arguments', async () => {
         : NonEmptyList a 
         : EmptyList
 
-        deftype: NonEmptyList a
+        defstruct: NonEmptyList a
         : first a
         : rest List a
 
-        deftype: EmptyList
+        defstruct: EmptyList
 
         defmulti: first-or-default
-        when: NonEmptyList
+        : NonEmptyList
           drop first>
-        when: EmptyList
+        : EmptyList
           swap drop
 
         def: main
         entry: true
-        : 1 >EmptyList >NonEmptyList
+        : 1 EmptyList >NonEmptyList
           0 first-or-default
     `);
 
@@ -130,25 +132,25 @@ test('Recursive word', async () => {
         : NonEmptyList a 
         : EmptyList
 
-        deftype: NonEmptyList a
+        defstruct: NonEmptyList a
         : first a
         : rest List a
 
-        deftype: EmptyList
+        defstruct: EmptyList
 
         def: sum
         : 0 sum-helper
 
         defmulti: sum-helper
         type: (List a) Int -- Int
-        when: NonEmptyList
+        : NonEmptyList
           swap dup first> rotate rest> rotate + sum-helper
-        when: EmptyList
+        : EmptyList
           swap drop
 
         def: main
         entry: true
-        : 1 2 3 >EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+        : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
           sum
     `);
 
@@ -159,16 +161,16 @@ test('Recursive word', async () => {
 
 test('Int case', async () => {
     const wat = await compiler.toWat(`
-        defunion: Bool
+        defunion: IntParseResult
         : Int
         : NoInt
 
-        deftype: NoInt
+        defstruct: NoInt
 
         defmulti: double
-        when: Int
+        : Int
           2 *
-        when: NoInt
+        : NoInt
           drop 0
 
         def: main
@@ -184,9 +186,9 @@ test('Int case', async () => {
 test('Int match', async () => {
     const wat = await compiler.toWat(`
         defmulti: double
-        when: Int( value 0 )
+        : Int( value 0 )
           drop 2
-        when: Int
+        : Int
           2 *
 
         def: main
@@ -202,9 +204,9 @@ test('Int match', async () => {
 test('Int match (reverse)', async () => {
     const wat = await compiler.toWat(`
         defmulti: double
-        when: Int( value 0 )
+        : Int( value 0 )
           drop 2
-        when: Int
+        : Int
           2 *
 
         def: main
@@ -220,12 +222,12 @@ test('Int match (reverse)', async () => {
 test('Correct Int boxing behaviour', async () => {
     const wat = await compiler.toWat(`
         defmulti: add
-        when: Int( value 0 )
+        : Int( value 0 )
           swap 
           drop 2
           swap
           +
-        when: Int
+        : Int
           +
 
         def: main
@@ -240,18 +242,18 @@ test('Correct Int boxing behaviour', async () => {
 
 test('Correct Int boxing behaviour when mismatch between word input size and stack size', async () => {
     const wat = await compiler.toWat(`
-        deftype: Nil
+        defstruct: Nil
 
         defmulti: inc-zero
-        when: Int( value 0 )
+        : Int( value 0 )
           swap 
           drop 1
           swap
-        when: Int
+        : Int
 
         def: main
         entry: true
-        : 0 >Nil inc-zero
+        : 0 Nil inc-zero
           drop 
     `);
 
@@ -266,20 +268,20 @@ test('Generic case', async () => {
         : a
         : Nil
 
-        deftype: Nil
+        defstruct: Nil
 
         defmulti: map
         type: (Maybe a) [ a -- b ] -- (Maybe b)
-        when: a
+        : a
           !
-        when: Nil
+        : Nil
           drop
 
         defmulti: with-default
         type: (Maybe a) a -- a
-        when: a
+        : a
           drop
-        when: Nil
+        : Nil
           swap drop
 
         def: main

@@ -28,9 +28,9 @@ suite =
                         : drop 0
 
                         defmulti: not
-                        when: Int ( value 0)
+                        : Int ( value 0)
                           drop 1
-                        : drop 0
+                        else: drop 0
                         """
             , test "Generated double definitions" <|
                 \_ ->
@@ -39,7 +39,7 @@ suite =
                         def: age>
                         : 1
 
-                        deftype: Person
+                        defstruct: Person
                         : age Int
                         """
             , test "Type definition" <|
@@ -47,7 +47,7 @@ suite =
                     let
                         source =
                             """
-                            deftype: Person
+                            defstruct: Person
                             : age Int
 
                             defunion: Person
@@ -97,7 +97,7 @@ suite =
                 \_ ->
                     checkForError (expectedError "age") <|
                         """
-                        deftype: Person
+                        defstruct: Person
                         # wrong syntax
                         age: Int
                         """
@@ -110,6 +110,13 @@ suite =
                         member: Female
                         """
             ]
+        , test "Only compiler can create functions which names begins with an upper case letter" <|
+            \_ ->
+                checkForError ((==) NotSymbol) <|
+                    """
+                    def: Person
+                    : 1
+                    """
         ]
 
 
