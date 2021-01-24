@@ -563,14 +563,14 @@ multiWordMetadataParser def =
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
-        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
-            |. Parser.keyword (Token "when:" NoProblem)
-            |. noiseParser
-            |= typeMatchParser
-            |= implementationParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
+            |. Parser.keyword (Token "else:" NoProblem)
+            |. noiseParser
+            |= implementationParser
+        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
+            |= typeMatchParser
             |= implementationParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser

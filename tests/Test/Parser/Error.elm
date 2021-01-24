@@ -28,9 +28,9 @@ suite =
                         : drop 0
 
                         defmulti: not
-                        when: Int ( value 0)
+                        : Int ( value 0)
                           drop 1
-                        : drop 0
+                        else: drop 0
                         """
             , test "Generated double definitions" <|
                 \_ ->

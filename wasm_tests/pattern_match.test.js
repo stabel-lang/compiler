@@ -6,9 +6,9 @@ test('Basic pattern match', async () => {
         : value Int
 
         defmulti: not
-        when: Box( value 0 )
+        : Box( value 0 )
           drop 1
-        when: Box
+        : Box
           drop 0
 
         def: main
@@ -27,9 +27,9 @@ test('Basic pattern match with default implementation', async () => {
         : value Int
 
         defmulti: not
-        when: Box( value 0 )
+        : Box( value 0 )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
@@ -47,9 +47,9 @@ test('Basic pattern match reverse case', async () => {
         : value Int
 
         defmulti: not
-        when: Box( value 0 )
+        : Box( value 0 )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
@@ -68,9 +68,9 @@ test('Multiple arguments', async () => {
         : second Int
 
         defmulti: origo?
-        when: Point( first 0 second 0 )
+        : Point( first 0 second 0 )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
@@ -89,9 +89,9 @@ test('Multiple arguments reverse case', async () => {
         : second Int
 
         defmulti: origo?
-        when: Point( first 0 second 0 )
+        : Point( first 0 second 0 )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
@@ -112,9 +112,9 @@ test('Recursive match', async () => {
         : box Box
 
         defmulti: deep-one?
-        when: BoxOfBox( box Box( value 1 ) )
+        : BoxOfBox( box Box( value 1 ) )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
@@ -135,9 +135,9 @@ test('Recursive match reverse case', async () => {
         : box Box
 
         defmulti: deep-one?
-        when: BoxOfBox( box Box( value 1 ) )
+        : BoxOfBox( box Box( value 1 ) )
           drop 1
-        : drop 0
+        else: drop 0
 
         def: main
         entry: true
