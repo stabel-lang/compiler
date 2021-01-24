@@ -8,7 +8,7 @@ import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, e
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations)
+import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations, expectCompiles)
 
 
 suite : Test
@@ -720,15 +720,6 @@ suite =
             ]
         , test "Support code comments" <|
             \_ ->
-                let
-                    expectCompiles code =
-                        case compile code of
-                            Err _ ->
-                                Expect.fail "Did not expect compilation to fail."
-
-                            Ok _ ->
-                                Expect.pass
-                in
                 expectCompiles
                     """
                     # Increments the passed in value by one
@@ -750,33 +741,39 @@ suite =
                     # And thats it!
                      # wonder what else we should do...
                     """
+        , test "definition without implementation should be legal" <|
+            \_ ->
+                expectCompiles
+                    """
+                    def: someword
+                    """
         , test "Correct line information" <|
             \_ ->
                 let
                     source =
                         """
-                       defunion: Bool
-                       : True
-                       : False
+                        defunion: Bool
+                        : True
+                        : False
 
-                       defstruct: True
-                       defstruct: False
+                        defstruct: True
+                        defstruct: False
 
-                       defmulti: from-int
-                       type: Int -- Int
-                       : Int( value 0 )
-                         False
-                       : Int
-                         True
+                        defmulti: from-int
+                        type: Int -- Int
+                        : Int( value 0 )
+                          False
+                        : Int
+                          True
 
-                       def: equal
-                       : - from-int not
+                        def: equal
+                        : - from-int not
 
-                       defmulti: not
-                       : True
-                         False
-                       else: True
-                       """
+                        defmulti: not
+                        : True
+                          False
+                        else: True
+                        """
 
                     -- The ending source location for most definitions now ends where the next definition beings
                     -- This is not what we want (it includes too much white space), but it'll do for now.

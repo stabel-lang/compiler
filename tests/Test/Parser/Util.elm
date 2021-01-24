@@ -2,10 +2,12 @@ module Test.Parser.Util exposing
     ( addFunctionsForStructs
     , compile
     , compileRetainLocations
+    , expectCompiles
     )
 
 import Dict
 import Dict.Extra as Dict
+import Expect
 import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type exposing (Type)
@@ -173,3 +175,13 @@ addFunctionsForStructsHelper name generics members ast =
                 |> Dict.fromListBy .name
     in
     { ast | words = Dict.union ast.words allFuncs }
+
+
+expectCompiles : String -> Expect.Expectation
+expectCompiles code =
+    case compile code of
+        Err _ ->
+            Expect.fail "Did not expect compilation to fail."
+
+        Ok _ ->
+            Expect.pass
