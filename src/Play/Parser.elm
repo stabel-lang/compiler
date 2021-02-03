@@ -186,17 +186,41 @@ symbolImplParser =
 symbolImplParser2 : Parser (SourceLocationRange -> AstNode)
 symbolImplParser2 =
     let
-        externalBuilder firstSymbol ( path, reference ) =
-            \loc ->
-                ExternalWord loc (firstSymbol :: path) reference
+        externalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path then
+                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
 
-        internalBuilder firstSymbol (( path, reference ) as modulePathResult) =
-            \loc ->
-                if modulePathResult == ( [], "" ) then
-                    Word loc firstSymbol
+            else if modulePathResult == ( [], "" ) then
+                Parser.problem <| InvalidModulePath <| "/" ++ firstSymbol
 
-                else
-                    PackageWord loc (firstSymbol :: path) reference
+            else
+                Parser.succeed <|
+                    \loc ->
+                        ExternalWord loc path reference
+
+        internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path && partialPath /= [] then
+                Parser.problem <| InvalidModulePath <| String.join "/" path
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        if modulePathResult == ( [], "" ) then
+                            Word loc firstSymbol
+
+                        else
+                            PackageWord loc path reference
+
+        checkForUpperCaseLetterInPath path =
+            List.any (String.any Char.isUpper) path
     in
     Parser.oneOf
         [ Parser.succeed externalBuilder
@@ -210,6 +234,7 @@ symbolImplParser2 =
                 , Parser.succeed ( [], "" )
                 ]
         ]
+        |> Parser.andThen identity
 
 
 modulePathParser : List String -> Parser (Parser.Step (List String) ( List String, String ))
