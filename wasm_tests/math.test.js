@@ -40,7 +40,7 @@ test('Division', async () => {
     const wat = await compiler.toWat(`
         def: main
         entry: true
-        : 10 5 /
+        : 10 5 div
     `);
 
     const result = await compiler.run(wat, 'main');

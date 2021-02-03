@@ -74,6 +74,12 @@ stripNodeLocation node =
         AST.Word _ val ->
             AST.Word emptyRange val
 
+        AST.PackageWord _ path val ->
+            AST.PackageWord emptyRange path val
+
+        AST.ExternalWord _ path val ->
+            AST.ExternalWord emptyRange path val
+
         AST.Quotation _ val ->
             AST.Quotation emptyRange (List.map stripNodeLocation val)
 

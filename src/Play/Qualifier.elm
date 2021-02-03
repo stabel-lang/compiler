@@ -61,7 +61,7 @@ builtinDict =
         [ ( "+", Builtin.Plus )
         , ( "-", Builtin.Minus )
         , ( "*", Builtin.Multiply )
-        , ( "/", Builtin.Divide )
+        , ( "div", Builtin.Divide )
         , ( "=", Builtin.Equal )
         , ( "swap", Builtin.StackSwap )
         , ( "dup", Builtin.StackDuplicate )
@@ -432,6 +432,12 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
                         , qualifiedWords
                         , Err (UnknownWordRef loc value) :: qualifiedNodes
                         )
+
+        Parser.PackageWord loc path value ->
+            qualifyNode ast currentDefName (Parser.Word loc value) ( availableQuoteId, qualifiedWords, qualifiedNodes )
+
+        Parser.ExternalWord loc path value ->
+            qualifyNode ast currentDefName (Parser.Word loc value) ( availableQuoteId, qualifiedWords, qualifiedNodes )
 
         Parser.ConstructType typeName ->
             ( availableQuoteId
