@@ -267,13 +267,13 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote2"
+                                                , WordRef emptyRange "quote:/main/2"
                                                 , Word emptyRange "apply-to-num"
-                                                , WordRef emptyRange "main__quote1"
+                                                , WordRef emptyRange "quote:/main/1"
                                                 , Word emptyRange "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "main__quote2"
+                                    , { name = "quote:/main/2"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -283,7 +283,7 @@ suite =
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "main__quote1"
+                                    , { name = "quote:/main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -397,23 +397,23 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote1"
+                                                , WordRef emptyRange "quote:/main/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
-                                    , { name = "main__quote1"
+                                    , { name = "quote:/main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote1__quote1"
+                                                , WordRef emptyRange "quote:/main/1/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "main__quote1__quote1"
+                                    , { name = "quote:/main/1/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted

@@ -467,7 +467,11 @@ qualifyNode ast currentDefName node ( availableQuoteId, qualifiedWords, qualifie
         Parser.Quotation sourceLocation quotImpl ->
             let
                 quoteName =
-                    currentDefName ++ "__" ++ "quote" ++ String.fromInt availableQuoteId
+                    if String.startsWith "quote:/" currentDefName then
+                        currentDefName ++ "/" ++ String.fromInt availableQuoteId
+
+                    else
+                        "quote:/" ++ currentDefName ++ "/" ++ String.fromInt availableQuoteId
 
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
                     initQualifyNode quoteName ast qualifiedWords quotImpl
