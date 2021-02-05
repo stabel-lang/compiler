@@ -1,5 +1,6 @@
 module Test.Qualifier.Util exposing
     ( addFunctionsForStructs
+    , expectModuleOutput
     , expectOutput
     )
 
@@ -20,6 +21,24 @@ expectOutput parserAst expectedAst =
             AST.run
                 { packageName = ""
                 , modulePath = ""
+                , ast = parserAst
+                }
+    in
+    case result of
+        Err errors ->
+            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+
+        Ok actualAst ->
+            Expect.equal expectedAst actualAst
+
+
+expectModuleOutput : Parser.AST -> AST -> Expectation
+expectModuleOutput parserAst expectedAst =
+    let
+        result =
+            AST.run
+                { packageName = "play/test"
+                , modulePath = "some/module"
                 , ast = parserAst
                 }
     in

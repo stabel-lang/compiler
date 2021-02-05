@@ -640,4 +640,216 @@ suite =
                             |> QualifierUtil.addFunctionsForStructs
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
+        , test "Name mangling" <|
+            \_ ->
+                let
+                    usMoneyUnion =
+                        [ Type.Custom "Dollar"
+                        , Type.Custom "Cent"
+                        ]
+
+                    unqualifiedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ AST.UnionTypeDef emptyRange
+                                    "USMoney"
+                                    []
+                                    usMoneyUnion
+                                , AST.CustomTypeDef emptyRange
+                                    "Dollar"
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Cent"
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "into-cents"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Union usMoneyUnion ]
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch emptyRange (Type.Custom "Dollar") []
+                                              , [ AST.Word emptyRange "dollar-value>"
+                                                , AST.Integer emptyRange 100
+                                                , AST.Word emptyRange "*"
+                                                ]
+                                              )
+                                            , ( AST.TypeMatch emptyRange (Type.Custom "Cent") []
+                                              , [ AST.Word emptyRange "cent-value>"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "add-money"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union usMoneyUnion, Type.Union usMoneyUnion ]
+                                                [ Type.Union usMoneyUnion ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.Word emptyRange "into-cents"
+                                            , AST.Word emptyRange "swap"
+                                            , AST.Word emptyRange "into-cents"
+                                            , AST.Word emptyRange "+"
+                                            ]
+                                  }
+                                , { name = "quote-excuse"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Dollar" ] [ Type.Custom "Dollar" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.Word emptyRange "dollar-value>"
+                                            , AST.Quotation emptyRange
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "*"
+                                                ]
+                                            , AST.Word emptyRange "!"
+                                            , AST.Word emptyRange ">Dollar"
+                                            ]
+                                  }
+                                ]
+                        }
+                            |> ParserUtil.addFunctionsForStructs
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef
+                                    "/play/test/some/module/USMoney"
+                                    emptyRange
+                                    []
+                                    usMoneyUnion
+                                , CustomTypeDef "/play/test/some/module/Dollar"
+                                    emptyRange
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , CustomTypeDef "Cent"
+                                    emptyRange
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "/play/test/some/module/into-cents"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Union usMoneyUnion ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Dollar") []
+                                              , [ Word emptyRange "/play/test/some/module/dollar-value>"
+                                                , Integer emptyRange 100
+                                                , Builtin emptyRange Builtin.Multiply
+                                                ]
+                                              )
+                                            , ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Cent") []
+                                              , [ Word emptyRange "/play/test/some/module/cent-value>"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "/play/test/some/module/add-money"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union usMoneyUnion, Type.Union usMoneyUnion ]
+                                                [ Type.Union usMoneyUnion ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word emptyRange "/play/test/some/module/into-cents"
+                                            , Builtin emptyRange Builtin.StackSwap
+                                            , Word emptyRange "/play/test/some/module/into-cents"
+                                            , Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                , { name = "quote-excuse"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word emptyRange "/play/test/some/module/dollar-value>"
+                                            , WordRef emptyRange "quote:/play/test/some/module/quote-excuse/1"
+                                            , Builtin emptyRange Builtin.Apply
+                                            , Word emptyRange "/play/test/some/module/>Dollar"
+                                            ]
+                                  }
+                                , { name = "quote:/play/test/some/module/quote-excuse/1"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 2
+                                            , Builtin emptyRange Builtin.Multiply
+                                            ]
+                                  }
+                                , { name = "/play/test/some/module/>Dollar"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Dollar" ]
+                                  }
+                                , { name = "/play/test/some/module/>Cent"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Cent" ]
+                                  }
+                                , { name = "/play/test/some/module/>dollar-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Dollar", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/>cent-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Cent", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                , { name = "/play/test/some/module/dollar-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Dollar" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/cent-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Cent" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                ]
+                        }
+                in
+                QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
         ]
