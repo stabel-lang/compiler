@@ -104,7 +104,15 @@ suite =
 
 checkForError : (Problem -> Bool) -> AST.AST -> Expectation
 checkForError fn source =
-    case run source of
+    let
+        result =
+            run
+                { packageName = ""
+                , modulePath = ""
+                , ast = source
+                }
+    in
+    case result of
         Err errors ->
             if List.any fn errors then
                 Expect.pass

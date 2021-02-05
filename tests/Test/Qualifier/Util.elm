@@ -1,10 +1,34 @@
-module Test.Qualifier.Util exposing (addFunctionsForStructs)
+module Test.Qualifier.Util exposing
+    ( addFunctionsForStructs
+    , expectOutput
+    )
 
 import Dict
 import Dict.Extra as Dict
+import Expect exposing (Expectation)
 import Play.Data.Metadata as Metadata
 import Play.Data.Type as Type exposing (Type)
+import Play.Parser as Parser
 import Play.Qualifier as AST exposing (AST)
+import Play.Qualifier.Problem exposing (Problem)
+
+
+expectOutput : Parser.AST -> AST -> Expectation
+expectOutput parserAst expectedAst =
+    let
+        result =
+            AST.run
+                { packageName = ""
+                , modulePath = ""
+                , ast = parserAst
+                }
+    in
+    case result of
+        Err errors ->
+            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+
+        Ok actualAst ->
+            Expect.equal expectedAst actualAst
 
 
 addFunctionsForStructs : AST -> AST

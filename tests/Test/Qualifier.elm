@@ -94,12 +94,7 @@ suite =
                                 ]
                         }
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , test "Generic function types" <|
             \_ ->
                 let
@@ -146,12 +141,7 @@ suite =
                                 ]
                         }
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , test "Union types and multifunctions" <|
             \_ ->
                 let
@@ -209,12 +199,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , describe "Quotations"
             [ test "Basic case" <|
                 \_ ->
@@ -311,12 +296,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Do not create new function if quoting exactly one word" <|
                 \_ ->
                     let
@@ -376,12 +356,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Quotes within quotes is fine" <|
                 \_ ->
                     let
@@ -451,12 +426,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             ]
         , describe "Pattern matching"
             [ test "Basic example" <|
@@ -524,12 +494,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Generic cases are allowed" <|
                 \_ ->
                     let
@@ -591,12 +556,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             ]
         , test "Resolves unions" <|
             \_ ->
@@ -679,10 +639,5 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         ]

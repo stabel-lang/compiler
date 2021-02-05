@@ -72,15 +72,22 @@ builtinDict =
         ]
 
 
-run : Parser.AST -> Result (List Problem) AST
-run ast =
+type alias RunConfig =
+    { packageName : String
+    , modulePath : String
+    , ast : Parser.AST
+    }
+
+
+run : RunConfig -> Result (List Problem) AST
+run config =
     let
         ( typeErrors, qualifiedTypes ) =
-            Dict.foldl (\_ val acc -> qualifyType ast val acc) ( [], Dict.empty ) ast.types
+            Dict.foldl (\_ val acc -> qualifyType config.ast val acc) ( [], Dict.empty ) config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
         ( wordErrors, qualifiedWords ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition ast qualifiedTypes val acc) ( [], Dict.empty ) ast.words
+            Dict.foldl (\_ val acc -> qualifyDefinition config.ast qualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
