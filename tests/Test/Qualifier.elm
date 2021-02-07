@@ -267,13 +267,13 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:/main/2"
+                                                , WordRef emptyRange "quote:main/2"
                                                 , Word emptyRange "apply-to-num"
-                                                , WordRef emptyRange "quote:/main/1"
+                                                , WordRef emptyRange "quote:main/1"
                                                 , Word emptyRange "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "quote:/main/2"
+                                    , { name = "quote:main/2"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -283,7 +283,7 @@ suite =
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "quote:/main/1"
+                                    , { name = "quote:main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -397,23 +397,23 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:/main/1"
+                                                , WordRef emptyRange "quote:main/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
-                                    , { name = "quote:/main/1"
+                                    , { name = "quote:main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:/main/1/1"
+                                                , WordRef emptyRange "quote:main/1/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "quote:/main/1/1"
+                                    , { name = "quote:main/1/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -643,9 +643,9 @@ suite =
         , test "Name mangling" <|
             \_ ->
                 let
-                    usMoneyUnion =
-                        [ Type.Custom "Dollar"
-                        , Type.Custom "Cent"
+                    qualifiedUsMoneyUnion =
+                        [ Type.Custom "/play/test/some/module/Dollar"
+                        , Type.Custom "/play/test/some/module/Cent"
                         ]
 
                     unqualifiedAst =
@@ -654,7 +654,9 @@ suite =
                                 [ AST.UnionTypeDef emptyRange
                                     "USMoney"
                                     []
-                                    usMoneyUnion
+                                    [ Type.Custom "Dollar"
+                                    , Type.Custom "Cent"
+                                    ]
                                 , AST.CustomTypeDef emptyRange
                                     "Dollar"
                                     []
@@ -670,8 +672,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union usMoneyUnion ]
-                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Custom "USMoney" ]
+                                                [ Type.Custom "USMoney" ]
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (Type.Custom "Dollar") []
@@ -691,8 +693,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union usMoneyUnion, Type.Union usMoneyUnion ]
-                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Custom "USMoney", Type.Custom "USMoney" ]
+                                                [ Type.Custom "USMoney" ]
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Word emptyRange "into-cents"
@@ -727,12 +729,12 @@ suite =
                                     "/play/test/some/module/USMoney"
                                     emptyRange
                                     []
-                                    usMoneyUnion
+                                    qualifiedUsMoneyUnion
                                 , CustomTypeDef "/play/test/some/module/Dollar"
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "Cent"
+                                , CustomTypeDef "/play/test/some/module/Cent"
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
@@ -743,8 +745,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union usMoneyUnion ]
-                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Dollar") []
@@ -764,8 +766,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union usMoneyUnion, Type.Union usMoneyUnion ]
-                                                [ Type.Union usMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion, Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         SoloImpl
                                             [ Word emptyRange "/play/test/some/module/into-cents"
@@ -774,7 +776,7 @@ suite =
                                             , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
-                                , { name = "quote-excuse"
+                                , { name = "/play/test/some/module/quote-excuse"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
