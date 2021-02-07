@@ -162,10 +162,30 @@ qualifyType config typeDef ( errors, acc ) =
             let
                 qualifiedName =
                     qualifyName config name
+
+                qualifiedMemberResult =
+                    List.map (Tuple.mapSecond (qualifyMemberType config range)) members
+                        |> List.map raiseTupleError
+                        |> Result.combine
+
+                raiseTupleError ( label, result ) =
+                    case result of
+                        Ok value ->
+                            Ok ( label, value )
+
+                        Err err ->
+                            Err err
             in
-            ( errors
-            , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics members) acc
-            )
+            case qualifiedMemberResult of
+                Err err ->
+                    ( err :: errors
+                    , acc
+                    )
+
+                Ok qualifiedMembers ->
+                    ( errors
+                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics members) acc
+                    )
 
         Parser.UnionTypeDef range name generics memberTypes ->
             let
