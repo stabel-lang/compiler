@@ -1,20 +1,28 @@
 module Test.Qualifier.Util exposing
     ( addFunctionsForStructs
     , expectModuleOutput
+    , expectModuleRequirements
     , expectOutput
     )
 
-import Dict
+import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Play.Data.Metadata as Metadata
 import Play.Data.Type as Type exposing (Type)
 import Play.Parser as Parser
-import Play.Qualifier as AST exposing (AST)
+import Play.Qualifier as AST exposing (AST, TypeDefinition, WordDefinition)
 import Play.Qualifier.Problem exposing (Problem)
+import Set
 
 
-expectOutput : Parser.AST -> AST -> Expectation
+type alias FullyLoadedAST =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
+expectOutput : Parser.AST -> FullyLoadedAST -> Expectation
 expectOutput parserAst expectedAst =
     let
         result =
@@ -29,10 +37,13 @@ expectOutput parserAst expectedAst =
             Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
 
         Ok actualAst ->
-            Expect.equal expectedAst actualAst
+            Expect.equal expectedAst
+                { types = actualAst.types
+                , words = actualAst.words
+                }
 
 
-expectModuleOutput : Parser.AST -> AST -> Expectation
+expectModuleOutput : Parser.AST -> FullyLoadedAST -> Expectation
 expectModuleOutput parserAst expectedAst =
     let
         result =
@@ -47,10 +58,39 @@ expectModuleOutput parserAst expectedAst =
             Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
 
         Ok actualAst ->
-            Expect.equal expectedAst actualAst
+            Expect.equal expectedAst
+                { types = actualAst.types
+                , words = actualAst.words
+                }
 
 
-addFunctionsForStructs : AST -> AST
+expectModuleRequirements : Parser.AST -> List String -> List String -> List String -> Expectation
+expectModuleRequirements parserAst expectedModulesToLoad expectedTypesToCheck expectedWordsToCheck =
+    let
+        result =
+            AST.run
+                { packageName = ""
+                , modulePath = ""
+                , ast = parserAst
+                }
+    in
+    case result of
+        Err errors ->
+            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+
+        Ok actualAst ->
+            Expect.equal
+                { additionalModulesRequired = Set.fromList expectedModulesToLoad
+                , checkForExistingTypes = Set.fromList expectedTypesToCheck
+                , checkForExistingWords = Set.fromList expectedWordsToCheck
+                }
+                { additionalModulesRequired = actualAst.additionalModulesRequired
+                , checkForExistingTypes = actualAst.checkForExistingTypes
+                , checkForExistingWords = actualAst.checkForExistingWords
+                }
+
+
+addFunctionsForStructs : FullyLoadedAST -> FullyLoadedAST
 addFunctionsForStructs ast =
     let
         helper _ t wipAst =
@@ -64,7 +104,7 @@ addFunctionsForStructs ast =
     Dict.foldl helper ast ast.types
 
 
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
+addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> FullyLoadedAST -> FullyLoadedAST
 addFunctionsForStructsHelper name generics members ast =
     let
         selfType =

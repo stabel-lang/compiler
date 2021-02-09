@@ -854,4 +854,28 @@ suite =
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
+        , describe "Module loading"
+            [ test "Detects external reference in simple word" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.ExternalWord emptyRange [ "external", "module" ] "sample"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectModuleRequirements unqualifiedAst
+                        [ "/external/module" ]
+                        []
+                        [ "/external/module/sample" ]
+            ]
         ]

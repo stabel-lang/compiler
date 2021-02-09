@@ -15,6 +15,9 @@ import Set exposing (Set)
 type alias AST =
     { types : Dict String TypeDefinition
     , words : Dict String WordDefinition
+    , additionalModulesRequired : Set String
+    , checkForExistingTypes : Set String
+    , checkForExistingWords : Set String
     }
 
 
@@ -94,6 +97,9 @@ run config =
             Ok
                 { types = qualifiedTypes
                 , words = qualifiedWords
+                , additionalModulesRequired = Set.empty
+                , checkForExistingTypes = Set.empty
+                , checkForExistingWords = Set.empty
                 }
 
         _ ->
