@@ -493,23 +493,32 @@ initQualifyNode :
     -> List Parser.AstNode
     -> ( Dict String WordDefinition, Result Problem (List Node) )
 initQualifyNode currentDefName config qualifiedWords impl =
-    List.foldr (qualifyNode config currentDefName) ( 1, qualifiedWords, [] ) impl
-        |> (\( _, newQualifiedWords, errors ) -> ( newQualifiedWords, Result.combine errors ))
+    List.foldr (qualifyNode config currentDefName) (initQualifyNodeAccumulator qualifiedWords) impl
+        |> (\acc -> ( acc.qualifiedWords, Result.combine acc.qualifiedNodes ))
 
 
-qualifyNode :
-    RunConfig
-    -> String
-    -> Parser.AstNode
-    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
-    -> ( Int, Dict String WordDefinition, List (Result Problem Node) )
-qualifyNode config currentDefName node ( availableQuoteId, qualifiedWords, qualifiedNodes ) =
+type alias QualifyNodeAccumulator =
+    { availableQuoteId : Int
+    , qualifiedWords : Dict String WordDefinition
+    , qualifiedNodes : List (Result Problem Node)
+    , externalWords : List ( List String, String )
+    }
+
+
+initQualifyNodeAccumulator : Dict String WordDefinition -> QualifyNodeAccumulator
+initQualifyNodeAccumulator qualifiedWords =
+    { availableQuoteId = 1
+    , qualifiedWords = qualifiedWords
+    , qualifiedNodes = []
+    , externalWords = []
+    }
+
+
+qualifyNode : RunConfig -> String -> Parser.AstNode -> QualifyNodeAccumulator -> QualifyNodeAccumulator
+qualifyNode config currentDefName node acc =
     case node of
         Parser.Integer loc value ->
-            ( availableQuoteId
-            , qualifiedWords
-            , Ok (Integer loc value) :: qualifiedNodes
-            )
+            { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
 
         Parser.Word loc value ->
             let
@@ -517,60 +526,42 @@ qualifyNode config currentDefName node ( availableQuoteId, qualifiedWords, quali
                     qualifyName config value
             in
             if Dict.member value config.ast.words then
-                ( availableQuoteId
-                , qualifiedWords
-                , Ok (Word loc qualifiedName) :: qualifiedNodes
-                )
+                { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
 
             else
                 case Dict.get value builtinDict of
                     Just builtin ->
-                        ( availableQuoteId
-                        , qualifiedWords
-                        , Ok (Builtin loc builtin) :: qualifiedNodes
-                        )
+                        { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
-                        ( availableQuoteId
-                        , qualifiedWords
-                        , Err (UnknownWordRef loc value) :: qualifiedNodes
-                        )
+                        { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
 
         Parser.PackageWord loc path value ->
-            qualifyNode config currentDefName (Parser.Word loc value) ( availableQuoteId, qualifiedWords, qualifiedNodes )
+            qualifyNode config currentDefName (Parser.Word loc value) acc
 
         Parser.ExternalWord loc path value ->
-            qualifyNode config currentDefName (Parser.Word loc value) ( availableQuoteId, qualifiedWords, qualifiedNodes )
+            qualifyNode config currentDefName (Parser.Word loc value) acc
 
         Parser.ConstructType typeName ->
-            ( availableQuoteId
-            , qualifiedWords
-            , Ok (ConstructType (qualifyName config typeName)) :: qualifiedNodes
-            )
+            { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
 
         Parser.SetMember typeName memberName ->
-            ( availableQuoteId
-            , qualifiedWords
-            , Ok (SetMember (qualifyName config typeName) memberName) :: qualifiedNodes
-            )
+            { acc | qualifiedNodes = Ok (SetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes }
 
         Parser.GetMember typeName memberName ->
-            ( availableQuoteId
-            , qualifiedWords
-            , Ok (GetMember (qualifyName config typeName) memberName) :: qualifiedNodes
-            )
+            { acc | qualifiedNodes = Ok (GetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes }
 
         Parser.Quotation sourceLocation quotImpl ->
             let
                 quoteName =
                     if String.startsWith "quote:" currentDefName then
-                        currentDefName ++ "/" ++ String.fromInt availableQuoteId
+                        currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
 
                     else
-                        "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt availableQuoteId
+                        "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
 
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    initQualifyNode quoteName config qualifiedWords quotImpl
+                    initQualifyNode quoteName config acc.qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok [ Word _ wordRef ] ->
@@ -579,31 +570,31 @@ qualifyNode config currentDefName node ( availableQuoteId, qualifiedWords, quali
                             Debug.todo "Cannot happen"
 
                         Just oldWord ->
-                            ( availableQuoteId
-                            , Dict.insert wordRef
-                                { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
-                                newWordsAfterQuot
-                            , Ok (WordRef sourceLocation wordRef) :: qualifiedNodes
-                            )
+                            { acc
+                                | qualifiedWords =
+                                    Dict.insert wordRef
+                                        { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
+                                        newWordsAfterQuot
+                                , qualifiedNodes = Ok (WordRef sourceLocation wordRef) :: acc.qualifiedNodes
+                            }
 
                 Ok qualifiedQuotImpl ->
-                    ( availableQuoteId + 1
-                    , Dict.insert quoteName
-                        { name = quoteName
-                        , metadata =
-                            Metadata.default
-                                |> Metadata.isQuoted
-                        , implementation = SoloImpl qualifiedQuotImpl
-                        }
-                        newWordsAfterQuot
-                    , Ok (WordRef sourceLocation quoteName) :: qualifiedNodes
-                    )
+                    { acc
+                        | availableQuoteId = acc.availableQuoteId + 1
+                        , qualifiedWords =
+                            Dict.insert quoteName
+                                { name = quoteName
+                                , metadata =
+                                    Metadata.default
+                                        |> Metadata.isQuoted
+                                , implementation = SoloImpl qualifiedQuotImpl
+                                }
+                                newWordsAfterQuot
+                        , qualifiedNodes = Ok (WordRef sourceLocation quoteName) :: acc.qualifiedNodes
+                    }
 
                 Err err ->
-                    ( availableQuoteId
-                    , qualifiedWords
-                    , Err err :: qualifiedNodes
-                    )
+                    { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
 
 typeDefinitionName : TypeDefinition -> String
