@@ -909,5 +909,66 @@ suite =
 
                         Ok actualAst ->
                             Expect.equal expectedAst actualAst
+            , test "Detects package reference in multiword" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
+                                                  , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/play/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/play/test/package/module/when-one"
+                                    , "/play/test/package/module/when-other-one"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
+                                                  , [ Word emptyRange "/play/test/package/module/when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Word emptyRange "/play/test/package/module/when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
             ]
         ]

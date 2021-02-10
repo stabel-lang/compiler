@@ -263,9 +263,9 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
                 Parser.MultiImpl whenImpl defImpl ->
                     ( whenImpl, defImpl )
 
-        ( newWordsAfterWhens, qualifiedWhensResult ) =
-            List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, [] ) whens
-                |> Tuple.mapSecond Result.combine
+        ( newWordsAfterWhens, externalWordsAfterWhens, qualifiedWhensResult ) =
+            List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, Set.empty, [] ) whens
+                |> (\( a, b, nodes ) -> ( a, b, Result.combine nodes ))
 
         ( newWordsAfterImpl, externalWordsAfterImpl, qualifiedImplementationResult ) =
             initQualifyNode unqualifiedWord.name config newWordsAfterWhens impl
@@ -279,7 +279,9 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
     case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
             ( errors
-            , Set.union externalWords externalWordsAfterImpl
+            , externalWords
+                |> Set.union externalWordsAfterWhens
+                |> Set.union externalWordsAfterImpl
             , Dict.insert qualifiedName
                 { name = qualifiedName
                 , metadata = qualifiedMetadata
@@ -385,11 +387,11 @@ qualifyWhen :
     -> Dict String TypeDefinition
     -> String
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
+    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, externalWords, result ) =
     let
-        ( newWords, externalWords, qualifiedImplementationResult ) =
+        ( newWords, externalWordsAfterImpl, qualifiedImplementationResult ) =
             initQualifyNode wordName config qualifiedWords impl
 
         qualifiedMatchResult =
@@ -398,16 +400,19 @@ qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords,
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
             ( newWords
+            , externalWords
             , Err err :: result
             )
 
         ( _, Err err ) ->
             ( newWords
+            , externalWords
             , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
             ( newWords
+            , Set.union externalWords externalWordsAfterImpl
             , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
             )
 
