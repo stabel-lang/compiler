@@ -9,6 +9,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
+import Set
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
@@ -855,7 +856,7 @@ suite =
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
         , describe "Module loading"
-            [ test "Detects external reference in simple word" <|
+            [ test "Detects package reference in simple word" <|
                 \_ ->
                     let
                         unqualifiedAst =
@@ -867,15 +868,46 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.ExternalWord emptyRange [ "external", "module" ] "sample"
+                                                , AST.PackageWord emptyRange [ "package", "module" ] "sample"
                                                 ]
                                       }
                                     ]
                             }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/play/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/play/test/package/module/sample" ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/play/test/package/module/sample"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                }
                     in
-                    QualifierUtil.expectModuleRequirements unqualifiedAst
-                        [ "/external/module" ]
-                        []
-                        [ "/external/module/sample" ]
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
             ]
         ]

@@ -1,7 +1,6 @@
 module Test.Qualifier.Util exposing
     ( addFunctionsForStructs
     , expectModuleOutput
-    , expectModuleRequirements
     , expectOutput
     )
 
@@ -61,32 +60,6 @@ expectModuleOutput parserAst expectedAst =
             Expect.equal expectedAst
                 { types = actualAst.types
                 , words = actualAst.words
-                }
-
-
-expectModuleRequirements : Parser.AST -> List String -> List String -> List String -> Expectation
-expectModuleRequirements parserAst expectedModulesToLoad expectedTypesToCheck expectedWordsToCheck =
-    let
-        result =
-            AST.run
-                { packageName = ""
-                , modulePath = ""
-                , ast = parserAst
-                }
-    in
-    case result of
-        Err errors ->
-            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
-
-        Ok actualAst ->
-            Expect.equal
-                { additionalModulesRequired = Set.fromList expectedModulesToLoad
-                , checkForExistingTypes = Set.fromList expectedTypesToCheck
-                , checkForExistingWords = Set.fromList expectedWordsToCheck
-                }
-                { additionalModulesRequired = actualAst.additionalModulesRequired
-                , checkForExistingTypes = actualAst.checkForExistingTypes
-                , checkForExistingWords = actualAst.checkForExistingWords
                 }
 
 
