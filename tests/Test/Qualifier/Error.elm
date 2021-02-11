@@ -153,6 +153,7 @@ checkForError fn source =
                 { packageName = ""
                 , modulePath = ""
                 , ast = source
+                , externalModules = []
                 }
     in
     case result of

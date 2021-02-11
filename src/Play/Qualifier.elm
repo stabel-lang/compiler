@@ -79,6 +79,7 @@ type alias RunConfig =
     { packageName : String
     , modulePath : String
     , ast : Parser.AST
+    , externalModules : List String
     }
 
 

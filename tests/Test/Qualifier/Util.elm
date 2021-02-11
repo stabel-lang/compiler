@@ -29,6 +29,7 @@ expectOutput parserAst expectedAst =
                 { packageName = ""
                 , modulePath = ""
                 , ast = parserAst
+                , externalModules = []
                 }
     in
     case result of
@@ -50,6 +51,7 @@ expectModuleOutput parserAst expectedAst =
                 { packageName = "play/test"
                 , modulePath = "some/module"
                 , ast = parserAst
+                , externalModules = []
                 }
     in
     case result of

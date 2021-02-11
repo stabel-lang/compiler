@@ -901,6 +901,7 @@ suite =
                                 { packageName = "play/test"
                                 , modulePath = "package/tests"
                                 , ast = unqualifiedAst
+                                , externalModules = []
                                 }
                     in
                     case result of
@@ -962,6 +963,7 @@ suite =
                                 { packageName = "play/test"
                                 , modulePath = "package/tests"
                                 , ast = unqualifiedAst
+                                , externalModules = []
                                 }
                     in
                     case result of
