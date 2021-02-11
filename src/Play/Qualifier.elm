@@ -573,7 +573,26 @@ qualifyNode config currentDefName node acc =
             }
 
         Parser.ExternalWord loc path value ->
-            qualifyNode config currentDefName (Parser.Word loc value) acc
+            let
+                normalizedPath =
+                    "/" ++ String.join "/" path
+            in
+            case Dict.get normalizedPath config.externalModules of
+                Nothing ->
+                    { acc | qualifiedNodes = Err (UnknownWordRef loc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
+
+                Just package ->
+                    let
+                        qualifiedPath =
+                            "/" ++ package ++ normalizedPath
+
+                        fullReference =
+                            qualifiedPath ++ "/" ++ value
+                    in
+                    { acc
+                        | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes
+                        , externalWords = Set.insert ( qualifiedPath, value ) acc.externalWords
+                    }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }

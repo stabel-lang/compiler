@@ -49,6 +49,27 @@ suite =
                             }
                     in
                     checkForError (noSuchWordReferenceError "dec") ast
+            , test "External" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "/external/module/inc"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    checkForError (noSuchWordReferenceError "/external/module/inc") ast
             , test "Type" <|
                 \_ ->
                     let
