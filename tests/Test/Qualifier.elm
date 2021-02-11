@@ -901,7 +901,61 @@ suite =
                                 { packageName = "play/test"
                                 , modulePath = "package/tests"
                                 , ast = unqualifiedAst
-                                , externalModules = []
+                                , externalModules = Dict.empty
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            , test "Detects external reference in simple word" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "sample" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/external/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/external/test/package/module/sample"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Word emptyRange "/external/test/package/module/sample" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/package/module", "external/test" )
+                                        ]
                                 }
                     in
                     case result of
@@ -963,7 +1017,72 @@ suite =
                                 { packageName = "play/test"
                                 , modulePath = "package/tests"
                                 , ast = unqualifiedAst
-                                , externalModules = []
+                                , externalModules = Dict.empty
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            , test "Detects external reference in multiword" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
+                                                  , [ AST.ExternalWord emptyRange [ "package", "module" ] "when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/external/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/external/test/package/module/when-one"
+                                    , "/external/test/package/module/when-other-one"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
+                                                  , [ Word emptyRange "/external/test/package/module/when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Word emptyRange "/external/test/package/module/when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/package/module", "external/test" )
+                                        ]
                                 }
                     in
                     case result of
