@@ -12,9 +12,10 @@
     "wabt": "^1.0.20"
   },
   "scripts": {
-    "test": "elm-test && npm run wasm-test",
-    "auto-elm-test": "elm-test --watch",
-    "wasm-test": "elm make src/Main.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest"
+    "test": "npm run test:elm && npm run test:wasm",
+    "test:elm": "elm-test",
+    "test:elm:watch": "elm-test --watch",
+    "test:wasm": "elm make src/Main.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest"
   },
   "author": "Robin Heggelund Hansen",
   "license": "MIT"
