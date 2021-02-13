@@ -1,6 +1,7 @@
 module Play.Data.PackageName exposing
     ( PackageName
     , fromString
+    , invalidPart
     )
 
 
