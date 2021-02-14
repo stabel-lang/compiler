@@ -3,7 +3,6 @@ module Test.Data.PackagePath exposing (suite)
 import Expect
 import Play.Data.PackagePath as PackagePath
 import Test exposing (Test, describe, test)
-import Test.PlayExpect as PlayExpect
 
 
 suite : Test

@@ -1,6 +1,7 @@
 module Play.PackageLoader exposing (init)
 
 import Json.Decode as Json
+import Play.Data.PackageMetadata as PackageMetadata
 
 
 type Problem
@@ -15,6 +16,11 @@ type SideEffect
     = NoOp
 
 
-init : String -> Json.Value -> Result Problem ( State, SideEffect )
+init : String -> String -> Result Problem ( State, SideEffect )
 init jsonFilePath json =
-    Err <| InvalidPackageMetadata jsonFilePath "todo"
+    case Json.decodeString PackageMetadata.decoder json of
+        Ok metadata ->
+            Ok ( (), NoOp )
+
+        Err err ->
+            Err <| InvalidPackageMetadata jsonFilePath (Json.errorToString err)
