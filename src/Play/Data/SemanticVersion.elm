@@ -11,28 +11,16 @@ type SemanticVersion
 fromString : String -> Result () SemanticVersion
 fromString str =
     case String.split "." str of
-        [ major ] ->
-            toInt major Nothing Nothing
-
-        [ major, minor ] ->
-            toInt major (Just minor) Nothing
-
         [ major, minor, patch ] ->
-            toInt major (Just minor) (Just patch)
+            toInt major minor patch
 
         _ ->
             Err ()
 
 
-toInt : String -> Maybe String -> Maybe String -> Result () SemanticVersion
-toInt majorStr maybeMinorStr maybePatchStr =
+toInt : String -> String -> String -> Result () SemanticVersion
+toInt majorStr minorStr patchStr =
     let
-        minorStr =
-            Maybe.withDefault "0" maybeMinorStr
-
-        patchStr =
-            Maybe.withDefault "0" maybePatchStr
-
         intVersions =
             [ majorStr, minorStr, patchStr ]
                 |> List.filterMap String.toInt

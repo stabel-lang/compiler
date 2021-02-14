@@ -12,9 +12,7 @@ suite =
         [ test "Valid versions" <|
             \_ ->
                 PlayExpect.allOk SemanticVersion.fromString
-                    [ "1"
-                    , "1.2"
-                    , "1.2.3"
+                    [ "1.2.3"
                     , "10.100.1000"
                     , "0.0.1"
                     , "0.1.0"
@@ -23,6 +21,12 @@ suite =
             \_ ->
                 SemanticVersion.fromString "1.2.3.4"
                     |> Expect.err
+        , test "Cannot contain less than three parts" <|
+            \_ ->
+                PlayExpect.allErr SemanticVersion.fromString
+                    [ "1"
+                    , "1.2"
+                    ]
         , test "Cannot be empty string" <|
             \_ ->
                 SemanticVersion.fromString ""
@@ -34,6 +38,7 @@ suite =
                     , "*"
                     , "~"
                     , "1.0.x"
+                    , "1.0.~"
                     , "~1.0.0"
                     , "1.0.0-alpha1"
                     , "alpha.1"
@@ -45,8 +50,8 @@ suite =
         , test "Cannot contain negative versions" <|
             \_ ->
                 PlayExpect.allErr SemanticVersion.fromString
-                    [ "-1"
-                    , "-1.2"
+                    [ "-1.0.0"
                     , "1.-2.0"
+                    , "1.2.-1"
                     ]
         ]
