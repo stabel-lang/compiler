@@ -1,5 +1,6 @@
 module Play.Data.SemanticVersion exposing
-    ( SemanticVersion
+    ( ParseError(..)
+    , SemanticVersion
     , fromString
     )
 
@@ -8,18 +9,25 @@ type SemanticVersion
     = SemanticVersion Int Int Int
 
 
-fromString : String -> Result () SemanticVersion
+type ParseError
+    = InvalidFormat String
+    | ExpectedInteger String
+    | NegativeVersions String
+    | LessThanMinimumVersion String
+
+
+fromString : String -> Result ParseError SemanticVersion
 fromString str =
     case String.split "." str of
         [ major, minor, patch ] ->
-            toInt major minor patch
+            toInt str major minor patch
 
         _ ->
-            Err ()
+            Err <| InvalidFormat str
 
 
-toInt : String -> String -> String -> Result () SemanticVersion
-toInt majorStr minorStr patchStr =
+toInt : String -> String -> String -> String -> Result ParseError SemanticVersion
+toInt originalStr majorStr minorStr patchStr =
     let
         intVersions =
             [ majorStr, minorStr, patchStr ]
@@ -28,13 +36,13 @@ toInt majorStr minorStr patchStr =
     case intVersions of
         [ major, minor, patch ] ->
             if major < 0 || minor < 0 || patch < 0 then
-                Err ()
+                Err <| NegativeVersions originalStr
 
             else if major == 0 && minor == 0 && patch < 1 then
-                Err ()
+                Err <| LessThanMinimumVersion originalStr
 
             else
                 Ok <| SemanticVersion major minor patch
 
         _ ->
-            Err ()
+            Err <| ExpectedInteger originalStr

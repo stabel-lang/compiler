@@ -1,5 +1,6 @@
 module Test.PlayExpect exposing
-    ( allErr
+    ( allEqual
+    , allErr
     , allOk
     )
 
@@ -36,5 +37,14 @@ allErr fn values =
 
                 Err _ ->
                     Expect.pass
+    in
+    Expect.all expectationList fn
+
+
+allEqual : (a -> b) -> List ( a, b ) -> Expect.Expectation
+allEqual fn values =
+    let
+        expectationList =
+            List.map (\( input, expected ) -> \f -> Expect.equal expected (f input)) values
     in
     Expect.all expectationList fn

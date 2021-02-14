@@ -20,38 +20,38 @@ suite =
         , test "Cannot contain more than three parts" <|
             \_ ->
                 SemanticVersion.fromString "1.2.3.4"
-                    |> Expect.err
+                    |> Expect.equal (Err <| SemanticVersion.InvalidFormat "1.2.3.4")
         , test "Cannot contain less than three parts" <|
             \_ ->
-                PlayExpect.allErr SemanticVersion.fromString
-                    [ "1"
-                    , "1.2"
+                PlayExpect.allEqual SemanticVersion.fromString
+                    [ ( "1", Err <| SemanticVersion.InvalidFormat "1" )
+                    , ( "1.2", Err <| SemanticVersion.InvalidFormat "1.2" )
                     ]
         , test "Cannot be empty string" <|
             \_ ->
                 SemanticVersion.fromString ""
-                    |> Expect.err
+                    |> Expect.equal (Err <| SemanticVersion.InvalidFormat "")
         , test "Must be numbers" <|
             \_ ->
-                PlayExpect.allErr SemanticVersion.fromString
-                    [ "A"
-                    , "*"
-                    , "~"
-                    , "1.0.x"
-                    , "1.0.~"
-                    , "~1.0.0"
-                    , "1.0.0-alpha1"
-                    , "alpha.1"
+                PlayExpect.allEqual SemanticVersion.fromString
+                    [ ( "A", Err <| SemanticVersion.InvalidFormat "A" )
+                    , ( "*", Err <| SemanticVersion.InvalidFormat "*" )
+                    , ( "~", Err <| SemanticVersion.InvalidFormat "~" )
+                    , ( "1.0.x", Err <| SemanticVersion.ExpectedInteger "1.0.x" )
+                    , ( "1.0.~", Err <| SemanticVersion.ExpectedInteger "1.0.~" )
+                    , ( "~1.0.0", Err <| SemanticVersion.ExpectedInteger "~1.0.0" )
+                    , ( "1.0.0-alpha1", Err <| SemanticVersion.ExpectedInteger "1.0.0-alpha1" )
+                    , ( "alpha.1", Err <| SemanticVersion.InvalidFormat "alpha.1" )
                     ]
         , test "Minimum version is 0.0.1" <|
             \_ ->
                 SemanticVersion.fromString "0.0.0"
-                    |> Expect.err
+                    |> Expect.equal (Err <| SemanticVersion.LessThanMinimumVersion "0.0.0")
         , test "Cannot contain negative versions" <|
             \_ ->
-                PlayExpect.allErr SemanticVersion.fromString
-                    [ "-1.0.0"
-                    , "1.-2.0"
-                    , "1.2.-1"
+                PlayExpect.allEqual SemanticVersion.fromString
+                    [ ( "-1.0.0", Err <| SemanticVersion.NegativeVersions "-1.0.0" )
+                    , ( "1.-2.0", Err <| SemanticVersion.NegativeVersions "1.-2.0" )
+                    , ( "1.2.-3", Err <| SemanticVersion.NegativeVersions "1.2.-3" )
                     ]
         ]
