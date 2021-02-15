@@ -24,12 +24,50 @@ type alias PackageMetadata =
 decoder : Json.Decoder PackageMetadata
 decoder =
     Json.map6 PackageMetadata
-        (Json.field "name" Json.string |> Json.andThen (resultDecodeAdapt << PackageName.fromString))
-        (Json.field "version" Json.string |> Json.andThen (resultDecodeAdapt << SemanticVersion.fromString))
-        (Json.field "language-version" Json.string |> Json.andThen (resultDecodeAdapt << SemanticVersion.fromString))
-        (Json.field "exposed-modules" (Json.list (Json.string |> Json.andThen (resultDecodeAdapt << ModuleName.fromString))))
-        (Json.field "dependencies" (Json.dict (Json.string |> Json.andThen (resultDecodeAdapt << SemanticVersion.fromString))))
-        (Json.field "package-paths" (Json.list (Json.string |> Json.map PackagePath.fromString)))
+        (Json.field "name" packageNameDecoder)
+        (Json.field "version" semverDecoder)
+        (Json.field "language-version" semverDecoder)
+        (Json.field "exposed-modules" (Json.list moduleNameDecoder))
+        (Json.field "dependencies" (Json.dict semverDecoder |> Json.andThen validateDependencyKeys))
+        (Json.field "package-paths" (Json.list packagePathDecoder))
+
+
+packageNameDecoder : Json.Decoder PackageName
+packageNameDecoder =
+    Json.string
+        |> Json.andThen (resultDecodeAdapt << PackageName.fromString)
+
+
+semverDecoder : Json.Decoder SemanticVersion
+semverDecoder =
+    Json.string
+        |> Json.andThen (resultDecodeAdapt << SemanticVersion.fromString)
+
+
+moduleNameDecoder : Json.Decoder ModuleName
+moduleNameDecoder =
+    Json.string
+        |> Json.andThen (resultDecodeAdapt << ModuleName.fromString)
+
+
+packagePathDecoder : Json.Decoder PackagePath
+packagePathDecoder =
+    Json.string
+        |> Json.map PackagePath.fromString
+
+
+validateDependencyKeys : Dict String SemanticVersion -> Json.Decoder (Dict String SemanticVersion)
+validateDependencyKeys deps =
+    let
+        isValid =
+            Dict.keys deps
+                |> List.all (\k -> Result.toMaybe (PackageName.fromString k) /= Nothing)
+    in
+    if isValid then
+        Json.succeed deps
+
+    else
+        Json.fail "Invalid dependency package name"
 
 
 resultDecodeAdapt : Result err ok -> Json.Decoder ok

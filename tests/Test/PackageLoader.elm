@@ -22,7 +22,7 @@ suite =
                             "fnv"
                         ],
                         "dependencies": {
-                            "template_string": "1.2.0"
+                            "jarvis/template_strings": "1.2.0"
                         },
                         "package-paths": [
                             "lib/*"
