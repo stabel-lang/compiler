@@ -2,6 +2,7 @@ module Play.Data.PackageName exposing
     ( PackageName
     , fromString
     , invalidPart
+    , toString
     )
 
 
@@ -34,3 +35,8 @@ invalidPart str =
                 (Char.isLower first
                     && String.all (\c -> Char.isLower c || Char.isDigit c || c == '_') rest
                 )
+
+
+toString : PackageName -> String
+toString (PackageName group name) =
+    group ++ "/" ++ name

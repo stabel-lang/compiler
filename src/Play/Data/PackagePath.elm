@@ -1,6 +1,7 @@
 module Play.Data.PackagePath exposing
     ( PackagePath(..)
     , fromString
+    , prefix
     )
 
 
@@ -33,3 +34,13 @@ fromString str =
                 0
     in
     ctor <| String.dropRight charsToDrop str
+
+
+prefix : String -> PackagePath -> PackagePath
+prefix pathToPrefix packagePath =
+    case packagePath of
+        Directory dir ->
+            Directory <| pathToPrefix ++ "/" ++ dir
+
+        AllDirectoriesInDirectory dir ->
+            AllDirectoriesInDirectory <| pathToPrefix ++ "/" ++ dir
