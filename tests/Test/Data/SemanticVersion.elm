@@ -54,4 +54,36 @@ suite =
                     , ( "1.-2.0", Err <| SemanticVersion.NegativeVersions "1.-2.0" )
                     , ( "1.2.-3", Err <| SemanticVersion.NegativeVersions "1.2.-3" )
                     ]
+        , describe "Compatibility" <|
+            let
+                helper ( lhs, rhs ) =
+                    Result.map2 SemanticVersion.compatible (SemanticVersion.fromString lhs) (SemanticVersion.fromString rhs)
+            in
+            [ test "Same version, or greater version, returns GreaterThanOrEqual" <|
+                \_ ->
+                    PlayExpect.allEqual helper
+                        [ ( ( "1.0.0", "1.0.0" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        , ( ( "0.2.1", "0.2.1" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        , ( ( "2.0.8", "2.0.8" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        , ( ( "1.0.0", "1.2.0" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        , ( ( "2.1.0", "2.1.1" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        , ( ( "1.2.3", "1.3.0" ), Ok SemanticVersion.GreaterThanOrEqual )
+                        ]
+            , test "Lesser version returns LessThan" <|
+                \_ ->
+                    PlayExpect.allEqual helper
+                        [ ( ( "0.2.1", "0.2.0" ), Ok SemanticVersion.LessThan )
+                        , ( ( "1.1.0", "1.0.5" ), Ok SemanticVersion.LessThan )
+                        , ( ( "2.1.3", "2.1.1" ), Ok SemanticVersion.LessThan )
+                        , ( ( "1.2.3", "1.2.2" ), Ok SemanticVersion.LessThan )
+                        ]
+            , test "Incompatible versions" <|
+                \_ ->
+                    PlayExpect.allEqual helper
+                        [ ( ( "0.2.1", "0.3.0" ), Ok SemanticVersion.Incompatible )
+                        , ( ( "1.0.0", "2.0.0" ), Ok SemanticVersion.Incompatible )
+                        , ( ( "1.2.0", "2.2.0" ), Ok SemanticVersion.Incompatible )
+                        , ( ( "0.0.1", "1.0.1" ), Ok SemanticVersion.Incompatible )
+                        ]
+            ]
         ]

@@ -1,6 +1,8 @@
 module Play.Data.SemanticVersion exposing
-    ( ParseError(..)
+    ( Compatibility(..)
+    , ParseError(..)
     , SemanticVersion
+    , compatible
     , fromString
     )
 
@@ -20,14 +22,14 @@ fromString : String -> Result ParseError SemanticVersion
 fromString str =
     case String.split "." str of
         [ major, minor, patch ] ->
-            toInt str major minor patch
+            fromInts str major minor patch
 
         _ ->
             Err <| InvalidFormat str
 
 
-toInt : String -> String -> String -> String -> Result ParseError SemanticVersion
-toInt originalStr majorStr minorStr patchStr =
+fromInts : String -> String -> String -> String -> Result ParseError SemanticVersion
+fromInts originalStr majorStr minorStr patchStr =
     let
         intVersions =
             [ majorStr, minorStr, patchStr ]
@@ -46,3 +48,42 @@ toInt originalStr majorStr minorStr patchStr =
 
         _ ->
             Err <| ExpectedInteger originalStr
+
+
+type Compatibility
+    = Incompatible
+    | LessThan
+    | GreaterThanOrEqual
+
+
+compatible : SemanticVersion -> SemanticVersion -> Compatibility
+compatible (SemanticVersion lhsMajor lhsMinor lhsPatch) (SemanticVersion rhsMajor rhsMinor rhsPatch) =
+    if lhsMajor /= rhsMajor then
+        Incompatible
+
+    else
+        case compare lhsMinor rhsMinor of
+            GT ->
+                if lhsMajor == 0 then
+                    Incompatible
+
+                else
+                    LessThan
+
+            LT ->
+                if lhsMajor == 0 then
+                    Incompatible
+
+                else
+                    GreaterThanOrEqual
+
+            EQ ->
+                case compare lhsPatch rhsPatch of
+                    GT ->
+                        LessThan
+
+                    EQ ->
+                        GreaterThanOrEqual
+
+                    LT ->
+                        GreaterThanOrEqual
