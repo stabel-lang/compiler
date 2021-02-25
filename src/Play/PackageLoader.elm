@@ -1,9 +1,8 @@
 module Play.PackageLoader exposing
-    ( Model
+    ( Model(..)
     , Msg(..)
-    , Problem
+    , Problem(..)
     , SideEffect(..)
-    , doneState
     , init
     , update
     )
@@ -21,28 +20,29 @@ type Problem
 
 
 type Model
-    = LoadingMetadata State (List PackagePath)
+    = Initializing SideEffect
+    | LoadingMetadata State (List PackagePath) SideEffect
     | Done State
-
-
-doneState : Model -> Maybe State
-doneState model =
-    case model of
-        Done state ->
-            Just state
-
-        _ ->
-            Nothing
+    | Failed Problem
 
 
 type alias State =
-    { loadedPackages : Dict String PackageMetadata
+    { rootPackage : PackageInfo
+    , dependentPackages : Dict String PackageInfo
     }
 
 
-emptyState : State
-emptyState =
-    { loadedPackages = Dict.empty }
+type alias PackageInfo =
+    { path : String
+    , metadata : PackageMetadata
+    }
+
+
+emptyState : PackageInfo -> State
+emptyState rootPackage =
+    { rootPackage = rootPackage
+    , dependentPackages = Dict.empty
+    }
 
 
 type Msg
@@ -51,29 +51,63 @@ type Msg
 
 
 type SideEffect
-    = NoOp
-    | ReadFile String String
+    = ReadFile String String
     | ResolveDirectories String
 
 
-init : String -> ( Model, SideEffect )
+init : String -> Model
 init projectDirPath =
-    ( LoadingMetadata emptyState [ PackagePath.Directory projectDirPath ]
-    , ReadFile projectDirPath "play.json"
-    )
+    Initializing
+        (ReadFile projectDirPath "play.json")
 
 
-update : Msg -> Model -> ( Model, SideEffect )
+update : Msg -> Model -> Model
 update msg model =
     case model of
-        Done _ ->
-            ( model, NoOp )
+        Initializing _ ->
+            case msg of
+                FileContents path _ content ->
+                    case Json.decodeString PackageMetadata.decoder content of
+                        Ok metadata ->
+                            let
+                                state =
+                                    emptyState
+                                        { path = path
+                                        , metadata = metadata
+                                        }
 
-        LoadingMetadata state remainingPaths ->
+                                pathsToLoad =
+                                    List.map (PackagePath.prefix path) metadata.packagePaths
+                            in
+                            case pathsToLoad of
+                                [] ->
+                                    Done state
+
+                                (PackagePath.Directory nextPathDir) :: _ ->
+                                    LoadingMetadata state pathsToLoad <|
+                                        ReadFile nextPathDir "play.json"
+
+                                (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
+                                    LoadingMetadata state pathsToLoad <|
+                                        ResolveDirectories nextPathDir
+
+                        Err err ->
+                            Failed <| InvalidPackageMetadata path <| Json.errorToString err
+
+                _ ->
+                    Failed (InvalidPackageMetadata "todo: path" "Wrong message on initialization")
+
+        LoadingMetadata state remainingPaths _ ->
             loadingMetadataUpdate msg state remainingPaths
 
+        Done _ ->
+            model
 
-loadingMetadataUpdate : Msg -> State -> List PackagePath -> ( Model, SideEffect )
+        Failed _ ->
+            model
+
+
+loadingMetadataUpdate : Msg -> State -> List PackagePath -> Model
 loadingMetadataUpdate msg state remainingPaths =
     case msg of
         FileContents path _ content ->
@@ -82,11 +116,13 @@ loadingMetadataUpdate msg state remainingPaths =
                     let
                         updatedState =
                             { state
-                                | loadedPackages =
+                                | dependentPackages =
                                     Dict.insert
                                         (PackageName.toString metadata.name)
-                                        metadata
-                                        state.loadedPackages
+                                        { path = path
+                                        , metadata = metadata
+                                        }
+                                        state.dependentPackages
                             }
 
                         absolutePackagePaths =
@@ -99,17 +135,15 @@ loadingMetadataUpdate msg state remainingPaths =
                     in
                     case pathsToLoad of
                         [] ->
-                            ( Done updatedState, NoOp )
+                            Done updatedState
 
                         (PackagePath.Directory nextPathDir) :: _ ->
-                            ( LoadingMetadata updatedState pathsToLoad
-                            , ReadFile nextPathDir "play.json"
-                            )
+                            LoadingMetadata updatedState pathsToLoad <|
+                                ReadFile nextPathDir "play.json"
 
                         (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
-                            ( LoadingMetadata updatedState pathsToLoad
-                            , ResolveDirectories nextPathDir
-                            )
+                            LoadingMetadata updatedState pathsToLoad <|
+                                ResolveDirectories nextPathDir
 
                 Err err ->
                     Debug.todo (Json.errorToString err)
@@ -123,14 +157,12 @@ loadingMetadataUpdate msg state remainingPaths =
             in
             case pathsToLoad of
                 [] ->
-                    ( Done state, NoOp )
+                    Done state
 
                 (PackagePath.Directory nextPathDir) :: _ ->
-                    ( LoadingMetadata state pathsToLoad
-                    , ReadFile nextPathDir "play.json"
-                    )
+                    LoadingMetadata state pathsToLoad <|
+                        ReadFile nextPathDir "play.json"
 
                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
-                    ( LoadingMetadata state pathsToLoad
-                    , ResolveDirectories <| parentDir ++ "/" ++ nextPathDir
-                    )
+                    LoadingMetadata state pathsToLoad <|
+                        ResolveDirectories (parentDir ++ "/" ++ nextPathDir)

@@ -14,8 +14,7 @@ suite =
         [ test "Passes the load package metadata step" <|
             \_ ->
                 PackageLoader.init "/project"
-                    |> Tuple.second
-                    |> Expect.equal (PackageLoader.ReadFile "/project" "play.json")
+                    |> Expect.equal (PackageLoader.Initializing <| PackageLoader.ReadFile "/project" "play.json")
         , test "Retrieves necessary files" <|
             \_ ->
                 PackageLoader.init "/project"
@@ -27,13 +26,13 @@ suite =
         ]
 
 
-expectSideEffects : Dict String String -> List PackageLoader.SideEffect -> ( PackageLoader.Model, PackageLoader.SideEffect ) -> Expectation
-expectSideEffects fileSystem expectedSFs ( model, sideEffect ) =
-    case PackageLoader.doneState model of
-        Just _ ->
+expectSideEffects : Dict String String -> List PackageLoader.SideEffect -> PackageLoader.Model -> Expectation
+expectSideEffects fileSystem expectedSFs model =
+    case getSideEffect model of
+        Nothing ->
             Expect.equalLists [] expectedSFs
 
-        Nothing ->
+        Just sideEffect ->
             case sideEffect of
                 PackageLoader.ReadFile path filename ->
                     case Dict.get (path ++ "/" ++ filename) fileSystem of
@@ -69,8 +68,21 @@ expectSideEffects fileSystem expectedSFs ( model, sideEffect ) =
                             model
                         )
 
-                PackageLoader.NoOp ->
-                    Expect.fail "Did not expect NoOp message."
+
+getSideEffect : PackageLoader.Model -> Maybe PackageLoader.SideEffect
+getSideEffect model =
+    case model of
+        PackageLoader.Done _ ->
+            Nothing
+
+        PackageLoader.Failed _ ->
+            Nothing
+
+        PackageLoader.Initializing sf ->
+            Just sf
+
+        PackageLoader.LoadingMetadata _ _ sf ->
+            Just sf
 
 
 testFiles : Dict String String
