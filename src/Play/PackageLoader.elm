@@ -10,18 +10,23 @@ module Play.PackageLoader exposing
 import Dict exposing (Dict)
 import Json.Decode as Json
 import List.Extra as List
+import Play.Data.ModuleName as ModuleName exposing (ModuleName)
 import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Play.Data.PackageName as PackageName
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
+import Result.Extra as Result
 
 
 type Problem
     = InvalidPackageMetadata String String
+    | UnknownMessageForState String
+    | InternalError String
 
 
 type Model
     = Initializing SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
+    | ResolvingModulePaths State (List PackageInfo) SideEffect
     | Done State
     | Failed Problem
 
@@ -35,6 +40,7 @@ type alias State =
 type alias PackageInfo =
     { path : String
     , metadata : PackageMetadata
+    , modules : List ModuleName
     }
 
 
@@ -48,11 +54,13 @@ emptyState rootPackage =
 type Msg
     = FileContents String String String
     | ResolvedDirectories String (List PackagePath)
+    | ResolvedPackageModules String (List String)
 
 
 type SideEffect
     = ReadFile String String
     | ResolveDirectories String
+    | ResolvePackageModules String String
 
 
 init : String -> Model
@@ -74,6 +82,7 @@ update msg model =
                                     emptyState
                                         { path = path
                                         , metadata = metadata
+                                        , modules = []
                                         }
 
                                 pathsToLoad =
@@ -81,7 +90,7 @@ update msg model =
                             in
                             case pathsToLoad of
                                 [] ->
-                                    Done state
+                                    ResolvingModulePaths state [] (ResolvePackageModules (PackageName.toString metadata.name) path)
 
                                 (PackagePath.Directory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
@@ -99,6 +108,9 @@ update msg model =
 
         LoadingMetadata state remainingPaths _ ->
             loadingMetadataUpdate msg state remainingPaths
+
+        ResolvingModulePaths state remainingPackages _ ->
+            resolvingModulePathsUpdate msg state remainingPackages
 
         Done _ ->
             model
@@ -121,6 +133,7 @@ loadingMetadataUpdate msg state remainingPaths =
                                         (PackageName.toString metadata.name)
                                         { path = path
                                         , metadata = metadata
+                                        , modules = []
                                         }
                                         state.dependentPackages
                             }
@@ -135,7 +148,9 @@ loadingMetadataUpdate msg state remainingPaths =
                     in
                     case pathsToLoad of
                         [] ->
-                            Done updatedState
+                            ResolvingModulePaths updatedState
+                                (Dict.values updatedState.dependentPackages)
+                                (ResolvePackageModules (PackageName.toString state.rootPackage.metadata.name) state.rootPackage.path)
 
                         (PackagePath.Directory nextPathDir) :: _ ->
                             LoadingMetadata updatedState pathsToLoad <|
@@ -157,7 +172,9 @@ loadingMetadataUpdate msg state remainingPaths =
             in
             case pathsToLoad of
                 [] ->
-                    Done state
+                    ResolvingModulePaths state
+                        (Dict.values state.dependentPackages)
+                        (ResolvePackageModules (PackageName.toString state.rootPackage.metadata.name) state.rootPackage.path)
 
                 (PackagePath.Directory nextPathDir) :: _ ->
                     LoadingMetadata state pathsToLoad <|
@@ -166,3 +183,55 @@ loadingMetadataUpdate msg state remainingPaths =
                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
                     LoadingMetadata state pathsToLoad <|
                         ResolveDirectories (parentDir ++ "/" ++ nextPathDir)
+
+        _ ->
+            Failed <| UnknownMessageForState "LoadingMetadata"
+
+
+resolvingModulePathsUpdate : Msg -> State -> List PackageInfo -> Model
+resolvingModulePathsUpdate msg state remainingPackages =
+    case msg of
+        ResolvedPackageModules packageName modules ->
+            let
+                rootPackage =
+                    state.rootPackage
+
+                moduleNameResults =
+                    List.map ModuleName.fromString modules
+                        |> Result.combine
+
+                updatedRemainingPackages =
+                    List.filter (\p -> PackageName.toString p.metadata.name /= packageName) remainingPackages
+
+                nextStep newState =
+                    case updatedRemainingPackages of
+                        nextPackage :: _ ->
+                            ResolvingModulePaths newState
+                                updatedRemainingPackages
+                                (ResolvePackageModules (PackageName.toString nextPackage.metadata.name) nextPackage.path)
+
+                        [] ->
+                            Done newState
+            in
+            case moduleNameResults of
+                Err _ ->
+                    Failed <| InternalError <| "Invalid module names for package " ++ packageName
+
+                Ok moduleNames ->
+                    if packageName == PackageName.toString state.rootPackage.metadata.name then
+                        nextStep { state | rootPackage = { rootPackage | modules = moduleNames } }
+
+                    else
+                        case Dict.get packageName state.dependentPackages of
+                            Nothing ->
+                                Failed <| InternalError <| "Package " ++ packageName ++ " doesn't exist"
+
+                            Just package ->
+                                nextStep
+                                    { state
+                                        | dependentPackages =
+                                            Dict.insert packageName { package | modules = moduleNames } state.dependentPackages
+                                    }
+
+        _ ->
+            Failed <| UnknownMessageForState "ResolvingModulePaths"

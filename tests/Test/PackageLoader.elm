@@ -22,6 +22,8 @@ suite =
                         [ PackageLoader.ReadFile "/project" "play.json"
                         , PackageLoader.ResolveDirectories "/project/lib"
                         , PackageLoader.ReadFile "/project/lib/template_strings" "play.json"
+                        , PackageLoader.ResolvePackageModules "robheghan/fnv" "/project"
+                        , PackageLoader.ResolvePackageModules "jarvis/template_strings" "/project/lib/template_strings"
                         ]
         ]
 
@@ -68,6 +70,27 @@ expectSideEffects fileSystem expectedSFs model =
                             model
                         )
 
+                PackageLoader.ResolvePackageModules packageName packagePath ->
+                    let
+                        srcPath =
+                            packagePath ++ "/src/"
+
+                        childPaths =
+                            Dict.keys fileSystem
+                                |> List.filter
+                                    (\path ->
+                                        String.startsWith srcPath path
+                                    )
+                                |> List.map (String.replace srcPath "")
+                    in
+                    expectSideEffects
+                        fileSystem
+                        (List.remove sideEffect expectedSFs)
+                        (PackageLoader.update
+                            (PackageLoader.ResolvedPackageModules packageName childPaths)
+                            model
+                        )
+
 
 getSideEffect : PackageLoader.Model -> Maybe PackageLoader.SideEffect
 getSideEffect model =
@@ -82,6 +105,9 @@ getSideEffect model =
             Just sf
 
         PackageLoader.LoadingMetadata _ _ sf ->
+            Just sf
+
+        PackageLoader.ResolvingModulePaths _ _ sf ->
             Just sf
 
 
