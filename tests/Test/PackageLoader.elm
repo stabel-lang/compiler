@@ -32,7 +32,12 @@ expectSideEffects : Dict String String -> List PackageLoader.SideEffect -> Packa
 expectSideEffects fileSystem expectedSFs model =
     case getSideEffect model of
         Nothing ->
-            Expect.equalLists [] expectedSFs
+            case model of
+                PackageLoader.Done _ ->
+                    Expect.equalLists [] expectedSFs
+
+                _ ->
+                    Expect.fail <| "Expected model be Done, was: " ++ Debug.toString model
 
         Just sideEffect ->
             case sideEffect of
@@ -132,6 +137,12 @@ testFiles =
             }
             """
           )
+        , ( "/project/src/mod1.play"
+          , """
+            def: inc
+            : 1 +
+            """
+          )
         , ( "/project/lib/template_strings/play.json"
           , """
             {
@@ -147,5 +158,11 @@ testFiles =
                 ]
             }
           """
+          )
+        , ( "/project/lib/template_strings/src/template_strings/mod.play"
+          , """
+            def: dec
+            : 1 =
+            """
           )
         ]

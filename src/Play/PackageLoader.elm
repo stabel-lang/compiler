@@ -197,7 +197,8 @@ resolvingModulePathsUpdate msg state remainingPackages =
                     state.rootPackage
 
                 moduleNameResults =
-                    List.map ModuleName.fromString modules
+                    List.map (String.replace ".play" "") modules
+                        |> List.map ModuleName.fromString
                         |> Result.combine
 
                 updatedRemainingPackages =
