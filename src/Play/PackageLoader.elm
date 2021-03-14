@@ -14,6 +14,7 @@ import Play.Data.ModuleName as ModuleName exposing (ModuleName)
 import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Play.Data.PackageName as PackageName
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
+import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
 import Result.Extra as Result
 
 
@@ -33,6 +34,7 @@ type Model
 
 type alias State =
     { rootPackage : PackageInfo
+    , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
     }
 
@@ -47,6 +49,7 @@ type alias PackageInfo =
 emptyState : PackageInfo -> State
 emptyState rootPackage =
     { rootPackage = rootPackage
+    , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
     }
 
@@ -90,7 +93,8 @@ update msg model =
                             in
                             case pathsToLoad of
                                 [] ->
-                                    ResolvingModulePaths state [] (ResolvePackageModules (PackageName.toString metadata.name) path)
+                                    ResolvingModulePaths state [] <|
+                                        ResolvePackageModules (PackageName.toString metadata.name) path
 
                                 (PackagePath.Directory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
@@ -121,44 +125,64 @@ update msg model =
 
 loadingMetadataUpdate : Msg -> State -> List PackagePath -> Model
 loadingMetadataUpdate msg state remainingPaths =
+    let
+        nextStep pathsToLoad nextState pathPrefix =
+            case pathsToLoad of
+                [] ->
+                    ResolvingModulePaths nextState
+                        (Dict.values nextState.dependentPackages)
+                        (ResolvePackageModules
+                            (PackageName.toString nextState.rootPackage.metadata.name)
+                            nextState.rootPackage.path
+                        )
+
+                (PackagePath.Directory nextPathDir) :: _ ->
+                    LoadingMetadata nextState pathsToLoad <|
+                        ReadFile nextPathDir "play.json"
+
+                (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
+                    LoadingMetadata nextState pathsToLoad <|
+                        ResolveDirectories (pathPrefix ++ nextPathDir)
+    in
     case msg of
         FileContents path _ content ->
             case Json.decodeString PackageMetadata.decoder content of
                 Ok metadata ->
-                    let
-                        updatedState =
-                            { state
-                                | dependentPackages =
-                                    Dict.insert
-                                        (PackageName.toString metadata.name)
-                                        { path = path
-                                        , metadata = metadata
-                                        , modules = []
-                                        }
-                                        state.dependentPackages
-                            }
+                    case Dict.get (PackageName.toString metadata.name) state.dependencies of
+                        Nothing ->
+                            -- This package is not required, so ignore it
+                            let
+                                pathsToLoad =
+                                    List.remove (PackagePath.Directory path) remainingPaths
+                            in
+                            nextStep pathsToLoad state ""
 
-                        absolutePackagePaths =
-                            List.map (PackagePath.prefix path) metadata.packagePaths
+                        Just _ ->
+                            let
+                                updatedState =
+                                    -- TODO: Register dependencies of sub-packages
+                                    { state
+                                        | dependentPackages =
+                                            Dict.update
+                                                (PackageName.toString metadata.name)
+                                                (insertHighestPackage
+                                                    { path = path
+                                                    , metadata = metadata
+                                                    , modules = []
+                                                    }
+                                                )
+                                                state.dependentPackages
+                                    }
 
-                        pathsToLoad =
-                            remainingPaths
-                                |> List.remove (PackagePath.Directory path)
-                                |> (++) absolutePackagePaths
-                    in
-                    case pathsToLoad of
-                        [] ->
-                            ResolvingModulePaths updatedState
-                                (Dict.values updatedState.dependentPackages)
-                                (ResolvePackageModules (PackageName.toString state.rootPackage.metadata.name) state.rootPackage.path)
+                                absolutePackagePaths =
+                                    List.map (PackagePath.prefix path) metadata.packagePaths
 
-                        (PackagePath.Directory nextPathDir) :: _ ->
-                            LoadingMetadata updatedState pathsToLoad <|
-                                ReadFile nextPathDir "play.json"
-
-                        (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
-                            LoadingMetadata updatedState pathsToLoad <|
-                                ResolveDirectories nextPathDir
+                                pathsToLoad =
+                                    remainingPaths
+                                        |> List.remove (PackagePath.Directory path)
+                                        |> (++) absolutePackagePaths
+                            in
+                            nextStep pathsToLoad updatedState ""
 
                 Err err ->
                     Debug.todo (Json.errorToString err)
@@ -170,22 +194,29 @@ loadingMetadataUpdate msg state remainingPaths =
                         |> List.remove (PackagePath.AllDirectoriesInDirectory parentDir)
                         |> (++) paths
             in
-            case pathsToLoad of
-                [] ->
-                    ResolvingModulePaths state
-                        (Dict.values state.dependentPackages)
-                        (ResolvePackageModules (PackageName.toString state.rootPackage.metadata.name) state.rootPackage.path)
-
-                (PackagePath.Directory nextPathDir) :: _ ->
-                    LoadingMetadata state pathsToLoad <|
-                        ReadFile nextPathDir "play.json"
-
-                (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
-                    LoadingMetadata state pathsToLoad <|
-                        ResolveDirectories (parentDir ++ "/" ++ nextPathDir)
+            nextStep pathsToLoad state (parentDir ++ "/")
 
         _ ->
             Failed <| UnknownMessageForState "LoadingMetadata"
+
+
+insertHighestPackage : PackageInfo -> Maybe PackageInfo -> Maybe PackageInfo
+insertHighestPackage packageInfo maybeExistingPackage =
+    case maybeExistingPackage of
+        Nothing ->
+            Just packageInfo
+
+        Just existingPackage ->
+            if
+                SemanticVersion.compatible
+                    existingPackage.metadata.version
+                    packageInfo.metadata.version
+                    == SemanticVersion.GreaterThanOrEqual
+            then
+                Just packageInfo
+
+            else
+                Just existingPackage
 
 
 resolvingModulePathsUpdate : Msg -> State -> List PackageInfo -> Model
