@@ -21,6 +21,12 @@ type alias AST =
     }
 
 
+type alias ExposedAST =
+    { types : Dict String TypeDefinition
+    , words : Dict String WordDefinition
+    }
+
+
 type TypeDefinition
     = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
     | UnionTypeDef String SourceLocationRange (List String) (List Type)

@@ -15,6 +15,7 @@ import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Play.Data.PackageName as PackageName
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
 import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
+import Play.Qualifier as Qualifier
 import Result.Extra as Result
 
 
@@ -28,7 +29,8 @@ type Model
     = Initializing SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
-    | Done State
+    | Compiling State (List ModuleName) SideEffect
+    | Done Qualifier.ExposedAST
     | Failed Problem
 
 
@@ -115,6 +117,9 @@ update msg model =
 
         ResolvingModulePaths state remainingPackages _ ->
             resolvingModulePathsUpdate msg state remainingPackages
+
+        Compiling state remainingModules _ ->
+            compilingUpdate msg state remainingModules
 
         Done _ ->
             model
@@ -243,7 +248,7 @@ resolvingModulePathsUpdate msg state remainingPackages =
                                 (ResolvePackageModules (PackageName.toString nextPackage.metadata.name) nextPackage.path)
 
                         [] ->
-                            Done newState
+                            initCompileStep newState
             in
             case moduleNameResults of
                 Err _ ->
@@ -267,3 +272,13 @@ resolvingModulePathsUpdate msg state remainingPackages =
 
         _ ->
             Failed <| UnknownMessageForState "ResolvingModulePaths"
+
+
+initCompileStep : State -> Model
+initCompileStep state =
+    Failed (InternalError "F")
+
+
+compilingUpdate : Msg -> State -> List ModuleName -> Model
+compilingUpdate msg state remainingModules =
+    Failed (InternalError "U")

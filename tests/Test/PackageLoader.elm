@@ -1,10 +1,15 @@
 module Test.PackageLoader exposing (suite)
 
 import Dict exposing (Dict)
+import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import List.Extra as List
+import Play.Data.Builtin as Builtin
+import Play.Data.Metadata as Metadata
 import Play.Data.PackagePath as PackagePath
+import Play.Data.SourceLocation exposing (emptyRange)
 import Play.PackageLoader as PackageLoader
+import Play.Qualifier as Qualifier
 import Test exposing (Test, describe, test)
 
 
@@ -28,77 +33,131 @@ suite =
                         , PackageLoader.ResolvePackageModules "robheghan/fnv" "/project"
                         , PackageLoader.ResolvePackageModules "jarvis/template_strings" "/project/lib/template_strings"
                         , PackageLoader.ResolvePackageModules "play/version" "/project/lib/template_strings/lib/version"
+                        , PackageLoader.ReadFile "/project/src" "mod1.play"
+                        , PackageLoader.ReadFile "/project/lib/template_strings/lib/version/src/version" "data.play"
                         ]
+        , test "Compiles to qualified AST" <|
+            \_ ->
+                let
+                    loaderResult =
+                        PackageLoader.init "/project"
+                            |> resolveSideEffects testFiles []
+                            |> Result.map Tuple.second
+                in
+                case loaderResult of
+                    Err msg ->
+                        Expect.fail msg
+
+                    Ok ast ->
+                        Expect.equal
+                            { types =
+                                Dict.fromListBy Qualifier.typeDefinitionName
+                                    []
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/robheghan/fnv/mod1/inc"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Word emptyRange "/play/version/version/data/version"
+                                                , Qualifier.Integer emptyRange 1
+                                                , Qualifier.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "/play/version/version/data/number"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Integer emptyRange 2
+                                                ]
+                                      }
+                                    ]
+                            }
+                            ast
         ]
 
 
 expectSideEffects : Dict String String -> List PackageLoader.SideEffect -> PackageLoader.Model -> Expectation
 expectSideEffects fileSystem expectedSFs model =
+    case resolveSideEffects fileSystem [] model of
+        Err msg ->
+            Expect.fail msg
+
+        Ok ( seenSfs, _ ) ->
+            let
+                sfDiff =
+                    List.filter (\sf -> not <| List.member sf expectedSFs) seenSfs
+            in
+            Expect.equalLists [] sfDiff
+
+
+resolveSideEffects :
+    Dict String String
+    -> List PackageLoader.SideEffect
+    -> PackageLoader.Model
+    -> Result String ( List PackageLoader.SideEffect, Qualifier.ExposedAST )
+resolveSideEffects fileSystem seenSfs model =
     case getSideEffect model of
         Nothing ->
             case model of
-                PackageLoader.Done _ ->
-                    Expect.equalLists [] expectedSFs
+                PackageLoader.Done ast ->
+                    Ok ( seenSfs, ast )
 
                 _ ->
-                    Expect.fail <| "Expected model be Done, was: " ++ Debug.toString model
+                    Err <| "Expected model be Done, was: " ++ Debug.toString model
 
         Just sideEffect ->
-            if not <| List.member sideEffect expectedSFs then
-                Expect.fail <| "Unexpected side effect: " ++ Debug.toString sideEffect
+            case sideEffect of
+                PackageLoader.ReadFile path filename ->
+                    case Dict.get (path ++ "/" ++ filename) fileSystem of
+                        Just fileContent ->
+                            resolveSideEffects
+                                fileSystem
+                                (sideEffect :: seenSfs)
+                                (PackageLoader.update
+                                    (PackageLoader.FileContents path filename fileContent)
+                                    model
+                                )
 
-            else
-                case sideEffect of
-                    PackageLoader.ReadFile path filename ->
-                        case Dict.get (path ++ "/" ++ filename) fileSystem of
-                            Just fileContent ->
-                                expectSideEffects
-                                    fileSystem
-                                    (List.remove sideEffect expectedSFs)
-                                    (PackageLoader.update
-                                        (PackageLoader.FileContents path filename fileContent)
-                                        model
+                        Nothing ->
+                            Err <| "No such file: " ++ path
+
+                PackageLoader.ResolveDirectories dir ->
+                    let
+                        childPaths =
+                            Dict.keys fileSystem
+                                |> List.filter (childPackage dir)
+                                |> List.map (String.replace "/play.json" "")
+                                |> List.map PackagePath.Directory
+                    in
+                    resolveSideEffects
+                        fileSystem
+                        (sideEffect :: seenSfs)
+                        (PackageLoader.update
+                            (PackageLoader.ResolvedDirectories dir childPaths)
+                            model
+                        )
+
+                PackageLoader.ResolvePackageModules packageName packagePath ->
+                    let
+                        srcPath =
+                            packagePath ++ "/src/"
+
+                        childPaths =
+                            Dict.keys fileSystem
+                                |> List.filter
+                                    (\path ->
+                                        String.startsWith srcPath path
                                     )
-
-                            Nothing ->
-                                Expect.fail <| "No such file: " ++ path
-
-                    PackageLoader.ResolveDirectories dir ->
-                        let
-                            childPaths =
-                                Dict.keys fileSystem
-                                    |> List.filter (childPackage dir)
-                                    |> List.map (String.replace "/play.json" "")
-                                    |> List.map PackagePath.Directory
-                        in
-                        expectSideEffects
-                            fileSystem
-                            (List.remove sideEffect expectedSFs)
-                            (PackageLoader.update
-                                (PackageLoader.ResolvedDirectories dir childPaths)
-                                model
-                            )
-
-                    PackageLoader.ResolvePackageModules packageName packagePath ->
-                        let
-                            srcPath =
-                                packagePath ++ "/src/"
-
-                            childPaths =
-                                Dict.keys fileSystem
-                                    |> List.filter
-                                        (\path ->
-                                            String.startsWith srcPath path
-                                        )
-                                    |> List.map (String.replace srcPath "")
-                        in
-                        expectSideEffects
-                            fileSystem
-                            (List.remove sideEffect expectedSFs)
-                            (PackageLoader.update
-                                (PackageLoader.ResolvedPackageModules packageName childPaths)
-                                model
-                            )
+                                |> List.map (String.replace srcPath "")
+                    in
+                    resolveSideEffects
+                        fileSystem
+                        (sideEffect :: seenSfs)
+                        (PackageLoader.update
+                            (PackageLoader.ResolvedPackageModules packageName childPaths)
+                            model
+                        )
 
 
 childPackage : String -> String -> Bool
@@ -139,6 +198,9 @@ getSideEffect model =
         PackageLoader.ResolvingModulePaths _ _ sf ->
             Just sf
 
+        PackageLoader.Compiling _ _ sf ->
+            Just sf
+
 
 testFiles : Dict String String
 testFiles =
@@ -164,8 +226,8 @@ testFiles =
           )
         , ( "/project/src/mod1.play"
           , """
-            def: inc
-            : 1 +
+            def: next-version
+            : version/number 1 +
             """
           )
         , ( "/project/lib/template_strings/play.json"
@@ -232,7 +294,7 @@ testFiles =
           )
         , ( "/project/lib/version/src/version/data.play"
           , """
-            def: version
+            def: number
             : 1
             """
           )
@@ -254,7 +316,7 @@ testFiles =
           )
         , ( "/project/lib/template_strings/lib/version/src/version/data.play"
           , """
-            def: version
+            def: number
             : 2
             """
           )
