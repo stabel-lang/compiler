@@ -22,6 +22,8 @@ import Result.Extra as Result
 type Problem
     = InvalidPackageMetadata String String
     | UnknownMessageForState String
+    | NoExposedModulesInRootProject
+    | ModuleNotFound String
     | InternalError String
 
 
@@ -276,7 +278,40 @@ resolvingModulePathsUpdate msg state remainingPackages =
 
 initCompileStep : State -> Model
 initCompileStep state =
-    Failed (InternalError "F")
+    case state.rootPackage.metadata.exposedModules of
+        [] ->
+            Failed NoExposedModulesInRootProject
+
+        firstExposedModule :: remModules ->
+            if List.member firstExposedModule state.rootPackage.modules then
+                let
+                    ( path, fileName ) =
+                        readModuleFromDisk state.rootPackage.path firstExposedModule
+                in
+                Compiling state remModules (ReadFile path fileName)
+
+            else
+                Failed (ModuleNotFound (ModuleName.toString firstExposedModule))
+
+
+readModuleFromDisk : String -> ModuleName -> ( String, String )
+readModuleFromDisk packagePath moduleName =
+    let
+        ( path, fileName ) =
+            case List.reverse (ModuleName.toPartStrings moduleName) of
+                name :: reversePath ->
+                    ( reversePath
+                        |> List.reverse
+                        |> String.join "/"
+                    , name ++ ".play"
+                    )
+
+                _ ->
+                    ( "", "" )
+    in
+    ( packagePath ++ "/src" ++ path
+    , fileName
+    )
 
 
 compilingUpdate : Msg -> State -> List ModuleName -> Model

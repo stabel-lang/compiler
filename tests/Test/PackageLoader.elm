@@ -212,7 +212,7 @@ testFiles =
                 "version": "1.0.0",
                 "language-version": "0.2.0",
                 "exposed-modules": [
-                    "fnv"
+                    "mod1"
                 ],
                 "dependencies": {
                     "jarvis/template_strings": "1.2.0",

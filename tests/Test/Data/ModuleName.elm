@@ -5,7 +5,6 @@ import Fuzz
 import Play.Data.ModuleName as ModuleName
 import Play.Data.PackageName as PackageName
 import Test exposing (Test, describe, fuzz, test)
-import Test.PlayExpect as PlayExpect
 
 
 suite : Test
@@ -35,6 +34,20 @@ suite =
         , test "Module names cannot end with a slash" <|
             \_ ->
                 Expect.err <| ModuleName.fromString "dict/"
+        , test "toString returns input of properly formated module name" <|
+            \_ ->
+                "some/module"
+                    |> ModuleName.fromString
+                    |> Result.map ModuleName.toString
+                    |> Result.withDefault ""
+                    |> Expect.equal "some/module"
+        , test "toPartStrings return each part of a module name in a list" <|
+            \_ ->
+                "some/kind/of/module"
+                    |> ModuleName.fromString
+                    |> Result.map ModuleName.toPartStrings
+                    |> Result.withDefault []
+                    |> Expect.equalLists [ "some", "kind", "of", "module" ]
         ]
 
 
