@@ -12,9 +12,10 @@ import Json.Decode as Json
 import List.Extra as List
 import Play.Data.ModuleName as ModuleName exposing (ModuleName)
 import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
-import Play.Data.PackageName as PackageName
+import Play.Data.PackageName as PackageName exposing (PackageName)
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
 import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
+import Play.Parser as Parser
 import Play.Qualifier as Qualifier
 import Result.Extra as Result
 
@@ -40,6 +41,7 @@ type alias State =
     { rootPackage : PackageInfo
     , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
+    , filePathToModule : Dict String ( PackageName, ModuleName )
     }
 
 
@@ -55,6 +57,7 @@ emptyState rootPackage =
     { rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
+    , filePathToModule = Dict.empty
     }
 
 
@@ -287,8 +290,14 @@ initCompileStep state =
                 let
                     ( path, fileName ) =
                         readModuleFromDisk state.rootPackage.path firstExposedModule
+
+                    pathsToModuleNames =
+                        List.foldl pathsOfModules Dict.empty (state.rootPackage :: Dict.values state.dependentPackages)
                 in
-                Compiling state remModules (ReadFile path fileName)
+                Compiling
+                    { state | filePathToModule = pathsToModuleNames }
+                    remModules
+                    (ReadFile path fileName)
 
             else
                 Failed (ModuleNotFound (ModuleName.toString firstExposedModule))
@@ -309,11 +318,59 @@ readModuleFromDisk packagePath moduleName =
                 _ ->
                     ( "", "" )
     in
-    ( packagePath ++ "/src" ++ path
+    ( [ packagePath, "src", path ]
+        |> List.filter (not << String.isEmpty)
+        |> String.join "/"
     , fileName
     )
 
 
+pathsOfModules : PackageInfo -> Dict String ( PackageName, ModuleName ) -> Dict String ( PackageName, ModuleName )
+pathsOfModules package acc =
+    let
+        modulePaths =
+            List.map (\moduleName -> ( pathToModule moduleName, ( package.metadata.name, moduleName ) )) package.modules
+                |> Dict.fromList
+
+        pathToModule moduleName =
+            let
+                ( path, fileName ) =
+                    readModuleFromDisk package.path moduleName
+            in
+            path ++ "/" ++ fileName
+    in
+    Dict.union acc modulePaths
+
+
 compilingUpdate : Msg -> State -> List ModuleName -> Model
 compilingUpdate msg state remainingModules =
-    Failed (InternalError "U")
+    case Debug.log "msg" msg of
+        FileContents path fileName content ->
+            let
+                fullPath =
+                    path ++ "/" ++ fileName
+
+                possibleModuleInfo =
+                    Debug.log fullPath (Dict.get fullPath state.filePathToModule)
+            in
+            case ( possibleModuleInfo, Parser.run content ) of
+                ( _, Err parserError ) ->
+                    Failed <| InternalError <| "Parser error: " ++ Debug.toString parserError
+
+                ( Just ( packageName, moduleName ), Ok parserAst ) ->
+                    let
+                        qualifierResult =
+                            Qualifier.run
+                                { packageName = PackageName.toString packageName
+                                , modulePath = ModuleName.toString moduleName
+                                , ast = parserAst
+                                , externalModules = Dict.empty
+                                }
+                    in
+                    Failed <| InternalError <| "U" ++ Debug.toString qualifierResult
+
+                ( Nothing, _ ) ->
+                    Failed <| InternalError <| "Don't know why we read file: " ++ fullPath
+
+        _ ->
+            Failed <| InternalError <| "Unknown message for compile stage: " ++ Debug.toString msg

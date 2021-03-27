@@ -227,7 +227,7 @@ testFiles =
         , ( "/project/src/mod1.play"
           , """
             def: next-version
-            : version/number 1 +
+            : /version/data/number 1 +
             """
           )
         , ( "/project/lib/template_strings/play.json"
