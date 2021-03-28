@@ -42,6 +42,7 @@ type alias State =
     , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
     , filePathToModule : Dict String ( PackageName, ModuleName )
+    , moduleNameToPackageName : Dict String String
     }
 
 
@@ -58,6 +59,7 @@ emptyState rootPackage =
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
     , filePathToModule = Dict.empty
+    , moduleNameToPackageName = Dict.empty
     }
 
 
@@ -291,11 +293,20 @@ initCompileStep state =
                     ( path, fileName ) =
                         readModuleFromDisk state.rootPackage.path firstExposedModule
 
+                    allPackages =
+                        state.rootPackage :: Dict.values state.dependentPackages
+
                     pathsToModuleNames =
-                        List.foldl pathsOfModules Dict.empty (state.rootPackage :: Dict.values state.dependentPackages)
+                        List.foldl pathsOfModules Dict.empty allPackages
+
+                    moduleNameToPackageName =
+                        List.foldl absolutePathsOfModules Dict.empty allPackages
                 in
                 Compiling
-                    { state | filePathToModule = pathsToModuleNames }
+                    { state
+                        | filePathToModule = pathsToModuleNames
+                        , moduleNameToPackageName = moduleNameToPackageName
+                    }
                     remModules
                     (ReadFile path fileName)
 
@@ -342,6 +353,22 @@ pathsOfModules package acc =
     Dict.union acc modulePaths
 
 
+absolutePathsOfModules : PackageInfo -> Dict String String -> Dict String String
+absolutePathsOfModules package acc =
+    let
+        absolutePathsForModule =
+            List.map
+                (\moduleName ->
+                    ( "/" ++ ModuleName.toString moduleName
+                    , PackageName.toString package.metadata.name
+                    )
+                )
+                package.modules
+                |> Dict.fromList
+    in
+    Dict.union acc absolutePathsForModule
+
+
 compilingUpdate : Msg -> State -> List ModuleName -> Model
 compilingUpdate msg state remainingModules =
     case Debug.log "msg" msg of
@@ -364,7 +391,7 @@ compilingUpdate msg state remainingModules =
                                 { packageName = PackageName.toString packageName
                                 , modulePath = ModuleName.toString moduleName
                                 , ast = parserAst
-                                , externalModules = Dict.empty
+                                , externalModules = state.moduleNameToPackageName
                                 }
                     in
                     Failed <| InternalError <| "U" ++ Debug.toString qualifierResult
