@@ -11,6 +11,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.PackageLoader as PackageLoader
 import Play.Qualifier as Qualifier
 import Test exposing (Test, describe, test)
+import Test.Qualifier.Util as Util
 
 
 suite : Test
@@ -51,15 +52,14 @@ suite =
                     Ok ast ->
                         Expect.equal
                             { types =
-                                Dict.fromListBy Qualifier.typeDefinitionName
-                                    []
+                                Dict.fromListBy Qualifier.typeDefinitionName []
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "/robheghan/fnv/mod1/inc"
+                                    [ { name = "/robheghan/fnv/mod1/next-version"
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/play/version/version/data/version"
+                                                [ Qualifier.Word emptyRange "/play/version/version/data/number"
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]
@@ -73,7 +73,7 @@ suite =
                                       }
                                     ]
                             }
-                            ast
+                            (Util.stripLocations ast)
         ]
 
 

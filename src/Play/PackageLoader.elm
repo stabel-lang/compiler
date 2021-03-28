@@ -18,6 +18,7 @@ import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
 import Play.Parser as Parser
 import Play.Qualifier as Qualifier
 import Result.Extra as Result
+import Set exposing (Set)
 
 
 type Problem
@@ -32,7 +33,7 @@ type Model
     = Initializing SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
-    | Compiling State (List ModuleName) SideEffect
+    | Compiling State (List ( PackageInfo, ModuleName )) SideEffect
     | Done Qualifier.ExposedAST
     | Failed Problem
 
@@ -43,6 +44,9 @@ type alias State =
     , dependentPackages : Dict String PackageInfo
     , filePathToModule : Dict String ( PackageName, ModuleName )
     , moduleNameToPackageName : Dict String String
+    , absoluteModuleNameToDetails : Dict String ( PackageInfo, ModuleName )
+    , inProgressAst : Maybe Qualifier.AST
+    , parsedModules : Set String
     }
 
 
@@ -60,6 +64,9 @@ emptyState rootPackage =
     , dependentPackages = Dict.empty
     , filePathToModule = Dict.empty
     , moduleNameToPackageName = Dict.empty
+    , absoluteModuleNameToDetails = Dict.empty
+    , inProgressAst = Nothing
+    , parsedModules = Set.empty
     }
 
 
@@ -301,13 +308,20 @@ initCompileStep state =
 
                     moduleNameToPackageName =
                         List.foldl absolutePathsOfModules Dict.empty allPackages
+
+                    absoluteNameToDetails =
+                        allPackages
+                            |> List.concatMap (\pInfo -> List.map (\m -> ( pInfo, m )) pInfo.modules)
+                            |> List.map (\( pInfo, mName ) -> ( absoluteModuleName pInfo.metadata.name mName, ( pInfo, mName ) ))
+                            |> Dict.fromList
                 in
                 Compiling
                     { state
                         | filePathToModule = pathsToModuleNames
                         , moduleNameToPackageName = moduleNameToPackageName
+                        , absoluteModuleNameToDetails = absoluteNameToDetails
                     }
-                    remModules
+                    (List.map (\m -> ( state.rootPackage, m )) remModules)
                     (ReadFile path fileName)
 
             else
@@ -369,16 +383,16 @@ absolutePathsOfModules package acc =
     Dict.union acc absolutePathsForModule
 
 
-compilingUpdate : Msg -> State -> List ModuleName -> Model
+compilingUpdate : Msg -> State -> List ( PackageInfo, ModuleName ) -> Model
 compilingUpdate msg state remainingModules =
-    case Debug.log "msg" msg of
+    case msg of
         FileContents path fileName content ->
             let
                 fullPath =
                     path ++ "/" ++ fileName
 
                 possibleModuleInfo =
-                    Debug.log fullPath (Dict.get fullPath state.filePathToModule)
+                    Dict.get fullPath state.filePathToModule
             in
             case ( possibleModuleInfo, Parser.run content ) of
                 ( _, Err parserError ) ->
@@ -394,10 +408,86 @@ compilingUpdate msg state remainingModules =
                                 , externalModules = state.moduleNameToPackageName
                                 }
                     in
-                    Failed <| InternalError <| "U" ++ Debug.toString qualifierResult
+                    case qualifierResult of
+                        Err qualifierError ->
+                            Failed <| InternalError <| "Qualifier error: " ++ Debug.toString qualifierError
+
+                        Ok qualifiedAST ->
+                            let
+                                fullModuleName =
+                                    absoluteModuleName packageName moduleName
+
+                                mergedQualifiedAst =
+                                    state.inProgressAst
+                                        |> Maybe.map
+                                            (\ipa ->
+                                                { additionalModulesRequired =
+                                                    Set.union
+                                                        ipa.additionalModulesRequired
+                                                        qualifiedAST.additionalModulesRequired
+                                                , checkForExistingTypes =
+                                                    Set.union
+                                                        ipa.checkForExistingTypes
+                                                        qualifiedAST.checkForExistingTypes
+                                                , checkForExistingWords =
+                                                    Set.union
+                                                        ipa.checkForExistingWords
+                                                        qualifiedAST.checkForExistingWords
+                                                , types = Dict.union ipa.types qualifiedAST.types
+                                                , words = Dict.union ipa.words qualifiedAST.words
+                                                }
+                                            )
+                                        |> Maybe.withDefault qualifiedAST
+
+                                updatedParsedModules =
+                                    Set.insert fullModuleName state.parsedModules
+
+                                modulesQueuedForOrAlreadyParsed =
+                                    remainingModules
+                                        |> List.map (\( pInfo, mName ) -> absoluteModuleName pInfo.metadata.name mName)
+                                        |> Set.fromList
+                                        |> Set.union updatedParsedModules
+
+                                missingModulesInParseQueue =
+                                    Set.diff mergedQualifiedAst.additionalModulesRequired modulesQueuedForOrAlreadyParsed
+                                        |> Set.toList
+                                        |> List.filterMap (\absName -> Dict.get absName state.absoluteModuleNameToDetails)
+
+                                updatedRemainingModules =
+                                    missingModulesInParseQueue ++ remainingModules
+                            in
+                            nextCompileStep updatedParsedModules mergedQualifiedAst updatedRemainingModules state
 
                 ( Nothing, _ ) ->
                     Failed <| InternalError <| "Don't know why we read file: " ++ fullPath
 
         _ ->
             Failed <| InternalError <| "Unknown message for compile stage: " ++ Debug.toString msg
+
+
+absoluteModuleName : PackageName -> ModuleName -> String
+absoluteModuleName packageName moduleName =
+    "/" ++ PackageName.toString packageName ++ "/" ++ ModuleName.toString moduleName
+
+
+nextCompileStep : Set String -> Qualifier.AST -> List ( PackageInfo, ModuleName ) -> State -> Model
+nextCompileStep parsedModules inProgressAst remainingModules state =
+    case remainingModules of
+        [] ->
+            Done
+                { types = inProgressAst.types
+                , words = inProgressAst.words
+                }
+
+        ( packageInfo, moduleName ) :: otherModules ->
+            let
+                ( path, fileName ) =
+                    readModuleFromDisk packageInfo.path moduleName
+            in
+            Compiling
+                { state
+                    | parsedModules = parsedModules
+                    , inProgressAst = Just inProgressAst
+                }
+                otherModules
+                (ReadFile path fileName)
