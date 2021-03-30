@@ -74,7 +74,14 @@ type StackEffect
     | Pop Type
 
 
-initContext : Qualifier.AST -> Context
+type alias LoadedQualifierAST a =
+    { a
+        | types : Dict String Qualifier.TypeDefinition
+        , words : Dict String Qualifier.WordDefinition
+    }
+
+
+initContext : LoadedQualifierAST a -> Context
 initContext ast =
     let
         concreteTypes =
@@ -132,12 +139,12 @@ initContext ast =
     }
 
 
-run : Qualifier.AST -> Result (List Problem) AST
+run : LoadedQualifierAST a -> Result (List Problem) AST
 run ast =
     typeCheckHelper (initContext ast) ast
 
 
-typeCheckHelper : Context -> Qualifier.AST -> Result (List Problem) AST
+typeCheckHelper : Context -> LoadedQualifierAST a -> Result (List Problem) AST
 typeCheckHelper context ast =
     let
         updatedContext =

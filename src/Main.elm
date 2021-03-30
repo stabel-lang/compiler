@@ -58,7 +58,15 @@ compile sourceCode =
             formatErrors (ParserProblem.toString sourceCode) parserErrors
 
         Ok ast ->
-            case Qualifier.run ast of
+            let
+                qualifierResult =
+                    Qualifier.run
+                        { packageName = ""
+                        , modulePath = ""
+                        , ast = ast
+                        }
+            in
+            case qualifierResult of
                 Err qualifierErrors ->
                     formatErrors (QualifierProblem.toString sourceCode) qualifierErrors
 

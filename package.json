@@ -5,7 +5,7 @@
   "dependencies": {},
   "devDependencies": {
     "elm": "^0.19.1-5",
-    "elm-format": "^0.8.4",
+    "elm-format": "^0.8.5",
     "elm-test": "^0.19.1-revision6",
     "jest": "^26.6.3",
     "strip-indent": "^3.0.0",

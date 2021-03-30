@@ -718,6 +718,64 @@ suite =
                         Ok ast ->
                             Expect.equal expectedAst ast
             ]
+        , describe "modules" <|
+            [ test "internal reference" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: test
+                            : some/module/sample
+                            """
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.PackageWord emptyRange [ "some", "module" ] "sample" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err _ ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "external reference" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: test
+                            : /some/module/sample
+                            """
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.ExternalWord emptyRange [ "some", "module" ] "sample" ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err _ ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            ]
         , test "Support code comments" <|
             \_ ->
                 expectCompiles

@@ -117,6 +117,52 @@ suite =
                     def: Person
                     : 1
                     """
+        , describe "Module path elements" <|
+            let
+                invalidModulePathError err =
+                    case err of
+                        InvalidModulePath _ ->
+                            True
+
+                        _ ->
+                            False
+            in
+            [ test "Starting with upper case" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : some/Other/module
+                        """
+            , test "Contains upper case" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : some/otHer/module
+                        """
+            , test "Starting with upper case (external)" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : /some/Other/module
+                        """
+            , test "Contains upper case (external)" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : /some/otHer/module
+                        """
+            , test "External reference must contain two parts" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : /some
+                        """
+            ]
         ]
 
 

@@ -47,16 +47,29 @@ suite =
                                       }
                                     ]
                             }
-
-                        noSuchReferenceError name problem =
-                            case problem of
-                                UnknownWordRef _ problemName ->
-                                    name == problemName
-
-                                _ ->
-                                    False
                     in
-                    checkForError (noSuchReferenceError "dec") ast
+                    checkForError (noSuchWordReferenceError "dec") ast
+            , test "External" <|
+                \_ ->
+                    let
+                        ast =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "/external/module/inc"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    checkForError (noSuchWordReferenceError "/external/module/inc") ast
             , test "Type" <|
                 \_ ->
                     let
@@ -88,23 +101,83 @@ suite =
                                       }
                                     ]
                             }
-
-                        noSuchReferenceError name problem =
-                            case problem of
-                                UnknownTypeRef _ problemName ->
-                                    name == problemName
-
-                                _ ->
-                                    False
                     in
-                    checkForError (noSuchReferenceError "Ints") ast
+                    checkForError (noSuchTypeReferenceError "Ints") ast
+            , test "Wrong reference within union definition" <|
+                \_ ->
+                    let
+                        ast =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ AST.UnionTypeDef
+                                        emptyRange
+                                        "USMoney"
+                                        []
+                                        [ Type.Custom "Dollar"
+                                        , Type.Custom "Cent"
+                                        ]
+                                    , AST.CustomTypeDef
+                                        emptyRange
+                                        "Dollar"
+                                        []
+                                        [ ( "dollar-value", Type.Int ) ]
+                                    ]
+                            , words = Dict.empty
+                            }
+                    in
+                    checkForError (noSuchTypeReferenceError "Cent") ast
+            , test "Wrong reference within custom type definition" <|
+                \_ ->
+                    let
+                        ast =
+                            { types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ AST.CustomTypeDef
+                                        emptyRange
+                                        "BoxWrapper"
+                                        []
+                                        [ ( "box", Type.Custom "Box" ) ]
+                                    ]
+                            , words = Dict.empty
+                            }
+                    in
+                    checkForError (noSuchTypeReferenceError "Box") ast
             ]
         ]
 
 
+noSuchWordReferenceError : String -> Problem -> Bool
+noSuchWordReferenceError name problem =
+    case problem of
+        UnknownWordRef _ problemName ->
+            name == problemName
+
+        _ ->
+            False
+
+
+noSuchTypeReferenceError : String -> Problem -> Bool
+noSuchTypeReferenceError name problem =
+    case problem of
+        UnknownTypeRef _ problemName ->
+            name == problemName
+
+        _ ->
+            False
+
+
 checkForError : (Problem -> Bool) -> AST.AST -> Expectation
 checkForError fn source =
-    case run source of
+    let
+        result =
+            run
+                { packageName = ""
+                , modulePath = ""
+                , ast = source
+                , externalModules = Dict.empty
+                }
+    in
+    case result of
         Err errors ->
             if List.any fn errors then
                 Expect.pass

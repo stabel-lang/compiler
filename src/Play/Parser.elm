@@ -61,6 +61,8 @@ type TypeMatchValue
 type AstNode
     = Integer SourceLocationRange Int
     | Word SourceLocationRange String
+    | PackageWord SourceLocationRange (List String) String
+    | ExternalWord SourceLocationRange (List String) String
     | Quotation SourceLocationRange (List AstNode)
     | ConstructType String
     | GetMember String String
@@ -98,7 +100,9 @@ specialChars =
         , '('
         , ')'
         , '.'
+        , ','
         , '#'
+        , '/'
         ]
 
 
@@ -177,6 +181,83 @@ symbolImplParser =
             ]
         |. noiseParser
         |> Parser.backtrackable
+
+
+symbolImplParser2 : Parser (SourceLocationRange -> AstNode)
+symbolImplParser2 =
+    let
+        externalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path then
+                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
+
+            else if modulePathResult == ( [], "" ) then
+                Parser.problem <| InvalidModulePath <| "/" ++ firstSymbol
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        ExternalWord loc path reference
+
+        internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path && partialPath /= [] then
+                Parser.problem <| InvalidModulePath <| String.join "/" path
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        if modulePathResult == ( [], "" ) then
+                            Word loc firstSymbol
+
+                        else
+                            PackageWord loc path reference
+
+        checkForUpperCaseLetterInPath path =
+            List.any (String.any Char.isUpper) path
+    in
+    Parser.oneOf
+        [ Parser.succeed externalBuilder
+            |. Parser.symbol (Token "/" NotMetadata)
+            |= symbolImplParser
+            |= Parser.loop [] modulePathParser
+        , Parser.succeed internalBuilder
+            |= symbolImplParser
+            |= Parser.oneOf
+                [ Parser.loop [] modulePathParser
+                , Parser.succeed ( [], "" )
+                ]
+        ]
+        |> Parser.andThen identity
+
+
+modulePathParser : List String -> Parser (Parser.Step (List String) ( List String, String ))
+modulePathParser symbols =
+    Parser.oneOf
+        [ Parser.succeed (\name -> Parser.Loop (name :: symbols))
+            |. Parser.symbol (Token "/" NotMetadata)
+            |= symbolImplParser
+        , Parser.succeed (Parser.Done (modulePathFinalizer symbols))
+        ]
+
+
+modulePathFinalizer : List String -> ( List String, String )
+modulePathFinalizer symbols =
+    case symbols of
+        [] ->
+            ( [], "" )
+
+        [ only ] ->
+            ( [], only )
+
+        first :: rest ->
+            ( List.reverse rest, first )
 
 
 definitionMetadataParser : Parser String
@@ -768,9 +849,9 @@ nodeParser =
             |= sourceLocationParser
             |= intParser
             |= sourceLocationParser
-        , Parser.succeed (\startLoc value endLoc -> Word (SourceLocationRange startLoc endLoc) value)
+        , Parser.succeed (\startLoc builder endLoc -> builder (SourceLocationRange startLoc endLoc))
             |= sourceLocationParser
-            |= symbolImplParser
+            |= symbolImplParser2
             |= sourceLocationParser
         ]
 

@@ -23,6 +23,7 @@ type Problem
     | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
     | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
     | UnknownMetadata String
+    | InvalidModulePath String
 
 
 toString : String -> Problem -> String
@@ -95,3 +96,6 @@ toString source problem =
 
         UnknownMetadata meta ->
             meta ++ " is not a known metadata label."
+
+        InvalidModulePath path ->
+            "'" ++ path ++ "' is not a valid module path. Note: Upper case characters are not allowed."

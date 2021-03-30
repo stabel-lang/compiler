@@ -9,6 +9,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
+import Set
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
@@ -94,12 +95,7 @@ suite =
                                 ]
                         }
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , test "Generic function types" <|
             \_ ->
                 let
@@ -146,12 +142,7 @@ suite =
                                 ]
                         }
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , test "Union types and multifunctions" <|
             \_ ->
                 let
@@ -209,12 +200,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
-
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
         , describe "Quotations"
             [ test "Basic case" <|
                 \_ ->
@@ -282,13 +268,13 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote2"
+                                                , WordRef emptyRange "quote:main/2"
                                                 , Word emptyRange "apply-to-num"
-                                                , WordRef emptyRange "main__quote1"
+                                                , WordRef emptyRange "quote:main/1"
                                                 , Word emptyRange "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "main__quote2"
+                                    , { name = "quote:main/2"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -298,7 +284,7 @@ suite =
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "main__quote1"
+                                    , { name = "quote:main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -311,12 +297,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Do not create new function if quoting exactly one word" <|
                 \_ ->
                     let
@@ -376,12 +357,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Quotes within quotes is fine" <|
                 \_ ->
                     let
@@ -422,23 +398,23 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote1"
+                                                , WordRef emptyRange "quote:main/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
-                                    , { name = "main__quote1"
+                                    , { name = "quote:main/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "main__quote1__quote1"
+                                                , WordRef emptyRange "quote:main/1/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "main__quote1__quote1"
+                                    , { name = "quote:main/1/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
@@ -451,12 +427,7 @@ suite =
                                     ]
                             }
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             ]
         , describe "Pattern matching"
             [ test "Basic example" <|
@@ -524,12 +495,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             , test "Generic cases are allowed" <|
                 \_ ->
                     let
@@ -591,12 +557,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run unqualifiedAst of
-                        Err _ ->
-                            Expect.fail "Did not expect qualification to fail"
-
-                        Ok qualifiedAst ->
-                            Expect.equal expectedAst qualifiedAst
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             ]
         , test "Resolves unions" <|
             \_ ->
@@ -679,10 +640,456 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run unqualifiedAst of
-                    Err _ ->
-                        Expect.fail "Did not expect qualification to fail"
+                QualifierUtil.expectOutput unqualifiedAst expectedAst
+        , test "Name mangling" <|
+            \_ ->
+                let
+                    qualifiedUsMoneyUnion =
+                        [ Type.Custom "/play/test/some/module/Dollar"
+                        , Type.Custom "/play/test/some/module/Cent"
+                        ]
 
-                    Ok qualifiedAst ->
-                        Expect.equal expectedAst qualifiedAst
+                    unqualifiedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ AST.UnionTypeDef emptyRange
+                                    "USMoney"
+                                    []
+                                    [ Type.Custom "Dollar"
+                                    , Type.Custom "Cent"
+                                    ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Dollar"
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Cent"
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "into-cents"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "USMoney" ]
+                                                [ Type.Custom "USMoney" ]
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch emptyRange (Type.Custom "Dollar") []
+                                              , [ AST.Word emptyRange "dollar-value>"
+                                                , AST.Integer emptyRange 100
+                                                , AST.Word emptyRange "*"
+                                                ]
+                                              )
+                                            , ( AST.TypeMatch emptyRange (Type.Custom "Cent") []
+                                              , [ AST.Word emptyRange "cent-value>"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "add-money"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "USMoney", Type.Custom "USMoney" ]
+                                                [ Type.Custom "USMoney" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.Word emptyRange "into-cents"
+                                            , AST.Word emptyRange "swap"
+                                            , AST.Word emptyRange "into-cents"
+                                            , AST.Word emptyRange "+"
+                                            ]
+                                  }
+                                , { name = "quote-excuse"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [ Type.Custom "Dollar" ] [ Type.Custom "Dollar" ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.Word emptyRange "dollar-value>"
+                                            , AST.Quotation emptyRange
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "*"
+                                                ]
+                                            , AST.Word emptyRange "!"
+                                            , AST.Word emptyRange ">Dollar"
+                                            ]
+                                  }
+                                ]
+                        }
+                            |> ParserUtil.addFunctionsForStructs
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef
+                                    "/play/test/some/module/USMoney"
+                                    emptyRange
+                                    []
+                                    qualifiedUsMoneyUnion
+                                , CustomTypeDef "/play/test/some/module/Dollar"
+                                    emptyRange
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , CustomTypeDef "/play/test/some/module/Cent"
+                                    emptyRange
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "/play/test/some/module/into-cents"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Dollar") []
+                                              , [ Word emptyRange "/play/test/some/module/dollar-value>"
+                                                , Integer emptyRange 100
+                                                , Builtin emptyRange Builtin.Multiply
+                                                ]
+                                              )
+                                            , ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Cent") []
+                                              , [ Word emptyRange "/play/test/some/module/cent-value>"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "/play/test/some/module/add-money"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union qualifiedUsMoneyUnion, Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word emptyRange "/play/test/some/module/into-cents"
+                                            , Builtin emptyRange Builtin.StackSwap
+                                            , Word emptyRange "/play/test/some/module/into-cents"
+                                            , Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                , { name = "/play/test/some/module/quote-excuse"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ Word emptyRange "/play/test/some/module/dollar-value>"
+                                            , WordRef emptyRange "quote:/play/test/some/module/quote-excuse/1"
+                                            , Builtin emptyRange Builtin.Apply
+                                            , Word emptyRange "/play/test/some/module/>Dollar"
+                                            ]
+                                  }
+                                , { name = "quote:/play/test/some/module/quote-excuse/1"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        SoloImpl
+                                            [ Integer emptyRange 2
+                                            , Builtin emptyRange Builtin.Multiply
+                                            ]
+                                  }
+                                , { name = "/play/test/some/module/>Dollar"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Dollar" ]
+                                  }
+                                , { name = "/play/test/some/module/>Cent"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Cent" ]
+                                  }
+                                , { name = "/play/test/some/module/>dollar-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Dollar", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/>cent-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Cent", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                , { name = "/play/test/some/module/dollar-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Dollar" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/cent-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Cent" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                ]
+                        }
+                in
+                QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
+        , describe "Module loading"
+            [ test "Detects package reference in simple word" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "package", "module" ] "sample"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/play/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/play/test/package/module/sample" ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/play/test/package/module/sample"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            , test "Detects external reference in simple word" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "sample" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/external/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/external/test/package/module/sample"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Word emptyRange "/external/test/package/module/sample" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/package/module", "external/test" )
+                                        ]
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            , test "Detects package reference in multiword" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
+                                                  , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/play/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/play/test/package/module/when-one"
+                                    , "/play/test/package/module/when-other-one"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
+                                                  , [ Word emptyRange "/play/test/package/module/when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Word emptyRange "/play/test/package/module/when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            , test "Detects external reference in multiword" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
+                                                  , [ AST.ExternalWord emptyRange [ "package", "module" ] "when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { additionalModulesRequired =
+                                Set.fromList
+                                    [ "/external/test/package/module" ]
+                            , checkForExistingTypes = Set.empty
+                            , checkForExistingWords =
+                                Set.fromList
+                                    [ "/external/test/package/module/when-one"
+                                    , "/external/test/package/module/when-other-one"
+                                    ]
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/play/test/package/tests/call-external"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
+                                                  , [ Word emptyRange "/external/test/package/module/when-one"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Word emptyRange "/external/test/package/module/when-other-one" ]
+                                      }
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = "play/test"
+                                , modulePath = "package/tests"
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/package/module", "external/test" )
+                                        ]
+                                }
+                    in
+                    case result of
+                        Err err ->
+                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+
+                        Ok actualAst ->
+                            Expect.equal expectedAst actualAst
+            ]
         ]

@@ -620,7 +620,7 @@ suite =
         ]
 
 
-checkForError : (Problem.Problem -> Bool) -> AST -> Expectation
+checkForError : (Problem.Problem -> Bool) -> TypeChecker.LoadedQualifierAST a -> Expectation
 checkForError fn source =
     case TypeChecker.run source of
         Err errors ->
