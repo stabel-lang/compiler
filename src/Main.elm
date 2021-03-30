@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Dict
 import Platform exposing (Program)
 import Play.Codegen as Codegen
 import Play.Parser as Parser
@@ -64,6 +65,7 @@ compile sourceCode =
                         { packageName = ""
                         , modulePath = ""
                         , ast = ast
+                        , externalModules = Dict.empty
                         }
             in
             case qualifierResult of
