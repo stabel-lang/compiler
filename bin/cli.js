@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+// Setup of Elm ports
+
+const compiler = require(__dirname + "/compiler").Elm.CLI.init({});
+
+// CLI
+
 const subCmd = process.argv[2];
 const subCmdFlags = process.argv.slice(3);
 
