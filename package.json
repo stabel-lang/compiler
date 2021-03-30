@@ -2,6 +2,8 @@
   "name": "play",
   "version": "0.0.1",
   "description": "",
+  "author": "Robin Heggelund Hansen",
+  "license": "MIT",
   "dependencies": {},
   "devDependencies": {
     "elm": "^0.19.1-5",
@@ -17,6 +19,7 @@
     "test:elm:watch": "elm-test --watch",
     "test:wasm": "elm make src/Main.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest"
   },
-  "author": "Robin Heggelund Hansen",
-  "license": "MIT"
+  "bin": {
+    "play": "bin/cli.js"
+  }
 }
