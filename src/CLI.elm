@@ -1,7 +1,10 @@
 port module CLI exposing (main)
 
+import Json.Decode as Json
+import Json.Encode as Encode
 import Platform exposing (Program)
 import Play.Codegen as Codegen
+import Play.PackageLoader as PackageLoader
 import Play.Parser as Parser
 import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
@@ -12,14 +15,14 @@ import Wasm
 
 
 type alias Model =
-    ()
+    PackageLoader.Model
 
 
 type Msg
-    = CompileString String
+    = Incomming Json.Value
 
 
-main : Program () Model Msg
+main : Program String Model Msg
 main =
     Platform.worker
         { init = init
@@ -28,37 +31,48 @@ main =
         }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( ()
-    , Cmd.none
+init : String -> ( Model, Cmd Msg )
+init projectDir =
+    let
+        initialModel =
+            PackageLoader.init projectDir
+    in
+    ( initialModel
+    , sendSideEffectFromModel initialModel
     )
 
 
+sendSideEffectFromModel : PackageLoader.Model -> Cmd Msg
+sendSideEffectFromModel model =
+    PackageLoader.getSideEffect model
+        |> Maybe.map encodeSideEffectAsJson
+        |> Maybe.map outgoingPort
+        |> Maybe.withDefault Cmd.none
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg _ =
+update msg model =
     case msg of
-        CompileString sourceCode ->
-            case compile sourceCode of
-                Ok wasm ->
-                    ( ()
-                    , compileFinished ( True, wasm )
+        Incomming packageLoaderMsgJson ->
+            case Json.decodeValue decodePackageLoaderMsg packageLoaderMsgJson of
+                Ok packageLoaderMsg ->
+                    let
+                        updatedModel =
+                            PackageLoader.update packageLoaderMsg model
+                                |> Debug.log "new model"
+                    in
+                    ( updatedModel
+                    , sendSideEffectFromModel updatedModel
                     )
 
-                Err errmsg ->
-                    ( ()
-                    , compileFinished ( False, "Compilation failed:\n\n" ++ errmsg )
+                Err decodeError ->
+                    let
+                        _ =
+                            Debug.log "error" decodeError
+                    in
+                    ( model
+                    , Cmd.none
                     )
-
-
-compile : String -> Result String String
-compile sourceCode =
-    case Parser.run sourceCode of
-        Err parserErrors ->
-            formatErrors (ParserProblem.toString sourceCode) parserErrors
-
-        Ok ast ->
-            Ok "It worked!"
 
 
 formatErrors : (a -> String) -> List a -> Result String b
@@ -69,12 +83,62 @@ formatErrors fn problems =
         |> Err
 
 
+
+-- Json Encoding/Decoding
+
+
+encodeSideEffectAsJson : PackageLoader.SideEffect -> Json.Value
+encodeSideEffectAsJson sf =
+    case sf of
+        PackageLoader.ReadFile path fileName ->
+            Encode.object
+                [ ( "type", Encode.string "readFile" )
+                , ( "path", Encode.string path )
+                , ( "fileName", Encode.string fileName )
+                ]
+
+        PackageLoader.ResolveDirectories path ->
+            Encode.object
+                [ ( "type", Encode.string "resolveDirectories" )
+                , ( "path", Encode.string path )
+                ]
+
+        PackageLoader.ResolvePackageModules moduleName path ->
+            Encode.object
+                [ ( "type", Encode.string "resolvePackageModules" )
+                , ( "module", Encode.string moduleName )
+                , ( "path", Encode.string path )
+                ]
+
+
+decodePackageLoaderMsg : Json.Decoder PackageLoader.Msg
+decodePackageLoaderMsg =
+    let
+        helper typeStr =
+            case typeStr of
+                "fileContents" ->
+                    Json.map3 PackageLoader.FileContents
+                        (Json.field "path" Json.string)
+                        (Json.field "fileName" Json.string)
+                        (Json.field "content" Json.string)
+
+                _ ->
+                    Json.fail <| "Unknown msg type: " ++ typeStr
+    in
+    Json.field "type" Json.string
+        |> Json.andThen helper
+
+
+
+-- PORTS
+
+
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    compileString CompileString
+    incomingPort Incomming
 
 
-port compileString : (String -> msg) -> Sub msg
+port incomingPort : (Json.Value -> msg) -> Sub msg
 
 
-port compileFinished : ( Bool, String ) -> Cmd msg
+port outgoingPort : Json.Value -> Cmd msg

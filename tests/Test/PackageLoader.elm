@@ -97,7 +97,7 @@ resolveSideEffects :
     -> PackageLoader.Model
     -> Result String ( List PackageLoader.SideEffect, Qualifier.ExposedAST )
 resolveSideEffects fileSystem seenSfs model =
-    case getSideEffect model of
+    case PackageLoader.getSideEffect model of
         Nothing ->
             case model of
                 PackageLoader.Done ast ->
@@ -178,28 +178,6 @@ childPackage targetDir path =
 
             _ ->
                 False
-
-
-getSideEffect : PackageLoader.Model -> Maybe PackageLoader.SideEffect
-getSideEffect model =
-    case model of
-        PackageLoader.Done _ ->
-            Nothing
-
-        PackageLoader.Failed _ ->
-            Nothing
-
-        PackageLoader.Initializing sf ->
-            Just sf
-
-        PackageLoader.LoadingMetadata _ _ sf ->
-            Just sf
-
-        PackageLoader.ResolvingModulePaths _ _ sf ->
-            Just sf
-
-        PackageLoader.Compiling _ _ sf ->
-            Just sf
 
 
 testFiles : Dict String String

@@ -3,6 +3,7 @@ module Play.PackageLoader exposing
     , Msg(..)
     , Problem(..)
     , SideEffect(..)
+    , getSideEffect
     , init
     , update
     )
@@ -80,6 +81,28 @@ type SideEffect
     = ReadFile String String
     | ResolveDirectories String
     | ResolvePackageModules String String
+
+
+getSideEffect : Model -> Maybe SideEffect
+getSideEffect model =
+    case model of
+        Done _ ->
+            Nothing
+
+        Failed _ ->
+            Nothing
+
+        Initializing sf ->
+            Just sf
+
+        LoadingMetadata _ _ sf ->
+            Just sf
+
+        ResolvingModulePaths _ _ sf ->
+            Just sf
+
+        Compiling _ _ sf ->
+            Just sf
 
 
 init : String -> Model
