@@ -4,11 +4,8 @@ import Json.Decode as Json
 import Json.Encode as Encode
 import Platform exposing (Program)
 import Play.Codegen as Codegen
+import Play.Data.PackagePath as PackagePath
 import Play.PackageLoader as PackageLoader
-import Play.Parser as Parser
-import Play.Parser.Problem as ParserProblem
-import Play.Qualifier as Qualifier
-import Play.Qualifier.Problem as QualifierProblem
 import Play.TypeChecker as TypeChecker
 import Play.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
@@ -59,11 +56,35 @@ update msg model =
                     let
                         updatedModel =
                             PackageLoader.update packageLoaderMsg model
-                                |> Debug.log "new model"
                     in
-                    ( updatedModel
-                    , sendSideEffectFromModel updatedModel
-                    )
+                    case updatedModel of
+                        PackageLoader.Done qualifiedAst ->
+                            let
+                                compilationResult =
+                                    case TypeChecker.run (Debug.log "ast" qualifiedAst) of
+                                        Err typeErrors ->
+                                            formatErrors (TypeCheckerProblem.toString "") typeErrors
+
+                                        Ok typedAst ->
+                                            Codegen.codegen typedAst
+                                                |> Result.mapError (always "compfail")
+                                                |> Result.map Wasm.toString
+                            in
+                            case compilationResult of
+                                Ok wast ->
+                                    ( model
+                                    , outgoingPort <| encodeCompilationDone wast
+                                    )
+
+                                Err error ->
+                                    ( model
+                                    , outgoingPort <| encodeCompilationFailure error
+                                    )
+
+                        _ ->
+                            ( updatedModel
+                            , sendSideEffectFromModel updatedModel
+                            )
 
                 Err decodeError ->
                     let
@@ -106,9 +127,25 @@ encodeSideEffectAsJson sf =
         PackageLoader.ResolvePackageModules moduleName path ->
             Encode.object
                 [ ( "type", Encode.string "resolvePackageModules" )
-                , ( "module", Encode.string moduleName )
+                , ( "package", Encode.string moduleName )
                 , ( "path", Encode.string path )
                 ]
+
+
+encodeCompilationDone : String -> Json.Value
+encodeCompilationDone wast =
+    Encode.object
+        [ ( "type", Encode.string "compilationDone" )
+        , ( "wast", Encode.string wast )
+        ]
+
+
+encodeCompilationFailure : String -> Json.Value
+encodeCompilationFailure errorMsg =
+    Encode.object
+        [ ( "type", Encode.string "compilationFailure" )
+        , ( "error", Encode.string errorMsg )
+        ]
 
 
 decodePackageLoaderMsg : Json.Decoder PackageLoader.Msg
@@ -122,8 +159,21 @@ decodePackageLoaderMsg =
                         (Json.field "fileName" Json.string)
                         (Json.field "content" Json.string)
 
+                "resolvedPackageModules" ->
+                    Json.map2 PackageLoader.ResolvedPackageModules
+                        (Json.field "package" Json.string)
+                        (Json.field "modules" (Json.list Json.string))
+
+                "resolvedDirectories" ->
+                    Json.map2 PackageLoader.ResolvedDirectories
+                        (Json.field "parentDir" Json.string)
+                        (Json.field "paths" (Json.list packagePathDecoder))
+
                 _ ->
                     Json.fail <| "Unknown msg type: " ++ typeStr
+
+        packagePathDecoder =
+            Json.map PackagePath.fromString Json.string
     in
     Json.field "type" Json.string
         |> Json.andThen helper

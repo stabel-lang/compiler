@@ -18,7 +18,6 @@ function compileProject() {
     });
 
     compiler.ports.outgoingPort.subscribe((msg) => {
-        console.log(msg);
         switch (msg.type) {
             case 'readFile':
                 const filePath = path.join(msg.path, msg.fileName);
@@ -31,11 +30,58 @@ function compileProject() {
                     content: fileContent
                 });
                 break;
+            case "resolvePackageModules":
+                const srcPath = path.join(msg.path, "src");
+                const childrenFiles = expandDir(msg.path)("src")
+                    .filter(name => name.endsWith(".play"))
+                    .map(name => name.replace(srcPath + "/", ""));
+
+                compiler.ports.incomingPort.send({
+                    type: "resolvedPackageModules",
+                    package: msg.package,
+                    modules: childrenFiles
+                });
+                break;
+            case "resolveDirectories":
+                const subFolders = packageDirs(msg.path);
+
+                compiler.ports.incomingPort.send({
+                    type: "resolvedDirectories",
+                    parentDir: msg.path,
+                    paths: subFolders
+                });
+                break;
+            case "compilationDone":
+                console.log("Compiled successfully");
+                break;
+            case "compilationFailure":
+                console.error(msg.error);
+                break;
             default:
                 console.error("Unknown message received from Elm compiler: ", msg);
                 break;
         }
     });
+}
+
+function expandDir(basePath) {
+    return (dirPath) => {
+        const srcPath = path.join(basePath, dirPath);
+
+        if (fs.statSync(srcPath).isFile()) {
+            return srcPath;
+        }
+
+        const children = fs.readdirSync(srcPath);
+        return children.flatMap(expandDir(srcPath));
+    };
+}
+
+function packageDirs(parentDir) {
+    return fs.readdirSync(parentDir)
+        .map(dir => path.join(parentDir, dir))
+        .filter(dir => fs.statSync(dir).isDirectory())
+        .filter(dir => fs.readdirSync(dir).indexOf('play.json') >= 0);
 }
 
 function printHelp() {

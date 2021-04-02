@@ -1,2 +1,2 @@
-def: one
-: 1
+def: version
+: tmp/mod/major /version/data/minor + 
