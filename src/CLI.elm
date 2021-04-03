@@ -61,7 +61,7 @@ update msg model =
                         PackageLoader.Done qualifiedAst ->
                             let
                                 compilationResult =
-                                    case TypeChecker.run (Debug.log "ast" qualifiedAst) of
+                                    case TypeChecker.run qualifiedAst of
                                         Err typeErrors ->
                                             formatErrors (TypeCheckerProblem.toString "") typeErrors
 
