@@ -2,19 +2,33 @@
 
 const path = require("path");
 const fs = require("fs");
+const wabtInit = require("wabt");
 
 const subCmd = process.argv[2];
 const subCmdFlags = process.argv.slice(3);
 
 switch (subCmd) {
     case "compile": compileProject(); break;
+    case "run": runProject(); break;
     default: printHelp(); break;
 }
 
-function compileProject() {
+function runProject() {
+    if (subCmdFlags.length !== 1) {
+        console.error("run command requires exactly one argument: the function to run.");
+        return;
+    }
+
+    compileProject(subCmdFlags[0]);
+}
+
+function compileProject(entryPoint) {
     const cwd = process.cwd();
     const compiler = require(__dirname + "/compiler").Elm.CLI.init({
-        flags: cwd
+        flags: {
+            projectDir: cwd,
+            entryPoint: typeof entryPoint === "undefined" ? null : entryPoint
+        }
     });
 
     compiler.ports.outgoingPort.subscribe((msg) => {
@@ -52,7 +66,11 @@ function compileProject() {
                 });
                 break;
             case "compilationDone":
-                console.log("Compiled successfully");
+                if (typeof entryPoint === "undefined") {
+                    console.log("Compiled successfully");
+                } else {
+                    executeWat(msg.wast, entryPoint);
+                }
                 break;
             case "compilationFailure":
                 console.error(msg.error);
@@ -90,6 +108,36 @@ Play compiler. Alpha-2.
 
 Possible options are:
 * compile: compile the project.
+* run <function_name>: compile the project, and execute the given function.
 * help: print this help message.
     `);
+}
+
+async function executeWat(wat, entryPointName) {
+    const wabt = await wabtInit();
+    const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;
+
+    const memory = new WebAssembly.Memory({
+        initial: 10
+    });
+
+    const imports = {
+        host: {
+            memory: memory
+        }
+    };
+
+    const program = await WebAssembly.instantiate(wasmModule, imports);
+    const entryPoint = program.instance.exports[entryPointName];
+    if (typeof entryPoint === 'undefined') {
+        console.error("Could not find a function named '" + entryPointName + "'");
+        return;
+    }
+
+    entryPoint();
+
+    const memView = new Int32Array(memory.buffer);
+    // First three i32 elements are stack and heap information
+    const returnValue = memView[3].toString(); 
+    console.log(returnValue);
 }

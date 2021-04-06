@@ -11,6 +11,12 @@ import Play.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
 
 
+type alias Flags =
+    { projectDir : String
+    , entryPoint : Maybe String
+    }
+
+
 type alias Model =
     PackageLoader.Model
 
@@ -19,7 +25,7 @@ type Msg
     = Incomming Json.Value
 
 
-main : Program String Model Msg
+main : Program Flags Model Msg
 main =
     Platform.worker
         { init = init
@@ -28,11 +34,14 @@ main =
         }
 
 
-init : String -> ( Model, Cmd Msg )
-init projectDir =
+init : Flags -> ( Model, Cmd Msg )
+init { projectDir, entryPoint } =
     let
         initialModel =
             PackageLoader.init projectDir
+
+        _ =
+            Debug.log "entry" entryPoint
     in
     ( initialModel
     , sendSideEffectFromModel initialModel
@@ -87,12 +96,10 @@ update msg model =
                             )
 
                 Err decodeError ->
-                    let
-                        _ =
-                            Debug.log "error" decodeError
-                    in
                     ( model
-                    , Cmd.none
+                    , outgoingPort <|
+                        encodeCompilationFailure <|
+                            Json.errorToString decodeError
                     )
 
 
