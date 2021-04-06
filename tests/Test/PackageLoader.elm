@@ -19,11 +19,11 @@ suite =
     describe "PackageLoader"
         [ test "Passes the load package metadata step" <|
             \_ ->
-                PackageLoader.init "/project"
-                    |> Expect.equal (PackageLoader.Initializing <| PackageLoader.ReadFile "/project" "play.json")
+                PackageLoader.init "/project" Nothing
+                    |> Expect.equal (PackageLoader.Initializing Nothing <| PackageLoader.ReadFile "/project" "play.json")
         , test "Retrieves necessary files" <|
             \_ ->
-                PackageLoader.init "/project"
+                PackageLoader.init "/project" Nothing
                     |> expectSideEffects testFiles
                         [ PackageLoader.ReadFile "/project" "play.json"
                         , PackageLoader.ResolveDirectories "/project/lib"
@@ -41,7 +41,7 @@ suite =
             \_ ->
                 let
                     loaderResult =
-                        PackageLoader.init "/project"
+                        PackageLoader.init "/project" Nothing
                             |> resolveSideEffects testFiles []
                             |> Result.map Tuple.second
                 in
@@ -66,6 +66,45 @@ suite =
                                       }
                                     , { name = "/play/version/version/data/number"
                                       , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Integer emptyRange 2
+                                                ]
+                                      }
+                                    ]
+                            }
+                            (Util.stripLocations ast)
+        , test "Specified entry point is marked as such" <|
+            \_ ->
+                let
+                    loaderResult =
+                        PackageLoader.init "/project" (Just "/play/version/version/data/number")
+                            |> resolveSideEffects testFiles []
+                            |> Result.map Tuple.second
+                in
+                case loaderResult of
+                    Err msg ->
+                        Expect.fail msg
+
+                    Ok ast ->
+                        Expect.equal
+                            { types =
+                                Dict.fromListBy Qualifier.typeDefinitionName []
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/robheghan/fnv/mod1/next-version"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Word emptyRange "/play/version/version/data/number"
+                                                , Qualifier.Integer emptyRange 1
+                                                , Qualifier.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "/play/version/version/data/number"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Integer emptyRange 2

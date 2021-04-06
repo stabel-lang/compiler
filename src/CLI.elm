@@ -38,10 +38,7 @@ init : Flags -> ( Model, Cmd Msg )
 init { projectDir, entryPoint } =
     let
         initialModel =
-            PackageLoader.init projectDir
-
-        _ =
-            Debug.log "entry" entryPoint
+            PackageLoader.init projectDir entryPoint
     in
     ( initialModel
     , sendSideEffectFromModel initialModel

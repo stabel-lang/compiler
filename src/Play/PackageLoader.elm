@@ -11,6 +11,7 @@ module Play.PackageLoader exposing
 import Dict exposing (Dict)
 import Json.Decode as Json
 import List.Extra as List
+import Play.Data.Metadata as Metadata
 import Play.Data.ModuleName as ModuleName exposing (ModuleName)
 import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Play.Data.PackageName as PackageName exposing (PackageName)
@@ -31,7 +32,7 @@ type Problem
 
 
 type Model
-    = Initializing SideEffect
+    = Initializing (Maybe String) SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
     | Compiling State (List ( PackageInfo, ModuleName )) SideEffect
@@ -40,7 +41,8 @@ type Model
 
 
 type alias State =
-    { rootPackage : PackageInfo
+    { possibleEntryPoint : Maybe String
+    , rootPackage : PackageInfo
     , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
     , filePathToModule : Dict String ( PackageName, ModuleName )
@@ -58,9 +60,10 @@ type alias PackageInfo =
     }
 
 
-emptyState : PackageInfo -> State
-emptyState rootPackage =
-    { rootPackage = rootPackage
+emptyState : Maybe String -> PackageInfo -> State
+emptyState possibleEntryPoint rootPackage =
+    { possibleEntryPoint = possibleEntryPoint
+    , rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
     , filePathToModule = Dict.empty
@@ -92,7 +95,7 @@ getSideEffect model =
         Failed _ ->
             Nothing
 
-        Initializing sf ->
+        Initializing _ sf ->
             Just sf
 
         LoadingMetadata _ _ sf ->
@@ -105,23 +108,23 @@ getSideEffect model =
             Just sf
 
 
-init : String -> Model
-init projectDirPath =
-    Initializing
-        (ReadFile projectDirPath "play.json")
+init : String -> Maybe String -> Model
+init projectDirPath possibleEntryPoint =
+    Initializing possibleEntryPoint <|
+        ReadFile projectDirPath "play.json"
 
 
 update : Msg -> Model -> Model
 update msg model =
     case model of
-        Initializing _ ->
+        Initializing possibleEntryPoint _ ->
             case msg of
                 FileContents path _ content ->
                     case Json.decodeString PackageMetadata.decoder content of
                         Ok metadata ->
                             let
                                 state =
-                                    emptyState
+                                    emptyState possibleEntryPoint
                                         { path = path
                                         , metadata = metadata
                                         , modules = []
@@ -497,9 +500,28 @@ nextCompileStep : Set String -> Qualifier.AST -> List ( PackageInfo, ModuleName 
 nextCompileStep parsedModules inProgressAst remainingModules state =
     case remainingModules of
         [] ->
+            let
+                wordsWithEntryPoint =
+                    state.possibleEntryPoint
+                        |> Maybe.map (setEntryPoint inProgressAst.words)
+                        |> Maybe.withDefault inProgressAst.words
+
+                setEntryPoint words entryPointName =
+                    Dict.update
+                        entryPointName
+                        (\maybeWord ->
+                            case maybeWord of
+                                Nothing ->
+                                    Nothing
+
+                                Just word ->
+                                    Just { word | metadata = Metadata.asEntryPoint word.metadata }
+                        )
+                        words
+            in
             Done
                 { types = inProgressAst.types
-                , words = inProgressAst.words
+                , words = wordsWithEntryPoint
                 }
 
         ( packageInfo, moduleName ) :: otherModules ->
