@@ -32,7 +32,9 @@ function initProject() {
         "exposed-modules": [
             "main"
         ],
-        dependencies: {},
+        dependencies: {
+            "play/standard_library": "0.2.0"
+        },
         "package-paths": []
     };
 
