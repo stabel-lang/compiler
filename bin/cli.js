@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const wabtInit = require("wabt");
 
+const stdLibPath = path.resolve(__dirname, "..", "stdlib");
 const subCmd = process.argv[2];
 const subCmdFlags = process.argv.slice(3);
 
@@ -33,7 +34,8 @@ function compileProject(entryPoint) {
     const compiler = require(__dirname + "/compiler").Elm.CLI.init({
         flags: {
             projectDir: cwd,
-            entryPoint: typeof entryPoint === "undefined" ? null : entryPoint
+            entryPoint: typeof entryPoint === "undefined" ? null : entryPoint,
+            stdLibPath: stdLibPath
         }
     });
 
