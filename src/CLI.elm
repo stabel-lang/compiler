@@ -87,6 +87,11 @@ update msg model =
                                     , outgoingPort <| encodeCompilationFailure error
                                     )
 
+                        PackageLoader.Failed error ->
+                            ( model
+                            , outgoingPort <| encodeCompilationFailure <| Debug.toString error
+                            )
+
                         _ ->
                             ( updatedModel
                             , sendSideEffectFromModel updatedModel
