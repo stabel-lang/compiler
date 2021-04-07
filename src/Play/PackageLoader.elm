@@ -31,8 +31,15 @@ type Problem
     | InternalError String
 
 
+type alias InitOptions =
+    { projectDirPath : String
+    , stdLibPath : String
+    , possibleEntryPoint : Maybe String
+    }
+
+
 type Model
-    = Initializing (Maybe String) SideEffect
+    = Initializing InitOptions SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
     | Compiling State (List ( PackageInfo, ModuleName )) SideEffect
@@ -60,9 +67,9 @@ type alias PackageInfo =
     }
 
 
-emptyState : Maybe String -> PackageInfo -> State
-emptyState possibleEntryPoint rootPackage =
-    { possibleEntryPoint = possibleEntryPoint
+emptyState : InitOptions -> PackageInfo -> State
+emptyState initOptions rootPackage =
+    { possibleEntryPoint = initOptions.possibleEntryPoint
     , rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
@@ -108,30 +115,36 @@ getSideEffect model =
             Just sf
 
 
-init : String -> Maybe String -> Model
-init projectDirPath possibleEntryPoint =
-    Initializing possibleEntryPoint <|
-        ReadFile projectDirPath "play.json"
+init : InitOptions -> Model
+init initOptions =
+    Initializing initOptions <|
+        ReadFile initOptions.projectDirPath "play.json"
 
 
 update : Msg -> Model -> Model
 update msg model =
     case model of
-        Initializing possibleEntryPoint _ ->
+        Initializing initOpts _ ->
             case msg of
                 FileContents path _ content ->
                     case Json.decodeString PackageMetadata.decoder content of
                         Ok metadata ->
                             let
+                                metadataWithStdLib =
+                                    { metadata
+                                        | packagePaths =
+                                            metadata.packagePaths ++ [ PackagePath.fromString initOpts.stdLibPath ]
+                                    }
+
                                 state =
-                                    emptyState possibleEntryPoint
+                                    emptyState initOpts
                                         { path = path
-                                        , metadata = metadata
+                                        , metadata = metadataWithStdLib
                                         , modules = []
                                         }
 
                                 pathsToLoad =
-                                    List.map (PackagePath.prefix path) metadata.packagePaths
+                                    List.map (PackagePath.prefix path) metadataWithStdLib.packagePaths
                             in
                             case pathsToLoad of
                                 [] ->

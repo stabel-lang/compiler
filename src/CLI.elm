@@ -14,6 +14,7 @@ import Wasm
 type alias Flags =
     { projectDir : String
     , entryPoint : Maybe String
+    , stdLibPath : String
     }
 
 
@@ -35,10 +36,14 @@ main =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { projectDir, entryPoint } =
+init { projectDir, entryPoint, stdLibPath } =
     let
         initialModel =
-            PackageLoader.init projectDir entryPoint
+            PackageLoader.init
+                { projectDirPath = projectDir
+                , possibleEntryPoint = entryPoint
+                , stdLibPath = stdLibPath
+                }
     in
     ( initialModel
     , sendSideEffectFromModel initialModel

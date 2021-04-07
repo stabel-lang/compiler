@@ -16,18 +16,25 @@ import Test.Qualifier.Util as Util
 
 suite : Test
 suite =
+    let
+        initOpts =
+            { projectDirPath = "/project"
+            , possibleEntryPoint = Nothing
+            , stdLibPath = "/project/lib/unused"
+            }
+    in
     describe "PackageLoader"
         [ test "Passes the load package metadata step" <|
             \_ ->
-                PackageLoader.init "/project" Nothing
-                    |> Expect.equal (PackageLoader.Initializing Nothing <| PackageLoader.ReadFile "/project" "play.json")
+                PackageLoader.init initOpts
+                    |> Expect.equal (PackageLoader.Initializing initOpts <| PackageLoader.ReadFile "/project" "play.json")
         , test "Retrieves necessary files" <|
             \_ ->
-                PackageLoader.init "/project" Nothing
+                PackageLoader.init initOpts
                     |> expectSideEffects testFiles
                         [ PackageLoader.ReadFile "/project" "play.json"
-                        , PackageLoader.ResolveDirectories "/project/lib"
                         , PackageLoader.ReadFile "/project/lib/template_strings" "play.json"
+                        , PackageLoader.ResolveDirectories "/project/lib/template_strings/lib"
                         , PackageLoader.ReadFile "/project/lib/template_strings/lib/version" "play.json"
                         , PackageLoader.ReadFile "/project/lib/unused" "play.json"
                         , PackageLoader.ReadFile "/project/lib/version" "play.json"
@@ -41,7 +48,7 @@ suite =
             \_ ->
                 let
                     loaderResult =
-                        PackageLoader.init "/project" Nothing
+                        PackageLoader.init initOpts
                             |> resolveSideEffects testFiles []
                             |> Result.map Tuple.second
                 in
@@ -78,7 +85,11 @@ suite =
             \_ ->
                 let
                     loaderResult =
-                        PackageLoader.init "/project" (Just "/play/version/version/data/number")
+                        PackageLoader.init
+                            { projectDirPath = "/project"
+                            , possibleEntryPoint = Just "/play/version/version/data/number"
+                            , stdLibPath = initOpts.stdLibPath
+                            }
                             |> resolveSideEffects testFiles []
                             |> Result.map Tuple.second
                 in
@@ -126,8 +137,11 @@ expectSideEffects fileSystem expectedSFs model =
             let
                 sfDiff =
                     List.filter (\sf -> not <| List.member sf expectedSFs) seenSfs
+
+                sfDiffRev =
+                    List.filter (\sf -> not <| List.member sf seenSfs) expectedSFs
             in
-            Expect.equalLists [] sfDiff
+            Expect.equalLists [] (sfDiff ++ sfDiffRev)
 
 
 resolveSideEffects :
@@ -236,7 +250,8 @@ testFiles =
                     "play/version": "1.0.0"
                 },
                 "package-paths": [
-                    "lib/*"
+                    "lib/template_strings",
+                    "lib/version"
                 ]
             }
             """
@@ -260,7 +275,7 @@ testFiles =
                     "play/version": "1.1.0"
                 },
                 "package-paths": [
-                    "lib/version"
+                    "lib/*"
                 ]
             }
           """
