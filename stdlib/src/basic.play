@@ -1,2 +1,25 @@
-def: version
-: tmp/mod/major /version/data/minor + 
+defmulti: zero?
+type: Int -- Int
+: Int( value 0 )
+  drop 1
+: Int
+  drop 0
+
+defmulti: select
+type: Int a a -- a
+: Int( value 0 )
+  rotate drop drop
+: Int
+  drop swap drop
+
+def: if
+type: a... Int [ a... -- b... ] [ a... -- b... ] -- b...
+: select !
+
+def: over
+type: a b -- a b a
+: swap dup rotate
+
+def: drop2
+type: a b c -- a
+: drop drop
