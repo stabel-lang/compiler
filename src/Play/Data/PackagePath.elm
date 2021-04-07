@@ -40,7 +40,15 @@ prefix : String -> PackagePath -> PackagePath
 prefix pathToPrefix packagePath =
     case packagePath of
         Directory dir ->
-            Directory <| pathToPrefix ++ "/" ++ dir
+            if String.startsWith "/" dir then
+                packagePath
+
+            else
+                Directory <| pathToPrefix ++ "/" ++ dir
 
         AllDirectoriesInDirectory dir ->
-            AllDirectoriesInDirectory <| pathToPrefix ++ "/" ++ dir
+            if String.startsWith "/" dir then
+                packagePath
+
+            else
+                AllDirectoriesInDirectory <| pathToPrefix ++ "/" ++ dir

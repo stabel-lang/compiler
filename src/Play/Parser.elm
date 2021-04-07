@@ -179,7 +179,6 @@ symbolImplParser =
                 |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
             , Parser.succeed identity
             ]
-        |. noiseParser
         |> Parser.backtrackable
 
 
@@ -234,6 +233,7 @@ symbolImplParser2 =
                 , Parser.succeed ( [], "" )
                 ]
         ]
+        |. noiseParser
         |> Parser.andThen identity
 
 

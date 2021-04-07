@@ -3,6 +3,7 @@ module Play.PackageLoader exposing
     , Msg(..)
     , Problem(..)
     , SideEffect(..)
+    , getSideEffect
     , init
     , update
     )
@@ -10,6 +11,7 @@ module Play.PackageLoader exposing
 import Dict exposing (Dict)
 import Json.Decode as Json
 import List.Extra as List
+import Play.Data.Metadata as Metadata
 import Play.Data.ModuleName as ModuleName exposing (ModuleName)
 import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Play.Data.PackageName as PackageName exposing (PackageName)
@@ -29,8 +31,15 @@ type Problem
     | InternalError String
 
 
+type alias InitOptions =
+    { projectDirPath : String
+    , stdLibPath : String
+    , possibleEntryPoint : Maybe String
+    }
+
+
 type Model
-    = Initializing SideEffect
+    = Initializing InitOptions SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
     | Compiling State (List ( PackageInfo, ModuleName )) SideEffect
@@ -39,7 +48,8 @@ type Model
 
 
 type alias State =
-    { rootPackage : PackageInfo
+    { possibleEntryPoint : Maybe String
+    , rootPackage : PackageInfo
     , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
     , filePathToModule : Dict String ( PackageName, ModuleName )
@@ -57,9 +67,10 @@ type alias PackageInfo =
     }
 
 
-emptyState : PackageInfo -> State
-emptyState rootPackage =
-    { rootPackage = rootPackage
+emptyState : InitOptions -> PackageInfo -> State
+emptyState initOptions rootPackage =
+    { possibleEntryPoint = initOptions.possibleEntryPoint
+    , rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
     , filePathToModule = Dict.empty
@@ -82,30 +93,58 @@ type SideEffect
     | ResolvePackageModules String String
 
 
-init : String -> Model
-init projectDirPath =
-    Initializing
-        (ReadFile projectDirPath "play.json")
+getSideEffect : Model -> Maybe SideEffect
+getSideEffect model =
+    case model of
+        Done _ ->
+            Nothing
+
+        Failed _ ->
+            Nothing
+
+        Initializing _ sf ->
+            Just sf
+
+        LoadingMetadata _ _ sf ->
+            Just sf
+
+        ResolvingModulePaths _ _ sf ->
+            Just sf
+
+        Compiling _ _ sf ->
+            Just sf
+
+
+init : InitOptions -> Model
+init initOptions =
+    Initializing initOptions <|
+        ReadFile initOptions.projectDirPath "play.json"
 
 
 update : Msg -> Model -> Model
 update msg model =
     case model of
-        Initializing _ ->
+        Initializing initOpts _ ->
             case msg of
                 FileContents path _ content ->
                     case Json.decodeString PackageMetadata.decoder content of
                         Ok metadata ->
                             let
+                                metadataWithStdLib =
+                                    { metadata
+                                        | packagePaths =
+                                            metadata.packagePaths ++ [ PackagePath.fromString initOpts.stdLibPath ]
+                                    }
+
                                 state =
-                                    emptyState
+                                    emptyState initOpts
                                         { path = path
-                                        , metadata = metadata
+                                        , metadata = metadataWithStdLib
                                         , modules = []
                                         }
 
                                 pathsToLoad =
-                                    List.map (PackagePath.prefix path) metadata.packagePaths
+                                    List.map (PackagePath.prefix path) metadataWithStdLib.packagePaths
                             in
                             case pathsToLoad of
                                 [] ->
@@ -474,9 +513,28 @@ nextCompileStep : Set String -> Qualifier.AST -> List ( PackageInfo, ModuleName 
 nextCompileStep parsedModules inProgressAst remainingModules state =
     case remainingModules of
         [] ->
+            let
+                wordsWithEntryPoint =
+                    state.possibleEntryPoint
+                        |> Maybe.map (setEntryPoint inProgressAst.words)
+                        |> Maybe.withDefault inProgressAst.words
+
+                setEntryPoint words entryPointName =
+                    Dict.update
+                        entryPointName
+                        (\maybeWord ->
+                            case maybeWord of
+                                Nothing ->
+                                    Nothing
+
+                                Just word ->
+                                    Just { word | metadata = Metadata.asEntryPoint word.metadata }
+                        )
+                        words
+            in
             Done
                 { types = inProgressAst.types
-                , words = inProgressAst.words
+                , words = wordsWithEntryPoint
                 }
 
         ( packageInfo, moduleName ) :: otherModules ->

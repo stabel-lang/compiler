@@ -16,18 +16,25 @@ import Test.Qualifier.Util as Util
 
 suite : Test
 suite =
+    let
+        initOpts =
+            { projectDirPath = "/project"
+            , possibleEntryPoint = Nothing
+            , stdLibPath = "/project/lib/unused"
+            }
+    in
     describe "PackageLoader"
         [ test "Passes the load package metadata step" <|
             \_ ->
-                PackageLoader.init "/project"
-                    |> Expect.equal (PackageLoader.Initializing <| PackageLoader.ReadFile "/project" "play.json")
+                PackageLoader.init initOpts
+                    |> Expect.equal (PackageLoader.Initializing initOpts <| PackageLoader.ReadFile "/project" "play.json")
         , test "Retrieves necessary files" <|
             \_ ->
-                PackageLoader.init "/project"
+                PackageLoader.init initOpts
                     |> expectSideEffects testFiles
                         [ PackageLoader.ReadFile "/project" "play.json"
-                        , PackageLoader.ResolveDirectories "/project/lib"
                         , PackageLoader.ReadFile "/project/lib/template_strings" "play.json"
+                        , PackageLoader.ResolveDirectories "/project/lib/template_strings/lib"
                         , PackageLoader.ReadFile "/project/lib/template_strings/lib/version" "play.json"
                         , PackageLoader.ReadFile "/project/lib/unused" "play.json"
                         , PackageLoader.ReadFile "/project/lib/version" "play.json"
@@ -41,7 +48,7 @@ suite =
             \_ ->
                 let
                     loaderResult =
-                        PackageLoader.init "/project"
+                        PackageLoader.init initOpts
                             |> resolveSideEffects testFiles []
                             |> Result.map Tuple.second
                 in
@@ -74,6 +81,49 @@ suite =
                                     ]
                             }
                             (Util.stripLocations ast)
+        , test "Specified entry point is marked as such" <|
+            \_ ->
+                let
+                    loaderResult =
+                        PackageLoader.init
+                            { projectDirPath = "/project"
+                            , possibleEntryPoint = Just "/play/version/version/data/number"
+                            , stdLibPath = initOpts.stdLibPath
+                            }
+                            |> resolveSideEffects testFiles []
+                            |> Result.map Tuple.second
+                in
+                case loaderResult of
+                    Err msg ->
+                        Expect.fail msg
+
+                    Ok ast ->
+                        Expect.equal
+                            { types =
+                                Dict.fromListBy Qualifier.typeDefinitionName []
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/robheghan/fnv/mod1/next-version"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Word emptyRange "/play/version/version/data/number"
+                                                , Qualifier.Integer emptyRange 1
+                                                , Qualifier.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "/play/version/version/data/number"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Integer emptyRange 2
+                                                ]
+                                      }
+                                    ]
+                            }
+                            (Util.stripLocations ast)
         ]
 
 
@@ -87,8 +137,11 @@ expectSideEffects fileSystem expectedSFs model =
             let
                 sfDiff =
                     List.filter (\sf -> not <| List.member sf expectedSFs) seenSfs
+
+                sfDiffRev =
+                    List.filter (\sf -> not <| List.member sf seenSfs) expectedSFs
             in
-            Expect.equalLists [] sfDiff
+            Expect.equalLists [] (sfDiff ++ sfDiffRev)
 
 
 resolveSideEffects :
@@ -97,7 +150,7 @@ resolveSideEffects :
     -> PackageLoader.Model
     -> Result String ( List PackageLoader.SideEffect, Qualifier.ExposedAST )
 resolveSideEffects fileSystem seenSfs model =
-    case getSideEffect model of
+    case PackageLoader.getSideEffect model of
         Nothing ->
             case model of
                 PackageLoader.Done ast ->
@@ -180,28 +233,6 @@ childPackage targetDir path =
                 False
 
 
-getSideEffect : PackageLoader.Model -> Maybe PackageLoader.SideEffect
-getSideEffect model =
-    case model of
-        PackageLoader.Done _ ->
-            Nothing
-
-        PackageLoader.Failed _ ->
-            Nothing
-
-        PackageLoader.Initializing sf ->
-            Just sf
-
-        PackageLoader.LoadingMetadata _ _ sf ->
-            Just sf
-
-        PackageLoader.ResolvingModulePaths _ _ sf ->
-            Just sf
-
-        PackageLoader.Compiling _ _ sf ->
-            Just sf
-
-
 testFiles : Dict String String
 testFiles =
     Dict.fromList
@@ -219,7 +250,8 @@ testFiles =
                     "play/version": "1.0.0"
                 },
                 "package-paths": [
-                    "lib/*"
+                    "lib/template_strings",
+                    "lib/version"
                 ]
             }
             """
@@ -243,7 +275,7 @@ testFiles =
                     "play/version": "1.1.0"
                 },
                 "package-paths": [
-                    "lib/version"
+                    "lib/*"
                 ]
             }
           """

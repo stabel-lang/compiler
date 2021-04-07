@@ -1,0 +1,2 @@
+def: version
+: tmp/mod/major /version/data/minor + 

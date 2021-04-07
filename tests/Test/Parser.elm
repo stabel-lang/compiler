@@ -775,6 +775,36 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "internal _and_ external reference" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: test
+                            : internal/sample /some/module/sample
+                            """
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.PackageWord emptyRange [ "internal" ] "sample"
+                                                , AST.ExternalWord emptyRange [ "some", "module" ] "sample"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err _ ->
+                            Expect.fail "Did not expect parsing to fail"
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
             ]
         , test "Support code comments" <|
             \_ ->
