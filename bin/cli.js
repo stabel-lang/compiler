@@ -24,6 +24,12 @@ function runProject() {
 
 function compileProject(entryPoint) {
     const cwd = process.cwd();
+    const rootJsonMetaPath = path.join(cwd, "play.json");
+    if (!fs.existsSync(rootJsonMetaPath)) {
+        console.error("No 'play.json' file found in this directory.");
+        return;
+    }
+
     const compiler = require(__dirname + "/compiler").Elm.CLI.init({
         flags: {
             projectDir: cwd,
