@@ -5,18 +5,48 @@ const fs = require("fs");
 const wabtInit = require("wabt");
 
 const stdLibPath = path.resolve(__dirname, "..", "stdlib");
+const cwd = process.cwd();
+
 const subCmd = process.argv[2];
 const subCmdFlags = process.argv.slice(3);
 
 switch (subCmd) {
-    case "compile": compileProject(); break;
+    case "init": initProject(); break;
     case "run": runProject(); break;
+    case "compile": compileProject(); break;
     default: printHelp(); break;
+}
+
+function initProject() {
+    if (subCmdFlags.length !== 1) {
+        console.error("'init' requires exactly one argument: the package name.");
+        return;
+    }
+
+    fs.mkdirSync(path.join(cwd, "src"));
+
+    const playJson = {
+        name: subCmdFlags[0],
+        version: "0.1.0",
+        "language-version": "0.2.0",
+        "exposed-modules": [
+            "main"
+        ],
+        dependencies: {},
+        "package-paths": []
+    };
+
+    fs.writeFileSync(path.join(cwd, "play.json"), JSON.stringify(playJson, null, 4));
+
+    fs.writeFileSync(path.join(cwd, "src", "main.play"), `
+def: execute
+: 0
+`.trim());
 }
 
 function runProject() {
     if (subCmdFlags.length !== 1) {
-        console.error("run command requires exactly one argument: the function to run.");
+        console.error("'run' requires exactly one argument: the function to run.");
         return;
     }
 
@@ -24,7 +54,6 @@ function runProject() {
 }
 
 function compileProject(entryPoint) {
-    const cwd = process.cwd();
     const rootJsonMetaPath = path.join(cwd, "play.json");
     if (!fs.existsSync(rootJsonMetaPath)) {
         console.error("No 'play.json' file found in this directory.");
@@ -115,8 +144,9 @@ function printHelp() {
 Play compiler. Alpha-2.
 
 Possible options are:
+* init <package_name>: initialize a new project in the current directory.
 * compile: compile the project.
-* run <function_name>: compile the project, and execute the given function.
+* run <function_name>: compile the project and execute the given function.
 * help: print this help message.
     `);
 }
