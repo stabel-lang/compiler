@@ -1,12 +1,5 @@
 # Everything in core is imported into every module outside the standard library
 
-def: test
-: 4 
-  [ 1 + ] [ 1 + ] split
-  int=
-  [ 10 ]
-  [ 20 ] if
-
 # booleans
 
 defunion: Bool
@@ -15,17 +8,6 @@ defunion: Bool
 
 defstruct: True
 defstruct: False
-
-defmulti: zero?
-type: Int -- Bool
-: Int( value 0 )
-  drop True
-: Int
-  drop False 
-
-def: int=
-type: Int Int -- Bool
-: - zero?
 
 defmulti: not
 type: Bool -- Bool
@@ -63,3 +45,31 @@ type: a [ a -- b ] [ a -- c ] -- b c
   ! # c b
   swap
   
+# numbers
+
+defmulti: zero?
+type: Int -- Bool
+: Int( value 0 )
+  drop True
+: Int
+  drop False 
+
+def: int=
+type: Int Int -- Bool
+: - zero?
+
+def: negate
+type: Int -- Int
+: dup dup - swap -
+
+def: square
+type: Int -- Int
+: dup *
+
+def: inc
+type: Int -- Int
+: 1 +
+
+def: dec
+type: Int -- Int
+: 1 -
