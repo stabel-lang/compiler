@@ -1,8 +1,9 @@
 # Everything in core is imported into every module outside the standard library
 
 def: test
-: 5 6
-  int= not
+: 4 
+  [ 1 + ] [ 1 + ] split
+  int=
   [ 10 ]
   [ 20 ] if
 
@@ -53,3 +54,12 @@ type: a b -- a b a
 def: drop2
 type: a b c -- a
 : drop drop
+
+def: split
+type: a [ a -- b ] [ a -- c ] -- b c
+: -rotate dup # [] [] a a
+  -rotate ! # [] a c
+  swap -rotate # c a []
+  ! # c b
+  swap
+  
