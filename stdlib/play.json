@@ -3,7 +3,7 @@
     "version": "0.2.0",
     "language-version": "0.2.0",
     "exposed-modules": [
-        "basic"
+        "core"
     ],
     "dependencies": {},
     "package-paths": []
