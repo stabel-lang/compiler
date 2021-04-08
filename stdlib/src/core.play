@@ -1,20 +1,50 @@
+# Everything in core is imported into every module outside the standard library
+
+def: test
+: 5 6
+  int= not
+  [ 10 ]
+  [ 20 ] if
+
+# booleans
+
+defunion: Bool
+: True
+: False
+
+defstruct: True
+defstruct: False
+
 defmulti: zero?
-type: Int -- Int
+type: Int -- Bool
 : Int( value 0 )
-  drop 1
+  drop True
 : Int
-  drop 0
+  drop False 
+
+def: int=
+type: Int Int -- Bool
+: - zero?
+
+defmulti: not
+type: Bool -- Bool
+: True
+  drop False
+: False
+  drop True
 
 defmulti: select
-type: Int a a -- a
-: Int( value 0 )
-  rotate drop drop
-: Int
+type: Bool a a -- a
+: True
   drop swap drop
+: False
+  rotate drop2
 
 def: if
-type: a... Int [ a... -- b... ] [ a... -- b... ] -- b...
+type: a... Bool [ a... -- b... ] [ a... -- b... ] -- b...
 : select !
+
+# stack manipulation
 
 def: over
 type: a b -- a b a
