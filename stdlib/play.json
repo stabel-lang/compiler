@@ -4,7 +4,8 @@
     "language-version": "0.2.0",
     "exposed-modules": [
         "core",
-        "maybe"
+        "maybe",
+        "pair"
     ],
     "dependencies": {},
     "package-paths": []
