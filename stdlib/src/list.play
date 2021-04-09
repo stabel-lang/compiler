@@ -1,0 +1,30 @@
+defunion: List a
+: NonEmpty a
+: Empty
+
+defstruct: NonEmpty a
+: first a
+: rest (List a)
+
+defstruct: Empty
+
+defmulti: fold
+type: (List a) b [ a b -- b ] -- b
+: Empty
+  drop swap drop
+: NonEmpty
+  pair/>Pair
+  swap # (Pair b quot) (NonEmpty a)
+  [ first> ] [ rest> ] core/split # Pair first rest
+  rotate swap # rest first Pair
+  pair/spill # rest first b quot
+  dup rotate # rest quot first b quot
+  ! # rest quot b
+  swap # rest b quot
+  fold
+
+def: test
+: 1 2 3 Empty >NonEmpty >NonEmpty >NonEmpty
+  0 [ + ] fold
+
+

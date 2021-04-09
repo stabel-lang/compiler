@@ -5,7 +5,8 @@
     "exposed-modules": [
         "core",
         "maybe",
-        "pair"
+        "pair",
+        "list"
     ],
     "dependencies": {},
     "package-paths": []
