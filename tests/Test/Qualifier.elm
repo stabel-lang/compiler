@@ -298,14 +298,14 @@ suite =
                             }
                     in
                     QualifierUtil.expectOutput unqualifiedAst expectedAst
-            , test "Do not create new function if quoting exactly one word" <|
+            , test "Quoting a word which hasn't been qualified yet is fine" <|
                 \_ ->
                     let
                         unqualifiedAst =
                             { types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "main"
+                                    [ { name = "a"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
@@ -333,25 +333,32 @@ suite =
                             { types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "main"
+                                    [ { name = "a"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "inc"
+                                                , WordRef emptyRange "quote:a/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "inc"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "quote:a/1"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.isQuoted
                                       , implementation =
                                             SoloImpl
-                                                [ Integer emptyRange 1
-                                                , Builtin emptyRange Builtin.Plus
+                                                [ Word emptyRange "inc"
                                                 ]
                                       }
                                     ]
