@@ -207,7 +207,7 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMembers ->
                     ( errors
-                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics members) acc
+                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics qualifiedMembers) acc
                     )
 
         Parser.UnionTypeDef range name generics memberTypes ->

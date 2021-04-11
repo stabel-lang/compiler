@@ -862,6 +862,167 @@ suite =
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
+        , test "member types are qualified" <|
+            \_ ->
+                let
+                    qualifiedUsMoneyUnion =
+                        [ Type.Custom "/play/test/some/module/Dollar"
+                        , Type.Custom "/play/test/some/module/Cent"
+                        ]
+
+                    unqualifiedAst =
+                        { types =
+                            Dict.fromListBy AST.typeDefinitionName
+                                [ AST.UnionTypeDef emptyRange
+                                    "USMoney"
+                                    []
+                                    [ Type.Custom "Dollar"
+                                    , Type.Custom "Cent"
+                                    ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Wallet"
+                                    []
+                                    [ ( "user-id", Type.Int )
+                                    , ( "value", Type.Custom "USMoney" )
+                                    ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Dollar"
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , AST.CustomTypeDef emptyRange
+                                    "Cent"
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                ]
+                        , words = Dict.empty
+                        }
+                            |> ParserUtil.addFunctionsForStructs
+
+                    expectedAst =
+                        { types =
+                            Dict.fromListBy typeDefinitionName
+                                [ UnionTypeDef
+                                    "/play/test/some/module/USMoney"
+                                    emptyRange
+                                    []
+                                    qualifiedUsMoneyUnion
+                                , CustomTypeDef "/play/test/some/module/Dollar"
+                                    emptyRange
+                                    []
+                                    [ ( "dollar-value", Type.Int ) ]
+                                , CustomTypeDef "/play/test/some/module/Cent"
+                                    emptyRange
+                                    []
+                                    [ ( "cent-value", Type.Int ) ]
+                                , CustomTypeDef "/play/test/some/module/Wallet"
+                                    emptyRange
+                                    []
+                                    [ ( "user-id", Type.Int )
+                                    , ( "value", Type.Union qualifiedUsMoneyUnion )
+                                    ]
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "/play/test/some/module/>Dollar"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Dollar" ]
+                                  }
+                                , { name = "/play/test/some/module/>Cent"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Cent" ]
+                                  }
+                                , { name = "/play/test/some/module/>Wallet"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Int, Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                  , implementation =
+                                        SoloImpl [ ConstructType "/play/test/some/module/Wallet" ]
+                                  }
+                                , { name = "/play/test/some/module/>dollar-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Dollar", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/>cent-value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Cent", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Cent" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                , { name = "/play/test/some/module/>user-id"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Wallet", Type.Int ]
+                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Wallet" "user-id" ]
+                                  }
+                                , { name = "/play/test/some/module/>value"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Wallet", Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ SetMember "/play/test/some/module/Wallet" "value" ]
+                                  }
+                                , { name = "/play/test/some/module/dollar-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Dollar" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                  }
+                                , { name = "/play/test/some/module/cent-value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Cent" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Cent" "cent-value" ]
+                                  }
+                                , { name = "/play/test/some/module/user-id>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Wallet" ] [ Type.Int ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Wallet" "user-id" ]
+                                  }
+                                , { name = "/play/test/some/module/value>"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withVerifiedType
+                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ GetMember "/play/test/some/module/Wallet" "value" ]
+                                  }
+                                ]
+                        }
+                in
+                QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
         , describe "Module loading"
             [ test "Detects package reference in simple word" <|
                 \_ ->
