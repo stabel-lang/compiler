@@ -1099,6 +1099,58 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            , test "Typechecking involving a multi-arity quotation is fine _if_ arity info is in type annotation" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "apply-to-nums"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Quotation
+                                                        { input = [ Type.Int, Type.Int ]
+                                                        , output = [ Type.Int ]
+                                                        }
+                                                    ]
+                                                    [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Builtin emptyRange Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "apply-to-nums"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err _ ->
+                            Expect.fail "Did not expect type check to fail."
             , test "With generics" <|
                 \_ ->
                     let
