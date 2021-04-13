@@ -564,8 +564,8 @@ suite =
                                 }
                     in
                     case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail." ++ Debug.toString err
 
                         Ok _ ->
                             Expect.pass
@@ -1120,6 +1120,7 @@ suite =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
                                                 , QAST.Integer emptyRange 2
+                                                , QAST.Builtin emptyRange Builtin.StackLeftRotate
                                                 , QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
@@ -1149,8 +1150,8 @@ suite =
                         Ok _ ->
                             Expect.pass
 
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail:" ++ Debug.toString err
             , test "With generics" <|
                 \_ ->
                     let

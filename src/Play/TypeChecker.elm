@@ -230,17 +230,6 @@ typeCheckMultiImplementation :
     -> Context
 typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     let
-        untypedDefMetadata =
-            untypedDef.metadata
-
-        untypedDefNoTypeAnnotation =
-            { untypedDef
-                | metadata =
-                    { untypedDefMetadata
-                        | type_ = TypeSignature.NotProvided
-                    }
-            }
-
         whens =
             case defaultImpl of
                 [] ->
@@ -249,10 +238,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 _ ->
                     let
                         ( inferredDefaultType, _ ) =
-                            typeCheckImplementation
-                                untypedDefNoTypeAnnotation
-                                defaultImpl
-                                (cleanContext context)
+                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
                     in
                     case inferredDefaultType.input of
                         [] ->
@@ -262,7 +248,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
         ( inferredWhenTypes, newContext ) =
-            List.foldr (inferWhenTypes untypedDefNoTypeAnnotation) ( [], context ) whens
+            List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
@@ -402,10 +388,30 @@ inferWhenTypes :
     -> ( Qualifier.TypeMatch, List Qualifier.Node )
     -> ( List WordType, Context )
     -> ( List WordType, Context )
-inferWhenTypes untypedDef ( _, im ) ( infs, ctx ) =
+inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
     let
+        alteredTypeSignature =
+            case untypedDef.metadata.type_ of
+                TypeSignature.UserProvided wt ->
+                    TypeSignature.UserProvided <|
+                        case wt.input of
+                            _ :: rest ->
+                                { wt | input = t :: rest }
+
+                            _ ->
+                                wt
+
+                x ->
+                    x
+
+        metadata =
+            untypedDef.metadata
+
+        alteredDef =
+            { untypedDef | metadata = { metadata | type_ = alteredTypeSignature } }
+
         ( inf, newCtx ) =
-            typeCheckImplementation untypedDef im (cleanContext ctx)
+            typeCheckImplementation alteredDef im (cleanContext ctx)
     in
     ( inf :: infs, newCtx )
 
