@@ -552,8 +552,17 @@ unionOfTypeMatches whenBranches =
         uniqueTypes =
             whenBranches
                 |> List.map (Tuple.first >> extractTypeFromTypeMatch)
+                |> List.concatMap flattenUnions
                 |> List.gatherEquals
                 |> List.map Tuple.first
+
+        flattenUnions t =
+            case t of
+                Type.Union members ->
+                    List.concatMap flattenUnions members
+
+                _ ->
+                    [ t ]
     in
     case uniqueTypes of
         [ singleType ] ->
