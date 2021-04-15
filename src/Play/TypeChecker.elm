@@ -248,7 +248,8 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
         ( inferredWhenTypes, newContext ) =
-            List.foldr (inferWhenTypes untypedDef) ( [], context ) whens
+            whens
+                |> List.foldr (inferWhenTypes untypedDef) ( [], context )
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
@@ -521,23 +522,17 @@ equalizeWhenTypesHelper types remappedGenerics acc =
                 constrainedInputs =
                     List.map2 constrainAndZip firstType.input secondType.input
 
-                constrainedOutputs =
-                    List.map2 constrainAndZip firstType.output secondType.output
-
                 ( unzippedFirstInputs, unzippedSecondInputs ) =
                     List.foldr unzip ( [], [] ) constrainedInputs
 
-                ( unzippedFirstOutputs, unzippedSecondOutputs ) =
-                    List.foldr unzip ( [], [] ) constrainedOutputs
-
                 newFirstType =
                     { input = unzippedFirstInputs
-                    , output = unzippedFirstOutputs
+                    , output = firstType.output
                     }
 
                 newSecondType =
                     { input = unzippedSecondInputs
-                    , output = unzippedSecondOutputs
+                    , output = secondType.output
                     }
             in
             equalizeWhenTypesHelper
