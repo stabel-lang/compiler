@@ -34,7 +34,7 @@ toString source problem =
                 ++ name
                 ++ "' is specified to be:\n\n"
                 ++ Type.wordTypeToString actual
-                ++ "\n\nHowever, it seems that the actual type is: "
+                ++ "\n\nHowever, it seems that the actual type is:\n\n"
                 ++ Type.wordTypeToString expected
 
         UnexpectedType range name actual expected ->

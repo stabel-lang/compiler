@@ -1059,6 +1059,12 @@ tagGeneric idx type_ =
         Type.Union members ->
             Type.Union (List.map (tagGeneric idx) members)
 
+        Type.Quotation wt ->
+            Type.Quotation
+                { input = List.map (tagGeneric idx) wt.input
+                , output = List.map (tagGeneric idx) wt.output
+                }
+
         _ ->
             type_
 
