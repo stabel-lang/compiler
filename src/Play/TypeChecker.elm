@@ -250,11 +250,19 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         ( inferredWhenTypes, newContext ) =
             whens
                 |> List.foldr (inferWhenTypes untypedDef) ( [], context )
+                |> Tuple.mapFirst logFold
                 |> Tuple.mapFirst normalizeWhenTypes
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.metadata.type_) whenTypes)
+
+        logFold a =
+            if String.endsWith "fold" untypedDef.name then
+                Debug.log "fold" a
+
+            else
+                a
 
         replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
             case typeSignature.input of
