@@ -32,9 +32,9 @@ toString source problem =
                 ++ "\n\n"
                 ++ "The type of '"
                 ++ name
-                ++ "' is specified to be: "
+                ++ "' is specified to be:\n\n"
                 ++ Type.wordTypeToString actual
-                ++ ".\nHowever, it seems that the actual type is: "
+                ++ "\n\nHowever, it seems that the actual type is: "
                 ++ Type.wordTypeToString expected
 
         UnexpectedType range name actual expected ->
@@ -42,11 +42,10 @@ toString source problem =
                 ++ "\n\n"
                 ++ "Found a problem in the implementation of '"
                 ++ name
-                ++ "'.\n\nExpected: "
+                ++ "'.\n\nExpected:\n\n"
                 ++ Type.toDisplayString expected
-                ++ ".\nActual: "
+                ++ "\n\nActual:\n"
                 ++ Type.toDisplayString actual
-                ++ "."
 
         InconsistentWhens range name ->
             SourceLocation.extractFromString source range
