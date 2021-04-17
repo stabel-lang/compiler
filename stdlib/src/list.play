@@ -8,6 +8,18 @@ defstruct: NonEmpty a
 
 defstruct: Empty
 
+def: of-one
+type: a -- (NonEmpty a)
+: Empty >NonEmpty
+
+def: of-two
+type: a a -- (NonEmpty a)
+: Empty >NonEmpty >NonEmpty
+
+def: of-three
+type: a a a -- (NonEmpty a)
+: Empty >NonEmpty >NonEmpty >NonEmpty
+
 defmulti: fold
 type: (List a) b [ a b -- b ] -- b
 : Empty
@@ -23,8 +35,15 @@ type: (List a) b [ a b -- b ] -- b
   swap pair/second> # rest b quot
   fold
 
-def: test
-: 1 2 3 Empty >NonEmpty >NonEmpty >NonEmpty
-  0 [ + ] fold
+def: reverse
+type: (List a) -- (List a)
+: Empty [ >NonEmpty ] fold
 
+def: fold-right
+type: (List a) b [ a b -- b ] -- b
+: -rotate reverse rotate fold
+
+def: test
+: 1 2 3 of-three
+  0 [ + ] fold
 
