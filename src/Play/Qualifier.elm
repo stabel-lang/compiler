@@ -207,7 +207,7 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMembers ->
                     ( errors
-                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics members) acc
+                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics qualifiedMembers) acc
                     )
 
         Parser.UnionTypeDef range name generics memberTypes ->
@@ -622,21 +622,6 @@ qualifyNode config currentDefName node acc =
                     initQualifyNode quoteName config acc.qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
-                Ok [ Word _ wordRef ] ->
-                    case Dict.get wordRef newWordsAfterQuot of
-                        Nothing ->
-                            Debug.todo "Cannot happen"
-
-                        Just oldWord ->
-                            { acc
-                                | qualifiedWords =
-                                    Dict.insert wordRef
-                                        { oldWord | metadata = Metadata.isQuoted oldWord.metadata }
-                                        newWordsAfterQuot
-                                , qualifiedNodes = Ok (WordRef sourceLocation wordRef) :: acc.qualifiedNodes
-                                , externalWords = Set.union externalWords acc.externalWords
-                            }
-
                 Ok qualifiedQuotImpl ->
                     { acc
                         | availableQuoteId = acc.availableQuoteId + 1

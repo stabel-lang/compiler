@@ -403,6 +403,202 @@ suite =
 
                     Ok _ ->
                         Expect.pass
+        , test "Generic types with generic quotations" <|
+            \_ ->
+                let
+                    listUnion =
+                        [ Type.Custom "Empty"
+                        , Type.CustomGeneric "NonEmpty" [ Type.Generic "a" ]
+                        ]
+
+                    input =
+                        { types =
+                            Dict.fromListBy QAST.typeDefinitionName
+                                [ QAST.CustomTypeDef "Pair"
+                                    emptyRange
+                                    [ "a", "b" ]
+                                    [ ( "first", Type.Generic "a" )
+                                    , ( "second", Type.Generic "b" )
+                                    ]
+                                , QAST.UnionTypeDef "List"
+                                    emptyRange
+                                    [ "a" ]
+                                    listUnion
+                                , QAST.CustomTypeDef "NonEmpty"
+                                    emptyRange
+                                    [ "a" ]
+                                    [ ( "head", Type.Generic "a" )
+                                    , ( "rest", Type.Union listUnion )
+                                    ]
+                                , QAST.CustomTypeDef "Empty" emptyRange [] []
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType [] [ Type.Int ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Integer emptyRange 3
+                                            , QAST.Word emptyRange "Empty"
+                                            , QAST.Word emptyRange ">NonEmpty"
+                                            , QAST.Word emptyRange ">NonEmpty"
+                                            , QAST.Word emptyRange ">NonEmpty"
+                                            , QAST.Integer emptyRange 0
+                                            , QAST.WordRef emptyRange "main__quot1"
+                                            , QAST.Word emptyRange "fold"
+                                            ]
+                                  }
+                                , { name = "main__quot1"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin emptyRange Builtin.Plus
+                                            ]
+                                  }
+                                , { name = "fold"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Union listUnion
+                                                , Type.Generic "b"
+                                                , Type.Quotation
+                                                    { input =
+                                                        [ Type.Generic "a"
+                                                        , Type.Generic "b"
+                                                        ]
+                                                    , output =
+                                                        [ Type.Generic "b"
+                                                        ]
+                                                    }
+                                                ]
+                                                [ Type.Generic "b" ]
+                                  , implementation =
+                                        QAST.MultiImpl
+                                            [ ( QAST.TypeMatch emptyRange (Type.Custom "Empty") []
+                                              , [ QAST.Builtin emptyRange Builtin.StackDrop
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                              )
+                                            , ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmpty" [ Type.Generic "a" ]) []
+                                              , [ QAST.Word emptyRange ">Pair"
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.WordRef emptyRange "fold_quot1"
+                                                , QAST.WordRef emptyRange "fold_quot2"
+                                                , QAST.Word emptyRange "split"
+                                                , QAST.Builtin emptyRange Builtin.StackRightRotate
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Builtin emptyRange Builtin.StackDuplicate
+                                                , QAST.Builtin emptyRange Builtin.StackRightRotate
+                                                , QAST.Word emptyRange "spill"
+                                                , QAST.Builtin emptyRange Builtin.Apply
+                                                , QAST.Builtin emptyRange Builtin.StackSwap
+                                                , QAST.Word emptyRange "second>"
+                                                , QAST.Word emptyRange "fold"
+                                                ]
+                                              )
+                                            ]
+                                            []
+                                  }
+                                , { name = "fold_quot1"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word emptyRange "head>" ]
+                                  }
+                                , { name = "fold_quot2"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word emptyRange "rest>" ]
+                                  }
+                                , { name = "split"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a"
+                                                , Type.Quotation
+                                                    { input = [ Type.Generic "a" ]
+                                                    , output = [ Type.Generic "b" ]
+                                                    }
+                                                , Type.Quotation
+                                                    { input = [ Type.Generic "a" ]
+                                                    , output = [ Type.Generic "c" ]
+                                                    }
+                                                ]
+                                                [ Type.Generic "b"
+                                                , Type.Generic "c"
+                                                ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin emptyRange Builtin.StackLeftRotate
+                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
+                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
+                                            , QAST.Builtin emptyRange Builtin.Apply
+                                            , QAST.Builtin emptyRange Builtin.StackSwap
+                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
+                                            , QAST.Builtin emptyRange Builtin.Apply
+                                            , QAST.Builtin emptyRange Builtin.StackSwap
+                                            ]
+                                  }
+                                , { name = "spill"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.CustomGeneric "Pair"
+                                                    [ Type.Generic "a"
+                                                    , Type.Generic "b"
+                                                    ]
+                                                ]
+                                                [ Type.Generic "a"
+                                                , Type.Generic "b"
+                                                ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.WordRef emptyRange "spill_quot1"
+                                            , QAST.WordRef emptyRange "spill_quot2"
+                                            , QAST.Word emptyRange "split"
+                                            ]
+                                  }
+                                , { name = "spill_quot1"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word emptyRange "first>" ]
+                                  }
+                                , { name = "spill_quot2"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.isQuoted
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Word emptyRange "second>" ]
+                                  }
+                                ]
+                        }
+                            |> QualifierUtil.addFunctionsForStructs
+                in
+                case run input of
+                    Err err ->
+                        err
+                            |> Debug.log "err"
+                            |> List.map (Problem.toString "")
+                            |> String.join "\n"
+                            |> (++) "Did not expect type check to fail.\n"
+                            |> Expect.fail
+
+                    Ok _ ->
+                        Expect.pass
         , test "Generic custom type fails if not generic is listed" <|
             \_ ->
                 let
@@ -564,8 +760,8 @@ suite =
                                 }
                     in
                     case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail." ++ Debug.toString err
 
                         Ok _ ->
                             Expect.pass
@@ -1099,6 +1295,59 @@ suite =
 
                         Err _ ->
                             Expect.fail "Did not expect type check to fail."
+            , test "Typechecking involving a multi-arity quotation is fine _if_ arity info is in type annotation" <|
+                \_ ->
+                    let
+                        input =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "apply-to-nums"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Quotation
+                                                        { input = [ Type.Int, Type.Int ]
+                                                        , output = [ Type.Int ]
+                                                        }
+                                                    ]
+                                                    [ Type.Int ]
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Integer emptyRange 1
+                                                , QAST.Integer emptyRange 2
+                                                , QAST.Builtin emptyRange Builtin.StackLeftRotate
+                                                , QAST.Builtin emptyRange Builtin.Apply
+                                                ]
+                                      }
+                                    , { name = "main"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.asEntryPoint
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.WordRef emptyRange "main__quot1"
+                                                , QAST.Word emptyRange "apply-to-nums"
+                                                ]
+                                      }
+                                    , { name = "main__quot1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isQuoted
+                                      , implementation =
+                                            QAST.SoloImpl
+                                                [ QAST.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case run input of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err err ->
+                            Expect.fail <| "Did not expect type check to fail:" ++ Debug.toString err
             , test "With generics" <|
                 \_ ->
                     let

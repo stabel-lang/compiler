@@ -1,0 +1,20 @@
+defunion: Maybe a
+: a
+: Nothing
+
+defstruct: Nothing
+
+defmulti: map
+type: (Maybe a) [ a -- b ] -- (Maybe b)
+: a
+  !
+: Nothing
+  drop
+
+defmulti: when-nothing
+type: (Maybe a) a -- a
+: a
+  drop
+: Nothing
+  swap drop
+

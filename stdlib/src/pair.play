@@ -1,0 +1,19 @@
+defstruct: Pair a b
+: first a
+: second b
+
+def: spill
+type: (Pair a b) -- a b
+: [ first> ] [ second> ] core/split
+
+def: map
+type: (Pair a b) [ a b -- c d ] -- (Pair c d)
+: swap spill -rotate ! >Pair
+
+def: map-first
+type: (Pair a b) [ a -- c ] -- (Pair c b)
+: core/over first> swap ! >first
+
+def: map-second
+type: (Pair a b) [ b -- c ] -- (Pair a c)
+: core/over second> swap ! >second

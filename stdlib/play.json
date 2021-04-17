@@ -3,12 +3,11 @@
     "version": "0.2.0",
     "language-version": "0.2.0",
     "exposed-modules": [
-        "basic"
+        "core",
+        "maybe",
+        "pair",
+        "list"
     ],
-    "dependencies": {
-        "play/version": "1.0.0"
-    },
-    "package-paths": [
-        "lib/*"
-    ]
+    "dependencies": {},
+    "package-paths": []
 }

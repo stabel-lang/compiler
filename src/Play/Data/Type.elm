@@ -147,8 +147,16 @@ toDisplayString t =
         CustomGeneric name _ ->
             name
 
-        Union _ ->
-            "Union"
+        Union members ->
+            let
+                memberString =
+                    members
+                        |> List.map toDisplayString
+                        |> String.join ", "
+            in
+            "Union("
+                ++ memberString
+                ++ ")"
 
         Quotation quotType ->
             "[ " ++ wordTypeToString quotType ++ " ]"

@@ -1,0 +1,49 @@
+defunion: List a
+: NonEmpty a
+: Empty
+
+defstruct: NonEmpty a
+: first a
+: rest (List a)
+
+defstruct: Empty
+
+def: of-one
+type: a -- (NonEmpty a)
+: Empty >NonEmpty
+
+def: of-two
+type: a a -- (NonEmpty a)
+: Empty >NonEmpty >NonEmpty
+
+def: of-three
+type: a a a -- (NonEmpty a)
+: Empty >NonEmpty >NonEmpty >NonEmpty
+
+defmulti: fold
+type: (List a) b [ a b -- b ] -- b
+: Empty
+  drop swap drop
+: NonEmpty
+  pair/>Pair
+  swap # (Pair b quot) (NonEmpty a)
+  [ first> ] [ rest> ] core/split # Pair first rest
+  rotate swap # rest first Pair
+  dup rotate # rest Pair first Pair
+  pair/spill # rest Pair first b quot
+  ! # rest Pair b
+  swap pair/second> # rest b quot
+  fold
+
+def: reverse
+type: (List a) -- (List a)
+: Empty [ >NonEmpty ] fold
+
+def: fold-right
+type: (List a) b [ a b -- b ] -- b
+: -rotate reverse rotate fold
+
+def: test
+: 1 2 3 of-three
+  0 [ + ] fold
+

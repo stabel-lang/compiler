@@ -1,0 +1,75 @@
+# Everything in core is imported into every module outside the standard library
+
+# booleans
+
+defunion: Bool
+: True
+: False
+
+defstruct: True
+defstruct: False
+
+defmulti: not
+type: Bool -- Bool
+: True
+  drop False
+: False
+  drop True
+
+defmulti: select
+type: Bool a a -- a
+: True
+  drop swap drop
+: False
+  rotate drop2
+
+def: if
+type: a... Bool [ a... -- b... ] [ a... -- b... ] -- b...
+: select !
+
+# stack manipulation
+
+def: over
+type: a b -- a b a
+: swap dup rotate
+
+def: drop2
+type: a b c -- a
+: drop drop
+
+def: split
+type: a [ a -- b ] [ a -- c ] -- b c
+: -rotate dup # [] [] a a
+  -rotate ! # [] a c
+  swap -rotate # c a []
+  ! # c b
+  swap
+  
+# numbers
+
+defmulti: zero?
+type: Int -- Bool
+: Int( value 0 )
+  drop True
+: Int
+  drop False 
+
+def: int=
+type: Int Int -- Bool
+: - zero?
+
+def: negate
+type: Int -- Int
+: dup dup - swap -
+
+def: square
+type: Int -- Int
+: dup *
+
+def: inc
+type: Int -- Int
+: 1 +
+
+def: dec
+type: Int -- Int
+: 1 -
