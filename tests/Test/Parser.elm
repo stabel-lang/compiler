@@ -32,7 +32,8 @@ suite =
                         """
 
                     expectedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
@@ -90,7 +91,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange "True" [] []
                                     ]
@@ -130,7 +132,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange
                                         "Person"
@@ -170,7 +173,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange
                                         "Box"
@@ -228,7 +232,8 @@ suite =
                         """
 
                     expectedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
@@ -273,7 +278,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
                                         "Bool"
@@ -328,7 +334,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
                                         "Maybe"
@@ -385,7 +392,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
                                         "MaybeBox"
@@ -444,7 +452,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
                                         "MaybeBox"
@@ -500,7 +509,8 @@ suite =
                         """
 
                     expectedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
@@ -555,7 +565,8 @@ suite =
                         """
 
                     expectedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
@@ -610,7 +621,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
@@ -647,7 +659,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "pair?"
@@ -691,7 +704,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "origo?"
@@ -729,7 +743,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
@@ -757,7 +772,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
@@ -785,7 +801,8 @@ suite =
                             """
 
                         expectedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
@@ -866,7 +883,8 @@ suite =
                     -- The ending source location for most definitions now ends where the next definition beings
                     -- This is not what we want (it includes too much white space), but it'll do for now.
                     expectedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ UnionTypeDef
                                     (SourceLocationRange

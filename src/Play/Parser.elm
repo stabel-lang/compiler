@@ -1,11 +1,13 @@
 module Play.Parser exposing
     ( AST
     , AstNode(..)
+    , ModuleDefinition
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
     , WordDefinition
     , WordImplementation(..)
+    , emptyModuleDefinition
     , run
     , typeDefinitionName
     )
@@ -26,8 +28,16 @@ type alias Parser a =
 
 
 type alias AST =
-    { types : Dict String TypeDefinition
+    { moduleDefinition : ModuleDefinition
+    , types : Dict String TypeDefinition
     , words : Dict String WordDefinition
+    }
+
+
+type alias ModuleDefinition =
+    { aliases : Dict String String
+    , imports : Dict String (List String)
+    , exposes : List String
     }
 
 
@@ -77,6 +87,14 @@ run sourceCode =
 
 
 -- ATOMS
+
+
+emptyModuleDefinition : ModuleDefinition
+emptyModuleDefinition =
+    { aliases = Dict.empty
+    , imports = Dict.empty
+    , exposes = []
+    }
 
 
 validSymbolChar : Char -> Bool
@@ -182,6 +200,16 @@ symbolImplParser =
         |> Parser.backtrackable
 
 
+symbolImplListParser : List String -> Parser (Parser.Step (List String) (List String))
+symbolImplListParser symbols =
+    Parser.oneOf
+        [ Parser.succeed (\sym -> Parser.Loop (sym :: symbols))
+            |= symbolImplParser
+            |. noiseParser
+        , Parser.succeed (Parser.Done <| List.reverse symbols)
+        ]
+
+
 symbolImplParser2 : Parser (SourceLocationRange -> AstNode)
 symbolImplParser2 =
     let
@@ -235,6 +263,12 @@ symbolImplParser2 =
         ]
         |. noiseParser
         |> Parser.andThen identity
+
+
+modulePathStringParser : Parser String
+modulePathStringParser =
+    Parser.loop [] modulePathParser
+        |> Parser.map (\( path, name ) -> String.join "/" (path ++ [ name ]))
 
 
 modulePathParser : List String -> Parser (Parser.Step (List String) ( List String, String ))
@@ -383,15 +417,63 @@ noiseParserLoop _ =
 parser : Parser AST
 parser =
     let
+        joinParseResults modDef ast =
+            { ast | moduleDefinition = modDef }
+
         emptyAst =
-            { types = Dict.empty
+            { moduleDefinition = emptyModuleDefinition
+            , types = Dict.empty
             , words = Dict.empty
             }
     in
     Parser.succeed identity
         |. noiseParser
-        |= Parser.loop emptyAst definitionParser
+        |= Parser.oneOf
+            [ Parser.succeed joinParseResults
+                |= moduleDefinitionParser
+                |. noiseParser
+                |= Parser.loop emptyAst definitionParser
+            , Parser.succeed (joinParseResults emptyModuleDefinition)
+                |= Parser.loop emptyAst definitionParser
+            ]
         |. Parser.end ExpectedEnd
+
+
+moduleDefinitionParser : Parser ModuleDefinition
+moduleDefinitionParser =
+    Parser.succeed identity
+        |. Parser.keyword (Token "defmodule:" NoProblem)
+        |= Parser.loop emptyModuleDefinition moduleDefinitionMetaParser
+
+
+moduleDefinitionMetaParser : ModuleDefinition -> Parser (Parser.Step ModuleDefinition ModuleDefinition)
+moduleDefinitionMetaParser def =
+    Parser.oneOf
+        [ Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            |. Parser.keyword (Token "alias:" NoProblem)
+            |. noiseParser
+            |= symbolParser
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+        , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+            |. Parser.keyword (Token "import:" NoProblem)
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+            |= Parser.loop [] symbolImplListParser
+            |. noiseParser
+        , Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
+            |. Parser.keyword (Token "exposing:" NoProblem)
+            |. noiseParser
+            |= Parser.loop [] symbolImplListParser
+            |. noiseParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
+        , Parser.succeed (Parser.Done def)
+            |. Parser.keyword (Token ":" NoProblem)
+        ]
 
 
 definitionParser : AST -> Parser (Parser.Step AST AST)

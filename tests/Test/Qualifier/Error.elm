@@ -20,7 +20,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
@@ -53,7 +54,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
@@ -74,7 +76,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
@@ -107,7 +110,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef
                                         emptyRange
@@ -130,7 +134,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.CustomTypeDef
                                         emptyRange

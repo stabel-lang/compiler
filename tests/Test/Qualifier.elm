@@ -22,7 +22,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
@@ -100,7 +101,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
@@ -147,7 +149,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "Bool"
@@ -206,7 +209,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
@@ -302,7 +306,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "a"
@@ -369,7 +374,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
@@ -441,7 +447,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef emptyRange
                                         "Bool"
@@ -507,7 +514,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef emptyRange
                                         "Maybe"
@@ -576,7 +584,8 @@ suite =
                             ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "Bool"
@@ -657,7 +666,8 @@ suite =
                         ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "USMoney"
@@ -871,7 +881,8 @@ suite =
                         ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "USMoney"
@@ -1028,7 +1039,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "call-external"
@@ -1082,7 +1094,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "call-external"
@@ -1136,7 +1149,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "call-external"
@@ -1198,7 +1212,8 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "call-external"
