@@ -37,7 +37,7 @@ type alias AST =
 type alias ModuleDefinition =
     { aliases : Dict String String
     , imports : Dict String (List String)
-    , exposes : List String
+    , exposes : Set String
     }
 
 
@@ -93,7 +93,7 @@ emptyModuleDefinition : ModuleDefinition
 emptyModuleDefinition =
     { aliases = Dict.empty
     , imports = Dict.empty
-    , exposes = []
+    , exposes = Set.empty
     }
 
 
@@ -267,8 +267,23 @@ symbolImplParser2 =
 
 modulePathStringParser : Parser String
 modulePathStringParser =
-    Parser.loop [] modulePathParser
-        |> Parser.map (\( path, name ) -> String.join "/" (path ++ [ name ]))
+    Parser.oneOf
+        [ Parser.succeed identity
+            |= symbolImplParser
+            |> Parser.andThen (\sym -> Parser.loop sym moduleRefParser)
+        , Parser.succeed identity
+            |= Parser.loop "" moduleRefParser
+        ]
+
+
+moduleRefParser : String -> Parser (Parser.Step String String)
+moduleRefParser path =
+    Parser.oneOf
+        [ Parser.succeed (\part -> Parser.Loop (path ++ "/" ++ part))
+            |. Parser.symbol (Token "/" NotMetadata)
+            |= symbolImplParser
+        , Parser.succeed (Parser.Done path)
+        ]
 
 
 modulePathParser : List String -> Parser (Parser.Step (List String) ( List String, String ))
@@ -443,6 +458,7 @@ moduleDefinitionParser : Parser ModuleDefinition
 moduleDefinitionParser =
     Parser.succeed identity
         |. Parser.keyword (Token "defmodule:" NoProblem)
+        |. noiseParser
         |= Parser.loop emptyModuleDefinition moduleDefinitionMetaParser
 
 
@@ -466,13 +482,14 @@ moduleDefinitionMetaParser def =
         , Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
             |. Parser.keyword (Token "exposing:" NoProblem)
             |. noiseParser
-            |= Parser.loop [] symbolImplListParser
+            |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
             |. noiseParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done def)
             |. Parser.keyword (Token ":" NoProblem)
+            |. noiseParser
         ]
 
 

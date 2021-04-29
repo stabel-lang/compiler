@@ -7,6 +7,7 @@ import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
+import Set
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations, expectCompiles)
 
@@ -1044,4 +1045,73 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , describe "Modules"
+            [ test "Module definition" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defmodule:
+                            alias: other /some/mod
+                            alias: moar local/mod
+                            import: /some/other/mod test1 word2
+                            import: internals foo
+                            import: internal/mod
+                            exposing: inc
+                            :
+
+                            defstruct: Pair a b
+                            : first a
+                            : second b
+
+                            def: inc
+                            : 1 +
+                            """
+
+                        expectedAst =
+                            { moduleDefinition =
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "other", "/some/mod" )
+                                        , ( "moar", "local/mod" )
+                                        ]
+                                , imports =
+                                    Dict.fromList
+                                        [ ( "/some/other/mod", [ "test1", "word2" ] )
+                                        , ( "internals", [ "foo" ] )
+                                        , ( "internal/mod", [] )
+                                        ]
+                                , exposes = Set.fromList [ "inc" ]
+                                }
+                            , types =
+                                Dict.fromListBy AST.typeDefinitionName
+                                    [ CustomTypeDef
+                                        emptyRange
+                                        "Pair"
+                                        [ "a", "b" ]
+                                        [ ( "first", Type.Generic "a" )
+                                        , ( "second", Type.Generic "b" )
+                                        ]
+                                    ]
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "inc"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+                                |> addFunctionsForStructs
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            ]
         ]

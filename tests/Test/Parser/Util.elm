@@ -30,7 +30,7 @@ compileRetainLocations str =
 
 stripLocations : AST -> AST
 stripLocations ast =
-    { moduleDefinition = emptyModuleDefinition
+    { moduleDefinition = ast.moduleDefinition
     , types = Dict.map (\_ t -> stripTypeLocation t) ast.types
     , words = Dict.map (\_ d -> stripWordLocation d) ast.words
     }
