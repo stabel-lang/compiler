@@ -1,12 +1,11 @@
 const compiler = require('./compiler.wrapper');
 
 test('Enum type', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
        defstruct: True 
        defstruct: False
 
        def: main
-       entry: true
        : True
     `);
 
@@ -17,7 +16,7 @@ test('Enum type', async () => {
 });
 
 test('Compound type', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Person
         : age Int
 
@@ -25,7 +24,6 @@ test('Compound type', async () => {
         : age> 1 + >Person
 
         def: main
-        entry: true
         : 1 >Person 19 >age inc-age age>
     `);
 

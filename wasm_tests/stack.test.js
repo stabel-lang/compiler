@@ -1,9 +1,8 @@
 const compiler = require('./compiler.wrapper');
 
 test('Square', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         type: -- Int
         : 5 square
 
@@ -18,9 +17,8 @@ test('Square', async () => {
 });
 
 test('Over', async() => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         type: -- Int
         : 1 2 over - + 2 =
 
@@ -37,9 +35,8 @@ test('Over', async() => {
 test('Under', async() => {
     // Not sure if under is actually a known function in forth
     // This is mainly to test -rotate
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         type: -- Int
         : 1 2 under - + 3 =
 

@@ -665,11 +665,6 @@ wordMetadataParser def =
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
-        , Parser.succeed (Parser.Loop { def | metadata = { metadata | isEntryPoint = True } })
-            |. Parser.keyword (Token "entry:" NoProblem)
-            |. noiseParser
-            |. Parser.keyword (Token "true" NoProblem)
-            |. noiseParser
         , Parser.succeed (\alias value -> Parser.Loop { def | metadata = Metadata.withAlias alias value def.metadata })
             |. Parser.keyword (Token "alias:" NoProblem)
             |. noiseParser

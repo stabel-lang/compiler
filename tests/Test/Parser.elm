@@ -28,7 +28,6 @@ suite =
                         : 1 -
 
                         def: main
-                        entry: true
                         : 1 inc inc dec 2 =
                         """
 
@@ -58,7 +57,6 @@ suite =
                                 , { name = "main"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.asEntryPoint
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -505,7 +503,6 @@ suite =
                         : !
 
                         def: main
-                        entry: true
                         : 1 [ 1 + ] apply-to-num
                         """
 
@@ -528,9 +525,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -561,7 +556,6 @@ suite =
                         : !
 
                         def: main
-                        entry: true
                         : 1 [ 1 + ] apply-to-num
                         """
 
@@ -587,9 +581,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1

@@ -1,9 +1,8 @@
 const compiler = require('./compiler.wrapper');
 
 test('Addition', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 3 3 +
     `);
 
@@ -13,9 +12,8 @@ test('Addition', async () => {
 });
 
 test('Subtraction', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 10 1 -
     `);
 
@@ -25,9 +23,8 @@ test('Subtraction', async () => {
 });
 
 test('Multiplication', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 5 3 *
     `);
 
@@ -37,9 +34,8 @@ test('Multiplication', async () => {
 });
 
 test('Division', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 10 5 div
     `);
 
