@@ -1113,5 +1113,54 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "Functions can have its own aliases and imports" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: inc
+                            alias: other /some/mod
+                            alias: moar local/mod
+                            import: /some/other/mod test1 word2
+                            import: internals foo
+                            import: internal/mod
+                            : 1 +
+                            """
+
+                        expectedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "inc"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withAlias "other" "/some/mod"
+                                                |> Metadata.withAlias "moar" "local/mod"
+                                                |> Metadata.withImport
+                                                    "/some/other/mod"
+                                                    [ "test1", "word2" ]
+                                                |> Metadata.withImport
+                                                    "internals"
+                                                    [ "foo" ]
+                                                |> Metadata.withImport
+                                                    "internal/mod"
+                                                    []
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+                                |> addFunctionsForStructs
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
             ]
         ]

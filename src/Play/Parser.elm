@@ -670,6 +670,20 @@ wordMetadataParser def =
             |. noiseParser
             |. Parser.keyword (Token "true" NoProblem)
             |. noiseParser
+        , Parser.succeed (\alias value -> Parser.Loop { def | metadata = Metadata.withAlias alias value def.metadata })
+            |. Parser.keyword (Token "alias:" NoProblem)
+            |. noiseParser
+            |= symbolParser
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+        , Parser.succeed (\mod vals -> Parser.Loop { def | metadata = Metadata.withImport mod vals def.metadata })
+            |. Parser.keyword (Token "import:" NoProblem)
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+            |= Parser.loop [] symbolImplListParser
+            |. noiseParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
