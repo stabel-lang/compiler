@@ -99,7 +99,7 @@ run config =
         ( wordErrors, externalWords, qualifiedWords ) =
             Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Set.empty, Dict.empty ) config.ast.words
 
-        requiredModules =
+        additionalRequiredModules =
             Set.toList externalWords
                 |> List.map Tuple.first
                 |> Set.fromList
@@ -114,7 +114,7 @@ run config =
             Ok
                 { types = qualifiedTypes
                 , words = qualifiedWords
-                , additionalModulesRequired = requiredModules
+                , additionalModulesRequired = additionalRequiredModules
                 , checkForExistingTypes = Set.empty
                 , checkForExistingWords = wordsToCheck
                 }
@@ -680,3 +680,114 @@ qualifyPackageModule config path =
             , "/"
             , path
             ]
+
+
+
+-- Dependant modules
+
+
+requiredModules : RunConfig -> Set String
+requiredModules config =
+    let
+        topLevelAliases =
+            config.ast.moduleDefinition.aliases
+
+        topLevelAliasTargets =
+            topLevelAliases
+                |> Dict.values
+                |> Set.fromList
+
+        topLevelImports =
+            config.ast.moduleDefinition.imports
+                |> Dict.keys
+                |> Set.fromList
+
+        wordRequirements =
+            config.ast.words
+                |> Dict.foldl
+                    (\_ w acc -> Set.union (requiredModulesOfWord topLevelAliases w) acc)
+                    Set.empty
+
+        fullyQualify mod acc =
+            if String.startsWith "/" mod then
+                case Dict.get mod config.externalModules of
+                    Just package ->
+                        Set.insert
+                            (String.concat
+                                [ "/"
+                                , package
+                                , mod
+                                ]
+                            )
+                            acc
+
+                    Nothing ->
+                        acc
+
+            else
+                Set.insert (qualifyPackageModule config mod) acc
+    in
+    topLevelAliasTargets
+        |> Set.union topLevelImports
+        |> Set.union wordRequirements
+        |> Set.foldl fullyQualify Set.empty
+
+
+requiredModulesOfWord : Dict String String -> Parser.WordDefinition -> Set String
+requiredModulesOfWord topLevelAliases word =
+    let
+        wordAliases =
+            word.metadata.aliases
+                |> Dict.values
+                |> Set.fromList
+
+        wordImports =
+            word.metadata.imports
+                |> Dict.keys
+                |> Set.fromList
+
+        impls =
+            case word.implementation of
+                Parser.SoloImpl impl ->
+                    [ impl ]
+
+                Parser.MultiImpl branches impl ->
+                    impl :: List.map Tuple.second branches
+
+        wordReferences =
+            impls
+                |> List.concat
+                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases word.metadata)
+                |> Set.fromList
+    in
+    wordAliases
+        |> Set.union wordImports
+        |> Set.union wordReferences
+
+
+extractModuleReferenceFromNode : Dict String String -> Metadata -> Parser.AstNode -> Maybe String
+extractModuleReferenceFromNode topLevelAliases meta node =
+    case node of
+        Parser.PackageWord _ [ potentialAlias ] _ ->
+            case
+                ( Dict.get potentialAlias topLevelAliases
+                , Dict.get potentialAlias meta.aliases
+                )
+            of
+                ( Just _, _ ) ->
+                    Nothing
+
+                ( _, Just _ ) ->
+                    Nothing
+
+                ( Nothing, Nothing ) ->
+                    Just potentialAlias
+
+        Parser.PackageWord _ path _ ->
+            Just (String.join "/" path)
+
+        Parser.ExternalWord _ path _ ->
+            Just ("/" ++ String.join "/" path)
+
+        _ ->
+            Nothing

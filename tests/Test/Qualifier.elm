@@ -1275,4 +1275,72 @@ suite =
                         Ok actualAst ->
                             Expect.equal expectedAst actualAst
             ]
+        , test "Retrieve dependant modules" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { moduleDefinition =
+                            { aliases =
+                                Dict.fromList
+                                    [ ( "html", "/external/html" ) ]
+                            , imports =
+                                Dict.fromList
+                                    [ ( "/external/module", [] ) ]
+                            , exposes = Set.fromList []
+                            }
+                        , types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "call-external"
+                                  , metadata = Metadata.default
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
+                                              , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                                ]
+                                              )
+                                            ]
+                                            [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                  }
+                                , { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withImport "/list/of/names" [ "one" ]
+                                            |> Metadata.withAlias "ali" "internal/alias"
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.PackageWord emptyRange [ "html" ] "div"
+                                            , AST.Word emptyRange "call-external"
+                                            , AST.ExternalWord emptyRange [ "some", "ext" ] "word"
+                                            , AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    expectedRequiredModules =
+                        Set.fromList
+                            [ "/robheghan/dummy/list/of/names"
+                            , "/robheghan/dummy/some/ext"
+                            , "/robheghan/html/external/html"
+                            , "/robheghan/html/external/module"
+                            , "/package/test/internal/alias"
+                            , "/package/test/package/module"
+                            ]
+
+                    actualRequiredModules =
+                        requiredModules
+                            { packageName = "package/test"
+                            , modulePath = "core"
+                            , ast = unqualifiedAst
+                            , externalModules =
+                                Dict.fromList
+                                    [ ( "/list/of/names", "robheghan/dummy" )
+                                    , ( "/some/ext", "robheghan/dummy" )
+                                    , ( "/external/html", "robheghan/html" )
+                                    , ( "/external/module", "robheghan/html" )
+                                    ]
+                            }
+                in
+                Expect.equal expectedRequiredModules actualRequiredModules
         ]
