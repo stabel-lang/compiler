@@ -67,6 +67,10 @@ compile entry sourceCode =
                         , modulePath = ""
                         , ast = ast
                         , externalModules = Dict.empty
+                        , inProgressAST =
+                            { types = Dict.empty
+                            , words = Dict.empty
+                            }
                         }
                         |> Result.map (\qast -> { qast | words = Dict.update entry (Maybe.map setEntryPoint) qast.words })
 
