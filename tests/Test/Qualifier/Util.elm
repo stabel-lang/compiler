@@ -5,7 +5,7 @@ module Test.Qualifier.Util exposing
     , stripLocations
     )
 
-import Dict exposing (Dict)
+import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Play.Data.Metadata as Metadata
@@ -24,13 +24,14 @@ import Play.Qualifier as AST
         )
 
 
-type alias FullyLoadedAST =
-    { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
+emptyAst : AST
+emptyAst =
+    { types = Dict.empty
+    , words = Dict.empty
     }
 
 
-expectOutput : Parser.AST -> FullyLoadedAST -> Expectation
+expectOutput : Parser.AST -> AST -> Expectation
 expectOutput parserAst expectedAst =
     let
         result =
@@ -39,6 +40,7 @@ expectOutput parserAst expectedAst =
                 , modulePath = ""
                 , ast = parserAst
                 , externalModules = Dict.empty
+                , inProgressAST = emptyAst
                 }
     in
     case result of
@@ -52,7 +54,7 @@ expectOutput parserAst expectedAst =
                 }
 
 
-expectModuleOutput : Parser.AST -> FullyLoadedAST -> Expectation
+expectModuleOutput : Parser.AST -> AST -> Expectation
 expectModuleOutput parserAst expectedAst =
     let
         result =
@@ -61,6 +63,7 @@ expectModuleOutput parserAst expectedAst =
                 , modulePath = "some/module"
                 , ast = parserAst
                 , externalModules = Dict.empty
+                , inProgressAST = emptyAst
                 }
     in
     case result of
@@ -74,7 +77,7 @@ expectModuleOutput parserAst expectedAst =
                 }
 
 
-addFunctionsForStructs : FullyLoadedAST -> FullyLoadedAST
+addFunctionsForStructs : AST -> AST
 addFunctionsForStructs ast =
     let
         helper _ t wipAst =
@@ -88,7 +91,7 @@ addFunctionsForStructs ast =
     Dict.foldl helper ast ast.types
 
 
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> FullyLoadedAST -> FullyLoadedAST
+addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
 addFunctionsForStructsHelper name generics members ast =
     let
         selfType =

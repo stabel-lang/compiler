@@ -77,6 +77,7 @@ type alias RunConfig =
     , modulePath : String
     , ast : Parser.AST
     , externalModules : Dict String String
+    , inProgressAST : AST
     }
 
 
@@ -87,8 +88,8 @@ run config =
             Dict.foldl (\_ val acc -> qualifyType config val acc) ( [], Dict.empty ) config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
-        ( wordErrors, externalWords, qualifiedWords ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Set.empty, Dict.empty ) config.ast.words
+        ( wordErrors, qualifiedWords ) =
+            Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -236,9 +237,9 @@ qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.WordDefinition
-    -> ( List Problem, Set ( String, String ), Dict String WordDefinition )
-    -> ( List Problem, Set ( String, String ), Dict String WordDefinition )
-qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords, acc ) =
+    -> ( List Problem, Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
+qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
     let
         ( whens, impl ) =
             case unqualifiedWord.implementation of
@@ -248,11 +249,12 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
                 Parser.MultiImpl whenImpl defImpl ->
                     ( whenImpl, defImpl )
 
-        ( newWordsAfterWhens, externalWordsAfterWhens, qualifiedWhensResult ) =
-            List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, Set.empty, [] ) whens
-                |> (\( a, b, nodes ) -> ( a, b, Result.combine nodes ))
+        ( newWordsAfterWhens, qualifiedWhensResult ) =
+            whens
+                |> List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, [] )
+                |> Tuple.mapSecond Result.combine
 
-        ( newWordsAfterImpl, externalWordsAfterImpl, qualifiedImplementationResult ) =
+        ( newWordsAfterImpl, qualifiedImplementationResult ) =
             initQualifyNode unqualifiedWord.name config newWordsAfterWhens impl
 
         qualifiedMetadataResult =
@@ -264,9 +266,6 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
     case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
             ( errors
-            , externalWords
-                |> Set.union externalWordsAfterWhens
-                |> Set.union externalWordsAfterImpl
             , Dict.insert qualifiedName
                 { name = qualifiedName
                 , metadata = qualifiedMetadata
@@ -282,19 +281,16 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
 
         ( Err whenError, _, _ ) ->
             ( whenError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
         ( _, Err implError, _ ) ->
             ( implError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
         ( _, _, Err metaError ) ->
             ( metaError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
@@ -372,11 +368,11 @@ qualifyWhen :
     -> Dict String TypeDefinition
     -> String
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, externalWords, result ) =
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
-        ( newWords, externalWordsAfterImpl, qualifiedImplementationResult ) =
+        ( newWords, qualifiedImplementationResult ) =
             initQualifyNode wordName config qualifiedWords impl
 
         qualifiedMatchResult =
@@ -385,19 +381,17 @@ qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords,
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
             ( newWords
-            , externalWords
             , Err err :: result
             )
 
         ( _, Err err ) ->
             ( newWords
-            , externalWords
             , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
+            -- TODO: Look here
             ( newWords
-            , Set.union externalWords externalWordsAfterImpl
             , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
             )
 
@@ -495,17 +489,16 @@ initQualifyNode :
     -> RunConfig
     -> Dict String WordDefinition
     -> List Parser.AstNode
-    -> ( Dict String WordDefinition, Set ( String, String ), Result Problem (List Node) )
+    -> ( Dict String WordDefinition, Result Problem (List Node) )
 initQualifyNode currentDefName config qualifiedWords impl =
     List.foldr (qualifyNode config currentDefName) (initQualifyNodeAccumulator qualifiedWords) impl
-        |> (\acc -> ( acc.qualifiedWords, acc.externalWords, Result.combine acc.qualifiedNodes ))
+        |> (\acc -> ( acc.qualifiedWords, Result.combine acc.qualifiedNodes ))
 
 
 type alias QualifyNodeAccumulator =
     { availableQuoteId : Int
     , qualifiedWords : Dict String WordDefinition
     , qualifiedNodes : List (Result Problem Node)
-    , externalWords : Set ( String, String )
     }
 
 
@@ -514,7 +507,6 @@ initQualifyNodeAccumulator qualifiedWords =
     { availableQuoteId = 1
     , qualifiedWords = qualifiedWords
     , qualifiedNodes = []
-    , externalWords = Set.empty
     }
 
 
@@ -546,15 +538,13 @@ qualifyNode config currentDefName node acc =
                     String.join "/" path
 
                 qualifiedPath =
-                    qualifyPackageModule config normalizedPath
+                    qualifyPackageModule config.packageName normalizedPath
 
                 qualifiedName =
                     String.join "/" [ qualifiedPath, value ]
             in
-            { acc
-                | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes
-                , externalWords = Set.insert ( qualifiedPath, value ) acc.externalWords
-            }
+            -- TODO: Look here
+            { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalWord loc path value ->
             let
@@ -573,10 +563,8 @@ qualifyNode config currentDefName node acc =
                         fullReference =
                             qualifiedPath ++ "/" ++ value
                     in
-                    { acc
-                        | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes
-                        , externalWords = Set.insert ( qualifiedPath, value ) acc.externalWords
-                    }
+                    -- TODO: Look here
+                    { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -596,11 +584,12 @@ qualifyNode config currentDefName node acc =
                     else
                         "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
 
-                ( newWordsAfterQuot, externalWords, qualifiedQuotImplResult ) =
+                ( newWordsAfterQuot, qualifiedQuotImplResult ) =
                     initQualifyNode quoteName config acc.qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->
+                    -- TODO: Look here
                     { acc
                         | availableQuoteId = acc.availableQuoteId + 1
                         , qualifiedWords =
@@ -613,7 +602,6 @@ qualifyNode config currentDefName node acc =
                                 }
                                 newWordsAfterQuot
                         , qualifiedNodes = Ok (WordRef sourceLocation quoteName) :: acc.qualifiedNodes
-                        , externalWords = Set.union externalWords acc.externalWords
                     }
 
                 Err err ->
@@ -646,15 +634,15 @@ qualifyName config name =
             ]
 
 
-qualifyPackageModule : RunConfig -> String -> String
-qualifyPackageModule config path =
-    if config.packageName == "" then
+qualifyPackageModule : String -> String -> String
+qualifyPackageModule packageName path =
+    if packageName == "" then
         path
 
     else
         String.concat
             [ "/"
-            , config.packageName
+            , packageName
             , "/"
             , path
             ]
@@ -664,7 +652,14 @@ qualifyPackageModule config path =
 -- Dependant modules
 
 
-requiredModules : RunConfig -> Set String
+type alias RequiredModulesConfig =
+    { packageName : String
+    , ast : Parser.AST
+    , externalModules : Dict String String
+    }
+
+
+requiredModules : RequiredModulesConfig -> Set String
 requiredModules config =
     let
         topLevelAliases =
@@ -703,7 +698,7 @@ requiredModules config =
                         acc
 
             else
-                Set.insert (qualifyPackageModule config mod) acc
+                Set.insert (qualifyPackageModule config.packageName mod) acc
     in
     topLevelAliasTargets
         |> Set.union topLevelImports

@@ -466,7 +466,6 @@ parsingUpdate msg state remainingModules =
                         requiredModules =
                             Qualifier.requiredModules
                                 { packageName = PackageName.toString packageName
-                                , modulePath = ModuleName.toString moduleName
                                 , ast = parserAst
                                 , externalModules = state.moduleNameToPackageName
                                 }
@@ -516,6 +515,7 @@ nextCompileStep remainingModules state =
                                 , modulePath = ModuleName.toString parsedModInfo.modulePath
                                 , ast = parsedModInfo.ast
                                 , externalModules = state.moduleNameToPackageName
+                                , inProgressAST = qast
                                 }
                     in
                     case qualifierResult of

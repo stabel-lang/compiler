@@ -1090,7 +1090,6 @@ suite =
                     actualRequiredModules =
                         requiredModules
                             { packageName = "package/test"
-                            , modulePath = "core"
                             , ast = unqualifiedAst
                             , externalModules =
                                 Dict.fromList

@@ -180,6 +180,10 @@ checkForError fn source =
                 , modulePath = ""
                 , ast = source
                 , externalModules = Dict.empty
+                , inProgressAST =
+                    { types = Dict.empty
+                    , words = Dict.empty
+                    }
                 }
     in
     case result of
