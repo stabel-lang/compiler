@@ -4,7 +4,7 @@ const stripIndent = require('strip-indent');
 
 exports.toWat = function toWat(entry, sourceCode) {
     return new Promise((resolve, reject) => {
-        const compiler = Compiler.Elm.Main.init({});
+        const compiler = Compiler.Elm.TestCompiler.init({});
 
         compiler.ports.compileFinished.subscribe(([ok, output]) => {
             if (ok) {

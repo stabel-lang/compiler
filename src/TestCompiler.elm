@@ -1,4 +1,4 @@
-port module Main exposing (main)
+port module TestCompiler exposing (main)
 
 import Dict
 import Platform exposing (Program)
