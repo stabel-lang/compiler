@@ -43,7 +43,7 @@ type Model
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
     | Parsing State (List ( PackageInfo, ModuleName )) SideEffect
-    | Done Qualifier.ExposedAST
+    | Done Qualifier.AST
     | Failed Problem
 
 

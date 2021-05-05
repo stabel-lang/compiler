@@ -15,15 +15,6 @@ import Set exposing (Set)
 type alias AST =
     { types : Dict String TypeDefinition
     , words : Dict String WordDefinition
-    , additionalModulesRequired : Set String
-    , checkForExistingTypes : Set String
-    , checkForExistingWords : Set String
-    }
-
-
-type alias ExposedAST =
-    { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
     }
 
 
@@ -98,25 +89,12 @@ run config =
 
         ( wordErrors, externalWords, qualifiedWords ) =
             Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Set.empty, Dict.empty ) config.ast.words
-
-        additionalRequiredModules =
-            Set.toList externalWords
-                |> List.map Tuple.first
-                |> Set.fromList
-
-        wordsToCheck =
-            Set.toList externalWords
-                |> List.map (\( path, name ) -> path ++ "/" ++ name)
-                |> Set.fromList
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
             Ok
                 { types = qualifiedTypes
                 , words = qualifiedWords
-                , additionalModulesRequired = additionalRequiredModules
-                , checkForExistingTypes = Set.empty
-                , checkForExistingWords = wordsToCheck
                 }
 
         _ ->

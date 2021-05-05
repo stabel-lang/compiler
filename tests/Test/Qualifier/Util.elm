@@ -14,7 +14,7 @@ import Play.Data.Type as Type exposing (Type)
 import Play.Parser as Parser
 import Play.Qualifier as AST
     exposing
-        ( ExposedAST
+        ( AST
         , Node(..)
         , TypeDefinition
         , TypeMatch(..)
@@ -147,7 +147,7 @@ addFunctionsForStructsHelper name generics members ast =
     { ast | words = Dict.union ast.words allFuncs }
 
 
-stripLocations : ExposedAST -> ExposedAST
+stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
     , words = Dict.map (\_ d -> stripWordLocation d) ast.words

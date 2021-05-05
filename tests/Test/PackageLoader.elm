@@ -148,7 +148,7 @@ resolveSideEffects :
     Dict String String
     -> List PackageLoader.SideEffect
     -> PackageLoader.Model
-    -> Result String ( List PackageLoader.SideEffect, Qualifier.ExposedAST )
+    -> Result String ( List PackageLoader.SideEffect, Qualifier.AST )
 resolveSideEffects fileSystem seenSfs model =
     case PackageLoader.getSideEffect model of
         Nothing ->
