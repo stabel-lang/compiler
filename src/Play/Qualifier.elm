@@ -1,6 +1,7 @@
 module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
+import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
@@ -259,7 +260,9 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
             { aliases =
                 config.ast.moduleDefinition.aliases
                     |> Dict.union unqualifiedWord.metadata.aliases
-            , imports = config.ast.moduleDefinition.imports
+            , imports =
+                config.ast.moduleDefinition.imports
+                    |> Dict.union unqualifiedWord.metadata.imports
             }
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
@@ -553,7 +556,36 @@ qualifyNode config currentDefName modRefs node acc =
                         { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
-                        { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
+                        case resolveImportedWord config modRefs value of
+                            Nothing ->
+                                { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
+
+                            Just mod ->
+                                if String.startsWith "/" mod then
+                                    let
+                                        path =
+                                            mod
+                                                |> String.split "/"
+                                                |> List.drop 1
+                                    in
+                                    qualifyNode
+                                        config
+                                        currentDefName
+                                        modRefs
+                                        (Parser.ExternalWord loc path value)
+                                        acc
+
+                                else
+                                    let
+                                        path =
+                                            String.split "/" mod
+                                    in
+                                    qualifyNode
+                                        config
+                                        currentDefName
+                                        modRefs
+                                        (Parser.PackageWord loc path value)
+                                        acc
 
         Parser.PackageWord loc path value ->
             let
@@ -695,6 +727,42 @@ qualifyPackageModule packageName path =
             , "/"
             , path
             ]
+
+
+resolveImportedWord : RunConfig -> ModuleReferences -> String -> Maybe String
+resolveImportedWord config modRefs name =
+    let
+        explicitImports =
+            modRefs.imports
+                |> Dict.toList
+                |> List.find (\( _, v ) -> List.member name v)
+                |> Maybe.map Tuple.first
+
+        potentialCandidates =
+            modRefs.imports
+                |> Dict.filter (\k v -> List.isEmpty v)
+                |> Dict.keys
+                |> List.filterMap resolveMod
+                |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
+
+        resolveMod mod =
+            if String.startsWith "/" mod then
+                Dict.get mod config.externalModules
+                    |> Maybe.map (\package -> qualifyPackageModule package mod)
+
+            else
+                Just <| qualifyPackageModule config.packageName mod
+    in
+    case explicitImports of
+        Just _ ->
+            explicitImports
+
+        Nothing ->
+            potentialCandidates
+                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.words ))
+                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
+                |> List.head
+                |> Maybe.map Tuple.first
 
 
 
