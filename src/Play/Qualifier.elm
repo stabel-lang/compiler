@@ -390,7 +390,6 @@ qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords,
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
-            -- TODO: Look here
             ( newWords
             , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
             )
@@ -543,8 +542,12 @@ qualifyNode config currentDefName node acc =
                 qualifiedName =
                     String.join "/" [ qualifiedPath, value ]
             in
-            -- TODO: Look here
-            { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+            case Dict.get qualifiedName config.inProgressAST.words of
+                Nothing ->
+                    { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
+
+                Just _ ->
+                    { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalWord loc path value ->
             let
@@ -557,14 +560,21 @@ qualifyNode config currentDefName node acc =
 
                 Just package ->
                     let
-                        qualifiedPath =
-                            "/" ++ package ++ normalizedPath
-
                         fullReference =
-                            qualifiedPath ++ "/" ++ value
+                            String.concat
+                                [ "/"
+                                , package
+                                , normalizedPath
+                                , "/"
+                                , value
+                                ]
                     in
-                    -- TODO: Look here
-                    { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
+                    case Dict.get fullReference config.inProgressAST.words of
+                        Nothing ->
+                            { acc | qualifiedNodes = Err (UnknownWordRef loc fullReference) :: acc.qualifiedNodes }
+
+                        Just _ ->
+                            { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -589,7 +599,6 @@ qualifyNode config currentDefName node acc =
             in
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->
-                    -- TODO: Look here
                     { acc
                         | availableQuoteId = acc.availableQuoteId + 1
                         , qualifiedWords =

@@ -1101,4 +1101,218 @@ suite =
                             }
                 in
                 Expect.equal expectedRequiredModules actualRequiredModules
+        , describe "Module resolution" <|
+            let
+                dummyWord =
+                    { name = "dummy"
+                    , metadata = Metadata.default
+                    , implementation =
+                        SoloImpl []
+                    }
+            in
+            [ test "Qualifies word in internal package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "internal" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "internal/add", dummyWord ) ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in internal package (multiword)" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int []
+                                                  , [ AST.Integer emptyRange 0
+                                                    , AST.PackageWord emptyRange [ "mod" ] "add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "mod" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int []
+                                                  , [ Integer emptyRange 0
+                                                    , Word emptyRange "mod/add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "mod/add", dummyWord ) ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "/external/package/mod/add", dummyWord ) ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in external package (multiword)" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange Type.Int []
+                                                  , [ AST.Integer emptyRange 0
+                                                    , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Integer emptyRange 1
+                                                , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int []
+                                                  , [ Integer emptyRange 0
+                                                    , Word emptyRange "/external/package/mod/add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "/external/package/mod/add", dummyWord ) ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            ]
         ]

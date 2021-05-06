@@ -1,5 +1,6 @@
 module Test.Qualifier.Util exposing
     ( addFunctionsForStructs
+    , expectExternalOutput
     , expectModuleOutput
     , expectOutput
     , stripLocations
@@ -75,6 +76,35 @@ expectModuleOutput parserAst expectedAst =
                 { types = actualAst.types
                 , words = actualAst.words
                 }
+
+
+expectExternalOutput : AST -> Parser.AST -> AST -> Expectation
+expectExternalOutput inProgressAst parserAst expectedAst =
+    let
+        config =
+            { packageName = ""
+            , modulePath = ""
+            , ast = parserAst
+            , externalModules =
+                Dict.fromList
+                    [ ( "/mod", "external/package" ) ]
+            , inProgressAST = emptyAst
+            }
+
+        result =
+            AST.run config
+    in
+    case result of
+        Ok _ ->
+            Expect.fail "Expected qualification to fail when inProgressAST is missing"
+
+        Err _ ->
+            case AST.run { config | inProgressAST = inProgressAst } of
+                Err errors ->
+                    Expect.fail <| "Did not expect qualification to fail: " ++ Debug.toString errors
+
+                Ok ast ->
+                    Expect.equal expectedAst ast
 
 
 addFunctionsForStructs : AST -> AST
