@@ -55,6 +55,12 @@ type Node
     | Builtin SourceLocationRange Builtin
 
 
+type alias ModuleReferences =
+    { aliases : Dict String String
+    , imports : Dict String (List String)
+    }
+
+
 builtinDict : Dict String Builtin
 builtinDict =
     Dict.fromList
@@ -249,13 +255,20 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
                 Parser.MultiImpl whenImpl defImpl ->
                     ( whenImpl, defImpl )
 
+        moduleReferences =
+            { aliases =
+                config.ast.moduleDefinition.aliases
+                    |> Dict.union unqualifiedWord.metadata.aliases
+            , imports = config.ast.moduleDefinition.imports
+            }
+
         ( newWordsAfterWhens, qualifiedWhensResult ) =
             whens
-                |> List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, [] )
+                |> List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name moduleReferences) ( acc, [] )
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
-            initQualifyNode unqualifiedWord.name config newWordsAfterWhens impl
+            initQualifyNode config unqualifiedWord.name moduleReferences newWordsAfterWhens impl
 
         qualifiedMetadataResult =
             qualifyMetadata config qualifiedTypes unqualifiedWord.metadata
@@ -367,13 +380,14 @@ qualifyWhen :
     RunConfig
     -> Dict String TypeDefinition
     -> String
+    -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, result ) =
+qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
-            initQualifyNode wordName config qualifiedWords impl
+            initQualifyNode config wordName modRefs qualifiedWords impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes typeMatch
@@ -484,13 +498,17 @@ qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, 
 
 
 initQualifyNode :
-    String
-    -> RunConfig
+    RunConfig
+    -> String
+    -> ModuleReferences
     -> Dict String WordDefinition
     -> List Parser.AstNode
     -> ( Dict String WordDefinition, Result Problem (List Node) )
-initQualifyNode currentDefName config qualifiedWords impl =
-    List.foldr (qualifyNode config currentDefName) (initQualifyNodeAccumulator qualifiedWords) impl
+initQualifyNode config currentDefName modRefs qualifiedWords impl =
+    List.foldr
+        (qualifyNode config currentDefName modRefs)
+        (initQualifyNodeAccumulator qualifiedWords)
+        impl
         |> (\acc -> ( acc.qualifiedWords, Result.combine acc.qualifiedNodes ))
 
 
@@ -509,8 +527,14 @@ initQualifyNodeAccumulator qualifiedWords =
     }
 
 
-qualifyNode : RunConfig -> String -> Parser.AstNode -> QualifyNodeAccumulator -> QualifyNodeAccumulator
-qualifyNode config currentDefName node acc =
+qualifyNode :
+    RunConfig
+    -> String
+    -> ModuleReferences
+    -> Parser.AstNode
+    -> QualifyNodeAccumulator
+    -> QualifyNodeAccumulator
+qualifyNode config currentDefName modRefs node acc =
     case node of
         Parser.Integer loc value ->
             { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
@@ -533,21 +557,37 @@ qualifyNode config currentDefName node acc =
 
         Parser.PackageWord loc path value ->
             let
-                normalizedPath =
+                normalizedPathPreAliasCheck =
                     String.join "/" path
 
-                qualifiedPath =
-                    qualifyPackageModule config.packageName normalizedPath
-
-                qualifiedName =
-                    String.join "/" [ qualifiedPath, value ]
+                normalizedPath =
+                    Dict.get normalizedPathPreAliasCheck modRefs.aliases
+                        |> Maybe.withDefault normalizedPathPreAliasCheck
             in
-            case Dict.get qualifiedName config.inProgressAST.words of
-                Nothing ->
-                    { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
+            if String.startsWith "/" normalizedPath then
+                let
+                    externalWordNode =
+                        Parser.ExternalWord
+                            loc
+                            (List.drop 1 <| String.split "/" normalizedPath)
+                            value
+                in
+                qualifyNode config currentDefName modRefs externalWordNode acc
 
-                Just _ ->
-                    { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+            else
+                let
+                    qualifiedPath =
+                        qualifyPackageModule config.packageName normalizedPath
+
+                    qualifiedName =
+                        String.join "/" [ qualifiedPath, value ]
+                in
+                case Dict.get qualifiedName config.inProgressAST.words of
+                    Nothing ->
+                        { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
+
+                    Just _ ->
+                        { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalWord loc path value ->
             let
@@ -595,7 +635,7 @@ qualifyNode config currentDefName node acc =
                         "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
 
                 ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    initQualifyNode quoteName config acc.qualifiedWords quotImpl
+                    initQualifyNode config quoteName modRefs acc.qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->

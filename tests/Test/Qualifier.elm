@@ -1314,5 +1314,121 @@ suite =
                         inProgressAst
                         unqualifiedAst
                         expectedAst
+            , test "Module alias" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "ext", "/mod" )
+                                        , ( "internal", "internal/mod" )
+                                        ]
+                                , imports = Dict.empty
+                                , exposes = Set.empty
+                                }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "internal" ] "value"
+                                                , AST.PackageWord emptyRange [ "ext" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "/external/package/mod/add", dummyWord )
+                                    , ( "internal/mod/value", dummyWord )
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module and function aliases" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "ext", "/mod" ) ]
+                                , imports = Dict.empty
+                                , exposes = Set.empty
+                                }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withAlias "internal" "internal/mod"
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "internal" ] "value"
+                                                , AST.PackageWord emptyRange [ "ext" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withAlias "internal" "internal/mod"
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ ( "/external/package/mod/add", dummyWord )
+                                    , ( "internal/mod/value", dummyWord )
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
             ]
         ]
