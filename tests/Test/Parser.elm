@@ -1062,19 +1062,20 @@ suite =
 
                         expectedAst =
                             { moduleDefinition =
-                                { aliases =
-                                    Dict.fromList
-                                        [ ( "other", "/some/mod" )
-                                        , ( "moar", "local/mod" )
-                                        ]
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "/some/other/mod", [ "test1", "word2" ] )
-                                        , ( "internals", [ "foo" ] )
-                                        , ( "internal/mod", [] )
-                                        ]
-                                , exposes = Set.fromList [ "inc" ]
-                                }
+                                Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "other", "/some/mod" )
+                                            , ( "moar", "local/mod" )
+                                            ]
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/some/other/mod", [ "test1", "word2" ] )
+                                            , ( "internals", [ "foo" ] )
+                                            , ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.fromList [ "inc" ]
+                                    }
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef

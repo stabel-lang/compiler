@@ -257,13 +257,16 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
                     ( whenImpl, defImpl )
 
         moduleReferences =
-            { aliases =
-                config.ast.moduleDefinition.aliases
-                    |> Dict.union unqualifiedWord.metadata.aliases
-            , imports =
-                config.ast.moduleDefinition.imports
-                    |> Dict.union unqualifiedWord.metadata.imports
-            }
+            case config.ast.moduleDefinition of
+                Parser.Defined def ->
+                    { aliases = Dict.union unqualifiedWord.metadata.aliases def.aliases
+                    , imports = Dict.union unqualifiedWord.metadata.imports def.imports
+                    }
+
+                Parser.Undefined ->
+                    { aliases = unqualifiedWord.metadata.aliases
+                    , imports = unqualifiedWord.metadata.imports
+                    }
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
             whens
@@ -780,7 +783,12 @@ requiredModules : RequiredModulesConfig -> Set String
 requiredModules config =
     let
         topLevelAliases =
-            config.ast.moduleDefinition.aliases
+            case config.ast.moduleDefinition of
+                Parser.Defined def ->
+                    def.aliases
+
+                Parser.Undefined ->
+                    Dict.empty
 
         topLevelAliasTargets =
             topLevelAliases
@@ -788,9 +796,14 @@ requiredModules config =
                 |> Set.fromList
 
         topLevelImports =
-            config.ast.moduleDefinition.imports
-                |> Dict.keys
-                |> Set.fromList
+            case config.ast.moduleDefinition of
+                Parser.Defined def ->
+                    def.imports
+                        |> Dict.keys
+                        |> Set.fromList
+
+                Parser.Undefined ->
+                    Set.empty
 
         wordRequirements =
             config.ast.words

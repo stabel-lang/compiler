@@ -1,7 +1,7 @@
 module Play.Parser exposing
     ( AST
     , AstNode(..)
-    , ModuleDefinition
+    , ModuleDefinition(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
@@ -34,7 +34,12 @@ type alias AST =
     }
 
 
-type alias ModuleDefinition =
+type ModuleDefinition
+    = Undefined
+    | Defined ModuleDefinitionRec
+
+
+type alias ModuleDefinitionRec =
     { aliases : Dict String String
     , imports : Dict String (List String)
     , exposes : Set String
@@ -91,6 +96,11 @@ run sourceCode =
 
 emptyModuleDefinition : ModuleDefinition
 emptyModuleDefinition =
+    Undefined
+
+
+emptyModuleDefinitionRec : ModuleDefinitionRec
+emptyModuleDefinitionRec =
     { aliases = Dict.empty
     , imports = Dict.empty
     , exposes = Set.empty
@@ -459,10 +469,10 @@ moduleDefinitionParser =
     Parser.succeed identity
         |. Parser.keyword (Token "defmodule:" NoProblem)
         |. noiseParser
-        |= Parser.loop emptyModuleDefinition moduleDefinitionMetaParser
+        |= Parser.map Defined (Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser)
 
 
-moduleDefinitionMetaParser : ModuleDefinition -> Parser (Parser.Step ModuleDefinition ModuleDefinition)
+moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDefinitionRec ModuleDefinitionRec)
 moduleDefinitionMetaParser def =
     Parser.oneOf
         [ Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })

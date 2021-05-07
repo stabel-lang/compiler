@@ -1039,14 +1039,15 @@ suite =
                 let
                     unqualifiedAst =
                         { moduleDefinition =
-                            { aliases =
-                                Dict.fromList
-                                    [ ( "html", "/external/html" ) ]
-                            , imports =
-                                Dict.fromList
-                                    [ ( "/external/module", [] ) ]
-                            , exposes = Set.fromList []
-                            }
+                            AST.Defined
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "html", "/external/html" ) ]
+                                , imports =
+                                    Dict.fromList
+                                        [ ( "/external/module", [] ) ]
+                                , exposes = Set.fromList []
+                                }
                         , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
@@ -1321,14 +1322,15 @@ suite =
                     let
                         unqualifiedAst =
                             { moduleDefinition =
-                                { aliases =
-                                    Dict.fromList
-                                        [ ( "ext", "/mod" )
-                                        , ( "internal", "internal/mod" )
-                                        ]
-                                , imports = Dict.empty
-                                , exposes = Set.empty
-                                }
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" )
+                                            , ( "internal", "internal/mod" )
+                                            ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
                             , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
@@ -1378,12 +1380,13 @@ suite =
                     let
                         unqualifiedAst =
                             { moduleDefinition =
-                                { aliases =
-                                    Dict.fromList
-                                        [ ( "ext", "/mod" ) ]
-                                , imports = Dict.empty
-                                , exposes = Set.empty
-                                }
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" ) ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
                             , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
@@ -1437,14 +1440,15 @@ suite =
                     let
                         unqualifiedAst =
                             { moduleDefinition =
-                                { aliases = Dict.empty
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "/mod", [ "add" ] )
-                                        , ( "internal/mod", [] )
-                                        ]
-                                , exposes = Set.empty
-                                }
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [ "add" ] )
+                                            , ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
                             , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
@@ -1494,13 +1498,14 @@ suite =
                     let
                         unqualifiedAst =
                             { moduleDefinition =
-                                { aliases = Dict.empty
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "internal/mod", [] )
-                                        ]
-                                , exposes = Set.empty
-                                }
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
                             , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
