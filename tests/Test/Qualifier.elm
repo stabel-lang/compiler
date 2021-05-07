@@ -9,6 +9,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
+import Play.Qualifier.Problem as Problem
 import Set
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
@@ -1112,6 +1113,17 @@ suite =
                             SoloImpl []
                       }
                     )
+
+                dummyWordUnexposed name =
+                    ( name
+                    , { name = name
+                      , metadata =
+                            Metadata.default
+                                |> Metadata.isExposed False
+                      , implementation =
+                            SoloImpl []
+                      }
+                    )
             in
             [ test "Qualifies word in internal package" <|
                 \_ ->
@@ -1677,5 +1689,117 @@ suite =
                             }
                     in
                     QualifierUtil.expectOutput unqualifiedAst expectedAst
+            , test "Referencing a function from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "value"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWordUnexposed "internal/mod/value"
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed function is called"
+
+                        Err [ Problem.WordNotExposed _ "internal/mod/value" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a function from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [ "add" ] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWordUnexposed "/external/package/mod/add"
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed function is called"
+
+                        Err [ Problem.WordNotExposed _ "/external/package/mod/add" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
             ]
         ]

@@ -633,8 +633,12 @@ qualifyNode config currentDefName modRefs node acc =
                     Nothing ->
                         { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
 
-                    Just _ ->
-                        { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+                    Just word ->
+                        if word.metadata.isExposed then
+                            { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+
+                        else
+                            { acc | qualifiedNodes = Err (WordNotExposed loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalWord loc path value ->
             let
@@ -660,8 +664,12 @@ qualifyNode config currentDefName modRefs node acc =
                         Nothing ->
                             { acc | qualifiedNodes = Err (UnknownWordRef loc fullReference) :: acc.qualifiedNodes }
 
-                        Just _ ->
-                            { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
+                        Just def ->
+                            if def.metadata.isExposed then
+                                { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
+
+                            else
+                                { acc | qualifiedNodes = Err (WordNotExposed loc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }

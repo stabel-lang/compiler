@@ -12,6 +12,7 @@ type Problem
     | UnionTypeMatchWithPatterns SourceLocationRange
     | InvalidTypeMatch SourceLocationRange
     | NoSuchMemberOnType SourceLocationRange String String
+    | WordNotExposed SourceLocationRange String
 
 
 toString : String -> Problem -> String
@@ -48,3 +49,10 @@ toString source problem =
                 ++ " does not have a member called '"
                 ++ member
                 ++ "'."
+
+        WordNotExposed range wordRef ->
+            SourceLocation.extractFromString source range
+                ++ "\n\n"
+                ++ "Trying to call '"
+                ++ wordRef
+                ++ "' but this function is not exposed."
