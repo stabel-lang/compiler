@@ -13,6 +13,7 @@ type alias Metadata =
     , sourceLocationRange : Maybe SourceLocationRange
     , aliases : Dict String String
     , imports : Dict String (List String)
+    , isExposed : Bool
     }
 
 
@@ -24,6 +25,7 @@ default =
     , sourceLocationRange = Nothing
     , aliases = Dict.empty
     , imports = Dict.empty
+    , isExposed = True
     }
 
 
@@ -65,3 +67,8 @@ withAlias ali val meta =
 withImport : String -> List String -> Metadata -> Metadata
 withImport ns vals meta =
     { meta | imports = Dict.insert ns vals meta.imports }
+
+
+isExposed : Bool -> Metadata -> Metadata
+isExposed val meta =
+    { meta | isExposed = val }

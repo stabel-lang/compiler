@@ -1351,7 +1351,9 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "external-call"
-                                      , metadata = Metadata.default
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -1411,6 +1413,7 @@ suite =
                                     [ { name = "external-call"
                                       , metadata =
                                             Metadata.default
+                                                |> Metadata.isExposed False
                                                 |> Metadata.withAlias "internal" "internal/mod"
                                       , implementation =
                                             SoloImpl
@@ -1469,7 +1472,9 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "external-call"
-                                      , metadata = Metadata.default
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -1531,6 +1536,7 @@ suite =
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withImport "/mod" [ "add" ]
+                                                |> Metadata.isExposed False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -1554,5 +1560,122 @@ suite =
                         inProgressAst
                         unqualifiedAst
                         expectedAst
+            , test "When module doesn't have a definition, all functions are exposed" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Integer emptyRange 3
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Integer emptyRange 2
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Integer emptyRange 3
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
+            , test "When module does have a definition, only functions defined to be exposed are" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports = Dict.empty
+                                    , exposes = Set.fromList [ "fn2" ]
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Integer emptyRange 3
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Integer emptyRange 2
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Integer emptyRange 3
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
             ]
         ]

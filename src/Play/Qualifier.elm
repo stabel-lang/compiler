@@ -277,7 +277,7 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
             initQualifyNode config unqualifiedWord.name moduleReferences newWordsAfterWhens impl
 
         qualifiedMetadataResult =
-            qualifyMetadata config qualifiedTypes unqualifiedWord.metadata
+            qualifyMetadata config qualifiedTypes unqualifiedWord.name unqualifiedWord.metadata
 
         qualifiedName =
             qualifyName config unqualifiedWord.name
@@ -314,8 +314,13 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
             )
 
 
-qualifyMetadata : RunConfig -> Dict String TypeDefinition -> Metadata -> Result Problem Metadata
-qualifyMetadata config qualifiedTypes meta =
+qualifyMetadata :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> String
+    -> Metadata
+    -> Result Problem Metadata
+qualifyMetadata config qualifiedTypes fnName meta =
     let
         wordRange =
             Maybe.withDefault SourceLocation.emptyRange meta.sourceLocationRange
@@ -340,6 +345,13 @@ qualifyMetadata config qualifiedTypes meta =
                 { meta
                     | type_ =
                         TypeSignature.map (resolveUnions qualifiedTypes) ts
+                    , isExposed =
+                        case config.ast.moduleDefinition of
+                            Parser.Undefined ->
+                                True
+
+                            Parser.Defined def ->
+                                Set.member fnName def.exposes
                 }
             )
 
