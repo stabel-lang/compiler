@@ -217,10 +217,14 @@ qualifyType config typeDef ( errors, acc ) =
                     )
 
 
-qualifyMemberType : RunConfig -> SourceLocationRange -> Type -> Result Problem Type
+qualifyMemberType :
+    RunConfig
+    -> SourceLocationRange
+    -> Parser.PossiblyQualifiedType
+    -> Result Problem Type
 qualifyMemberType config range type_ =
     case type_ of
-        Type.Custom name ->
+        Parser.LocalRef name [] ->
             case Dict.get name config.ast.types of
                 Just _ ->
                     Ok <| Type.Custom (qualifyName config name)
@@ -228,16 +232,75 @@ qualifyMemberType config range type_ =
                 Nothing ->
                     Err <| UnknownTypeRef range name
 
-        Type.CustomGeneric name binds ->
+        Parser.LocalRef name binds ->
             case Dict.get name config.ast.types of
                 Just _ ->
-                    Ok <| Type.CustomGeneric (qualifyName config name) binds
+                    let
+                        bindResult =
+                            binds
+                                |> List.map (qualifyMemberType config range)
+                                |> Result.combine
+                    in
+                    case bindResult of
+                        Ok convertedBindings ->
+                            Ok <|
+                                Type.CustomGeneric
+                                    (qualifyName config name)
+                                    convertedBindings
+
+                        Err err ->
+                            Err err
 
                 Nothing ->
                     Err <| UnknownTypeRef range name
 
-        _ ->
-            Ok type_
+        Parser.InternalRef _ name _ ->
+            case Dict.get name config.ast.types of
+                Just _ ->
+                    Ok <| Type.Custom (qualifyName config name)
+
+                Nothing ->
+                    Err <| UnknownTypeRef range name
+
+        Parser.ExternalRef _ name _ ->
+            case Dict.get name config.ast.types of
+                Just _ ->
+                    Ok <| Type.Custom (qualifyName config name)
+
+                Nothing ->
+                    Err <| UnknownTypeRef range name
+
+        Parser.Generic sym ->
+            Ok (Type.Generic sym)
+
+        Parser.StackRange sym ->
+            Ok (Type.Generic sym)
+
+        Parser.QuotationType sign ->
+            let
+                inputResult =
+                    sign.input
+                        |> List.map (qualifyMemberType config range)
+                        |> Result.combine
+
+                outputResult =
+                    sign.output
+                        |> List.map (qualifyMemberType config range)
+                        |> Result.combine
+            in
+            case ( inputResult, outputResult ) of
+                ( Ok input, Ok output ) ->
+                    Ok <|
+                        Type.Quotation
+                            { input = input
+                            , output = output
+                            }
+
+                ( Err input, _ ) ->
+                    Err input
+
+                ( _, Err output ) ->
+                    Err output
 
 
 qualifyDefinition :
@@ -259,13 +322,13 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
         moduleReferences =
             case config.ast.moduleDefinition of
                 Parser.Defined def ->
-                    { aliases = Dict.union unqualifiedWord.metadata.aliases def.aliases
-                    , imports = Dict.union unqualifiedWord.metadata.imports def.imports
+                    { aliases = Dict.union unqualifiedWord.aliases def.aliases
+                    , imports = Dict.union unqualifiedWord.imports def.imports
                     }
 
                 Parser.Undefined ->
-                    { aliases = unqualifiedWord.metadata.aliases
-                    , imports = unqualifiedWord.metadata.imports
+                    { aliases = unqualifiedWord.aliases
+                    , imports = unqualifiedWord.imports
                     }
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
@@ -277,7 +340,7 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
             initQualifyNode config unqualifiedWord.name moduleReferences newWordsAfterWhens impl
 
         qualifiedMetadataResult =
-            qualifyMetadata config qualifiedTypes unqualifiedWord.name unqualifiedWord.metadata
+            qualifyMetadata config qualifiedTypes unqualifiedWord
 
         qualifiedName =
             qualifyName config unqualifiedWord.name
@@ -317,32 +380,52 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
 qualifyMetadata :
     RunConfig
     -> Dict String TypeDefinition
-    -> String
-    -> Metadata
+    -> Parser.WordDefinition
     -> Result Problem Metadata
-qualifyMetadata config qualifiedTypes fnName meta =
+qualifyMetadata config qualifiedTypes word =
     let
         wordRange =
-            Maybe.withDefault SourceLocation.emptyRange meta.sourceLocationRange
+            Maybe.withDefault SourceLocation.emptyRange word.sourceLocationRange
+
+        inputLength =
+            case word.typeSignature of
+                Parser.NotProvided ->
+                    0
+
+                Parser.UserProvided wt ->
+                    List.length wt.input
+
+                Parser.Verified wt ->
+                    List.length wt.input
     in
-    TypeSignature.toMaybe meta.type_
+    Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (validateTypeReferences config qualifiedTypes wordRange)
+        |> List.map (qualifyMemberType config wordRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
                 let
+                    wordType =
+                        { input = List.take inputLength qualifiedFlatTypeSignature
+                        , output = List.drop inputLength qualifiedFlatTypeSignature
+                        }
+
                     ts =
-                        TypeSignature.map
-                            (\wt ->
-                                { input = List.take (List.length wt.input) qualifiedFlatTypeSignature
-                                , output = List.drop (List.length wt.input) qualifiedFlatTypeSignature
-                                }
-                            )
-                            meta.type_
+                        case word.typeSignature of
+                            Parser.NotProvided ->
+                                TypeSignature.NotProvided
+
+                            Parser.UserProvided _ ->
+                                TypeSignature.UserProvided wordType
+
+                            Parser.Verified _ ->
+                                TypeSignature.CompilerProvided wordType
+
+                    baseMeta =
+                        Metadata.default
                 in
-                { meta
+                { baseMeta
                     | type_ =
                         TypeSignature.map (resolveUnions qualifiedTypes) ts
                     , isExposed =
@@ -351,7 +434,7 @@ qualifyMetadata config qualifiedTypes fnName meta =
                                 True
 
                             Parser.Defined def ->
-                                Set.member fnName def.exposes
+                                Set.member word.name def.exposes
                 }
             )
 
@@ -430,16 +513,16 @@ qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifi
 qualifyMatch : RunConfig -> Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
 qualifyMatch config qualifiedTypes typeMatch =
     case typeMatch of
-        Parser.TypeMatch range Type.Int [] ->
+        Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
             Ok <| TypeMatch range Type.Int []
 
-        Parser.TypeMatch range Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
+        Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
             Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
 
-        Parser.TypeMatch range ((Type.Generic _) as type_) [] ->
-            Ok <| TypeMatch range type_ []
+        Parser.TypeMatch range (Parser.Generic sym) [] ->
+            Ok <| TypeMatch range (Type.Generic sym) []
 
-        Parser.TypeMatch range (Type.Custom name) patterns ->
+        Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
             let
                 qualifiedName =
                     qualifyName config name
@@ -501,7 +584,16 @@ qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, 
                 Ok <| ( fieldName, LiteralInt val )
 
             Parser.LiteralType type_ ->
-                Ok <| ( fieldName, LiteralType type_ )
+                let
+                    qualifyTypeResult =
+                        qualifyMemberType config range type_
+                in
+                case qualifyTypeResult of
+                    Ok qualifiedType ->
+                        Ok <| ( fieldName, LiteralType qualifiedType )
+
+                    Err err ->
+                        Err err
 
             Parser.RecursiveMatch typeMatch ->
                 case qualifyMatch config qualifiedTypes typeMatch of
@@ -860,12 +952,12 @@ requiredModulesOfWord : Dict String String -> Parser.WordDefinition -> Set Strin
 requiredModulesOfWord topLevelAliases word =
     let
         wordAliases =
-            word.metadata.aliases
+            word.aliases
                 |> Dict.values
                 |> Set.fromList
 
         wordImports =
-            word.metadata.imports
+            word.imports
                 |> Dict.keys
                 |> Set.fromList
 
@@ -880,7 +972,7 @@ requiredModulesOfWord topLevelAliases word =
         wordReferences =
             impls
                 |> List.concat
-                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases word.metadata)
+                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases word)
                 |> Set.fromList
     in
     wordAliases
@@ -888,7 +980,7 @@ requiredModulesOfWord topLevelAliases word =
         |> Set.union wordReferences
 
 
-extractModuleReferenceFromNode : Dict String String -> Metadata -> Parser.AstNode -> Maybe String
+extractModuleReferenceFromNode : Dict String String -> Parser.WordDefinition -> Parser.AstNode -> Maybe String
 extractModuleReferenceFromNode topLevelAliases meta node =
     case node of
         Parser.PackageWord _ [ potentialAlias ] _ ->

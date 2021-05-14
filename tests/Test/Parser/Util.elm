@@ -50,7 +50,7 @@ stripWordLocation : WordDefinition -> WordDefinition
 stripWordLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
-        , metadata = Metadata.clearSourceLocationRange word.metadata
+        , sourceLocationRange = Nothing
     }
 
 
@@ -125,15 +125,11 @@ addFunctionsForStructs ast =
     Dict.foldl helper ast ast.types
 
 
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
+addFunctionsForStructsHelper : String -> List String -> List ( String, AST.PossiblyQualifiedType ) -> AST -> AST
 addFunctionsForStructsHelper name generics members ast =
     let
         selfType =
-            if List.isEmpty generics then
-                Type.Custom name
-
-            else
-                Type.CustomGeneric name (List.map Type.Generic generics)
+            LocalRef name (List.map Generic generics)
 
         ctor =
             { name =
@@ -142,9 +138,14 @@ addFunctionsForStructsHelper name generics members ast =
 
                 else
                     ">" ++ name
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType (List.map Tuple.second members) [ selfType ]
+            , typeSignature =
+                Verified
+                    { input = List.map Tuple.second members
+                    , output = [ selfType ]
+                    }
+            , sourceLocationRange = Nothing
+            , aliases = Dict.empty
+            , imports = Dict.empty
             , implementation = AST.SoloImpl [ AST.ConstructType name ]
             }
 
@@ -153,11 +154,14 @@ addFunctionsForStructsHelper name generics members ast =
 
         settersHelper ( memberName, type_ ) =
             { name = ">" ++ memberName
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType
-                        [ selfType, type_ ]
-                        [ selfType ]
+            , typeSignature =
+                Verified
+                    { input = [ selfType, type_ ]
+                    , output = [ selfType ]
+                    }
+            , sourceLocationRange = Nothing
+            , aliases = Dict.empty
+            , imports = Dict.empty
             , implementation =
                 AST.SoloImpl [ AST.SetMember name memberName ]
             }
@@ -167,11 +171,14 @@ addFunctionsForStructsHelper name generics members ast =
 
         gettersHelper ( memberName, type_ ) =
             { name = memberName ++ ">"
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType
-                        [ selfType ]
-                        [ type_ ]
+            , typeSignature =
+                Verified
+                    { input = [ selfType ]
+                    , output = [ type_ ]
+                    }
+            , sourceLocationRange = Nothing
+            , aliases = Dict.empty
+            , imports = Dict.empty
             , implementation =
                 AST.SoloImpl [ AST.GetMember name memberName ]
             }

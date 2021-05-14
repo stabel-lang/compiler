@@ -11,8 +11,6 @@ type alias Metadata =
     , type_ : TypeSignature
     , isQuoted : Bool
     , sourceLocationRange : Maybe SourceLocationRange
-    , aliases : Dict String String
-    , imports : Dict String (List String)
     , isExposed : Bool
     }
 
@@ -23,8 +21,6 @@ default =
     , type_ = NotProvided
     , isQuoted = False
     , sourceLocationRange = Nothing
-    , aliases = Dict.empty
-    , imports = Dict.empty
     , isExposed = True
     }
 
@@ -57,16 +53,6 @@ withSourceLocationRange range meta =
 clearSourceLocationRange : Metadata -> Metadata
 clearSourceLocationRange meta =
     { meta | sourceLocationRange = Nothing }
-
-
-withAlias : String -> String -> Metadata -> Metadata
-withAlias ali val meta =
-    { meta | aliases = Dict.insert ali val meta.aliases }
-
-
-withImport : String -> List String -> Metadata -> Metadata
-withImport ns vals meta =
-    { meta | imports = Dict.insert ns vals meta.imports }
 
 
 isExposed : Bool -> Metadata -> Metadata
