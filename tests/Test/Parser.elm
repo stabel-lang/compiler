@@ -4,12 +4,23 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Play.Data.Metadata as Metadata
-import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange, emptyRange)
+import Play.Data.SourceLocation
+    exposing
+        ( SourceLocation
+        , SourceLocationRange
+        , emptyRange
+        )
 import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Set
 import Test exposing (Test, describe, test)
-import Test.Parser.Util exposing (addFunctionsForStructs, compile, compileRetainLocations, expectCompiles)
+import Test.Parser.Util
+    exposing
+        ( addFunctionsForStructs
+        , compile
+        , compileRetainLocations
+        , expectCompiles
+        )
 
 
 suite : Test
@@ -37,7 +48,10 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , metadata = Metadata.default
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -45,9 +59,14 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , typeSignature =
+                                        UserProvided
+                                            { input = [ LocalRef "Int" [] ]
+                                            , output = [ LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -55,8 +74,10 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -98,9 +119,14 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "as-int"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ LocalRef "True" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -137,16 +163,21 @@ suite =
                                     [ CustomTypeDef emptyRange
                                         "Person"
                                         []
-                                        [ ( "age", Type.Int )
-                                        , ( "jobs", Type.Int )
+                                        [ ( "age", LocalRef "Int" [] )
+                                        , ( "jobs", LocalRef "Int" [] )
                                         ]
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "get-age"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Person" ] [ Type.Int ]
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ LocalRef "Person" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.Word emptyRange "age>"
@@ -178,35 +209,44 @@ suite =
                                     [ CustomTypeDef emptyRange
                                         "Box"
                                         [ "a" ]
-                                        [ ( "element", Type.Generic "a" )
+                                        [ ( "element", Generic "a" )
                                         ]
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , typeSignature =
+                                            Verified
+                                                { input = [ Generic "a" ]
+                                                , output = [ LocalRef "Box" [ Generic "a" ] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl [ AST.ConstructType "Box" ]
                                       }
                                     , { name = ">element"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ], Type.Generic "a" ]
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
+                                      , typeSignature =
+                                            Verified
+                                                { input = [ LocalRef "Box" [ Generic "a" ], Generic "a" ]
+                                                , output = [ LocalRef "Box" [ Generic "a" ] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl [ AST.SetMember "Box" "element" ]
                                       }
                                     , { name = "element>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType
-                                                    [ Type.CustomGeneric "Box" [ Type.Generic "a" ] ]
-                                                    [ Type.Generic "a" ]
+                                      , typeSignature =
+                                            Verified
+                                                { input = [ LocalRef "Box" [ Generic "a" ] ]
+                                                , output = [ Generic "a" ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl [ AST.GetMember "Box" "element" ]
                                       }
@@ -236,11 +276,14 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
-                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , typeSignature =
+                                        Verified
+                                            { input = [ Generic "a", Generic "b" ]
+                                            , output = [ Generic "a", Generic "b", Generic "a" ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Word emptyRange "dup"
@@ -283,8 +326,8 @@ suite =
                                     [ UnionTypeDef emptyRange
                                         "Bool"
                                         []
-                                        [ Type.Custom "True"
-                                        , Type.Custom "False"
+                                        [ LocalRef "True" []
+                                        , LocalRef "False" []
                                         ]
                                     , CustomTypeDef emptyRange "True" [] []
                                     , CustomTypeDef emptyRange "False" [] []
@@ -292,13 +335,16 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "to-int"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.Custom "True") []
+                                                [ ( TypeMatch emptyRange (LocalRef "True" []) []
                                                   , [ AST.Word emptyRange "drop", AST.Integer emptyRange 1 ]
                                                   )
-                                                , ( TypeMatch emptyRange (Type.Custom "False") []
+                                                , ( TypeMatch emptyRange (LocalRef "False" []) []
                                                   , [ AST.Word emptyRange "drop", AST.Integer emptyRange 0 ]
                                                   )
                                                 ]
@@ -339,21 +385,24 @@ suite =
                                     [ UnionTypeDef emptyRange
                                         "Maybe"
                                         [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nil"
+                                        [ Generic "a"
+                                        , LocalRef "Nil" []
                                         ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                                [ ( TypeMatch emptyRange (Generic "a") []
                                                   , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
@@ -397,22 +446,25 @@ suite =
                                     [ UnionTypeDef emptyRange
                                         "MaybeBox"
                                         [ "a" ]
-                                        [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                        , Type.Custom "Nil"
+                                        [ LocalRef "Box" [ Generic "a" ]
+                                        , LocalRef "Nil" []
                                         ]
-                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
                                                   , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
@@ -457,26 +509,29 @@ suite =
                                     [ UnionTypeDef emptyRange
                                         "MaybeBox"
                                         [ "a" ]
-                                        [ Type.CustomGeneric "Box" [ Type.Generic "a" ]
-                                        , Type.Custom "Nil"
+                                        [ LocalRef "Box" [ Generic "a" ]
+                                        , LocalRef "Nil" []
                                         ]
-                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Type.Generic "a" ) ]
+                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.CustomGeneric "MaybeBox" [ Type.Generic "a" ], Type.Generic "a" ]
-                                                    [ Type.Generic "a" ]
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ LocalRef "MaybeBox" [ Generic "a" ], Generic "a" ]
+                                                , output = [ Generic "a" ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.CustomGeneric "Box" [ Type.Generic "a" ]) []
+                                                [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
                                                   , [ AST.Word emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
@@ -512,20 +567,30 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Int
-                                                , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                  , typeSignature =
+                                        UserProvided
+                                            { input =
+                                                [ LocalRef "Int" []
+                                                , QuotationType
+                                                    { input = [ LocalRef "Int" [] ]
+                                                    , output = [ LocalRef "Int" [] ]
+                                                    }
                                                 ]
-                                                [ Type.Int ]
+                                            , output = [ LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Word emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata = Metadata.default
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -565,23 +630,30 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.StackRange "a"
-                                                , Type.Quotation
-                                                    { input = [ Type.StackRange "a" ]
-                                                    , output = [ Type.StackRange "b" ]
+                                  , typeSignature =
+                                        UserProvided
+                                            { input =
+                                                [ StackRange "a"
+                                                , QuotationType
+                                                    { input = [ StackRange "a" ]
+                                                    , output = [ StackRange "b" ]
                                                     }
                                                 ]
-                                                [ Type.StackRange "b" ]
+                                            , output = [ StackRange "b" ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Word emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata = Metadata.default
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -619,11 +691,15 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange
-                                                        Type.Int
+                                                [ ( TypeMatch
+                                                        emptyRange
+                                                        (LocalRef "Int" [])
                                                         [ ( "value", AST.LiteralInt 0 )
                                                         ]
                                                   , [ AST.Word emptyRange "True" ]
@@ -657,16 +733,19 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "pair?"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange
-                                                        (Type.Custom "List")
+                                                        (LocalRef "List" [])
                                                         [ ( "tail"
                                                           , AST.RecursiveMatch
                                                                 (TypeMatch emptyRange
-                                                                    (Type.Custom "List")
-                                                                    [ ( "tail", AST.LiteralType (Type.Custom "Nil") )
+                                                                    (LocalRef "List" [])
+                                                                    [ ( "tail", AST.LiteralType (LocalRef "Nil" []) )
                                                                     ]
                                                                 )
                                                           )
@@ -702,11 +781,14 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "origo?"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange
-                                                        (Type.Custom "Pair")
+                                                        (LocalRef "Pair" [])
                                                         [ ( "first", AST.LiteralInt 0 )
                                                         , ( "second", AST.LiteralInt 0 )
                                                         ]
@@ -741,7 +823,10 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.PackageWord emptyRange [ "some", "module" ] "sample" ]
@@ -770,7 +855,10 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.ExternalWord emptyRange [ "some", "module" ] "sample" ]
@@ -799,7 +887,10 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "test"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.PackageWord emptyRange [ "internal" ] "sample"
@@ -886,8 +977,8 @@ suite =
                                     )
                                     "Bool"
                                     []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
+                                    [ LocalRef "True" []
+                                    , LocalRef "False" []
                                     ]
                                 , CustomTypeDef
                                     (SourceLocationRange
@@ -909,26 +1000,41 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "True" ]
+                                  , typeSignature =
+                                        UserProvided
+                                            { input = []
+                                            , output = [ LocalRef "True" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation = SoloImpl [ ConstructType "True" ]
                                   }
                                 , { name = "False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "False" ]
+                                  , typeSignature =
+                                        UserProvided
+                                            { input = []
+                                            , output = [ LocalRef "False" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation = SoloImpl [ ConstructType "False" ]
                                   }
                                 , { name = "from-int"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
-                                            |> Metadata.withSourceLocationRange
-                                                (SourceLocationRange
-                                                    (SourceLocation 9 1 66)
-                                                    (SourceLocation 16 1 141)
-                                                )
+                                  , typeSignature =
+                                        UserProvided
+                                            { input = [ LocalRef "Int" [] ]
+                                            , output = [ LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 9 1 66)
+                                                (SourceLocation 16 1 141)
+                                            )
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch
@@ -936,7 +1042,7 @@ suite =
                                                         (SourceLocation 11 3 104)
                                                         (SourceLocation 11 17 118)
                                                     )
-                                                    Type.Int
+                                                    (LocalRef "Int" [])
                                                     [ ( "value", LiteralInt 0 ) ]
                                               , [ Word
                                                     (SourceLocationRange
@@ -951,7 +1057,7 @@ suite =
                                                         (SourceLocation 13 3 129)
                                                         (SourceLocation 14 3 135)
                                                     )
-                                                    Type.Int
+                                                    (LocalRef "Int" [])
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
@@ -965,13 +1071,15 @@ suite =
                                             []
                                   }
                                 , { name = "equal"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withSourceLocationRange
-                                                (SourceLocationRange
-                                                    (SourceLocation 16 1 141)
-                                                    (SourceLocation 19 1 170)
-                                                )
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 16 1 141)
+                                                (SourceLocation 19 1 170)
+                                            )
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
                                             [ Word
@@ -995,13 +1103,15 @@ suite =
                                             ]
                                   }
                                 , { name = "not"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withSourceLocationRange
-                                                (SourceLocationRange
-                                                    (SourceLocation 19 1 170)
-                                                    (SourceLocation 23 1 210)
-                                                )
+                                  , typeSignature = NotProvided
+                                  , sourceLocationRange =
+                                        Just
+                                            (SourceLocationRange
+                                                (SourceLocation 19 1 170)
+                                                (SourceLocation 23 1 210)
+                                            )
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch
@@ -1009,7 +1119,7 @@ suite =
                                                         (SourceLocation 20 3 186)
                                                         (SourceLocation 21 3 193)
                                                     )
-                                                    (Type.Custom "True")
+                                                    (LocalRef "True" [])
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
@@ -1082,14 +1192,17 @@ suite =
                                         emptyRange
                                         "Pair"
                                         [ "a", "b" ]
-                                        [ ( "first", Type.Generic "a" )
-                                        , ( "second", Type.Generic "b" )
+                                        [ ( "first", Generic "a" )
+                                        , ( "second", Generic "b" )
                                         ]
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
-                                      , metadata = Metadata.default
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -1126,19 +1239,19 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withAlias "other" "/some/mod"
-                                                |> Metadata.withAlias "moar" "local/mod"
-                                                |> Metadata.withImport
-                                                    "/some/other/mod"
-                                                    [ "test1", "word2" ]
-                                                |> Metadata.withImport
-                                                    "internals"
-                                                    [ "foo" ]
-                                                |> Metadata.withImport
-                                                    "internal/mod"
-                                                    []
+                                      , typeSignature = NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases =
+                                            Dict.fromList
+                                                [ ( "other", "/some/mod" )
+                                                , ( "moar", "local/mod" )
+                                                ]
+                                      , imports =
+                                            Dict.fromList
+                                                [ ( "/some/other/mod", [ "test1", "word2" ] )
+                                                , ( "internals", [ "foo" ] )
+                                                , ( "internal/mod", [] )
+                                                ]
                                       , implementation =
                                             SoloImpl
                                                 [ AST.Integer emptyRange 1
