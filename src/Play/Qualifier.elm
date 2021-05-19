@@ -224,6 +224,9 @@ qualifyMemberType :
     -> Result Problem Type
 qualifyMemberType config range type_ =
     case type_ of
+        Parser.LocalRef "Int" [] ->
+            Ok <| Type.Int
+
         Parser.LocalRef name [] ->
             case Dict.get name config.ast.types of
                 Just _ ->

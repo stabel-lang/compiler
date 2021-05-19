@@ -286,9 +286,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -363,9 +361,7 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -430,9 +426,7 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1

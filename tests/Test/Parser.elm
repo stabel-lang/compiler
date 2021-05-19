@@ -277,7 +277,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "over"
                                   , typeSignature =
-                                        Verified
+                                        UserProvided
                                             { input = [ Generic "a", Generic "b" ]
                                             , output = [ Generic "a", Generic "b", Generic "a" ]
                                             }
@@ -1001,7 +1001,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "True"
                                   , typeSignature =
-                                        UserProvided
+                                        Verified
                                             { input = []
                                             , output = [ LocalRef "True" [] ]
                                             }
@@ -1012,7 +1012,7 @@ suite =
                                   }
                                 , { name = "False"
                                   , typeSignature =
-                                        UserProvided
+                                        Verified
                                             { input = []
                                             , output = [ LocalRef "False" [] ]
                                             }
