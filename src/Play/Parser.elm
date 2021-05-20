@@ -230,6 +230,23 @@ symbolParser =
         |> Parser.backtrackable
 
 
+symbolParser2 : Parser String
+symbolParser2 =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        , expecting = NotSymbol
+        }
+        |. Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token ":" NotMetadata)
+                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
+            , Parser.succeed identity
+            ]
+        |> Parser.backtrackable
+
+
 symbolImplParser : Parser String
 symbolImplParser =
     Parser.variable
@@ -399,6 +416,7 @@ genericOrRangeParser =
                     |. Parser.symbol (Token "..." NoProblem)
                     |. noiseParser
                 , Parser.succeed (Generic value)
+                    |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
                 ]
     in
     Parser.andThen helper genericParser
@@ -413,8 +431,15 @@ typeParser =
 typeRefParser : Parser PossiblyQualifiedType
 typeRefParser =
     Parser.oneOf
-        [ Parser.succeed (\name binds -> LocalRef name binds)
+        [ Parser.succeed LocalRef
             |= typeNameParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed (\( path, name ) binds -> ExternalRef path name binds)
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed (\( path, name ) binds -> InternalRef path name binds)
+            |= Parser.loop [] modularizedTypeRefParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed Generic
             |= genericParser
@@ -424,6 +449,29 @@ typeRefParser =
             |= Parser.lazy (\_ -> typeRefParser)
             |. Parser.symbol (Token ")" ExpectedRightParen)
             |. noiseParser
+        ]
+
+
+modularizedTypeRefParser :
+    List String
+    -> Parser (Parser.Step (List String) ( List String, String ))
+modularizedTypeRefParser reversedPath =
+    let
+        onType type_ =
+            Parser.Done
+                ( List.reverse reversedPath
+                , type_
+                )
+
+        addToPath pathPiece =
+            Parser.Loop (pathPiece :: reversedPath)
+    in
+    Parser.oneOf
+        [ Parser.succeed onType
+            |= typeNameParser
+        , Parser.succeed addToPath
+            |= symbolParser2
+            |. Parser.symbol (Token "/" NoProblem)
         ]
 
 
@@ -900,8 +948,6 @@ typeLoopParser reverseTypes =
     in
     Parser.oneOf
         [ Parser.succeed step
-            |= typeParser
-        , Parser.succeed step
             |= genericOrRangeParser
         , Parser.succeed step
             |= typeRefParser

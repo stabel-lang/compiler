@@ -3,14 +3,12 @@ module Test.Parser exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Play.Data.Metadata as Metadata
 import Play.Data.SourceLocation
     exposing
         ( SourceLocation
         , SourceLocationRange
         , emptyRange
         )
-import Play.Data.Type as Type
 import Play.Parser as AST exposing (..)
 import Set
 import Test exposing (Test, describe, test)
@@ -807,8 +805,8 @@ suite =
                         Ok ast ->
                             Expect.equal expectedAst ast
             ]
-        , describe "modules" <|
-            [ test "internal reference" <|
+        , describe "Modules" <|
+            [ test "Internal word reference" <|
                 \_ ->
                     let
                         source =
@@ -840,7 +838,7 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
-            , test "external reference" <|
+            , test "External word reference" <|
                 \_ ->
                     let
                         source =
@@ -872,7 +870,7 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
-            , test "internal _and_ external reference" <|
+            , test "Internal _and_ external word reference" <|
                 \_ ->
                     let
                         source =
@@ -906,6 +904,84 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "Internal types in type signature" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: test
+                            type: internal/Tipe -- Int
+                            : drop 1
+                            """
+
+                        expectedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ InternalRef [ "internal" ] "Tipe" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Integer emptyRange 1
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "External types in type signature" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: test
+                            type: /external/Tipe -- Int
+                            : drop 1
+                            """
+
+                        expectedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ ExternalRef [ "external" ] "Tipe" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Integer emptyRange 1
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
             ]
         , test "Support code comments" <|
             \_ ->
@@ -930,7 +1006,7 @@ suite =
                     # And thats it!
                      # wonder what else we should do...
                     """
-        , test "definition without implementation should be legal" <|
+        , test "Definition without implementation should be legal" <|
             \_ ->
                 expectCompiles
                     """
@@ -1147,8 +1223,8 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , describe "Modules"
-            [ test "Module definition" <|
+        , describe "Module definitions"
+            [ test "Imports and aliases" <|
                 \_ ->
                     let
                         source =
