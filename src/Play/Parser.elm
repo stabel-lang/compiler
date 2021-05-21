@@ -452,6 +452,27 @@ typeRefParser =
         ]
 
 
+typeMatchTypeParser : Parser PossiblyQualifiedType
+typeMatchTypeParser =
+    Parser.oneOf
+        [ Parser.succeed (\name -> LocalRef name [])
+            |= typeNameParser
+        , Parser.succeed (\( path, name ) -> ExternalRef path name [])
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed (\( path, name ) -> InternalRef path name [])
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed Generic
+            |= genericParser
+        , Parser.succeed identity
+            |. Parser.symbol (Token "(" ExpectedLeftParen)
+            |. noiseParser
+            |= typeRefParser
+            |. Parser.symbol (Token ")" ExpectedRightParen)
+            |. noiseParser
+        ]
+
+
 modularizedTypeRefParser :
     List String
     -> Parser (Parser.Step (List String) ( List String, String ))
@@ -963,29 +984,19 @@ typeLoopParser reverseTypes =
 
 typeMatchParser : Parser TypeMatch
 typeMatchParser =
-    Parser.oneOf
-        [ Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
-            |= sourceLocationParser
-            |= typeParser
-            |= Parser.oneOf
-                [ Parser.succeed identity
-                    |. Parser.symbol (Token "(" ExpectedLeftParen)
-                    |. noiseParser
-                    |= Parser.loop [] typeMatchConditionParser
-                    |. Parser.symbol (Token ")" ExpectedRightParen)
-                , Parser.succeed []
-                ]
-            |= sourceLocationParser
-            |. noiseParser
-        , Parser.succeed (\startLoc sym endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) (Generic sym) [])
-            |= sourceLocationParser
-            |= genericParser
-            |= sourceLocationParser
-        , Parser.succeed (\startLoc typ endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) typ [])
-            |= sourceLocationParser
-            |= typeRefParser
-            |= sourceLocationParser
-        ]
+    Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
+        |= sourceLocationParser
+        |= typeMatchTypeParser
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token "(" ExpectedLeftParen)
+                |. noiseParser
+                |= Parser.loop [] typeMatchConditionParser
+                |. Parser.symbol (Token ")" ExpectedRightParen)
+            , Parser.succeed []
+            ]
+        |= sourceLocationParser
+        |. noiseParser
 
 
 typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))

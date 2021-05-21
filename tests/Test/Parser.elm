@@ -982,6 +982,102 @@ suite =
 
                         Ok ast ->
                             Expect.equal expectedAst ast
+            , test "External type in multifn" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defmulti: test
+                            type: /external/Tipe -- Int
+                            : /external/Tipe( value 1 )
+                              drop 1
+                            else:
+                              drop 0
+                            """
+
+                        expectedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ ExternalRef [ "external" ] "Tipe" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (ExternalRef [ "external" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Integer emptyRange 1
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Integer emptyRange 0
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
+            , test "Internal type in multifn" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defmulti: test
+                            type: internal/Tipe -- Int
+                            : internal/Tipe( value 1 )
+                              drop 1
+                            else:
+                              drop 0
+                            """
+
+                        expectedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , typeSignature =
+                                            UserProvided
+                                                { input = [ InternalRef [ "internal" ] "Tipe" [] ]
+                                                , output = [ LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Integer emptyRange 1
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Integer emptyRange 0
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    case compile source of
+                        Err err ->
+                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
+
+                        Ok ast ->
+                            Expect.equal expectedAst ast
             ]
         , test "Support code comments" <|
             \_ ->
