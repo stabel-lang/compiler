@@ -257,13 +257,31 @@ qualifyMemberType config range type_ =
                 Nothing ->
                     Err <| UnknownTypeRef range name
 
-        Parser.InternalRef _ name _ ->
-            case Dict.get name config.ast.types of
-                Just _ ->
-                    Ok <| Type.Custom (qualifyName config name)
+        Parser.InternalRef path name binds ->
+            let
+                qualifiedName =
+                    path
+                        ++ [ name ]
+                        |> String.join "/"
+                        |> qualifyPackageModule config.packageName
 
-                Nothing ->
-                    Err <| UnknownTypeRef range name
+                bindResult =
+                    binds
+                        |> List.map (qualifyMemberType config range)
+                        |> Result.combine
+            in
+            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
+                ( Just (CustomTypeDef _ _ [] _), _ ) ->
+                    Ok <| Type.Custom qualifiedName
+
+                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+
+                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
+                    Ok <| Type.Union memberTypes
+
+                _ ->
+                    Err <| UnknownTypeRef range qualifiedName
 
         Parser.ExternalRef _ name _ ->
             case Dict.get name config.ast.types of
@@ -531,6 +549,52 @@ qualifyMatch config qualifiedTypes typeMatch =
                     qualifyName config name
             in
             case Dict.get qualifiedName qualifiedTypes of
+                Just (CustomTypeDef _ _ gens members) ->
+                    let
+                        memberNames =
+                            members
+                                |> List.map Tuple.first
+                                |> Set.fromList
+
+                        qualifiedPatternsResult =
+                            patterns
+                                |> List.map (qualifyMatchValue config qualifiedTypes range qualifiedName memberNames)
+                                |> Result.combine
+
+                        actualType =
+                            case gens of
+                                [] ->
+                                    Type.Custom qualifiedName
+
+                                _ ->
+                                    Type.CustomGeneric qualifiedName (List.map Type.Generic gens)
+                    in
+                    case qualifiedPatternsResult of
+                        Ok qualifiedPatterns ->
+                            Ok <| TypeMatch range actualType qualifiedPatterns
+
+                        Err err ->
+                            Err err
+
+                Just (UnionTypeDef _ _ _ types) ->
+                    if List.isEmpty patterns then
+                        Ok <| TypeMatch range (Type.Union types) []
+
+                    else
+                        Err <| UnionTypeMatchWithPatterns range
+
+                Nothing ->
+                    Err <| UnknownTypeRef range qualifiedName
+
+        Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
+            let
+                qualifiedName =
+                    path
+                        ++ [ name ]
+                        |> String.join "/"
+                        |> qualifyPackageModule config.packageName
+            in
+            case Dict.get qualifiedName config.inProgressAST.types of
                 Just (CustomTypeDef _ _ gens members) ->
                     let
                         memberNames =
