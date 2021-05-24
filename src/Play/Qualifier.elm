@@ -95,8 +95,11 @@ run config =
             Dict.foldl (\_ val acc -> qualifyType config val acc) ( [], Dict.empty ) config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
+        allQualifiedTypes =
+            Dict.union qualifiedTypes config.inProgressAST.types
+
         ( wordErrors, qualifiedWords ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
+            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -283,13 +286,33 @@ qualifyMemberType config range type_ =
                 _ ->
                     Err <| UnknownTypeRef range qualifiedName
 
-        Parser.ExternalRef _ name _ ->
-            case Dict.get name config.ast.types of
-                Just _ ->
-                    Ok <| Type.Custom (qualifyName config name)
+        Parser.ExternalRef path name binds ->
+            let
+                pathString =
+                    "/" ++ String.join "/" path
 
-                Nothing ->
-                    Err <| UnknownTypeRef range name
+                qualifiedName =
+                    Dict.get pathString config.externalModules
+                        |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
+                        |> Maybe.withDefault ""
+
+                bindResult =
+                    binds
+                        |> List.map (qualifyMemberType config range)
+                        |> Result.combine
+            in
+            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
+                ( Just (CustomTypeDef _ _ [] _), _ ) ->
+                    Ok <| Type.Custom qualifiedName
+
+                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+
+                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
+                    Ok <| Type.Union memberTypes
+
+                _ ->
+                    Err <| UnknownTypeRef range qualifiedName
 
         Parser.Generic sym ->
             Ok (Type.Generic sym)
@@ -533,6 +556,46 @@ qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifi
 
 qualifyMatch : RunConfig -> Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
 qualifyMatch config qualifiedTypes typeMatch =
+    let
+        qualifiedNameToMatch range name patterns =
+            case Dict.get name qualifiedTypes of
+                Just (CustomTypeDef _ _ gens members) ->
+                    let
+                        memberNames =
+                            members
+                                |> List.map Tuple.first
+                                |> Set.fromList
+
+                        qualifiedPatternsResult =
+                            patterns
+                                |> List.map (qualifyMatchValue config qualifiedTypes range name memberNames)
+                                |> Result.combine
+
+                        actualType =
+                            case gens of
+                                [] ->
+                                    Type.Custom name
+
+                                _ ->
+                                    Type.CustomGeneric name (List.map Type.Generic gens)
+                    in
+                    case qualifiedPatternsResult of
+                        Ok qualifiedPatterns ->
+                            Ok <| TypeMatch range actualType qualifiedPatterns
+
+                        Err err ->
+                            Err err
+
+                Just (UnionTypeDef _ _ _ types) ->
+                    if List.isEmpty patterns then
+                        Ok <| TypeMatch range (Type.Union types) []
+
+                    else
+                        Err <| UnionTypeMatchWithPatterns range
+
+                Nothing ->
+                    Err <| UnknownTypeRef range name
+    in
     case typeMatch of
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
             Ok <| TypeMatch range Type.Int []
@@ -544,47 +607,7 @@ qualifyMatch config qualifiedTypes typeMatch =
             Ok <| TypeMatch range (Type.Generic sym) []
 
         Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
-            let
-                qualifiedName =
-                    qualifyName config name
-            in
-            case Dict.get qualifiedName qualifiedTypes of
-                Just (CustomTypeDef _ _ gens members) ->
-                    let
-                        memberNames =
-                            members
-                                |> List.map Tuple.first
-                                |> Set.fromList
-
-                        qualifiedPatternsResult =
-                            patterns
-                                |> List.map (qualifyMatchValue config qualifiedTypes range qualifiedName memberNames)
-                                |> Result.combine
-
-                        actualType =
-                            case gens of
-                                [] ->
-                                    Type.Custom qualifiedName
-
-                                _ ->
-                                    Type.CustomGeneric qualifiedName (List.map Type.Generic gens)
-                    in
-                    case qualifiedPatternsResult of
-                        Ok qualifiedPatterns ->
-                            Ok <| TypeMatch range actualType qualifiedPatterns
-
-                        Err err ->
-                            Err err
-
-                Just (UnionTypeDef _ _ _ types) ->
-                    if List.isEmpty patterns then
-                        Ok <| TypeMatch range (Type.Union types) []
-
-                    else
-                        Err <| UnionTypeMatchWithPatterns range
-
-                Nothing ->
-                    Err <| UnknownTypeRef range qualifiedName
+            qualifiedNameToMatch range (qualifyName config name) patterns
 
         Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
             let
@@ -594,43 +617,19 @@ qualifyMatch config qualifiedTypes typeMatch =
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
             in
-            case Dict.get qualifiedName config.inProgressAST.types of
-                Just (CustomTypeDef _ _ gens members) ->
-                    let
-                        memberNames =
-                            members
-                                |> List.map Tuple.first
-                                |> Set.fromList
+            qualifiedNameToMatch range qualifiedName patterns
 
-                        qualifiedPatternsResult =
-                            patterns
-                                |> List.map (qualifyMatchValue config qualifiedTypes range qualifiedName memberNames)
-                                |> Result.combine
+        Parser.TypeMatch range (Parser.ExternalRef path name _) patterns ->
+            let
+                pathString =
+                    "/" ++ String.join "/" path
 
-                        actualType =
-                            case gens of
-                                [] ->
-                                    Type.Custom qualifiedName
-
-                                _ ->
-                                    Type.CustomGeneric qualifiedName (List.map Type.Generic gens)
-                    in
-                    case qualifiedPatternsResult of
-                        Ok qualifiedPatterns ->
-                            Ok <| TypeMatch range actualType qualifiedPatterns
-
-                        Err err ->
-                            Err err
-
-                Just (UnionTypeDef _ _ _ types) ->
-                    if List.isEmpty patterns then
-                        Ok <| TypeMatch range (Type.Union types) []
-
-                    else
-                        Err <| UnionTypeMatchWithPatterns range
-
-                Nothing ->
-                    Err <| UnknownTypeRef range qualifiedName
+                qualifiedName =
+                    Dict.get pathString config.externalModules
+                        |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
+                        |> Maybe.withDefault ""
+            in
+            qualifiedNameToMatch range qualifiedName patterns
 
         Parser.TypeMatch range _ _ ->
             Err <| InvalidTypeMatch range

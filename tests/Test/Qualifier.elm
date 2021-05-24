@@ -1452,7 +1452,48 @@ suite =
                         inProgressAst
                         unqualifiedAst
                         expectedAst
-            , Test.todo "Qualifies member type in internal package"
+            , test "Qualifies member type in internal package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , AST.CustomTypeDef emptyRange
+                                            "SomeType"
+                                            []
+                                            [ ( "tipe", AST.InternalRef [ "mod" ] "Tipe" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , CustomTypeDef "SomeType"
+                                            emptyRange
+                                            []
+                                            [ ( "tipe", Type.Custom "mod/Tipe" ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
             , test "Qualifies word in external package" <|
                 \_ ->
                     let
@@ -1555,6 +1596,200 @@ suite =
                             , words =
                                 Dict.fromList
                                     [ dummyWord "/external/package/mod/add" ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input =
+                                                    [ AST.ExternalRef [ "mod" ] "Tipe" []
+                                                    , AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
+                                                    , AST.ExternalRef [ "mod" ] "TipeUnion" []
+                                                    ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe"
+                                                    , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                    , Type.Union
+                                                        [ Type.Custom "/external/package/mod/Tipe"
+                                                        , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in external package (multiword)" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.ExternalRef [ "mod" ] "TipeUnion" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                , ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Union
+                                                        [ Type.Custom "/external/package/mod/Tipe"
+                                                        , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]) []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies member type in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , AST.CustomTypeDef emptyRange
+                                            "SomeType"
+                                            []
+                                            [ ( "tipe", AST.ExternalRef [ "mod" ] "Tipe" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , CustomTypeDef "SomeType"
+                                            emptyRange
+                                            []
+                                            [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
                             }
                     in
                     QualifierUtil.expectExternalOutput
