@@ -170,13 +170,17 @@ qualifyType :
     -> ( List Problem, Dict String TypeDefinition )
 qualifyType config typeDef ( errors, acc ) =
     let
-        ( aliases, imports ) =
+        modRefs =
             case config.ast.moduleDefinition of
                 Parser.Undefined ->
-                    ( Dict.empty, Dict.empty )
+                    { aliases = Dict.empty
+                    , imports = Dict.empty
+                    }
 
                 Parser.Defined mod ->
-                    ( mod.aliases, mod.imports )
+                    { aliases = mod.aliases
+                    , imports = mod.imports
+                    }
     in
     case typeDef of
         Parser.CustomTypeDef range name generics members ->
@@ -185,7 +189,7 @@ qualifyType config typeDef ( errors, acc ) =
                     qualifyName config name
 
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config aliases imports range)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs range)) members
                         |> List.map raiseTupleError
                         |> Result.combine
 
@@ -214,7 +218,7 @@ qualifyType config typeDef ( errors, acc ) =
                     qualifyName config name
 
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config aliases imports range) memberTypes
+                    List.map (qualifyMemberType config modRefs range) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -231,12 +235,11 @@ qualifyType config typeDef ( errors, acc ) =
 
 qualifyMemberType :
     RunConfig
-    -> Dict String String
-    -> Dict String (List String)
+    -> ModuleReferences
     -> SourceLocationRange
     -> Parser.PossiblyQualifiedType
     -> Result Problem Type
-qualifyMemberType config aliases imports range type_ =
+qualifyMemberType config modRefs range type_ =
     let
         internalRefLookup path name binds =
             let
@@ -248,7 +251,7 @@ qualifyMemberType config aliases imports range type_ =
 
                 bindResult =
                     binds
-                        |> List.map (qualifyMemberType config aliases imports range)
+                        |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
@@ -263,6 +266,28 @@ qualifyMemberType config aliases imports range type_ =
 
                 _ ->
                     Err <| UnknownTypeRef range qualifiedName
+
+        importsLookup name binds =
+            case resolveImportedType config modRefs name of
+                Just importedModule ->
+                    if String.startsWith "/" importedModule then
+                        let
+                            nextPath =
+                                importedModule
+                                    |> String.dropLeft 1
+                                    |> String.split "/"
+                                    -- Drop author/packageName part
+                                    |> List.drop 2
+                        in
+                        qualifyMemberType config modRefs range <|
+                            Parser.ExternalRef nextPath name binds
+
+                    else
+                        qualifyMemberType config modRefs range <|
+                            Parser.InternalRef (String.split "/" importedModule) name binds
+
+                Nothing ->
+                    Err <| UnknownTypeRef range name
     in
     case type_ of
         Parser.LocalRef "Int" [] ->
@@ -274,7 +299,7 @@ qualifyMemberType config aliases imports range type_ =
                     Ok <| Type.Custom (qualifyName config name)
 
                 Nothing ->
-                    Err <| UnknownTypeRef range name
+                    importsLookup name []
 
         Parser.LocalRef name binds ->
             case Dict.get name config.ast.types of
@@ -282,7 +307,7 @@ qualifyMemberType config aliases imports range type_ =
                     let
                         bindResult =
                             binds
-                                |> List.map (qualifyMemberType config aliases imports range)
+                                |> List.map (qualifyMemberType config modRefs range)
                                 |> Result.combine
                     in
                     case bindResult of
@@ -296,10 +321,10 @@ qualifyMemberType config aliases imports range type_ =
                             Err err
 
                 Nothing ->
-                    Err <| UnknownTypeRef range name
+                    importsLookup name binds
 
         Parser.InternalRef ([ possibleAlias ] as path) name binds ->
-            case Dict.get possibleAlias aliases of
+            case Dict.get possibleAlias modRefs.aliases of
                 Just val ->
                     if String.startsWith "/" val then
                         let
@@ -308,7 +333,7 @@ qualifyMemberType config aliases imports range type_ =
                                     |> String.split "/"
                                     |> List.drop 1
                         in
-                        qualifyMemberType config aliases imports range <|
+                        qualifyMemberType config modRefs range <|
                             Parser.ExternalRef newPath name binds
 
                     else
@@ -332,7 +357,7 @@ qualifyMemberType config aliases imports range type_ =
 
                 bindResult =
                     binds
-                        |> List.map (qualifyMemberType config aliases imports range)
+                        |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
@@ -358,12 +383,12 @@ qualifyMemberType config aliases imports range type_ =
             let
                 inputResult =
                     sign.input
-                        |> List.map (qualifyMemberType config aliases imports range)
+                        |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
 
                 outputResult =
                     sign.output
-                        |> List.map (qualifyMemberType config aliases imports range)
+                        |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
             in
             case ( inputResult, outputResult ) of
@@ -485,20 +510,22 @@ qualifyMetadata config qualifiedTypes word =
                 Parser.Verified wt ->
                     List.length wt.input
 
-        ( aliases, imports ) =
+        modRefs =
             case config.ast.moduleDefinition of
                 Parser.Undefined ->
-                    ( word.aliases, word.imports )
+                    { aliases = word.aliases
+                    , imports = word.imports
+                    }
 
                 Parser.Defined mod ->
-                    ( Dict.union mod.aliases word.aliases
-                    , Dict.union mod.imports word.imports
-                    )
+                    { aliases = Dict.union mod.aliases word.aliases
+                    , imports = Dict.union mod.imports word.imports
+                    }
     in
     Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (qualifyMemberType config aliases imports wordRange)
+        |> List.map (qualifyMemberType config modRefs wordRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
@@ -756,8 +783,13 @@ qualifyMatchValue config qualifiedTypes aliases imports range typeName memberNam
 
             Parser.LiteralType type_ ->
                 let
+                    modRefs =
+                        { aliases = aliases
+                        , imports = imports
+                        }
+
                     qualifyTypeResult =
-                        qualifyMemberType config aliases imports range type_
+                        qualifyMemberType config modRefs range type_
                 in
                 case qualifyTypeResult of
                     Ok qualifiedType ->
@@ -1046,6 +1078,47 @@ resolveImportedWord config modRefs name =
         Nothing ->
             potentialCandidates
                 |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.words ))
+                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
+                |> List.head
+                |> Maybe.map Tuple.first
+
+
+resolveImportedType : RunConfig -> ModuleReferences -> String -> Maybe String
+resolveImportedType config modRefs name =
+    let
+        explicitImports =
+            modRefs.imports
+                |> Dict.toList
+                |> List.find (\( _, v ) -> List.member name v)
+                |> Maybe.map Tuple.first
+                |> Maybe.andThen resolveMod
+
+        potentialCandidates =
+            modRefs.imports
+                |> Dict.filter (\_ v -> List.isEmpty v)
+                |> Dict.keys
+                |> List.filterMap resolveMod
+                |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
+
+        resolveMod mod =
+            if String.startsWith "/" mod then
+                Dict.get mod config.externalModules
+                    |> Maybe.map
+                        (\package ->
+                            String.dropLeft 1 mod
+                                |> qualifyPackageModule package
+                        )
+
+            else
+                Just <| qualifyPackageModule config.packageName mod
+    in
+    case explicitImports of
+        Just _ ->
+            explicitImports
+
+        Nothing ->
+            potentialCandidates
+                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.types ))
                 |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
                 |> List.head
                 |> Maybe.map Tuple.first
