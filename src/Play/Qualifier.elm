@@ -169,6 +169,15 @@ qualifyType :
     -> ( List Problem, Dict String TypeDefinition )
     -> ( List Problem, Dict String TypeDefinition )
 qualifyType config typeDef ( errors, acc ) =
+    let
+        ( aliases, imports ) =
+            case config.ast.moduleDefinition of
+                Parser.Undefined ->
+                    ( Dict.empty, Dict.empty )
+
+                Parser.Defined mod ->
+                    ( mod.aliases, mod.imports )
+    in
     case typeDef of
         Parser.CustomTypeDef range name generics members ->
             let
@@ -176,7 +185,7 @@ qualifyType config typeDef ( errors, acc ) =
                     qualifyName config name
 
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config range)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config aliases imports range)) members
                         |> List.map raiseTupleError
                         |> Result.combine
 
@@ -205,7 +214,7 @@ qualifyType config typeDef ( errors, acc ) =
                     qualifyName config name
 
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config range) memberTypes
+                    List.map (qualifyMemberType config aliases imports range) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -222,10 +231,39 @@ qualifyType config typeDef ( errors, acc ) =
 
 qualifyMemberType :
     RunConfig
+    -> Dict String String
+    -> Dict String (List String)
     -> SourceLocationRange
     -> Parser.PossiblyQualifiedType
     -> Result Problem Type
-qualifyMemberType config range type_ =
+qualifyMemberType config aliases imports range type_ =
+    let
+        internalRefLookup path name binds =
+            let
+                qualifiedName =
+                    path
+                        ++ [ name ]
+                        |> String.join "/"
+                        |> qualifyPackageModule config.packageName
+
+                bindResult =
+                    binds
+                        |> List.map (qualifyMemberType config aliases imports range)
+                        |> Result.combine
+            in
+            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
+                ( Just (CustomTypeDef _ _ [] _), _ ) ->
+                    Ok <| Type.Custom qualifiedName
+
+                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+
+                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
+                    Ok <| Type.Union memberTypes
+
+                _ ->
+                    Err <| UnknownTypeRef range qualifiedName
+    in
     case type_ of
         Parser.LocalRef "Int" [] ->
             Ok <| Type.Int
@@ -244,7 +282,7 @@ qualifyMemberType config range type_ =
                     let
                         bindResult =
                             binds
-                                |> List.map (qualifyMemberType config range)
+                                |> List.map (qualifyMemberType config aliases imports range)
                                 |> Result.combine
                     in
                     case bindResult of
@@ -260,31 +298,27 @@ qualifyMemberType config range type_ =
                 Nothing ->
                     Err <| UnknownTypeRef range name
 
+        Parser.InternalRef ([ possibleAlias ] as path) name binds ->
+            case Dict.get possibleAlias aliases of
+                Just val ->
+                    if String.startsWith "/" val then
+                        let
+                            newPath =
+                                val
+                                    |> String.split "/"
+                                    |> List.drop 1
+                        in
+                        qualifyMemberType config aliases imports range <|
+                            Parser.ExternalRef newPath name binds
+
+                    else
+                        internalRefLookup (String.split "/" val) name binds
+
+                Nothing ->
+                    internalRefLookup path name binds
+
         Parser.InternalRef path name binds ->
-            let
-                qualifiedName =
-                    path
-                        ++ [ name ]
-                        |> String.join "/"
-                        |> qualifyPackageModule config.packageName
-
-                bindResult =
-                    binds
-                        |> List.map (qualifyMemberType config range)
-                        |> Result.combine
-            in
-            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ _ [] _), _ ) ->
-                    Ok <| Type.Custom qualifiedName
-
-                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
-                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
-
-                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union memberTypes
-
-                _ ->
-                    Err <| UnknownTypeRef range qualifiedName
+            internalRefLookup path name binds
 
         Parser.ExternalRef path name binds ->
             let
@@ -298,7 +332,7 @@ qualifyMemberType config range type_ =
 
                 bindResult =
                     binds
-                        |> List.map (qualifyMemberType config range)
+                        |> List.map (qualifyMemberType config aliases imports range)
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
@@ -324,12 +358,12 @@ qualifyMemberType config range type_ =
             let
                 inputResult =
                     sign.input
-                        |> List.map (qualifyMemberType config range)
+                        |> List.map (qualifyMemberType config aliases imports range)
                         |> Result.combine
 
                 outputResult =
                     sign.output
-                        |> List.map (qualifyMemberType config range)
+                        |> List.map (qualifyMemberType config aliases imports range)
                         |> Result.combine
             in
             case ( inputResult, outputResult ) of
@@ -377,7 +411,16 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
             whens
-                |> List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name moduleReferences) ( acc, [] )
+                |> List.foldr
+                    (qualifyWhen
+                        config
+                        qualifiedTypes
+                        moduleReferences.aliases
+                        moduleReferences.imports
+                        unqualifiedWord.name
+                        moduleReferences
+                    )
+                    ( acc, [] )
                 |> Tuple.mapSecond Result.combine
 
         ( newWordsAfterImpl, qualifiedImplementationResult ) =
@@ -441,11 +484,21 @@ qualifyMetadata config qualifiedTypes word =
 
                 Parser.Verified wt ->
                     List.length wt.input
+
+        ( aliases, imports ) =
+            case config.ast.moduleDefinition of
+                Parser.Undefined ->
+                    ( word.aliases, word.imports )
+
+                Parser.Defined mod ->
+                    ( Dict.union mod.aliases word.aliases
+                    , Dict.union mod.imports word.imports
+                    )
     in
     Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (qualifyMemberType config wordRange)
+        |> List.map (qualifyMemberType config aliases imports wordRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
@@ -524,18 +577,20 @@ resolveUnions typeDefs wt =
 qualifyWhen :
     RunConfig
     -> Dict String TypeDefinition
+    -> Dict String String
+    -> Dict String (List String)
     -> String
     -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
+qualifyWhen config qualifiedTypes aliases imports wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
             initQualifyNode config wordName modRefs qualifiedWords impl
 
         qualifiedMatchResult =
-            qualifyMatch config qualifiedTypes typeMatch
+            qualifyMatch config qualifiedTypes aliases imports typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
@@ -554,8 +609,14 @@ qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifi
             )
 
 
-qualifyMatch : RunConfig -> Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
-qualifyMatch config qualifiedTypes typeMatch =
+qualifyMatch :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> Dict String String
+    -> Dict String (List String)
+    -> Parser.TypeMatch
+    -> Result Problem TypeMatch
+qualifyMatch config qualifiedTypes aliases imports typeMatch =
     let
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
@@ -568,7 +629,16 @@ qualifyMatch config qualifiedTypes typeMatch =
 
                         qualifiedPatternsResult =
                             patterns
-                                |> List.map (qualifyMatchValue config qualifiedTypes range name memberNames)
+                                |> List.map
+                                    (qualifyMatchValue
+                                        config
+                                        qualifiedTypes
+                                        aliases
+                                        imports
+                                        range
+                                        name
+                                        memberNames
+                                    )
                                 |> Result.combine
 
                         actualType =
@@ -609,6 +679,39 @@ qualifyMatch config qualifiedTypes typeMatch =
         Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
             qualifiedNameToMatch range (qualifyName config name) patterns
 
+        Parser.TypeMatch range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
+            case Dict.get possibleAlias aliases of
+                Just actualPath ->
+                    if String.startsWith "/" actualPath then
+                        let
+                            extPath =
+                                actualPath
+                                    |> String.dropLeft 1
+                                    |> String.split "/"
+                        in
+                        qualifyMatch config qualifiedTypes aliases imports <|
+                            Parser.TypeMatch range (Parser.ExternalRef extPath name []) patterns
+
+                    else
+                        let
+                            qualifiedName =
+                                actualPath
+                                    ++ "/"
+                                    ++ name
+                                    |> qualifyPackageModule config.packageName
+                        in
+                        qualifiedNameToMatch range qualifiedName patterns
+
+                Nothing ->
+                    let
+                        qualifiedName =
+                            possibleAlias
+                                ++ "/"
+                                ++ name
+                                |> qualifyPackageModule config.packageName
+                    in
+                    qualifiedNameToMatch range qualifiedName patterns
+
         Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
             let
                 qualifiedName =
@@ -638,12 +741,14 @@ qualifyMatch config qualifiedTypes typeMatch =
 qualifyMatchValue :
     RunConfig
     -> Dict String TypeDefinition
+    -> Dict String String
+    -> Dict String (List String)
     -> SourceLocationRange
     -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
     -> Result Problem ( String, TypeMatchValue )
-qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, matchValue ) =
+qualifyMatchValue config qualifiedTypes aliases imports range typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
@@ -652,7 +757,7 @@ qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, 
             Parser.LiteralType type_ ->
                 let
                     qualifyTypeResult =
-                        qualifyMemberType config range type_
+                        qualifyMemberType config aliases imports range type_
                 in
                 case qualifyTypeResult of
                     Ok qualifiedType ->
@@ -662,7 +767,7 @@ qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, 
                         Err err
 
             Parser.RecursiveMatch typeMatch ->
-                case qualifyMatch config qualifiedTypes typeMatch of
+                case qualifyMatch config qualifiedTypes aliases imports typeMatch of
                     Err err ->
                         Err err
 
@@ -921,7 +1026,7 @@ resolveImportedWord config modRefs name =
 
         potentialCandidates =
             modRefs.imports
-                |> Dict.filter (\k v -> List.isEmpty v)
+                |> Dict.filter (\_ v -> List.isEmpty v)
                 |> Dict.keys
                 |> List.filterMap resolveMod
                 |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
