@@ -440,8 +440,6 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
                     (qualifyWhen
                         config
                         qualifiedTypes
-                        moduleReferences.aliases
-                        moduleReferences.imports
                         unqualifiedWord.name
                         moduleReferences
                     )
@@ -604,20 +602,18 @@ resolveUnions typeDefs wt =
 qualifyWhen :
     RunConfig
     -> Dict String TypeDefinition
-    -> Dict String String
-    -> Dict String (List String)
     -> String
     -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
     -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes aliases imports wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
+qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
         ( newWords, qualifiedImplementationResult ) =
             initQualifyNode config wordName modRefs qualifiedWords impl
 
         qualifiedMatchResult =
-            qualifyMatch config qualifiedTypes aliases imports typeMatch
+            qualifyMatch config qualifiedTypes modRefs typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
@@ -639,11 +635,10 @@ qualifyWhen config qualifiedTypes aliases imports wordName modRefs ( typeMatch, 
 qualifyMatch :
     RunConfig
     -> Dict String TypeDefinition
-    -> Dict String String
-    -> Dict String (List String)
+    -> ModuleReferences
     -> Parser.TypeMatch
     -> Result Problem TypeMatch
-qualifyMatch config qualifiedTypes aliases imports typeMatch =
+qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
@@ -660,8 +655,7 @@ qualifyMatch config qualifiedTypes aliases imports typeMatch =
                                     (qualifyMatchValue
                                         config
                                         qualifiedTypes
-                                        aliases
-                                        imports
+                                        modRefs
                                         range
                                         name
                                         memberNames
@@ -704,10 +698,20 @@ qualifyMatch config qualifiedTypes aliases imports typeMatch =
             Ok <| TypeMatch range (Type.Generic sym) []
 
         Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
-            qualifiedNameToMatch range (qualifyName config name) patterns
+            case qualifiedNameToMatch range (qualifyName config name) patterns of
+                (Err (UnknownTypeRef _ _)) as errMsg ->
+                    case resolveImportedType config modRefs name of
+                        Just importedModule ->
+                            qualifiedNameToMatch range (importedModule ++ "/" ++ name) patterns
+
+                        Nothing ->
+                            errMsg
+
+                result ->
+                    result
 
         Parser.TypeMatch range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
-            case Dict.get possibleAlias aliases of
+            case Dict.get possibleAlias modRefs.aliases of
                 Just actualPath ->
                     if String.startsWith "/" actualPath then
                         let
@@ -716,7 +720,7 @@ qualifyMatch config qualifiedTypes aliases imports typeMatch =
                                     |> String.dropLeft 1
                                     |> String.split "/"
                         in
-                        qualifyMatch config qualifiedTypes aliases imports <|
+                        qualifyMatch config qualifiedTypes modRefs <|
                             Parser.TypeMatch range (Parser.ExternalRef extPath name []) patterns
 
                     else
@@ -768,14 +772,13 @@ qualifyMatch config qualifiedTypes aliases imports typeMatch =
 qualifyMatchValue :
     RunConfig
     -> Dict String TypeDefinition
-    -> Dict String String
-    -> Dict String (List String)
+    -> ModuleReferences
     -> SourceLocationRange
     -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
     -> Result Problem ( String, TypeMatchValue )
-qualifyMatchValue config qualifiedTypes aliases imports range typeName memberNames ( fieldName, matchValue ) =
+qualifyMatchValue config qualifiedTypes modRefs range typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
@@ -783,11 +786,6 @@ qualifyMatchValue config qualifiedTypes aliases imports range typeName memberNam
 
             Parser.LiteralType type_ ->
                 let
-                    modRefs =
-                        { aliases = aliases
-                        , imports = imports
-                        }
-
                     qualifyTypeResult =
                         qualifyMemberType config modRefs range type_
                 in
@@ -799,7 +797,7 @@ qualifyMatchValue config qualifiedTypes aliases imports range typeName memberNam
                         Err err
 
             Parser.RecursiveMatch typeMatch ->
-                case qualifyMatch config qualifiedTypes aliases imports typeMatch of
+                case qualifyMatch config qualifiedTypes modRefs typeMatch of
                     Err err ->
                         Err err
 
