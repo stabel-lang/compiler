@@ -112,7 +112,7 @@ addFunctionsForStructs ast =
     let
         helper _ t wipAst =
             case t of
-                AST.CustomTypeDef name _ generics members ->
+                AST.CustomTypeDef name _ _ generics members ->
                     addFunctionsForStructsHelper name generics members wipAst
 
                 _ ->
@@ -190,11 +190,11 @@ stripLocations ast =
 stripTypeLocation : TypeDefinition -> TypeDefinition
 stripTypeLocation typeDef =
     case typeDef of
-        AST.CustomTypeDef name _ generics members ->
-            AST.CustomTypeDef name emptyRange generics members
+        AST.CustomTypeDef exposed name _ generics members ->
+            AST.CustomTypeDef exposed name emptyRange generics members
 
-        AST.UnionTypeDef name _ generics members ->
-            AST.UnionTypeDef name emptyRange generics members
+        AST.UnionTypeDef exposed name _ generics members ->
+            AST.UnionTypeDef exposed name emptyRange generics members
 
 
 stripWordLocation : WordDefinition -> WordDefinition

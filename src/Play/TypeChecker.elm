@@ -88,10 +88,10 @@ initContext ast =
             Dict.map
                 (\_ t ->
                     case t of
-                        Qualifier.CustomTypeDef name range generics members ->
+                        Qualifier.CustomTypeDef name _ range generics members ->
                             CustomTypeDef name range generics members
 
-                        Qualifier.UnionTypeDef name range generics memberTypes ->
+                        Qualifier.UnionTypeDef name _ range generics memberTypes ->
                             UnionTypeDef name range generics memberTypes
                 )
                 ast.types

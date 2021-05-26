@@ -136,7 +136,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "True" emptyRange [] []
+                                [ QAST.CustomTypeDef "True" True emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -175,7 +175,7 @@ suite =
                     source =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Person" emptyRange [] [ ( "age", Type.Int ) ]
+                                [ QAST.CustomTypeDef "Person" True emptyRange [] [ ( "age", Type.Int ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -303,6 +303,7 @@ suite =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
                                 [ QAST.CustomTypeDef "Box"
+                                    True
                                     emptyRange
                                     [ "a" ]
                                     [ ( "element", Type.Generic "a" ) ]
@@ -341,6 +342,7 @@ suite =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
                                 [ QAST.CustomTypeDef "Coordinate"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "x", Type.Int )
@@ -415,22 +417,25 @@ suite =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
                                 [ QAST.CustomTypeDef "Pair"
+                                    True
                                     emptyRange
                                     [ "a", "b" ]
                                     [ ( "first", Type.Generic "a" )
                                     , ( "second", Type.Generic "b" )
                                     ]
                                 , QAST.UnionTypeDef "List"
+                                    True
                                     emptyRange
                                     [ "a" ]
                                     listUnion
                                 , QAST.CustomTypeDef "NonEmpty"
+                                    True
                                     emptyRange
                                     [ "a" ]
                                     [ ( "head", Type.Generic "a" )
                                     , ( "rest", Type.Union listUnion )
                                     ]
-                                , QAST.CustomTypeDef "Empty" emptyRange [] []
+                                , QAST.CustomTypeDef "Empty" True emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -605,7 +610,11 @@ suite =
                     input =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box" emptyRange [] [ ( "element", Type.Generic "a" ) ]
+                                [ QAST.CustomTypeDef "Box"
+                                    True
+                                    emptyRange
+                                    []
+                                    [ ( "element", Type.Generic "a" ) ]
                                 ]
                         , words =
                             Dict.empty
@@ -624,7 +633,11 @@ suite =
                     input =
                         { types =
                             Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box" emptyRange [ "a" ] [ ( "element", Type.Generic "b" ) ]
+                                [ QAST.CustomTypeDef "Box"
+                                    True
+                                    emptyRange
+                                    [ "a" ]
+                                    [ ( "element", Type.Generic "b" ) ]
                                 ]
                         , words =
                             Dict.empty
@@ -649,13 +662,14 @@ suite =
                     { types =
                         Dict.fromListBy QAST.typeDefinitionName
                             [ QAST.UnionTypeDef "Bool"
+                                True
                                 emptyRange
                                 []
                                 [ Type.Custom "True"
                                 , Type.Custom "False"
                                 ]
-                            , QAST.CustomTypeDef "True" emptyRange [] []
-                            , QAST.CustomTypeDef "False" emptyRange [] []
+                            , QAST.CustomTypeDef "True" True emptyRange [] []
+                            , QAST.CustomTypeDef "False" True emptyRange [] []
                             ]
                     , words =
                         Dict.fromListBy .name
@@ -798,16 +812,19 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Beings"
+                                        True
                                         emptyRange
                                         []
                                         [ Type.Custom "Person"
                                         , Type.Custom "Dog"
                                         ]
                                     , QAST.CustomTypeDef "Person"
+                                        True
                                         emptyRange
                                         []
                                         [ ( "age", Type.Int ) ]
                                     , QAST.CustomTypeDef "Dog"
+                                        True
                                         emptyRange
                                         []
                                         [ ( "man-years", Type.Int ) ]
@@ -882,13 +899,14 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Bool"
+                                        True
                                         emptyRange
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , QAST.CustomTypeDef "True" emptyRange [] []
-                                    , QAST.CustomTypeDef "False" emptyRange [] []
+                                    , QAST.CustomTypeDef "True" True emptyRange [] []
+                                    , QAST.CustomTypeDef "False" True emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -953,18 +971,24 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "List"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                                         , Type.Custom "EmptyList"
                                         ]
                                     , QAST.CustomTypeDef "NonEmptyList"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ ( "first", Type.Generic "a" )
                                         , ( "rest", listUnion )
                                         ]
-                                    , QAST.CustomTypeDef "EmptyList" emptyRange [] []
+                                    , QAST.CustomTypeDef "EmptyList"
+                                        True
+                                        emptyRange
+                                        []
+                                        []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -1027,12 +1051,17 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Maybe"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nil"
                                         ]
-                                    , QAST.CustomTypeDef "Nil" emptyRange [] []
+                                    , QAST.CustomTypeDef "Nil"
+                                        True
+                                        emptyRange
+                                        []
+                                        []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -1154,12 +1183,17 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Maybe"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "b"
                                         , Type.Custom "Nothing"
                                         ]
-                                    , QAST.CustomTypeDef "Nothing" emptyRange [] []
+                                    , QAST.CustomTypeDef "Nothing"
+                                        True
+                                        emptyRange
+                                        []
+                                        []
                                     ]
                             , words =
                                 Dict.empty
@@ -1414,12 +1448,17 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "Maybe"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nil"
                                         ]
-                                    , QAST.CustomTypeDef "Nil" emptyRange [] []
+                                    , QAST.CustomTypeDef "Nil"
+                                        True
+                                        emptyRange
+                                        []
+                                        []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -1493,18 +1532,24 @@ suite =
                             { types =
                                 Dict.fromListBy QAST.typeDefinitionName
                                     [ QAST.UnionTypeDef "List"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                                         , Type.Custom "EmptyList"
                                         ]
                                     , QAST.CustomTypeDef "NonEmptyList"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ ( "first", Type.Generic "a" )
                                         , ( "rest", listUnion )
                                         ]
-                                    , QAST.CustomTypeDef "EmptyList" emptyRange [] []
+                                    , QAST.CustomTypeDef "EmptyList"
+                                        True
+                                        emptyRange
+                                        []
+                                        []
                                     ]
                             , words =
                                 Dict.fromListBy .name

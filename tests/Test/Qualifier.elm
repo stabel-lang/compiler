@@ -192,13 +192,14 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    True
                                     emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" emptyRange [] []
-                                , CustomTypeDef "False" emptyRange [] []
+                                , CustomTypeDef "True" True emptyRange [] []
+                                , CustomTypeDef "False" True emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -505,14 +506,16 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Bool"
+                                        True
                                         emptyRange
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , CustomTypeDef "True" emptyRange [] []
-                                    , CustomTypeDef "False" emptyRange [] []
+                                    , CustomTypeDef "True" True emptyRange [] []
+                                    , CustomTypeDef "False" True emptyRange [] []
                                     , CustomTypeDef "Box"
+                                        True
                                         emptyRange
                                         []
                                         [ ( "value", Type.Int ) ]
@@ -572,12 +575,13 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Maybe"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nothing"
                                         ]
-                                    , CustomTypeDef "Nothing" emptyRange [] []
+                                    , CustomTypeDef "Nothing" True emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -654,14 +658,16 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    True
                                     emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" emptyRange [] []
-                                , CustomTypeDef "False" emptyRange [] []
+                                , CustomTypeDef "True" True emptyRange [] []
+                                , CustomTypeDef "False" True emptyRange [] []
                                 , CustomTypeDef "Box"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "value", boolUnion ) ]
@@ -786,14 +792,17 @@ suite =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
                                     "/play/test/some/module/USMoney"
+                                    True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
                                 , CustomTypeDef "/play/test/some/module/Dollar"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Cent"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
@@ -955,18 +964,22 @@ suite =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
                                     "/play/test/some/module/USMoney"
+                                    True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
                                 , CustomTypeDef "/play/test/some/module/Dollar"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Cent"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Wallet"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "user-id", Type.Int )
@@ -1198,13 +1211,14 @@ suite =
                             name ++ "Union"
                     in
                     [ ( name
-                      , CustomTypeDef name emptyRange [] []
+                      , CustomTypeDef name True emptyRange [] []
                       )
                     , ( genericName
-                      , CustomTypeDef genericName emptyRange [ "a" ] []
+                      , CustomTypeDef genericName True emptyRange [ "a" ] []
                       )
                     , ( unionName
                       , UnionTypeDef unionName
+                            True
                             emptyRange
                             []
                             [ Type.Custom name
@@ -1495,6 +1509,7 @@ suite =
                                 Dict.fromList
                                     [ ( "SomeType"
                                       , CustomTypeDef "SomeType"
+                                            True
                                             emptyRange
                                             []
                                             [ ( "tipe", Type.Custom "mod/Tipe" ) ]
@@ -1797,6 +1812,7 @@ suite =
                                 Dict.fromList
                                     [ ( "SomeType"
                                       , CustomTypeDef "SomeType"
+                                            True
                                             emptyRange
                                             []
                                             [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
@@ -2072,6 +2088,7 @@ suite =
                                     [ ( "Tepip"
                                       , CustomTypeDef
                                             "Tepip"
+                                            True
                                             emptyRange
                                             []
                                             [ ( "first", Type.Custom "/external/package/mod/Tipe" )
@@ -2280,6 +2297,7 @@ suite =
                                     [ ( "Tepip"
                                       , CustomTypeDef
                                             "Tepip"
+                                            True
                                             emptyRange
                                             []
                                             [ ( "first", Type.Custom "/external/package/mod/Tipe" )

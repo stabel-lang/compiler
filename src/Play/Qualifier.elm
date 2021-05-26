@@ -19,9 +19,11 @@ type alias AST =
     }
 
 
-type TypeDefinition
-    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
-    | UnionTypeDef String SourceLocationRange (List String) (List Type)
+type
+    TypeDefinition
+    -- TODO: Each branch here should take a record. Too many arguments.
+    = CustomTypeDef String Bool SourceLocationRange (List String) (List ( String, Type ))
+    | UnionTypeDef String Bool SourceLocationRange (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -115,11 +117,11 @@ run config =
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
     case td of
-        CustomTypeDef name range generics members ->
-            CustomTypeDef name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+        CustomTypeDef exposed name range generics members ->
+            CustomTypeDef exposed name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
 
-        UnionTypeDef name range generics memberTypes ->
-            UnionTypeDef name range generics (List.map (resolveUnion qt) memberTypes)
+        UnionTypeDef exposed name range generics memberTypes ->
+            UnionTypeDef exposed name range generics (List.map (resolveUnion qt) memberTypes)
 
 
 resolveUnion : Dict String TypeDefinition -> Type -> Type
@@ -127,7 +129,7 @@ resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ _ members) ->
+                Just (UnionTypeDef _ _ _ _ members) ->
                     Type.Union members
 
                 _ ->
@@ -135,7 +137,7 @@ resolveUnion typeDefs type_ =
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ generics members) ->
+                Just (UnionTypeDef _ _ _ generics members) ->
                     let
                         genericsMap =
                             List.map2 Tuple.pair generics types
@@ -170,17 +172,21 @@ qualifyType :
     -> ( List Problem, Dict String TypeDefinition )
 qualifyType config typeDef ( errors, acc ) =
     let
-        modRefs =
+        ( modRefs, exposes ) =
             case config.ast.moduleDefinition of
                 Parser.Undefined ->
-                    { aliases = Dict.empty
-                    , imports = Dict.empty
-                    }
+                    ( { aliases = Dict.empty
+                      , imports = Dict.empty
+                      }
+                    , Set.empty
+                    )
 
                 Parser.Defined mod ->
-                    { aliases = mod.aliases
-                    , imports = mod.imports
-                    }
+                    ( { aliases = mod.aliases
+                      , imports = mod.imports
+                      }
+                    , mod.exposes
+                    )
     in
     case typeDef of
         Parser.CustomTypeDef range name generics members ->
@@ -192,6 +198,9 @@ qualifyType config typeDef ( errors, acc ) =
                     List.map (Tuple.mapSecond (qualifyMemberType config modRefs range)) members
                         |> List.map raiseTupleError
                         |> Result.combine
+
+                exposed =
+                    Set.isEmpty exposes || Set.member name exposes
 
                 raiseTupleError ( label, result ) =
                     case result of
@@ -209,13 +218,24 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMembers ->
                     ( errors
-                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics qualifiedMembers) acc
+                    , Dict.insert qualifiedName
+                        (CustomTypeDef
+                            qualifiedName
+                            exposed
+                            range
+                            generics
+                            qualifiedMembers
+                        )
+                        acc
                     )
 
         Parser.UnionTypeDef range name generics memberTypes ->
             let
                 qualifiedName =
                     qualifyName config name
+
+                exposed =
+                    Set.isEmpty exposes || Set.member name exposes
 
                 qualifiedMemberTypesResult =
                     List.map (qualifyMemberType config modRefs range) memberTypes
@@ -229,7 +249,15 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMemberTypes ->
                     ( errors
-                    , Dict.insert qualifiedName (UnionTypeDef qualifiedName range generics qualifiedMemberTypes) acc
+                    , Dict.insert qualifiedName
+                        (UnionTypeDef
+                            qualifiedName
+                            exposed
+                            range
+                            generics
+                            qualifiedMemberTypes
+                        )
+                        acc
                     )
 
 
@@ -255,13 +283,13 @@ qualifyMemberType config modRefs range type_ =
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ _ [] _), _ ) ->
+                ( Just (CustomTypeDef _ _ _ [] _), _ ) ->
                     Ok <| Type.Custom qualifiedName
 
-                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
+                ( Just (CustomTypeDef _ _ _ _ _), Ok qualifiedBinds ) ->
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
-                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
+                ( Just (UnionTypeDef _ _ _ _ memberTypes), _ ) ->
                     Ok <| Type.Union memberTypes
 
                 _ ->
@@ -361,13 +389,13 @@ qualifyMemberType config modRefs range type_ =
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ _ [] _), _ ) ->
+                ( Just (CustomTypeDef _ _ _ [] _), _ ) ->
                     Ok <| Type.Custom qualifiedName
 
-                ( Just (CustomTypeDef _ _ _ _), Ok qualifiedBinds ) ->
+                ( Just (CustomTypeDef _ _ _ _ _), Ok qualifiedBinds ) ->
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
-                ( Just (UnionTypeDef _ _ _ memberTypes), _ ) ->
+                ( Just (UnionTypeDef _ _ _ _ memberTypes), _ ) ->
                     Ok <| Type.Union memberTypes
 
                 _ ->
@@ -642,7 +670,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ _ gens members) ->
+                Just (CustomTypeDef _ _ _ gens members) ->
                     let
                         memberNames =
                             members
@@ -677,7 +705,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         Err err ->
                             Err err
 
-                Just (UnionTypeDef _ _ _ types) ->
+                Just (UnionTypeDef _ _ _ _ types) ->
                     if List.isEmpty patterns then
                         Ok <| TypeMatch range (Type.Union types) []
 
@@ -1008,10 +1036,10 @@ qualifyNode config currentDefName modRefs node acc =
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ _ ->
+        CustomTypeDef name _ _ _ _ ->
             name
 
-        UnionTypeDef name _ _ _ ->
+        UnionTypeDef name _ _ _ _ ->
             name
 
 
