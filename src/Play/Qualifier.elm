@@ -1159,6 +1159,12 @@ requiredModules config =
                 Parser.Undefined ->
                     Set.empty
 
+        typeRequirements =
+            config.ast.types
+                |> Dict.foldl
+                    (\_ t acc -> Set.union (requiredModulesOfType t) acc)
+                    Set.empty
+
         wordRequirements =
             config.ast.words
                 |> Dict.foldl
@@ -1186,8 +1192,24 @@ requiredModules config =
     in
     topLevelAliasTargets
         |> Set.union topLevelImports
+        |> Set.union typeRequirements
         |> Set.union wordRequirements
         |> Set.foldl fullyQualify Set.empty
+
+
+requiredModulesOfType : Parser.TypeDefinition -> Set String
+requiredModulesOfType typeDef =
+    case typeDef of
+        Parser.CustomTypeDef _ _ _ members ->
+            members
+                |> List.map Tuple.second
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
+
+        Parser.UnionTypeDef _ _ _ members ->
+            members
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
 
 
 requiredModulesOfWord : Dict String String -> Parser.WordDefinition -> Set String
@@ -1202,6 +1224,38 @@ requiredModulesOfWord topLevelAliases word =
             word.imports
                 |> Dict.keys
                 |> Set.fromList
+
+        typeSignature =
+            case word.typeSignature of
+                Parser.NotProvided ->
+                    Set.empty
+
+                Parser.UserProvided wordType ->
+                    moduleReferenceFromWordType wordType
+
+                Parser.Verified wordType ->
+                    moduleReferenceFromWordType wordType
+
+        moduleReferenceFromWordType wordType =
+            wordType.input
+                ++ wordType.output
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
+
+        matches =
+            case word.implementation of
+                Parser.SoloImpl _ ->
+                    Set.empty
+
+                Parser.MultiImpl branches _ ->
+                    branches
+                        |> List.map Tuple.first
+                        |> List.map extractMatchType
+                        |> List.filterMap extractModuleReferenceFromType
+                        |> Set.fromList
+
+        extractMatchType (Parser.TypeMatch _ tipe _) =
+            tipe
 
         impls =
             case word.implementation of
@@ -1219,7 +1273,22 @@ requiredModulesOfWord topLevelAliases word =
     in
     wordAliases
         |> Set.union wordImports
+        |> Set.union typeSignature
+        |> Set.union matches
         |> Set.union wordReferences
+
+
+extractModuleReferenceFromType : Parser.PossiblyQualifiedType -> Maybe String
+extractModuleReferenceFromType ref =
+    case ref of
+        Parser.ExternalRef path _ _ ->
+            Just <| "/" ++ String.join "/" path
+
+        Parser.InternalRef path _ _ ->
+            Just <| String.join "/" path
+
+        _ ->
+            Nothing
 
 
 extractModuleReferenceFromNode : Dict String String -> Parser.WordDefinition -> Parser.AstNode -> Maybe String

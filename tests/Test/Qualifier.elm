@@ -1089,11 +1089,23 @@ suite =
                                         [ ( "/external/module", [] ) ]
                                 , exposes = Set.fromList []
                                 }
-                        , types = Dict.empty
+                        , types =
+                            Dict.fromList
+                                [ ( "Tipe"
+                                  , AST.CustomTypeDef emptyRange
+                                        "Tipe"
+                                        []
+                                        [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
+                                  )
+                                ]
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "call-external"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.InternalRef [ "internal", "types" ] "In" [] ]
+                                            , output = [ AST.ExternalRef [ "external", "types" ] "Out" [] ]
+                                            }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1102,6 +1114,9 @@ suite =
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
                                               , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
                                                 ]
+                                              )
+                                            , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
+                                              , [ AST.Word emptyRange "drop" ]
                                               )
                                             ]
                                             [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
@@ -1128,7 +1143,11 @@ suite =
                             , "/robheghan/dummy/some/ext"
                             , "/robheghan/html/external/html"
                             , "/robheghan/html/external/module"
+                            , "/robheghan/html/external/types"
+                            , "/robheghan/html/external/double"
                             , "/package/test/internal/alias"
+                            , "/package/test/internal/types"
+                            , "/package/test/internal/match"
                             , "/package/test/package/module"
                             ]
 
@@ -1142,6 +1161,8 @@ suite =
                                     , ( "/some/ext", "robheghan/dummy" )
                                     , ( "/external/html", "robheghan/html" )
                                     , ( "/external/module", "robheghan/html" )
+                                    , ( "/external/types", "robheghan/html" )
+                                    , ( "/external/double", "robheghan/html" )
                                     ]
                             }
                 in
