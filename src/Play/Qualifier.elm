@@ -283,14 +283,20 @@ qualifyMemberType config modRefs range type_ =
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ _ _ [] _), _ ) ->
+                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
                     Ok <| Type.Custom qualifiedName
 
-                ( Just (CustomTypeDef _ _ _ _ _), Ok qualifiedBinds ) ->
+                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
-                ( Just (UnionTypeDef _ _ _ _ memberTypes), _ ) ->
+                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
                     Ok <| Type.Union memberTypes
+
+                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
 
                 _ ->
                     Err <| UnknownTypeRef range qualifiedName
@@ -389,14 +395,20 @@ qualifyMemberType config modRefs range type_ =
                         |> Result.combine
             in
             case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ _ _ [] _), _ ) ->
+                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
                     Ok <| Type.Custom qualifiedName
 
-                ( Just (CustomTypeDef _ _ _ _ _), Ok qualifiedBinds ) ->
+                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
-                ( Just (UnionTypeDef _ _ _ _ memberTypes), _ ) ->
+                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
                     Ok <| Type.Union memberTypes
+
+                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
 
                 _ ->
                     Err <| UnknownTypeRef range qualifiedName
@@ -670,7 +682,10 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ _ _ gens members) ->
+                Just (CustomTypeDef _ False _ _ _) ->
+                    Err <| TypeNotExposed range name
+
+                Just (CustomTypeDef _ True _ gens members) ->
                     let
                         memberNames =
                             members
@@ -705,7 +720,10 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         Err err ->
                             Err err
 
-                Just (UnionTypeDef _ _ _ _ types) ->
+                Just (UnionTypeDef _ False _ _ _) ->
+                    Err <| TypeNotExposed range name
+
+                Just (UnionTypeDef _ True _ _ types) ->
                     if List.isEmpty patterns then
                         Ok <| TypeMatch range (Type.Union types) []
 

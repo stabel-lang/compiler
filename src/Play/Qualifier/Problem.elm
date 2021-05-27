@@ -13,6 +13,7 @@ type Problem
     | InvalidTypeMatch SourceLocationRange
     | NoSuchMemberOnType SourceLocationRange String String
     | WordNotExposed SourceLocationRange String
+    | TypeNotExposed SourceLocationRange String
 
 
 toString : String -> Problem -> String
@@ -56,3 +57,10 @@ toString source problem =
                 ++ "Trying to call '"
                 ++ wordRef
                 ++ "' but this function is not exposed."
+
+        TypeNotExposed range typeRef ->
+            SourceLocation.extractFromString source range
+                ++ "\n\n"
+                ++ "Referencing '"
+                ++ typeRef
+                ++ "' but this type is not exposed."

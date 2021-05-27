@@ -1183,26 +1183,29 @@ suite =
         , describe "Module resolution" <|
             let
                 dummyWord name =
-                    ( name
-                    , { name = name
-                      , metadata = Metadata.default
-                      , implementation =
-                            SoloImpl []
-                      }
-                    )
+                    dummyWordImpl name True
 
                 dummyWordUnexposed name =
+                    dummyWordImpl name False
+
+                dummyWordImpl name isExposed =
                     ( name
                     , { name = name
                       , metadata =
                             Metadata.default
-                                |> Metadata.isExposed False
+                                |> Metadata.isExposed isExposed
                       , implementation =
                             SoloImpl []
                       }
                     )
 
                 dummyType name =
+                    dummyTypeImpl name True
+
+                dummyTypeUnexposed name =
+                    dummyTypeImpl name False
+
+                dummyTypeImpl name isExposed =
                     let
                         genericName =
                             name ++ "Generic"
@@ -1211,14 +1214,14 @@ suite =
                             name ++ "Union"
                     in
                     [ ( name
-                      , CustomTypeDef name True emptyRange [] []
+                      , CustomTypeDef name isExposed emptyRange [] []
                       )
                     , ( genericName
-                      , CustomTypeDef genericName True emptyRange [ "a" ] []
+                      , CustomTypeDef genericName isExposed emptyRange [ "a" ] []
                       )
                     , ( unionName
                       , UnionTypeDef unionName
-                            True
+                            isExposed
                             emptyRange
                             []
                             [ Type.Custom name
@@ -2635,6 +2638,300 @@ suite =
                             Expect.fail "Expected qualification to fail because an unexposed function is called"
 
                         Err [ Problem.WordNotExposed _ "/external/package/mod/add" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type signature from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.ExternalRef [ "mod" ] "Tipe" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type definition from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types =
+                                Dict.fromList
+                                    [ ( "BoxedTipe"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "BoxedTipe"
+                                            []
+                                            [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/TipeUnion" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type match from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type signature from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.InternalRef [ "mod" ] "Tipe" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type definition from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types =
+                                Dict.fromList
+                                    [ ( "BoxedTipe"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "BoxedTipe"
+                                            []
+                                            [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "mod/TipeUnion" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type match from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
                             Expect.pass
 
                         Err errs ->
