@@ -95,6 +95,45 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , test "Multi args and type signature" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: int=
+                        type: Int Int -- Bool
+                        : - zero?
+                        """
+
+                    expectedAst =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "int="
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "Int" [], AST.LocalRef "Int" [] ]
+                                            , output = [ AST.LocalRef "Bool" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Word emptyRange "-"
+                                            , AST.Word emptyRange "zero?"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case compile source of
+                    Err _ ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         , describe "Custom data structures"
             [ test "Without members" <|
                 \_ ->

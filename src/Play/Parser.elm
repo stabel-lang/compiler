@@ -422,10 +422,25 @@ genericOrRangeParser =
     Parser.andThen helper genericParser
 
 
-typeParser : Parser PossiblyQualifiedType
-typeParser =
-    Parser.succeed (\name -> LocalRef name [])
-        |= typeNameParser
+typeSignatureRefParser : Parser PossiblyQualifiedType
+typeSignatureRefParser =
+    Parser.oneOf
+        [ Parser.succeed (\name -> LocalRef name [])
+            |= typeNameParser
+        , Parser.succeed (\( path, name ) -> ExternalRef path name [])
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed (\( path, name ) -> InternalRef path name [])
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed Generic
+            |= genericParser
+        , Parser.succeed identity
+            |. Parser.symbol (Token "(" ExpectedLeftParen)
+            |. noiseParser
+            |= typeRefParser
+            |. Parser.symbol (Token ")" ExpectedRightParen)
+            |. noiseParser
+        ]
 
 
 typeRefParser : Parser PossiblyQualifiedType
@@ -971,7 +986,7 @@ typeLoopParser reverseTypes =
         [ Parser.succeed step
             |= genericOrRangeParser
         , Parser.succeed step
-            |= typeRefParser
+            |= typeSignatureRefParser
         , Parser.succeed (\wordType -> step (QuotationType wordType))
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
