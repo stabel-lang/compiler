@@ -967,6 +967,9 @@ qualifyNode config currentDefName modRefs node acc =
 
                     qualifiedName =
                         String.join "/" [ qualifiedPath, value ]
+
+                    _ =
+                        Dict.keys config.inProgressAST.words
                 in
                 case Dict.get qualifiedName config.inProgressAST.words of
                     Nothing ->

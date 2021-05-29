@@ -71,6 +71,7 @@ type alias ParsedModuleInfo =
     { packageName : PackageName
     , modulePath : ModuleName
     , ast : Parser.AST
+    , requiredModules : Set String
     }
 
 
@@ -452,6 +453,13 @@ parsingUpdate msg state remainingModules =
                         updatedParsedModules =
                             Set.insert fullModuleName state.parsedModuleNames
 
+                        requiredModules =
+                            Qualifier.requiredModules
+                                { packageName = PackageName.toString packageName
+                                , ast = parserAst
+                                , externalModules = state.moduleNameToPackageName
+                                }
+
                         updatedState =
                             { state
                                 | parsedModuleNames = updatedParsedModules
@@ -459,16 +467,10 @@ parsingUpdate msg state remainingModules =
                                     { packageName = packageName
                                     , modulePath = moduleName
                                     , ast = parserAst
+                                    , requiredModules = requiredModules
                                     }
                                         :: state.parsedModules
                             }
-
-                        requiredModules =
-                            Qualifier.requiredModules
-                                { packageName = PackageName.toString packageName
-                                , ast = parserAst
-                                , externalModules = state.moduleNameToPackageName
-                                }
 
                         modulesQueuedForOrAlreadyParsed =
                             remainingModules
@@ -503,8 +505,11 @@ nextCompileStep remainingModules state =
     case remainingModules of
         [] ->
             let
+                sortedParsedModules =
+                    List.sortWith sortByRequiredModules state.parsedModules
+
                 ( qualifiedAst, errs ) =
-                    state.parsedModules
+                    sortedParsedModules
                         |> List.foldl qualifyAst ( { types = Dict.empty, words = Dict.empty }, [] )
 
                 qualifyAst parsedModInfo ( qast, es ) =
@@ -560,3 +565,29 @@ nextCompileStep remainingModules state =
                     readModuleFromDisk packageInfo.path moduleName
             in
             Parsing state otherModules (ReadFile path fileName)
+
+
+sortByRequiredModules : ParsedModuleInfo -> ParsedModuleInfo -> Order
+sortByRequiredModules a b =
+    let
+        aQualifiedName =
+            absoluteModuleName a.packageName a.modulePath
+
+        bQualifiedName =
+            absoluteModuleName b.packageName b.modulePath
+
+        aRequiredByB =
+            Set.member aQualifiedName b.requiredModules
+
+        bRequiredByA =
+            Set.member bQualifiedName a.requiredModules
+    in
+    case ( aRequiredByB, bRequiredByA ) of
+        ( True, False ) ->
+            LT
+
+        ( False, True ) ->
+            GT
+
+        otherwise ->
+            EQ

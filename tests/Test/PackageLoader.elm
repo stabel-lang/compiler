@@ -44,7 +44,7 @@ suite =
                         , PackageLoader.ReadFile "/project/src" "mod1.play"
                         , PackageLoader.ReadFile "/project/lib/template_strings/lib/version/src/version" "data.play"
                         ]
-        , test "Compiles to qualified AST" <|
+        , test "Compiles project with external dependencies to qualified AST" <|
             \_ ->
                 let
                     loaderResult =
@@ -76,6 +76,50 @@ suite =
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Integer emptyRange 2
+                                                ]
+                                      }
+                                    ]
+                            }
+                            (Util.stripLocations ast)
+        , test "Compiles project with multiple dependant modules to qualified AST" <|
+            \_ ->
+                let
+                    loaderResult =
+                        PackageLoader.init initOpts
+                            |> resolveSideEffects testFilesInternalConsistency []
+                            |> Result.map Tuple.second
+                in
+                case loaderResult of
+                    Err msg ->
+                        Expect.fail msg
+
+                    Ok ast ->
+                        Expect.equal
+                            { types =
+                                Dict.fromListBy Qualifier.typeDefinitionName []
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "/robheghan/dummy/mod1/bump-version"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Integer emptyRange 1
+                                                , Qualifier.Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "/robheghan/dummy/mod2/version"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Integer emptyRange 5
+                                                ]
+                                      }
+                                    , { name = "/robheghan/dummy/mod3/next-version"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            Qualifier.SoloImpl
+                                                [ Qualifier.Word emptyRange "/robheghan/dummy/mod2/version"
+                                                , Qualifier.Word emptyRange "/robheghan/dummy/mod1/bump-version"
                                                 ]
                                       }
                                     ]
@@ -233,6 +277,34 @@ childPackage targetDir path =
                 False
 
 
+stdLibFiles : Dict String String
+stdLibFiles =
+    Dict.fromList
+        [ ( "/project/lib/unused/play.json"
+          , """
+            {
+                "name": "some/useless",
+                "version": "1.7.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "useless/mod"
+                ],
+                "dependencies": {
+                },
+                "package-paths": [
+                ]
+            }
+          """
+          )
+        , ( "/project/lib/unused/src/useless/mod.play"
+          , """
+            def: square
+            : dup *
+            """
+          )
+        ]
+
+
 testFiles : Dict String String
 testFiles =
     Dict.fromList
@@ -286,28 +358,6 @@ testFiles =
             : 1 =
             """
           )
-        , ( "/project/lib/unused/play.json"
-          , """
-            {
-                "name": "some/useless",
-                "version": "1.7.0",
-                "language-version": "0.2.0",
-                "exposed-modules": [
-                    "useless/mod"
-                ],
-                "dependencies": {
-                },
-                "package-paths": [
-                ]
-            }
-          """
-          )
-        , ( "/project/lib/unused/src/useless/mod.play"
-          , """
-            def: square
-            : dup *
-            """
-          )
         , ( "/project/lib/version/play.json"
           , """
             {
@@ -353,3 +403,45 @@ testFiles =
             """
           )
         ]
+        |> Dict.union stdLibFiles
+
+
+testFilesInternalConsistency : Dict String String
+testFilesInternalConsistency =
+    Dict.fromList
+        [ ( "/project/play.json"
+          , """
+            {
+                "name": "robheghan/dummy",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "mod1",
+                    "mod2",
+                    "mod3"
+                ],
+                "dependencies": {},
+                "package-paths": []
+            }
+            """
+          )
+        , ( "/project/src/mod1.play"
+          , """
+            def: bump-version
+            : 1 +
+            """
+          )
+        , ( "/project/src/mod2.play"
+          , """
+            def: version
+            : 5
+            """
+          )
+        , ( "/project/src/mod3.play"
+          , """
+            def: next-version
+            : mod2/version mod1/bump-version
+            """
+          )
+        ]
+        |> Dict.union stdLibFiles
