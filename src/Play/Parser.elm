@@ -2,6 +2,7 @@ module Play.Parser exposing
     ( AST
     , AstNode(..)
     , ModuleDefinition(..)
+    , ModuleDefinitionRec
     , PossiblyQualifiedType(..)
     , TypeDefinition(..)
     , TypeMatch(..)

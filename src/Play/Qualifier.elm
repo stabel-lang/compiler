@@ -114,6 +114,37 @@ run config =
             Err <| typeErrors ++ wordErrors
 
 
+type alias ModuleDefinitionConfig a =
+    { a
+        | ast : Parser.AST
+        , externalModules : Dict String String
+    }
+
+
+moduleDefinition : ModuleDefinitionConfig a -> Parser.ModuleDefinitionRec
+moduleDefinition config =
+    let
+        defaultImports =
+            if Dict.get "/core" config.externalModules == Just "play/standard_library" then
+                Dict.fromList [ ( "/core", [] ) ]
+
+            else
+                Dict.empty
+    in
+    case config.ast.moduleDefinition of
+        Parser.Undefined ->
+            { imports = defaultImports
+            , aliases = Dict.empty
+            , exposes = Set.empty
+            }
+
+        Parser.Defined def ->
+            { imports = Dict.union def.imports defaultImports
+            , aliases = def.aliases
+            , exposes = def.exposes
+            }
+
+
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
     case td of
@@ -172,21 +203,15 @@ qualifyType :
     -> ( List Problem, Dict String TypeDefinition )
 qualifyType config typeDef ( errors, acc ) =
     let
-        ( modRefs, exposes ) =
-            case config.ast.moduleDefinition of
-                Parser.Undefined ->
-                    ( { aliases = Dict.empty
-                      , imports = Dict.empty
-                      }
-                    , Set.empty
-                    )
+        modDef =
+            moduleDefinition config
 
-                Parser.Defined mod ->
-                    ( { aliases = mod.aliases
-                      , imports = mod.imports
-                      }
-                    , mod.exposes
-                    )
+        ( modRefs, exposes ) =
+            ( { aliases = modDef.aliases
+              , imports = modDef.imports
+              }
+            , modDef.exposes
+            )
     in
     case typeDef of
         Parser.CustomTypeDef range name generics members ->
@@ -462,17 +487,13 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
                 Parser.MultiImpl whenImpl defImpl ->
                     ( whenImpl, defImpl )
 
-        moduleReferences =
-            case config.ast.moduleDefinition of
-                Parser.Defined def ->
-                    { aliases = Dict.union unqualifiedWord.aliases def.aliases
-                    , imports = Dict.union unqualifiedWord.imports def.imports
-                    }
+        modDef =
+            moduleDefinition config
 
-                Parser.Undefined ->
-                    { aliases = unqualifiedWord.aliases
-                    , imports = unqualifiedWord.imports
-                    }
+        moduleReferences =
+            { aliases = Dict.union unqualifiedWord.aliases modDef.aliases
+            , imports = Dict.union unqualifiedWord.imports modDef.imports
+            }
 
         ( newWordsAfterWhens, qualifiedWhensResult ) =
             whens
@@ -548,17 +569,13 @@ qualifyMetadata config qualifiedTypes word =
                 Parser.Verified wt ->
                     List.length wt.input
 
-        modRefs =
-            case config.ast.moduleDefinition of
-                Parser.Undefined ->
-                    { aliases = word.aliases
-                    , imports = word.imports
-                    }
+        modDef =
+            moduleDefinition config
 
-                Parser.Defined mod ->
-                    { aliases = Dict.union mod.aliases word.aliases
-                    , imports = Dict.union mod.imports word.imports
-                    }
+        modRefs =
+            { aliases = Dict.union modDef.aliases word.aliases
+            , imports = Dict.union modDef.imports word.imports
+            }
     in
     Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
@@ -920,7 +937,7 @@ qualifyNode config currentDefName modRefs node acc =
                                         path =
                                             mod
                                                 |> String.split "/"
-                                                |> List.drop 1
+                                                |> List.drop 3
                                     in
                                     qualifyNode
                                         config
@@ -1102,6 +1119,7 @@ resolveImportedWord config modRefs name =
                 |> Dict.toList
                 |> List.find (\( _, v ) -> List.member name v)
                 |> Maybe.map Tuple.first
+                |> Maybe.andThen resolveMod
 
         potentialCandidates =
             modRefs.imports
@@ -1113,7 +1131,10 @@ resolveImportedWord config modRefs name =
         resolveMod mod =
             if String.startsWith "/" mod then
                 Dict.get mod config.externalModules
-                    |> Maybe.map (\package -> qualifyPackageModule package mod)
+                    |> Maybe.map
+                        (\package ->
+                            qualifyPackageModule package (String.dropLeft 1 mod)
+                        )
 
             else
                 Just <| qualifyPackageModule config.packageName mod
@@ -1185,13 +1206,11 @@ type alias RequiredModulesConfig =
 requiredModules : RequiredModulesConfig -> Set String
 requiredModules config =
     let
-        topLevelAliases =
-            case config.ast.moduleDefinition of
-                Parser.Defined def ->
-                    def.aliases
+        modDef =
+            moduleDefinition config
 
-                Parser.Undefined ->
-                    Dict.empty
+        topLevelAliases =
+            modDef.aliases
 
         topLevelAliasTargets =
             topLevelAliases
@@ -1199,14 +1218,9 @@ requiredModules config =
                 |> Set.fromList
 
         topLevelImports =
-            case config.ast.moduleDefinition of
-                Parser.Defined def ->
-                    def.imports
-                        |> Dict.keys
-                        |> Set.fromList
-
-                Parser.Undefined ->
-                    Set.empty
+            modDef.imports
+                |> Dict.keys
+                |> Set.fromList
 
         typeRequirements =
             config.ast.types

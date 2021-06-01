@@ -1162,6 +1162,7 @@ suite =
                             , "/package/test/internal/types"
                             , "/package/test/internal/match"
                             , "/package/test/package/module"
+                            , "/play/standard_library/core"
                             ]
 
                     actualRequiredModules =
@@ -1176,7 +1177,42 @@ suite =
                                     , ( "/external/module", "robheghan/html" )
                                     , ( "/external/types", "robheghan/html" )
                                     , ( "/external/double", "robheghan/html" )
+                                    , ( "/core", "play/standard_library" )
                                     ]
+                            }
+                in
+                Expect.equal expectedRequiredModules actualRequiredModules
+        , test "Reliance on standard_library/core only when standard_library is specified as externalModule" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { moduleDefinition = AST.Undefined
+                        , types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.fromList [ ( "ali", "internal/alias" ) ]
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    expectedRequiredModules =
+                        Set.fromList
+                            [ "/package/test/internal/alias"
+                            ]
+
+                    actualRequiredModules =
+                        requiredModules
+                            { packageName = "package/test"
+                            , ast = unqualifiedAst
+                            , externalModules = Dict.empty
                             }
                 in
                 Expect.equal expectedRequiredModules actualRequiredModules
@@ -2932,6 +2968,101 @@ suite =
                             Expect.fail "Expected qualification to fail because an unexposed type is referenced"
 
                         Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "There's an implicit import on standard_library/core in anonymous modules" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "over"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/play/standard_library/core/over" ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/core", "play/standard_library" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "There's an implicit import on standard_library/core in named modules" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { imports = Dict.empty
+                                    , aliases = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "over"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/play/standard_library/core/over" ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/core", "play/standard_library" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
                             Expect.pass
 
                         Err errs ->
