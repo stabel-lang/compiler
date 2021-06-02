@@ -5,6 +5,7 @@ module Play.PackageLoader exposing
     , SideEffect(..)
     , getSideEffect
     , init
+    , problemToString
     , update
     )
 
@@ -18,7 +19,9 @@ import Play.Data.PackageName as PackageName exposing (PackageName)
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
 import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
 import Play.Parser as Parser
+import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
+import Play.Qualifier.Problem as QualifierProblem
 import Result.Extra as Result
 import Set exposing (Set)
 
@@ -28,7 +31,38 @@ type Problem
     | UnknownMessageForState String
     | NoExposedModulesInRootProject
     | ModuleNotFound String
+    | ParserError String (List ParserProblem.Problem)
+    | QualifierError String (List QualifierProblem.Problem)
     | InternalError String
+
+
+problemToString : Problem -> String
+problemToString problem =
+    case problem of
+        InvalidPackageMetadata path err ->
+            "Something is wrong with file located at '" ++ path ++ "':\n\n" ++ err
+
+        UnknownMessageForState msg ->
+            "Unknown message for state: " ++ msg
+
+        NoExposedModulesInRootProject ->
+            "No exposed modules in root project"
+
+        ModuleNotFound mod ->
+            "Failed to locate module '" ++ mod ++ "' on disk"
+
+        ParserError source errs ->
+            errs
+                |> List.map (ParserProblem.toString source)
+                |> String.join "\n\n"
+
+        QualifierError source errs ->
+            errs
+                |> List.map (QualifierProblem.toString source)
+                |> String.join "\n\n"
+
+        InternalError msg ->
+            "Internal error: " ++ msg
 
 
 type alias InitOptions =
@@ -72,6 +106,7 @@ type alias ParsedModuleInfo =
     , modulePath : ModuleName
     , ast : Parser.AST
     , requiredModules : Set String
+    , source : String
     }
 
 
@@ -443,7 +478,7 @@ parsingUpdate msg state remainingModules =
             in
             case ( possibleModuleInfo, Parser.run content ) of
                 ( _, Err parserError ) ->
-                    Failed <| InternalError <| "Parser error: " ++ Debug.toString parserError
+                    Failed <| ParserError content parserError
 
                 ( Just ( packageName, moduleName ), Ok parserAst ) ->
                     let
@@ -468,6 +503,7 @@ parsingUpdate msg state remainingModules =
                                     , modulePath = moduleName
                                     , ast = parserAst
                                     , requiredModules = requiredModules
+                                    , source = content
                                     }
                                         :: state.parsedModules
                             }
@@ -526,7 +562,7 @@ nextCompileStep remainingModules state =
                     case qualifierResult of
                         Err qualifierError ->
                             ( qast
-                            , (InternalError <| "Qualifier error: " ++ Debug.toString qualifierError) :: es
+                            , QualifierError parsedModInfo.source qualifierError :: es
                             )
 
                         Ok qualifiedAST ->
@@ -556,8 +592,8 @@ nextCompileStep remainingModules state =
                         , words = wordsWithEntryPoint
                         }
 
-                _ ->
-                    Failed <| InternalError <| "Qualification failed with error: " ++ Debug.toString errs
+                err :: _ ->
+                    Failed <| err
 
         ( packageInfo, moduleName ) :: otherModules ->
             let
