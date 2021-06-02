@@ -306,7 +306,7 @@ formatFunction module_ function =
         fullFuncDef =
             String.join " "
                 [ "(func"
-                , "$" ++ function.name
+                , "$" ++ String.replace "," "__COMMA__" function.name
                 , "(type " ++ String.fromInt function.typeSignatureIndex ++ ")"
                 , locals
                 ]

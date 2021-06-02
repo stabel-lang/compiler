@@ -134,6 +134,63 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , test ", is a valid fn name" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: ,
+                        type: Int Int -- Int
+                        : +
+
+                        def: add2
+                        type: Int -- Int
+                        : 2 ,
+                        """
+
+                    expectedAst =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = ","
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "Int" [], AST.LocalRef "Int" [] ]
+                                            , output = [ AST.LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Word emptyRange "+"
+                                            ]
+                                  }
+                                , { name = "add2"
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "Int" [] ]
+                                            , output = [ AST.LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Integer emptyRange 2
+                                            , AST.Word emptyRange ","
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                case compile source of
+                    Err _ ->
+                        Expect.fail "Did not expect parsing to fail"
+
+                    Ok ast ->
+                        Expect.equal expectedAst ast
         , describe "Custom data structures"
             [ test "Without members" <|
                 \_ ->

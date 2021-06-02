@@ -10,10 +10,10 @@ exposing:
   of-one
   of-two
   of-three
+  ,
   fold
   reverse
   fold-reverse
-  test
 :
 
 defunion: List a
@@ -37,6 +37,10 @@ type: a a -- (NonEmpty a)
 def: of-three
 type: a a a -- (NonEmpty a)
 : Empty >NonEmpty >NonEmpty >NonEmpty
+
+def: ,
+type: (List a) a -- (NonEmpty a)
+: swap >NonEmpty
 
 defmulti: fold
 type: (List a) b [ a b -- b ] -- b
