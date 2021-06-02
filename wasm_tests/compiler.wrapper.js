@@ -2,9 +2,9 @@ const Compiler = require('./compiler.js');
 const wabtInit = require('wabt');
 const stripIndent = require('strip-indent');
 
-exports.toWat = function toWat(sourceCode) {
+exports.toWat = function toWat(entry, sourceCode) {
     return new Promise((resolve, reject) => {
-        const compiler = Compiler.Elm.Main.init({});
+        const compiler = Compiler.Elm.TestCompiler.init({});
 
         compiler.ports.compileFinished.subscribe(([ok, output]) => {
             if (ok) {
@@ -14,7 +14,7 @@ exports.toWat = function toWat(sourceCode) {
             }
         });
 
-        compiler.ports.compileString.send(stripIndent(sourceCode));
+        compiler.ports.compileString.send([entry, stripIndent(sourceCode)]);
     });
 }
 

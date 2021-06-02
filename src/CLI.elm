@@ -94,7 +94,9 @@ update msg model =
 
                         PackageLoader.Failed error ->
                             ( model
-                            , outgoingPort <| encodeCompilationFailure <| Debug.toString error
+                            , outgoingPort <|
+                                encodeCompilationFailure <|
+                                    PackageLoader.problemToString error
                             )
 
                         _ ->

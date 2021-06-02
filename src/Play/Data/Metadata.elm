@@ -1,5 +1,6 @@
 module Play.Data.Metadata exposing (..)
 
+import Dict exposing (Dict)
 import Play.Data.SourceLocation exposing (SourceLocationRange)
 import Play.Data.Type exposing (Type)
 import Play.Data.TypeSignature exposing (TypeSignature(..))
@@ -10,6 +11,7 @@ type alias Metadata =
     , type_ : TypeSignature
     , isQuoted : Bool
     , sourceLocationRange : Maybe SourceLocationRange
+    , isExposed : Bool
     }
 
 
@@ -19,6 +21,7 @@ default =
     , type_ = NotProvided
     , isQuoted = False
     , sourceLocationRange = Nothing
+    , isExposed = True
     }
 
 
@@ -50,3 +53,8 @@ withSourceLocationRange range meta =
 clearSourceLocationRange : Metadata -> Metadata
 clearSourceLocationRange meta =
     { meta | sourceLocationRange = Nothing }
+
+
+isExposed : Bool -> Metadata -> Metadata
+isExposed val meta =
+    { meta | isExposed = val }

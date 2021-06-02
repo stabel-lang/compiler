@@ -1,7 +1,7 @@
 const compiler = require('./compiler.wrapper');
 
 test('Simple case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: Bool
         : True
         : False
@@ -16,7 +16,6 @@ test('Simple case', async () => {
           drop 75
 
         def: main
-        entry: true
         : True to-int 
           False to-int 
           -
@@ -29,7 +28,7 @@ test('Simple case', async () => {
 
 // Same as above, but without an explicit False branch.
 test('Default branch', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: Bool
         : True 
         : False
@@ -43,7 +42,6 @@ test('Default branch', async () => {
         else: drop 75
 
         def: main
-        entry: true
         : True to-int 
           False to-int 
           -
@@ -55,7 +53,7 @@ test('Default branch', async () => {
 });
 
 test('Multiple arguments', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: Beings
         : Person 
         : Dog
@@ -84,7 +82,6 @@ test('Multiple arguments', async () => {
           man-years>
 
         def: main
-        entry: true
         : 18 >Person 10 add-to-age 
           0 >Dog 2 add-to-age 
           get-man-age swap 
@@ -98,7 +95,7 @@ test('Multiple arguments', async () => {
 });
 
 test('Generic arguments', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: List a
         : NonEmptyList a 
         : EmptyList
@@ -116,7 +113,6 @@ test('Generic arguments', async () => {
           swap drop
 
         def: main
-        entry: true
         : 1 EmptyList >NonEmptyList
           0 first-or-default
     `);
@@ -127,7 +123,7 @@ test('Generic arguments', async () => {
 });
 
 test('Recursive word', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: List a
         : NonEmptyList a 
         : EmptyList
@@ -149,7 +145,6 @@ test('Recursive word', async () => {
           swap drop
 
         def: main
-        entry: true
         : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
           sum
     `);
@@ -160,7 +155,7 @@ test('Recursive word', async () => {
 });
 
 test('Int case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: IntParseResult
         : Int
         : NoInt
@@ -174,7 +169,6 @@ test('Int case', async () => {
           drop 0
 
         def: main
-        entry: true
         : 4 double
     `);
 
@@ -184,7 +178,7 @@ test('Int case', async () => {
 });
 
 test('Int match', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defmulti: double
         : Int( value 0 )
           drop 2
@@ -192,7 +186,6 @@ test('Int match', async () => {
           2 *
 
         def: main
-        entry: true
         : 0 double
     `);
 
@@ -202,7 +195,7 @@ test('Int match', async () => {
 });
 
 test('Int match (reverse)', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defmulti: double
         : Int( value 0 )
           drop 2
@@ -210,7 +203,6 @@ test('Int match (reverse)', async () => {
           2 *
 
         def: main
-        entry: true
         : 6 double
     `);
 
@@ -220,7 +212,7 @@ test('Int match (reverse)', async () => {
 });
 
 test('Correct Int boxing behaviour', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defmulti: add
         : Int( value 0 )
           swap 
@@ -231,7 +223,6 @@ test('Correct Int boxing behaviour', async () => {
           +
 
         def: main
-        entry: true
         : 10 6 add
     `);
 
@@ -241,7 +232,7 @@ test('Correct Int boxing behaviour', async () => {
 });
 
 test('Correct Int boxing behaviour when mismatch between word input size and stack size', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Nil
 
         defmulti: inc-zero
@@ -252,7 +243,6 @@ test('Correct Int boxing behaviour when mismatch between word input size and sta
         : Int
 
         def: main
-        entry: true
         : 0 Nil inc-zero
           drop 
     `);
@@ -263,7 +253,7 @@ test('Correct Int boxing behaviour when mismatch between word input size and sta
 });
 
 test('Generic case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defunion: Maybe a
         : a
         : Nil
@@ -285,7 +275,6 @@ test('Generic case', async () => {
           swap drop
 
         def: main
-        entry: true
         : 10
           [ 1 - ] map
           0 with-default

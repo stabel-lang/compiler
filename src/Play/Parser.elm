@@ -1,22 +1,25 @@
 module Play.Parser exposing
     ( AST
     , AstNode(..)
+    , ModuleDefinition(..)
+    , ModuleDefinitionRec
+    , PossiblyQualifiedType(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
+    , TypeSignature(..)
     , WordDefinition
     , WordImplementation(..)
+    , emptyModuleDefinition
     , run
     , typeDefinitionName
+    , typeSignatureToMaybe
     )
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
-import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
-import Play.Data.Type as Type exposing (Type, WordType)
-import Play.Data.TypeSignature as TypeSignature
 import Play.Parser.Problem exposing (..)
 import Set exposing (Set)
 
@@ -26,21 +29,71 @@ type alias Parser a =
 
 
 type alias AST =
-    { types : Dict String TypeDefinition
+    { moduleDefinition : ModuleDefinition
+    , types : Dict String TypeDefinition
     , words : Dict String WordDefinition
     }
 
 
+type ModuleDefinition
+    = Undefined
+    | Defined ModuleDefinitionRec
+
+
+type alias ModuleDefinitionRec =
+    { aliases : Dict String String
+    , imports : Dict String (List String)
+    , exposes : Set String
+    }
+
+
 type TypeDefinition
-    = CustomTypeDef SourceLocationRange String (List String) (List ( String, Type ))
-    | UnionTypeDef SourceLocationRange String (List String) (List Type)
+    = CustomTypeDef SourceLocationRange String (List String) (List ( String, PossiblyQualifiedType ))
+    | UnionTypeDef SourceLocationRange String (List String) (List PossiblyQualifiedType)
 
 
 type alias WordDefinition =
     { name : String
-    , metadata : Metadata
+    , typeSignature : TypeSignature
+    , sourceLocationRange : Maybe SourceLocationRange
+    , aliases : Dict String String
+    , imports : Dict String (List String)
     , implementation : WordImplementation
     }
+
+
+type alias ParserWordType =
+    { input : List PossiblyQualifiedType
+    , output : List PossiblyQualifiedType
+    }
+
+
+type TypeSignature
+    = NotProvided
+    | UserProvided ParserWordType
+    | Verified ParserWordType
+
+
+typeSignatureToMaybe : TypeSignature -> Maybe ParserWordType
+typeSignatureToMaybe ts =
+    case ts of
+        NotProvided ->
+            Nothing
+
+        UserProvided wt ->
+            Just wt
+
+        Verified wt ->
+            Just wt
+
+
+type PossiblyQualifiedType
+    = LocalRef String (List PossiblyQualifiedType)
+    | InternalRef (List String) String (List PossiblyQualifiedType)
+    | ExternalRef (List String) String (List PossiblyQualifiedType)
+    | Generic String
+    | StackRange String
+    | QuotationType ParserWordType
 
 
 type WordImplementation
@@ -49,12 +102,12 @@ type WordImplementation
 
 
 type TypeMatch
-    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange PossiblyQualifiedType (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
     = LiteralInt Int
-    | LiteralType Type
+    | LiteralType PossiblyQualifiedType
     | RecursiveMatch TypeMatch
 
 
@@ -79,6 +132,19 @@ run sourceCode =
 -- ATOMS
 
 
+emptyModuleDefinition : ModuleDefinition
+emptyModuleDefinition =
+    Undefined
+
+
+emptyModuleDefinitionRec : ModuleDefinitionRec
+emptyModuleDefinitionRec =
+    { aliases = Dict.empty
+    , imports = Dict.empty
+    , exposes = Set.empty
+    }
+
+
 validSymbolChar : Char -> Bool
 validSymbolChar c =
     not <| Set.member c invalidSymbolChars
@@ -100,7 +166,6 @@ specialChars =
         , '('
         , ')'
         , '.'
-        , ','
         , '#'
         , '/'
         ]
@@ -165,6 +230,23 @@ symbolParser =
         |> Parser.backtrackable
 
 
+symbolParser2 : Parser String
+symbolParser2 =
+    Parser.variable
+        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
+        , inner = validSymbolChar
+        , reserved = Set.empty
+        , expecting = NotSymbol
+        }
+        |. Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token ":" NotMetadata)
+                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
+            , Parser.succeed identity
+            ]
+        |> Parser.backtrackable
+
+
 symbolImplParser : Parser String
 symbolImplParser =
     Parser.variable
@@ -180,6 +262,16 @@ symbolImplParser =
             , Parser.succeed identity
             ]
         |> Parser.backtrackable
+
+
+symbolImplListParser : List String -> Parser (Parser.Step (List String) (List String))
+symbolImplListParser symbols =
+    Parser.oneOf
+        [ Parser.succeed (\sym -> Parser.Loop (sym :: symbols))
+            |= symbolImplParser
+            |. noiseParser
+        , Parser.succeed (Parser.Done <| List.reverse symbols)
+        ]
 
 
 symbolImplParser2 : Parser (SourceLocationRange -> AstNode)
@@ -235,6 +327,27 @@ symbolImplParser2 =
         ]
         |. noiseParser
         |> Parser.andThen identity
+
+
+modulePathStringParser : Parser String
+modulePathStringParser =
+    Parser.oneOf
+        [ Parser.succeed identity
+            |= symbolImplParser
+            |> Parser.andThen (\sym -> Parser.loop sym moduleRefParser)
+        , Parser.succeed identity
+            |= Parser.loop "" moduleRefParser
+        ]
+
+
+moduleRefParser : String -> Parser (Parser.Step String String)
+moduleRefParser path =
+    Parser.oneOf
+        [ Parser.succeed (\part -> Parser.Loop (path ++ "/" ++ part))
+            |. Parser.symbol (Token "/" NotMetadata)
+            |= symbolImplParser
+        , Parser.succeed (Parser.Done path)
+        ]
 
 
 modulePathParser : List String -> Parser (Parser.Step (List String) ( List String, String ))
@@ -294,50 +407,56 @@ typeNameParser =
         |. noiseParser
 
 
-genericOrRangeParser : Parser Type
+genericOrRangeParser : Parser PossiblyQualifiedType
 genericOrRangeParser =
     let
         helper value =
             Parser.oneOf
-                [ Parser.succeed (Type.StackRange value)
+                [ Parser.succeed (StackRange value)
                     |. Parser.symbol (Token "..." NoProblem)
                     |. noiseParser
-                , Parser.succeed (Type.Generic value)
+                , Parser.succeed (Generic value)
+                    |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
                 ]
     in
     Parser.andThen helper genericParser
 
 
-typeParser : Parser Type
-typeParser =
+typeSignatureRefParser : Parser PossiblyQualifiedType
+typeSignatureRefParser =
     Parser.oneOf
-        [ Parser.succeed Type.Int
-            |. Parser.keyword (Token "Int" NoProblem)
-            |. noiseParser
-        , Parser.succeed Type.Custom
+        [ Parser.succeed (\name -> LocalRef name [])
             |= typeNameParser
+        , Parser.succeed (\( path, name ) -> ExternalRef path name [])
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed (\( path, name ) -> InternalRef path name [])
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed Generic
+            |= genericParser
+        , Parser.succeed identity
+            |. Parser.symbol (Token "(" ExpectedLeftParen)
+            |. noiseParser
+            |= typeRefParser
+            |. Parser.symbol (Token ")" ExpectedRightParen)
+            |. noiseParser
         ]
 
 
-typeRefParser : Parser Type
+typeRefParser : Parser PossiblyQualifiedType
 typeRefParser =
-    let
-        helper name binds =
-            case binds of
-                [] ->
-                    Type.Custom name
-
-                _ ->
-                    Type.CustomGeneric name binds
-    in
     Parser.oneOf
-        [ Parser.succeed Type.Int
-            |. Parser.keyword (Token "Int" NoProblem)
-            |. noiseParser
-        , Parser.succeed helper
+        [ Parser.succeed LocalRef
             |= typeNameParser
             |= Parser.loop [] typeOrGenericParser
-        , Parser.succeed Type.Generic
+        , Parser.succeed (\( path, name ) binds -> ExternalRef path name binds)
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed (\( path, name ) binds -> InternalRef path name binds)
+            |= Parser.loop [] modularizedTypeRefParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed Generic
             |= genericParser
         , Parser.succeed identity
             |. Parser.symbol (Token "(" ExpectedLeftParen)
@@ -348,12 +467,56 @@ typeRefParser =
         ]
 
 
-typeOrGenericParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+typeMatchTypeParser : Parser PossiblyQualifiedType
+typeMatchTypeParser =
+    Parser.oneOf
+        [ Parser.succeed (\name -> LocalRef name [])
+            |= typeNameParser
+        , Parser.succeed (\( path, name ) -> ExternalRef path name [])
+            |. Parser.symbol (Token "/" NoProblem)
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed (\( path, name ) -> InternalRef path name [])
+            |= Parser.loop [] modularizedTypeRefParser
+        , Parser.succeed Generic
+            |= genericParser
+        , Parser.succeed identity
+            |. Parser.symbol (Token "(" ExpectedLeftParen)
+            |. noiseParser
+            |= typeRefParser
+            |. Parser.symbol (Token ")" ExpectedRightParen)
+            |. noiseParser
+        ]
+
+
+modularizedTypeRefParser :
+    List String
+    -> Parser (Parser.Step (List String) ( List String, String ))
+modularizedTypeRefParser reversedPath =
+    let
+        onType type_ =
+            Parser.Done
+                ( List.reverse reversedPath
+                , type_
+                )
+
+        addToPath pathPiece =
+            Parser.Loop (pathPiece :: reversedPath)
+    in
+    Parser.oneOf
+        [ Parser.succeed onType
+            |= typeNameParser
+        , Parser.succeed addToPath
+            |= symbolParser2
+            |. Parser.symbol (Token "/" NoProblem)
+        ]
+
+
+typeOrGenericParser : List PossiblyQualifiedType -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
 typeOrGenericParser types =
     Parser.oneOf
-        [ Parser.succeed (\name -> Parser.Loop (Type.Custom name :: types))
+        [ Parser.succeed (\name -> Parser.Loop (LocalRef name [] :: types))
             |= typeNameParser
-        , Parser.succeed (\name -> Parser.Loop (Type.Generic name :: types))
+        , Parser.succeed (\name -> Parser.Loop (Generic name :: types))
             |= genericParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
@@ -383,15 +546,65 @@ noiseParserLoop _ =
 parser : Parser AST
 parser =
     let
+        joinParseResults modDef ast =
+            { ast | moduleDefinition = modDef }
+
         emptyAst =
-            { types = Dict.empty
+            { moduleDefinition = emptyModuleDefinition
+            , types = Dict.empty
             , words = Dict.empty
             }
     in
     Parser.succeed identity
         |. noiseParser
-        |= Parser.loop emptyAst definitionParser
+        |= Parser.oneOf
+            [ Parser.succeed joinParseResults
+                |= moduleDefinitionParser
+                |. noiseParser
+                |= Parser.loop emptyAst definitionParser
+            , Parser.succeed (joinParseResults emptyModuleDefinition)
+                |= Parser.loop emptyAst definitionParser
+            ]
         |. Parser.end ExpectedEnd
+
+
+moduleDefinitionParser : Parser ModuleDefinition
+moduleDefinitionParser =
+    Parser.succeed identity
+        |. Parser.keyword (Token "defmodule:" NoProblem)
+        |. noiseParser
+        |= Parser.map Defined (Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser)
+
+
+moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDefinitionRec ModuleDefinitionRec)
+moduleDefinitionMetaParser def =
+    Parser.oneOf
+        [ Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            |. Parser.keyword (Token "alias:" NoProblem)
+            |. noiseParser
+            |= symbolParser
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+        , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+            |. Parser.keyword (Token "import:" NoProblem)
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+            |= Parser.loop [] symbolImplListParser
+            |. noiseParser
+        , Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
+            |. Parser.keyword (Token "exposing:" NoProblem)
+            |. noiseParser
+            |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
+            |. noiseParser
+        , Parser.succeed UnknownMetadata
+            |= definitionMetadataParser
+            |> Parser.andThen Parser.problem
+        , Parser.succeed (Parser.Done def)
+            |. Parser.keyword (Token ":" NoProblem)
+            |. noiseParser
+        ]
 
 
 definitionParser : AST -> Parser (Parser.Step AST AST)
@@ -412,8 +625,8 @@ definitionParser ast =
                 |> Maybe.map
                     (\prevDef ->
                         WordAlreadyDefined wordDef.name
-                            prevDef.metadata.sourceLocationRange
-                            wordDef.metadata.sourceLocationRange
+                            prevDef.sourceLocationRange
+                            wordDef.sourceLocationRange
                     )
 
         insertType typeDef =
@@ -484,12 +697,7 @@ generateDefaultWordsForType typeDef =
         CustomTypeDef _ typeName binds typeMembers ->
             let
                 typeOfType =
-                    case binds of
-                        [] ->
-                            Type.Custom typeName
-
-                        _ ->
-                            Type.CustomGeneric typeName (List.map Type.Generic binds)
+                    LocalRef typeName (List.map Generic binds)
 
                 ctorDef =
                     { name =
@@ -498,26 +706,41 @@ generateDefaultWordsForType typeDef =
 
                         else
                             ">" ++ typeName
-                    , metadata =
-                        Metadata.default
-                            |> Metadata.withVerifiedType (List.map Tuple.second typeMembers) [ typeOfType ]
+                    , typeSignature =
+                        Verified
+                            { input = List.map Tuple.second typeMembers
+                            , output = [ typeOfType ]
+                            }
+                    , sourceLocationRange = Nothing
+                    , aliases = Dict.empty
+                    , imports = Dict.empty
                     , implementation =
                         SoloImpl [ ConstructType typeName ]
                     }
 
                 setterGetterPair ( memberName, memberType ) =
                     [ { name = ">" ++ memberName
-                      , metadata =
-                            Metadata.default
-                                |> Metadata.withVerifiedType [ typeOfType, memberType ] [ typeOfType ]
+                      , typeSignature =
+                            Verified
+                                { input = [ typeOfType, memberType ]
+                                , output = [ typeOfType ]
+                                }
+                      , sourceLocationRange = Nothing
+                      , aliases = Dict.empty
+                      , imports = Dict.empty
                       , implementation =
                             SoloImpl
                                 [ SetMember typeName memberName ]
                       }
                     , { name = memberName ++ ">"
-                      , metadata =
-                            Metadata.default
-                                |> Metadata.withVerifiedType [ typeOfType ] [ memberType ]
+                      , typeSignature =
+                            Verified
+                                { input = [ typeOfType ]
+                                , output = [ memberType ]
+                                }
+                      , sourceLocationRange = Nothing
+                      , aliases = Dict.empty
+                      , imports = Dict.empty
                       , implementation =
                             SoloImpl
                                 [ GetMember typeName memberName ]
@@ -535,17 +758,19 @@ wordDefinitionParser startLocation =
         joinParseResults name def endLocation =
             { def
                 | name = name
-                , metadata =
-                    Metadata.withSourceLocationRange
+                , sourceLocationRange =
+                    Just
                         { start = startLocation
                         , end = endLocation
                         }
-                        def.metadata
             }
 
         emptyDef =
             { name = ""
-            , metadata = Metadata.default
+            , typeSignature = NotProvided
+            , sourceLocationRange = Nothing
+            , aliases = Dict.empty
+            , imports = Dict.empty
             , implementation = SoloImpl []
             }
     in
@@ -557,19 +782,24 @@ wordDefinitionParser startLocation =
 
 wordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
 wordMetadataParser def =
-    let
-        metadata =
-            def.metadata
-    in
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = TypeSignature.UserProvided typeSign } })
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
-        , Parser.succeed (Parser.Loop { def | metadata = { metadata | isEntryPoint = True } })
-            |. Parser.keyword (Token "entry:" NoProblem)
+        , Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            |. Parser.keyword (Token "alias:" NoProblem)
             |. noiseParser
-            |. Parser.keyword (Token "true" NoProblem)
+            |= symbolParser
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+        , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+            |. Parser.keyword (Token "import:" NoProblem)
+            |. noiseParser
+            |= modulePathStringParser
+            |. noiseParser
+            |= Parser.loop [] symbolImplListParser
             |. noiseParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
             |. Parser.keyword (Token ":" NoProblem)
@@ -589,17 +819,19 @@ multiWordDefinitionParser startLocation =
             reverseWhens <|
                 { def
                     | name = name
-                    , metadata =
-                        Metadata.withSourceLocationRange
+                    , sourceLocationRange =
+                        Just
                             { start = startLocation
                             , end = endLocation
                             }
-                            def.metadata
                 }
 
         emptyDef =
             { name = ""
-            , metadata = Metadata.default
+            , typeSignature = NotProvided
+            , sourceLocationRange = Nothing
+            , aliases = Dict.empty
+            , imports = Dict.empty
             , implementation = SoloImpl []
             }
 
@@ -620,9 +852,6 @@ multiWordDefinitionParser startLocation =
 multiWordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
 multiWordMetadataParser def =
     let
-        metadata =
-            def.metadata
-
         addWhenImpl impl =
             case def.implementation of
                 MultiImpl whens default ->
@@ -640,7 +869,7 @@ multiWordMetadataParser def =
                     MultiImpl [] impl
     in
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | metadata = { metadata | type_ = TypeSignature.UserProvided typeSign } })
+        [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
             |. Parser.keyword (Token "type:" NoProblem)
             |. noiseParser
             |= typeSignatureParser
@@ -686,7 +915,9 @@ typeGenericParser generics =
         ]
 
 
-typeMemberParser : List ( String, Type ) -> Parser (Parser.Step (List ( String, Type )) (List ( String, Type )))
+typeMemberParser :
+    List ( String, PossiblyQualifiedType )
+    -> Parser (Parser.Step (List ( String, PossiblyQualifiedType )) (List ( String, PossiblyQualifiedType )))
 typeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
@@ -718,7 +949,9 @@ unionTypeDefinitionParser startLocation =
         |= sourceLocationParser
 
 
-unionTypeMemberParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+unionTypeMemberParser :
+    List PossiblyQualifiedType
+    -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
 unionTypeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
@@ -732,7 +965,7 @@ unionTypeMemberParser types =
         ]
 
 
-typeSignatureParser : Parser WordType
+typeSignatureParser : Parser ParserWordType
 typeSignatureParser =
     Parser.succeed (\input output -> { input = input, output = output })
         |= Parser.loop [] typeLoopParser
@@ -741,7 +974,9 @@ typeSignatureParser =
         |= Parser.loop [] typeLoopParser
 
 
-typeLoopParser : List Type -> Parser (Parser.Step (List Type) (List Type))
+typeLoopParser :
+    List PossiblyQualifiedType
+    -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
 typeLoopParser reverseTypes =
     let
         step type_ =
@@ -749,12 +984,10 @@ typeLoopParser reverseTypes =
     in
     Parser.oneOf
         [ Parser.succeed step
-            |= typeParser
-        , Parser.succeed step
             |= genericOrRangeParser
         , Parser.succeed step
-            |= typeRefParser
-        , Parser.succeed (\wordType -> step (Type.Quotation wordType))
+            |= typeSignatureRefParser
+        , Parser.succeed (\wordType -> step (QuotationType wordType))
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= typeSignatureParser
@@ -766,29 +999,19 @@ typeLoopParser reverseTypes =
 
 typeMatchParser : Parser TypeMatch
 typeMatchParser =
-    Parser.oneOf
-        [ Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
-            |= sourceLocationParser
-            |= typeParser
-            |= Parser.oneOf
-                [ Parser.succeed identity
-                    |. Parser.symbol (Token "(" ExpectedLeftParen)
-                    |. noiseParser
-                    |= Parser.loop [] typeMatchConditionParser
-                    |. Parser.symbol (Token ")" ExpectedRightParen)
-                , Parser.succeed []
-                ]
-            |= sourceLocationParser
-            |. noiseParser
-        , Parser.succeed (\startLoc sym endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) (Type.Generic sym) [])
-            |= sourceLocationParser
-            |= genericParser
-            |= sourceLocationParser
-        , Parser.succeed (\startLoc typ endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) typ [])
-            |= sourceLocationParser
-            |= typeRefParser
-            |= sourceLocationParser
-        ]
+    Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
+        |= sourceLocationParser
+        |= typeMatchTypeParser
+        |= Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token "(" ExpectedLeftParen)
+                |. noiseParser
+                |= Parser.loop [] typeMatchConditionParser
+                |. Parser.symbol (Token ")" ExpectedRightParen)
+            , Parser.succeed []
+            ]
+        |= sourceLocationParser
+        |. noiseParser
 
 
 typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))

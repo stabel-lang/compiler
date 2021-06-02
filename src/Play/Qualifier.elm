@@ -1,6 +1,7 @@
 module Play.Qualifier exposing (..)
 
 import Dict exposing (Dict)
+import List.Extra as List
 import Play.Data.Builtin as Builtin exposing (Builtin)
 import Play.Data.Metadata as Metadata exposing (Metadata)
 import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
@@ -15,21 +16,14 @@ import Set exposing (Set)
 type alias AST =
     { types : Dict String TypeDefinition
     , words : Dict String WordDefinition
-    , additionalModulesRequired : Set String
-    , checkForExistingTypes : Set String
-    , checkForExistingWords : Set String
     }
 
 
-type alias ExposedAST =
-    { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
-    }
-
-
-type TypeDefinition
-    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
-    | UnionTypeDef String SourceLocationRange (List String) (List Type)
+type
+    TypeDefinition
+    -- TODO: Each branch here should take a record. Too many arguments.
+    = CustomTypeDef String Bool SourceLocationRange (List String) (List ( String, Type ))
+    | UnionTypeDef String Bool SourceLocationRange (List String) (List Type)
 
 
 type alias WordDefinition =
@@ -64,6 +58,12 @@ type Node
     | Builtin SourceLocationRange Builtin
 
 
+type alias ModuleReferences =
+    { aliases : Dict String String
+    , imports : Dict String (List String)
+    }
+
+
 builtinDict : Dict String Builtin
 builtinDict =
     Dict.fromList
@@ -86,6 +86,7 @@ type alias RunConfig =
     , modulePath : String
     , ast : Parser.AST
     , externalModules : Dict String String
+    , inProgressAST : AST
     }
 
 
@@ -96,41 +97,62 @@ run config =
             Dict.foldl (\_ val acc -> qualifyType config val acc) ( [], Dict.empty ) config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
-        ( wordErrors, externalWords, qualifiedWords ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config qualifiedTypes val acc) ( [], Set.empty, Dict.empty ) config.ast.words
+        allQualifiedTypes =
+            Dict.union qualifiedTypes config.inProgressAST.types
 
-        requiredModules =
-            Set.toList externalWords
-                |> List.map Tuple.first
-                |> Set.fromList
-
-        wordsToCheck =
-            Set.toList externalWords
-                |> List.map (\( path, name ) -> path ++ "/" ++ name)
-                |> Set.fromList
+        ( wordErrors, qualifiedWords ) =
+            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
             Ok
                 { types = qualifiedTypes
                 , words = qualifiedWords
-                , additionalModulesRequired = requiredModules
-                , checkForExistingTypes = Set.empty
-                , checkForExistingWords = wordsToCheck
                 }
 
         _ ->
             Err <| typeErrors ++ wordErrors
 
 
+type alias ModuleDefinitionConfig a =
+    { a
+        | ast : Parser.AST
+        , externalModules : Dict String String
+    }
+
+
+moduleDefinition : ModuleDefinitionConfig a -> Parser.ModuleDefinitionRec
+moduleDefinition config =
+    let
+        defaultImports =
+            if Dict.get "/core" config.externalModules == Just "play/standard_library" then
+                Dict.fromList [ ( "/core", [] ) ]
+
+            else
+                Dict.empty
+    in
+    case config.ast.moduleDefinition of
+        Parser.Undefined ->
+            { imports = defaultImports
+            , aliases = Dict.empty
+            , exposes = Set.empty
+            }
+
+        Parser.Defined def ->
+            { imports = Dict.union def.imports defaultImports
+            , aliases = def.aliases
+            , exposes = def.exposes
+            }
+
+
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
     case td of
-        CustomTypeDef name range generics members ->
-            CustomTypeDef name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+        CustomTypeDef exposed name range generics members ->
+            CustomTypeDef exposed name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
 
-        UnionTypeDef name range generics memberTypes ->
-            UnionTypeDef name range generics (List.map (resolveUnion qt) memberTypes)
+        UnionTypeDef exposed name range generics memberTypes ->
+            UnionTypeDef exposed name range generics (List.map (resolveUnion qt) memberTypes)
 
 
 resolveUnion : Dict String TypeDefinition -> Type -> Type
@@ -138,7 +160,7 @@ resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ _ members) ->
+                Just (UnionTypeDef _ _ _ _ members) ->
                     Type.Union members
 
                 _ ->
@@ -146,7 +168,7 @@ resolveUnion typeDefs type_ =
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ generics members) ->
+                Just (UnionTypeDef _ _ _ generics members) ->
                     let
                         genericsMap =
                             List.map2 Tuple.pair generics types
@@ -180,6 +202,17 @@ qualifyType :
     -> ( List Problem, Dict String TypeDefinition )
     -> ( List Problem, Dict String TypeDefinition )
 qualifyType config typeDef ( errors, acc ) =
+    let
+        modDef =
+            moduleDefinition config
+
+        ( modRefs, exposes ) =
+            ( { aliases = modDef.aliases
+              , imports = modDef.imports
+              }
+            , modDef.exposes
+            )
+    in
     case typeDef of
         Parser.CustomTypeDef range name generics members ->
             let
@@ -187,9 +220,12 @@ qualifyType config typeDef ( errors, acc ) =
                     qualifyName config name
 
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config range)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs range)) members
                         |> List.map raiseTupleError
                         |> Result.combine
+
+                exposed =
+                    Set.isEmpty exposes || Set.member name exposes
 
                 raiseTupleError ( label, result ) =
                     case result of
@@ -207,7 +243,15 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMembers ->
                     ( errors
-                    , Dict.insert qualifiedName (CustomTypeDef qualifiedName range generics qualifiedMembers) acc
+                    , Dict.insert qualifiedName
+                        (CustomTypeDef
+                            qualifiedName
+                            exposed
+                            range
+                            generics
+                            qualifiedMembers
+                        )
+                        acc
                     )
 
         Parser.UnionTypeDef range name generics memberTypes ->
@@ -215,8 +259,11 @@ qualifyType config typeDef ( errors, acc ) =
                 qualifiedName =
                     qualifyName config name
 
+                exposed =
+                    Set.isEmpty exposes || Set.member name exposes
+
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config range) memberTypes
+                    List.map (qualifyMemberType config modRefs range) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -227,40 +274,210 @@ qualifyType config typeDef ( errors, acc ) =
 
                 Ok qualifiedMemberTypes ->
                     ( errors
-                    , Dict.insert qualifiedName (UnionTypeDef qualifiedName range generics qualifiedMemberTypes) acc
+                    , Dict.insert qualifiedName
+                        (UnionTypeDef
+                            qualifiedName
+                            exposed
+                            range
+                            generics
+                            qualifiedMemberTypes
+                        )
+                        acc
                     )
 
 
-qualifyMemberType : RunConfig -> SourceLocationRange -> Type -> Result Problem Type
-qualifyMemberType config range type_ =
+qualifyMemberType :
+    RunConfig
+    -> ModuleReferences
+    -> SourceLocationRange
+    -> Parser.PossiblyQualifiedType
+    -> Result Problem Type
+qualifyMemberType config modRefs range type_ =
+    let
+        internalRefLookup path name binds =
+            let
+                qualifiedName =
+                    path
+                        ++ [ name ]
+                        |> String.join "/"
+                        |> qualifyPackageModule config.packageName
+
+                bindResult =
+                    binds
+                        |> List.map (qualifyMemberType config modRefs range)
+                        |> Result.combine
+            in
+            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
+                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
+                    Ok <| Type.Custom qualifiedName
+
+                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+
+                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
+                    Ok <| Type.Union memberTypes
+
+                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                _ ->
+                    Err <| UnknownTypeRef range qualifiedName
+
+        importsLookup name binds =
+            case resolveImportedType config modRefs name of
+                Just importedModule ->
+                    if String.startsWith "/" importedModule then
+                        let
+                            nextPath =
+                                importedModule
+                                    |> String.dropLeft 1
+                                    |> String.split "/"
+                                    -- Drop author/packageName part
+                                    |> List.drop 2
+                        in
+                        qualifyMemberType config modRefs range <|
+                            Parser.ExternalRef nextPath name binds
+
+                    else
+                        qualifyMemberType config modRefs range <|
+                            Parser.InternalRef (String.split "/" importedModule) name binds
+
+                Nothing ->
+                    Err <| UnknownTypeRef range name
+    in
     case type_ of
-        Type.Custom name ->
+        Parser.LocalRef "Int" [] ->
+            Ok <| Type.Int
+
+        Parser.LocalRef name [] ->
             case Dict.get name config.ast.types of
                 Just _ ->
                     Ok <| Type.Custom (qualifyName config name)
 
                 Nothing ->
-                    Err <| UnknownTypeRef range name
+                    importsLookup name []
 
-        Type.CustomGeneric name binds ->
+        Parser.LocalRef name binds ->
             case Dict.get name config.ast.types of
                 Just _ ->
-                    Ok <| Type.CustomGeneric (qualifyName config name) binds
+                    let
+                        bindResult =
+                            binds
+                                |> List.map (qualifyMemberType config modRefs range)
+                                |> Result.combine
+                    in
+                    case bindResult of
+                        Ok convertedBindings ->
+                            Ok <|
+                                Type.CustomGeneric
+                                    (qualifyName config name)
+                                    convertedBindings
+
+                        Err err ->
+                            Err err
 
                 Nothing ->
-                    Err <| UnknownTypeRef range name
+                    importsLookup name binds
 
-        _ ->
-            Ok type_
+        Parser.InternalRef ([ possibleAlias ] as path) name binds ->
+            case Dict.get possibleAlias modRefs.aliases of
+                Just val ->
+                    if String.startsWith "/" val then
+                        let
+                            newPath =
+                                val
+                                    |> String.split "/"
+                                    |> List.drop 1
+                        in
+                        qualifyMemberType config modRefs range <|
+                            Parser.ExternalRef newPath name binds
+
+                    else
+                        internalRefLookup (String.split "/" val) name binds
+
+                Nothing ->
+                    internalRefLookup path name binds
+
+        Parser.InternalRef path name binds ->
+            internalRefLookup path name binds
+
+        Parser.ExternalRef path name binds ->
+            let
+                pathString =
+                    "/" ++ String.join "/" path
+
+                qualifiedName =
+                    Dict.get pathString config.externalModules
+                        |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
+                        |> Maybe.withDefault ""
+
+                bindResult =
+                    binds
+                        |> List.map (qualifyMemberType config modRefs range)
+                        |> Result.combine
+            in
+            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
+                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
+                    Ok <| Type.Custom qualifiedName
+
+                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+
+                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
+                    Ok <| Type.Union memberTypes
+
+                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
+                    Err <| TypeNotExposed range qualifiedName
+
+                _ ->
+                    Err <| UnknownTypeRef range qualifiedName
+
+        Parser.Generic sym ->
+            Ok (Type.Generic sym)
+
+        Parser.StackRange sym ->
+            Ok (Type.Generic sym)
+
+        Parser.QuotationType sign ->
+            let
+                inputResult =
+                    sign.input
+                        |> List.map (qualifyMemberType config modRefs range)
+                        |> Result.combine
+
+                outputResult =
+                    sign.output
+                        |> List.map (qualifyMemberType config modRefs range)
+                        |> Result.combine
+            in
+            case ( inputResult, outputResult ) of
+                ( Ok input, Ok output ) ->
+                    Ok <|
+                        Type.Quotation
+                            { input = input
+                            , output = output
+                            }
+
+                ( Err input, _ ) ->
+                    Err input
+
+                ( _, Err output ) ->
+                    Err output
 
 
 qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.WordDefinition
-    -> ( List Problem, Set ( String, String ), Dict String WordDefinition )
-    -> ( List Problem, Set ( String, String ), Dict String WordDefinition )
-qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords, acc ) =
+    -> ( List Problem, Dict String WordDefinition )
+    -> ( List Problem, Dict String WordDefinition )
+qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
     let
         ( whens, impl ) =
             case unqualifiedWord.implementation of
@@ -270,15 +487,31 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
                 Parser.MultiImpl whenImpl defImpl ->
                     ( whenImpl, defImpl )
 
-        ( newWordsAfterWhens, externalWordsAfterWhens, qualifiedWhensResult ) =
-            List.foldr (qualifyWhen config qualifiedTypes unqualifiedWord.name) ( acc, Set.empty, [] ) whens
-                |> (\( a, b, nodes ) -> ( a, b, Result.combine nodes ))
+        modDef =
+            moduleDefinition config
 
-        ( newWordsAfterImpl, externalWordsAfterImpl, qualifiedImplementationResult ) =
-            initQualifyNode unqualifiedWord.name config newWordsAfterWhens impl
+        moduleReferences =
+            { aliases = Dict.union unqualifiedWord.aliases modDef.aliases
+            , imports = Dict.union unqualifiedWord.imports modDef.imports
+            }
+
+        ( newWordsAfterWhens, qualifiedWhensResult ) =
+            whens
+                |> List.foldr
+                    (qualifyWhen
+                        config
+                        qualifiedTypes
+                        unqualifiedWord.name
+                        moduleReferences
+                    )
+                    ( acc, [] )
+                |> Tuple.mapSecond Result.combine
+
+        ( newWordsAfterImpl, qualifiedImplementationResult ) =
+            initQualifyNode config unqualifiedWord.name moduleReferences newWordsAfterWhens impl
 
         qualifiedMetadataResult =
-            qualifyMetadata config qualifiedTypes unqualifiedWord.metadata
+            qualifyMetadata config qualifiedTypes unqualifiedWord
 
         qualifiedName =
             qualifyName config unqualifiedWord.name
@@ -286,9 +519,6 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
     case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
             ( errors
-            , externalWords
-                |> Set.union externalWordsAfterWhens
-                |> Set.union externalWordsAfterImpl
             , Dict.insert qualifiedName
                 { name = qualifiedName
                 , metadata = qualifiedMetadata
@@ -304,49 +534,86 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, externalWords,
 
         ( Err whenError, _, _ ) ->
             ( whenError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
         ( _, Err implError, _ ) ->
             ( implError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
         ( _, _, Err metaError ) ->
             ( metaError :: errors
-            , externalWords
             , newWordsAfterImpl
             )
 
 
-qualifyMetadata : RunConfig -> Dict String TypeDefinition -> Metadata -> Result Problem Metadata
-qualifyMetadata config qualifiedTypes meta =
+qualifyMetadata :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> Parser.WordDefinition
+    -> Result Problem Metadata
+qualifyMetadata config qualifiedTypes word =
     let
         wordRange =
-            Maybe.withDefault SourceLocation.emptyRange meta.sourceLocationRange
+            Maybe.withDefault SourceLocation.emptyRange word.sourceLocationRange
+
+        inputLength =
+            case word.typeSignature of
+                Parser.NotProvided ->
+                    0
+
+                Parser.UserProvided wt ->
+                    List.length wt.input
+
+                Parser.Verified wt ->
+                    List.length wt.input
+
+        modDef =
+            moduleDefinition config
+
+        modRefs =
+            { aliases = Dict.union modDef.aliases word.aliases
+            , imports = Dict.union modDef.imports word.imports
+            }
     in
-    TypeSignature.toMaybe meta.type_
+    Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (validateTypeReferences config qualifiedTypes wordRange)
+        |> List.map (qualifyMemberType config modRefs wordRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
                 let
+                    wordType =
+                        { input = List.take inputLength qualifiedFlatTypeSignature
+                        , output = List.drop inputLength qualifiedFlatTypeSignature
+                        }
+
                     ts =
-                        TypeSignature.map
-                            (\wt ->
-                                { input = List.take (List.length wt.input) qualifiedFlatTypeSignature
-                                , output = List.drop (List.length wt.input) qualifiedFlatTypeSignature
-                                }
-                            )
-                            meta.type_
+                        case word.typeSignature of
+                            Parser.NotProvided ->
+                                TypeSignature.NotProvided
+
+                            Parser.UserProvided _ ->
+                                TypeSignature.UserProvided wordType
+
+                            Parser.Verified _ ->
+                                TypeSignature.CompilerProvided wordType
+
+                    baseMeta =
+                        Metadata.default
                 in
-                { meta
+                { baseMeta
                     | type_ =
                         TypeSignature.map (resolveUnions qualifiedTypes) ts
+                    , isExposed =
+                        case config.ast.moduleDefinition of
+                            Parser.Undefined ->
+                                True
+
+                            Parser.Defined def ->
+                                Set.member word.name def.exposes
                 }
             )
 
@@ -393,56 +660,49 @@ qualifyWhen :
     RunConfig
     -> Dict String TypeDefinition
     -> String
+    -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, Set ( String, String ), List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName ( typeMatch, impl ) ( qualifiedWords, externalWords, result ) =
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
     let
-        ( newWords, externalWordsAfterImpl, qualifiedImplementationResult ) =
-            initQualifyNode wordName config qualifiedWords impl
+        ( newWords, qualifiedImplementationResult ) =
+            initQualifyNode config wordName modRefs qualifiedWords impl
 
         qualifiedMatchResult =
-            qualifyMatch config qualifiedTypes typeMatch
+            qualifyMatch config qualifiedTypes modRefs typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
             ( newWords
-            , externalWords
             , Err err :: result
             )
 
         ( _, Err err ) ->
             ( newWords
-            , externalWords
             , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
             ( newWords
-            , Set.union externalWords externalWordsAfterImpl
             , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
             )
 
 
-qualifyMatch : RunConfig -> Dict String TypeDefinition -> Parser.TypeMatch -> Result Problem TypeMatch
-qualifyMatch config qualifiedTypes typeMatch =
-    case typeMatch of
-        Parser.TypeMatch range Type.Int [] ->
-            Ok <| TypeMatch range Type.Int []
+qualifyMatch :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> ModuleReferences
+    -> Parser.TypeMatch
+    -> Result Problem TypeMatch
+qualifyMatch config qualifiedTypes modRefs typeMatch =
+    let
+        qualifiedNameToMatch range name patterns =
+            case Dict.get name qualifiedTypes of
+                Just (CustomTypeDef _ False _ _ _) ->
+                    Err <| TypeNotExposed range name
 
-        Parser.TypeMatch range Type.Int [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
-
-        Parser.TypeMatch range ((Type.Generic _) as type_) [] ->
-            Ok <| TypeMatch range type_ []
-
-        Parser.TypeMatch range (Type.Custom name) patterns ->
-            let
-                qualifiedName =
-                    qualifyName config name
-            in
-            case Dict.get qualifiedName qualifiedTypes of
-                Just (CustomTypeDef _ _ gens members) ->
+                Just (CustomTypeDef _ True _ gens members) ->
                     let
                         memberNames =
                             members
@@ -451,16 +711,24 @@ qualifyMatch config qualifiedTypes typeMatch =
 
                         qualifiedPatternsResult =
                             patterns
-                                |> List.map (qualifyMatchValue config qualifiedTypes range qualifiedName memberNames)
+                                |> List.map
+                                    (qualifyMatchValue
+                                        config
+                                        qualifiedTypes
+                                        modRefs
+                                        range
+                                        name
+                                        memberNames
+                                    )
                                 |> Result.combine
 
                         actualType =
                             case gens of
                                 [] ->
-                                    Type.Custom qualifiedName
+                                    Type.Custom name
 
                                 _ ->
-                                    Type.CustomGeneric qualifiedName (List.map Type.Generic gens)
+                                    Type.CustomGeneric name (List.map Type.Generic gens)
                     in
                     case qualifiedPatternsResult of
                         Ok qualifiedPatterns ->
@@ -469,7 +737,10 @@ qualifyMatch config qualifiedTypes typeMatch =
                         Err err ->
                             Err err
 
-                Just (UnionTypeDef _ _ _ types) ->
+                Just (UnionTypeDef _ False _ _ _) ->
+                    Err <| TypeNotExposed range name
+
+                Just (UnionTypeDef _ True _ _ types) ->
                     if List.isEmpty patterns then
                         Ok <| TypeMatch range (Type.Union types) []
 
@@ -477,7 +748,85 @@ qualifyMatch config qualifiedTypes typeMatch =
                         Err <| UnionTypeMatchWithPatterns range
 
                 Nothing ->
-                    Err <| UnknownTypeRef range qualifiedName
+                    Err <| UnknownTypeRef range name
+    in
+    case typeMatch of
+        Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
+            Ok <| TypeMatch range Type.Int []
+
+        Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
+            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
+
+        Parser.TypeMatch range (Parser.Generic sym) [] ->
+            Ok <| TypeMatch range (Type.Generic sym) []
+
+        Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
+            case qualifiedNameToMatch range (qualifyName config name) patterns of
+                (Err (UnknownTypeRef _ _)) as errMsg ->
+                    case resolveImportedType config modRefs name of
+                        Just importedModule ->
+                            qualifiedNameToMatch range (importedModule ++ "/" ++ name) patterns
+
+                        Nothing ->
+                            errMsg
+
+                result ->
+                    result
+
+        Parser.TypeMatch range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
+            case Dict.get possibleAlias modRefs.aliases of
+                Just actualPath ->
+                    if String.startsWith "/" actualPath then
+                        let
+                            extPath =
+                                actualPath
+                                    |> String.dropLeft 1
+                                    |> String.split "/"
+                        in
+                        qualifyMatch config qualifiedTypes modRefs <|
+                            Parser.TypeMatch range (Parser.ExternalRef extPath name []) patterns
+
+                    else
+                        let
+                            qualifiedName =
+                                actualPath
+                                    ++ "/"
+                                    ++ name
+                                    |> qualifyPackageModule config.packageName
+                        in
+                        qualifiedNameToMatch range qualifiedName patterns
+
+                Nothing ->
+                    let
+                        qualifiedName =
+                            possibleAlias
+                                ++ "/"
+                                ++ name
+                                |> qualifyPackageModule config.packageName
+                    in
+                    qualifiedNameToMatch range qualifiedName patterns
+
+        Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
+            let
+                qualifiedName =
+                    path
+                        ++ [ name ]
+                        |> String.join "/"
+                        |> qualifyPackageModule config.packageName
+            in
+            qualifiedNameToMatch range qualifiedName patterns
+
+        Parser.TypeMatch range (Parser.ExternalRef path name _) patterns ->
+            let
+                pathString =
+                    "/" ++ String.join "/" path
+
+                qualifiedName =
+                    Dict.get pathString config.externalModules
+                        |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
+                        |> Maybe.withDefault ""
+            in
+            qualifiedNameToMatch range qualifiedName patterns
 
         Parser.TypeMatch range _ _ ->
             Err <| InvalidTypeMatch range
@@ -486,22 +835,32 @@ qualifyMatch config qualifiedTypes typeMatch =
 qualifyMatchValue :
     RunConfig
     -> Dict String TypeDefinition
+    -> ModuleReferences
     -> SourceLocationRange
     -> String
     -> Set String
     -> ( String, Parser.TypeMatchValue )
     -> Result Problem ( String, TypeMatchValue )
-qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, matchValue ) =
+qualifyMatchValue config qualifiedTypes modRefs range typeName memberNames ( fieldName, matchValue ) =
     if Set.member fieldName memberNames then
         case matchValue of
             Parser.LiteralInt val ->
                 Ok <| ( fieldName, LiteralInt val )
 
             Parser.LiteralType type_ ->
-                Ok <| ( fieldName, LiteralType type_ )
+                let
+                    qualifyTypeResult =
+                        qualifyMemberType config modRefs range type_
+                in
+                case qualifyTypeResult of
+                    Ok qualifiedType ->
+                        Ok <| ( fieldName, LiteralType qualifiedType )
+
+                    Err err ->
+                        Err err
 
             Parser.RecursiveMatch typeMatch ->
-                case qualifyMatch config qualifiedTypes typeMatch of
+                case qualifyMatch config qualifiedTypes modRefs typeMatch of
                     Err err ->
                         Err err
 
@@ -513,21 +872,24 @@ qualifyMatchValue config qualifiedTypes range typeName memberNames ( fieldName, 
 
 
 initQualifyNode :
-    String
-    -> RunConfig
+    RunConfig
+    -> String
+    -> ModuleReferences
     -> Dict String WordDefinition
     -> List Parser.AstNode
-    -> ( Dict String WordDefinition, Set ( String, String ), Result Problem (List Node) )
-initQualifyNode currentDefName config qualifiedWords impl =
-    List.foldr (qualifyNode config currentDefName) (initQualifyNodeAccumulator qualifiedWords) impl
-        |> (\acc -> ( acc.qualifiedWords, acc.externalWords, Result.combine acc.qualifiedNodes ))
+    -> ( Dict String WordDefinition, Result Problem (List Node) )
+initQualifyNode config currentDefName modRefs qualifiedWords impl =
+    List.foldr
+        (qualifyNode config currentDefName modRefs)
+        (initQualifyNodeAccumulator qualifiedWords)
+        impl
+        |> (\acc -> ( acc.qualifiedWords, Result.combine acc.qualifiedNodes ))
 
 
 type alias QualifyNodeAccumulator =
     { availableQuoteId : Int
     , qualifiedWords : Dict String WordDefinition
     , qualifiedNodes : List (Result Problem Node)
-    , externalWords : Set ( String, String )
     }
 
 
@@ -536,12 +898,17 @@ initQualifyNodeAccumulator qualifiedWords =
     { availableQuoteId = 1
     , qualifiedWords = qualifiedWords
     , qualifiedNodes = []
-    , externalWords = Set.empty
     }
 
 
-qualifyNode : RunConfig -> String -> Parser.AstNode -> QualifyNodeAccumulator -> QualifyNodeAccumulator
-qualifyNode config currentDefName node acc =
+qualifyNode :
+    RunConfig
+    -> String
+    -> ModuleReferences
+    -> Parser.AstNode
+    -> QualifyNodeAccumulator
+    -> QualifyNodeAccumulator
+qualifyNode config currentDefName modRefs node acc =
     case node of
         Parser.Integer loc value ->
             { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
@@ -560,23 +927,77 @@ qualifyNode config currentDefName node acc =
                         { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
-                        { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
+                        case resolveImportedWord config modRefs value of
+                            Nothing ->
+                                { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
+
+                            Just mod ->
+                                if String.startsWith "/" mod then
+                                    let
+                                        path =
+                                            mod
+                                                |> String.split "/"
+                                                |> List.drop 3
+                                    in
+                                    qualifyNode
+                                        config
+                                        currentDefName
+                                        modRefs
+                                        (Parser.ExternalWord loc path value)
+                                        acc
+
+                                else
+                                    let
+                                        path =
+                                            String.split "/" mod
+                                    in
+                                    qualifyNode
+                                        config
+                                        currentDefName
+                                        modRefs
+                                        (Parser.PackageWord loc path value)
+                                        acc
 
         Parser.PackageWord loc path value ->
             let
-                normalizedPath =
+                normalizedPathPreAliasCheck =
                     String.join "/" path
 
-                qualifiedPath =
-                    qualifyPackageModule config normalizedPath
-
-                qualifiedName =
-                    String.join "/" [ qualifiedPath, value ]
+                normalizedPath =
+                    Dict.get normalizedPathPreAliasCheck modRefs.aliases
+                        |> Maybe.withDefault normalizedPathPreAliasCheck
             in
-            { acc
-                | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes
-                , externalWords = Set.insert ( qualifiedPath, value ) acc.externalWords
-            }
+            if String.startsWith "/" normalizedPath then
+                let
+                    externalWordNode =
+                        Parser.ExternalWord
+                            loc
+                            (List.drop 1 <| String.split "/" normalizedPath)
+                            value
+                in
+                qualifyNode config currentDefName modRefs externalWordNode acc
+
+            else
+                let
+                    qualifiedPath =
+                        qualifyPackageModule config.packageName normalizedPath
+
+                    qualifiedName =
+                        String.join "/" [ qualifiedPath, value ]
+
+                    _ =
+                        Dict.keys config.inProgressAST.words
+                in
+                case Dict.get qualifiedName config.inProgressAST.words of
+                    Nothing ->
+                        { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
+
+                    Just word ->
+                        if word.metadata.isExposed then
+                            { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+
+                        else
+                            { acc | qualifiedNodes = Err (WordNotExposed loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalWord loc path value ->
             let
@@ -589,16 +1010,25 @@ qualifyNode config currentDefName node acc =
 
                 Just package ->
                     let
-                        qualifiedPath =
-                            "/" ++ package ++ normalizedPath
-
                         fullReference =
-                            qualifiedPath ++ "/" ++ value
+                            String.concat
+                                [ "/"
+                                , package
+                                , normalizedPath
+                                , "/"
+                                , value
+                                ]
                     in
-                    { acc
-                        | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes
-                        , externalWords = Set.insert ( qualifiedPath, value ) acc.externalWords
-                    }
+                    case Dict.get fullReference config.inProgressAST.words of
+                        Nothing ->
+                            { acc | qualifiedNodes = Err (UnknownWordRef loc fullReference) :: acc.qualifiedNodes }
+
+                        Just def ->
+                            if def.metadata.isExposed then
+                                { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
+
+                            else
+                                { acc | qualifiedNodes = Err (WordNotExposed loc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -618,8 +1048,8 @@ qualifyNode config currentDefName node acc =
                     else
                         "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
 
-                ( newWordsAfterQuot, externalWords, qualifiedQuotImplResult ) =
-                    initQualifyNode quoteName config acc.qualifiedWords quotImpl
+                ( newWordsAfterQuot, qualifiedQuotImplResult ) =
+                    initQualifyNode config quoteName modRefs acc.qualifiedWords quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->
@@ -635,7 +1065,6 @@ qualifyNode config currentDefName node acc =
                                 }
                                 newWordsAfterQuot
                         , qualifiedNodes = Ok (WordRef sourceLocation quoteName) :: acc.qualifiedNodes
-                        , externalWords = Set.union externalWords acc.externalWords
                     }
 
                 Err err ->
@@ -645,10 +1074,10 @@ qualifyNode config currentDefName node acc =
 typeDefinitionName : TypeDefinition -> String
 typeDefinitionName typeDef =
     case typeDef of
-        CustomTypeDef name _ _ _ ->
+        CustomTypeDef name _ _ _ _ ->
             name
 
-        UnionTypeDef name _ _ _ ->
+        UnionTypeDef name _ _ _ _ ->
             name
 
 
@@ -668,15 +1097,286 @@ qualifyName config name =
             ]
 
 
-qualifyPackageModule : RunConfig -> String -> String
-qualifyPackageModule config path =
-    if config.packageName == "" then
+qualifyPackageModule : String -> String -> String
+qualifyPackageModule packageName path =
+    if packageName == "" then
         path
 
     else
         String.concat
             [ "/"
-            , config.packageName
+            , packageName
             , "/"
             , path
             ]
+
+
+resolveImportedWord : RunConfig -> ModuleReferences -> String -> Maybe String
+resolveImportedWord config modRefs name =
+    let
+        explicitImports =
+            modRefs.imports
+                |> Dict.toList
+                |> List.find (\( _, v ) -> List.member name v)
+                |> Maybe.map Tuple.first
+                |> Maybe.andThen resolveMod
+
+        potentialCandidates =
+            modRefs.imports
+                |> Dict.filter (\_ v -> List.isEmpty v)
+                |> Dict.keys
+                |> List.filterMap resolveMod
+                |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
+
+        resolveMod mod =
+            if String.startsWith "/" mod then
+                Dict.get mod config.externalModules
+                    |> Maybe.map
+                        (\package ->
+                            qualifyPackageModule package (String.dropLeft 1 mod)
+                        )
+
+            else
+                Just <| qualifyPackageModule config.packageName mod
+    in
+    case explicitImports of
+        Just _ ->
+            explicitImports
+
+        Nothing ->
+            potentialCandidates
+                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.words ))
+                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
+                |> List.head
+                |> Maybe.map Tuple.first
+
+
+resolveImportedType : RunConfig -> ModuleReferences -> String -> Maybe String
+resolveImportedType config modRefs name =
+    let
+        explicitImports =
+            modRefs.imports
+                |> Dict.toList
+                |> List.find (\( _, v ) -> List.member name v)
+                |> Maybe.map Tuple.first
+                |> Maybe.andThen resolveMod
+
+        potentialCandidates =
+            modRefs.imports
+                |> Dict.filter (\_ v -> List.isEmpty v)
+                |> Dict.keys
+                |> List.filterMap resolveMod
+                |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
+
+        resolveMod mod =
+            if String.startsWith "/" mod then
+                Dict.get mod config.externalModules
+                    |> Maybe.map
+                        (\package ->
+                            String.dropLeft 1 mod
+                                |> qualifyPackageModule package
+                        )
+
+            else
+                Just <| qualifyPackageModule config.packageName mod
+    in
+    case explicitImports of
+        Just _ ->
+            explicitImports
+
+        Nothing ->
+            potentialCandidates
+                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.types ))
+                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
+                |> List.head
+                |> Maybe.map Tuple.first
+
+
+
+-- Dependant modules
+
+
+type alias RequiredModulesConfig =
+    { packageName : String
+    , ast : Parser.AST
+    , externalModules : Dict String String
+    }
+
+
+requiredModules : RequiredModulesConfig -> Set String
+requiredModules config =
+    let
+        modDef =
+            moduleDefinition config
+
+        topLevelAliases =
+            modDef.aliases
+
+        topLevelAliasTargets =
+            topLevelAliases
+                |> Dict.values
+                |> Set.fromList
+
+        topLevelImports =
+            modDef.imports
+                |> Dict.keys
+                |> Set.fromList
+
+        typeRequirements =
+            config.ast.types
+                |> Dict.foldl
+                    (\_ t acc -> Set.union (requiredModulesOfType t) acc)
+                    Set.empty
+
+        wordRequirements =
+            config.ast.words
+                |> Dict.foldl
+                    (\_ w acc -> Set.union (requiredModulesOfWord topLevelAliases w) acc)
+                    Set.empty
+
+        fullyQualify mod acc =
+            if String.startsWith "/" mod then
+                case Dict.get mod config.externalModules of
+                    Just package ->
+                        Set.insert
+                            (String.concat
+                                [ "/"
+                                , package
+                                , mod
+                                ]
+                            )
+                            acc
+
+                    Nothing ->
+                        acc
+
+            else
+                Set.insert (qualifyPackageModule config.packageName mod) acc
+    in
+    topLevelAliasTargets
+        |> Set.union topLevelImports
+        |> Set.union typeRequirements
+        |> Set.union wordRequirements
+        |> Set.foldl fullyQualify Set.empty
+
+
+requiredModulesOfType : Parser.TypeDefinition -> Set String
+requiredModulesOfType typeDef =
+    case typeDef of
+        Parser.CustomTypeDef _ _ _ members ->
+            members
+                |> List.map Tuple.second
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
+
+        Parser.UnionTypeDef _ _ _ members ->
+            members
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
+
+
+requiredModulesOfWord : Dict String String -> Parser.WordDefinition -> Set String
+requiredModulesOfWord topLevelAliases word =
+    let
+        wordAliases =
+            word.aliases
+                |> Dict.values
+                |> Set.fromList
+
+        wordImports =
+            word.imports
+                |> Dict.keys
+                |> Set.fromList
+
+        typeSignature =
+            case word.typeSignature of
+                Parser.NotProvided ->
+                    Set.empty
+
+                Parser.UserProvided wordType ->
+                    moduleReferenceFromWordType wordType
+
+                Parser.Verified wordType ->
+                    moduleReferenceFromWordType wordType
+
+        moduleReferenceFromWordType wordType =
+            wordType.input
+                ++ wordType.output
+                |> List.filterMap extractModuleReferenceFromType
+                |> Set.fromList
+
+        matches =
+            case word.implementation of
+                Parser.SoloImpl _ ->
+                    Set.empty
+
+                Parser.MultiImpl branches _ ->
+                    branches
+                        |> List.map Tuple.first
+                        |> List.map extractMatchType
+                        |> List.filterMap extractModuleReferenceFromType
+                        |> Set.fromList
+
+        extractMatchType (Parser.TypeMatch _ tipe _) =
+            tipe
+
+        impls =
+            case word.implementation of
+                Parser.SoloImpl impl ->
+                    [ impl ]
+
+                Parser.MultiImpl branches impl ->
+                    impl :: List.map Tuple.second branches
+
+        wordReferences =
+            impls
+                |> List.concat
+                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases word)
+                |> Set.fromList
+    in
+    wordAliases
+        |> Set.union wordImports
+        |> Set.union typeSignature
+        |> Set.union matches
+        |> Set.union wordReferences
+
+
+extractModuleReferenceFromType : Parser.PossiblyQualifiedType -> Maybe String
+extractModuleReferenceFromType ref =
+    case ref of
+        Parser.ExternalRef path _ _ ->
+            Just <| "/" ++ String.join "/" path
+
+        Parser.InternalRef path _ _ ->
+            Just <| String.join "/" path
+
+        _ ->
+            Nothing
+
+
+extractModuleReferenceFromNode : Dict String String -> Parser.WordDefinition -> Parser.AstNode -> Maybe String
+extractModuleReferenceFromNode topLevelAliases meta node =
+    case node of
+        Parser.PackageWord _ [ potentialAlias ] _ ->
+            case
+                ( Dict.get potentialAlias topLevelAliases
+                , Dict.get potentialAlias meta.aliases
+                )
+            of
+                ( Just _, _ ) ->
+                    Nothing
+
+                ( _, Just _ ) ->
+                    Nothing
+
+                ( Nothing, Nothing ) ->
+                    Just potentialAlias
+
+        Parser.PackageWord _ path _ ->
+            Just (String.join "/" path)
+
+        Parser.ExternalWord _ path _ ->
+            Just ("/" ++ String.join "/" path)
+
+        _ ->
+            Nothing

@@ -1,9 +1,8 @@
 const compiler = require('./compiler.wrapper');
 
 test('Basic quotation', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 2 [ inc dec dec ] !
 
         def: inc
@@ -19,7 +18,7 @@ test('Basic quotation', async () => {
 });
 
 test('Basic quotation', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Coordinate
         : x Int
         : y Int
@@ -33,7 +32,6 @@ test('Basic quotation', async () => {
           >x
 
         def: main
-        entry: true
         : 1 2 >Coordinate
           [ 1 + ] update-x
           x>

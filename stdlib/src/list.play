@@ -1,3 +1,21 @@
+defmodule:
+exposing:
+  List
+  NonEmpty
+  >first
+  first>
+  >rest
+  rest>
+  Empty
+  of-one
+  of-two
+  of-three
+  ,
+  fold
+  reverse
+  fold-reverse
+:
+
 defunion: List a
 : NonEmpty a
 : Empty
@@ -20,6 +38,10 @@ def: of-three
 type: a a a -- (NonEmpty a)
 : Empty >NonEmpty >NonEmpty >NonEmpty
 
+def: ,
+type: (List a) a -- (NonEmpty a)
+: swap >NonEmpty
+
 defmulti: fold
 type: (List a) b [ a b -- b ] -- b
 : Empty
@@ -39,11 +61,6 @@ def: reverse
 type: (List a) -- (List a)
 : Empty [ >NonEmpty ] fold
 
-def: fold-right
+def: fold-reverse
 type: (List a) b [ a b -- b ] -- b
 : -rotate reverse rotate fold
-
-def: test
-: 1 2 3 of-three
-  0 [ + ] fold
-

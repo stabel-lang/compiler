@@ -1,3 +1,22 @@
+defmodule:
+exposing:
+  Bool
+  True
+  False
+  not
+  select
+  if
+  over
+  drop2
+  split
+  zero?
+  int=
+  negate
+  square
+  inc
+  dec
+:
+
 # Everything in core is imported into every module outside the standard library
 
 # booleans

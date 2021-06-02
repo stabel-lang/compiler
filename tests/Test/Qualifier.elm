@@ -9,6 +9,7 @@ import Play.Data.SourceLocation exposing (emptyRange)
 import Play.Data.Type as Type
 import Play.Parser as AST
 import Play.Qualifier exposing (..)
+import Play.Qualifier.Problem as Problem
 import Set
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
@@ -22,11 +23,15 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , metadata = Metadata.default
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -34,7 +39,10 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , metadata = Metadata.default
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -42,9 +50,10 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
@@ -79,9 +88,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -100,15 +107,19 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types = Dict.empty
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types = Dict.empty
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
-                                                [ Type.Generic "a", Type.Generic "b", Type.Generic "a" ]
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.Generic "a", AST.Generic "b" ]
+                                            , output = [ AST.Generic "a", AST.Generic "b", AST.Generic "a" ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Word emptyRange "swap"
@@ -147,13 +158,14 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "Bool"
                                     []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
+                                    [ AST.LocalRef "True" []
+                                    , AST.LocalRef "False" []
                                     ]
                                 , AST.CustomTypeDef emptyRange "True" [] []
                                 , AST.CustomTypeDef emptyRange "False" [] []
@@ -161,11 +173,14 @@ suite =
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
-                                  , metadata = Metadata.default
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (Type.Custom "False") [], [ AST.Integer emptyRange 0 ] )
-                                            , ( AST.TypeMatch emptyRange (Type.Custom "True") [], [ AST.Integer emptyRange 1 ] )
+                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "False" []) [], [ AST.Integer emptyRange 0 ] )
+                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "True" []) [], [ AST.Integer emptyRange 1 ] )
                                             ]
                                             []
                                   }
@@ -177,13 +192,14 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    True
                                     emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" emptyRange [] []
-                                , CustomTypeDef "False" emptyRange [] []
+                                , CustomTypeDef "True" True emptyRange [] []
+                                , CustomTypeDef "False" True emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -206,26 +222,35 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Int
-                                                    , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input =
+                                                    [ AST.LocalRef "Int" []
+                                                    , AST.QuotationType
+                                                        { input = [ AST.LocalRef "Int" [] ]
+                                                        , output = [ AST.LocalRef "Int" [] ]
+                                                        }
                                                     ]
-                                                    [ Type.Int ]
+                                                , output = [ AST.LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Word emptyRange "!"
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -262,9 +287,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -302,13 +325,15 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -319,7 +344,10 @@ suite =
                                                 ]
                                       }
                                     , { name = "inc"
-                                      , metadata = Metadata.default
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -334,9 +362,7 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -369,13 +395,15 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -399,9 +427,7 @@ suite =
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -441,28 +467,32 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef emptyRange
                                         "Bool"
                                         []
-                                        [ Type.Custom "True"
-                                        , Type.Custom "False"
+                                        [ AST.LocalRef "True" []
+                                        , AST.LocalRef "False" []
                                         ]
                                     , AST.CustomTypeDef emptyRange "True" [] []
                                     , AST.CustomTypeDef emptyRange "False" [] []
                                     , AST.CustomTypeDef emptyRange
                                         "Box"
                                         []
-                                        [ ( "value", Type.Int ) ]
+                                        [ ( "value", AST.LocalRef "Int" [] ) ]
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , metadata = Metadata.default
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (Type.Custom "Box") [ ( "value", AST.LiteralInt 0 ) ]
+                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
                                                   , [ AST.Word emptyRange "True" ]
                                                   )
                                                 ]
@@ -476,14 +506,16 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Bool"
+                                        True
                                         emptyRange
                                         []
                                         [ Type.Custom "True"
                                         , Type.Custom "False"
                                         ]
-                                    , CustomTypeDef "True" emptyRange [] []
-                                    , CustomTypeDef "False" emptyRange [] []
+                                    , CustomTypeDef "True" True emptyRange [] []
+                                    , CustomTypeDef "False" True emptyRange [] []
                                     , CustomTypeDef "Box"
+                                        True
                                         emptyRange
                                         []
                                         [ ( "value", Type.Int ) ]
@@ -507,23 +539,27 @@ suite =
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef emptyRange
                                         "Maybe"
                                         [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nothing"
+                                        [ AST.Generic "a"
+                                        , AST.LocalRef "Nothing" []
                                         ]
                                     , AST.CustomTypeDef emptyRange "Nothing" [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
-                                      , metadata = Metadata.default
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (Type.Generic "a") []
+                                                [ ( AST.TypeMatch emptyRange (AST.Generic "a") []
                                                   , [ AST.Word emptyRange "drop" ]
                                                   )
                                                 ]
@@ -539,12 +575,13 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Maybe"
+                                        True
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nothing"
                                         ]
-                                    , CustomTypeDef "Nothing" emptyRange [] []
+                                    , CustomTypeDef "Nothing" True emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
@@ -576,32 +613,38 @@ suite =
                             ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "Bool"
                                     []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
+                                    [ AST.LocalRef "True" []
+                                    , AST.LocalRef "False" []
                                     ]
                                 , AST.CustomTypeDef emptyRange "True" [] []
                                 , AST.CustomTypeDef emptyRange "False" [] []
                                 , AST.CustomTypeDef emptyRange
                                     "Box"
                                     []
-                                    [ ( "value", Type.Custom "Bool" ) ]
+                                    [ ( "value", AST.LocalRef "Bool" [] ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "true?"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Box" ] [ Type.Custom "Bool" ]
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "Box" [] ]
+                                            , output = [ AST.LocalRef "Bool" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange
-                                                    (Type.Custom "Box")
-                                                    [ ( "value", AST.LiteralType (Type.Custom "True") ) ]
+                                                    (AST.LocalRef "Box" [])
+                                                    [ ( "value", AST.LiteralType (AST.LocalRef "True" []) ) ]
                                               , [ AST.Word emptyRange "True" ]
                                               )
                                             ]
@@ -615,14 +658,16 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    True
                                     emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" emptyRange [] []
-                                , CustomTypeDef "False" emptyRange [] []
+                                , CustomTypeDef "True" True emptyRange [] []
+                                , CustomTypeDef "False" True emptyRange [] []
                                 , CustomTypeDef "Box"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "value", boolUnion ) ]
@@ -657,40 +702,44 @@ suite =
                         ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "USMoney"
                                     []
-                                    [ Type.Custom "Dollar"
-                                    , Type.Custom "Cent"
+                                    [ AST.LocalRef "Dollar" []
+                                    , AST.LocalRef "Cent" []
                                     ]
                                 , AST.CustomTypeDef emptyRange
                                     "Dollar"
                                     []
-                                    [ ( "dollar-value", Type.Int ) ]
+                                    [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                 , AST.CustomTypeDef emptyRange
                                     "Cent"
                                     []
-                                    [ ( "cent-value", Type.Int ) ]
+                                    [ ( "cent-value", AST.LocalRef "Int" [] ) ]
                                 ]
                         , words =
                             Dict.fromListBy .name
                                 [ { name = "into-cents"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "USMoney" ]
-                                                [ Type.Custom "USMoney" ]
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "USMoney" [] ]
+                                            , output = [ AST.LocalRef "USMoney" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (Type.Custom "Dollar") []
+                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Dollar" []) []
                                               , [ AST.Word emptyRange "dollar-value>"
                                                 , AST.Integer emptyRange 100
                                                 , AST.Word emptyRange "*"
                                                 ]
                                               )
-                                            , ( AST.TypeMatch emptyRange (Type.Custom "Cent") []
+                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "Cent" []) []
                                               , [ AST.Word emptyRange "cent-value>"
                                                 ]
                                               )
@@ -698,11 +747,14 @@ suite =
                                             []
                                   }
                                 , { name = "add-money"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "USMoney", Type.Custom "USMoney" ]
-                                                [ Type.Custom "USMoney" ]
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "USMoney" [], AST.LocalRef "USMoney" [] ]
+                                            , output = [ AST.LocalRef "USMoney" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Word emptyRange "into-cents"
@@ -712,9 +764,14 @@ suite =
                                             ]
                                   }
                                 , { name = "quote-excuse"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Dollar" ] [ Type.Custom "Dollar" ]
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.LocalRef "Dollar" [] ]
+                                            , output = [ AST.LocalRef "Dollar" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Word emptyRange "dollar-value>"
@@ -735,14 +792,17 @@ suite =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
                                     "/play/test/some/module/USMoney"
+                                    True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
                                 , CustomTypeDef "/play/test/some/module/Dollar"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Cent"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
@@ -871,28 +931,29 @@ suite =
                         ]
 
                     unqualifiedAst =
-                        { types =
+                        { moduleDefinition = AST.emptyModuleDefinition
+                        , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ AST.UnionTypeDef emptyRange
                                     "USMoney"
                                     []
-                                    [ Type.Custom "Dollar"
-                                    , Type.Custom "Cent"
+                                    [ AST.LocalRef "Dollar" []
+                                    , AST.LocalRef "Cent" []
                                     ]
                                 , AST.CustomTypeDef emptyRange
                                     "Wallet"
                                     []
-                                    [ ( "user-id", Type.Int )
-                                    , ( "value", Type.Custom "USMoney" )
+                                    [ ( "user-id", AST.LocalRef "Int" [] )
+                                    , ( "value", AST.LocalRef "USMoney" [] )
                                     ]
                                 , AST.CustomTypeDef emptyRange
                                     "Dollar"
                                     []
-                                    [ ( "dollar-value", Type.Int ) ]
+                                    [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                 , AST.CustomTypeDef emptyRange
                                     "Cent"
                                     []
-                                    [ ( "cent-value", Type.Int ) ]
+                                    [ ( "cent-value", AST.LocalRef "Int" [] ) ]
                                 ]
                         , words = Dict.empty
                         }
@@ -903,18 +964,22 @@ suite =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
                                     "/play/test/some/module/USMoney"
+                                    True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
                                 , CustomTypeDef "/play/test/some/module/Dollar"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Cent"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
                                 , CustomTypeDef "/play/test/some/module/Wallet"
+                                    True
                                     emptyRange
                                     []
                                     [ ( "user-id", Type.Int )
@@ -1023,241 +1088,1984 @@ suite =
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
-        , describe "Module loading"
-            [ test "Detects package reference in simple word" <|
+        , test "Retrieve dependant modules" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { moduleDefinition =
+                            AST.Defined
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "html", "/external/html" ) ]
+                                , imports =
+                                    Dict.fromList
+                                        [ ( "/external/module", [] ) ]
+                                , exposes = Set.fromList []
+                                }
+                        , types =
+                            Dict.fromList
+                                [ ( "Tipe"
+                                  , AST.CustomTypeDef emptyRange
+                                        "Tipe"
+                                        []
+                                        [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
+                                  )
+                                ]
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "call-external"
+                                  , typeSignature =
+                                        AST.UserProvided
+                                            { input = [ AST.InternalRef [ "internal", "types" ] "In" [] ]
+                                            , output = [ AST.ExternalRef [ "external", "types" ] "Out" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        AST.MultiImpl
+                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
+                                              , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                                ]
+                                              )
+                                            , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
+                                              , [ AST.Word emptyRange "drop" ]
+                                              )
+                                            ]
+                                            [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                  }
+                                , { name = "main"
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.fromList [ ( "ali", "internal/alias" ) ]
+                                  , imports = Dict.fromList [ ( "/list/of/names", [ "one" ] ) ]
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.PackageWord emptyRange [ "html" ] "div"
+                                            , AST.Word emptyRange "call-external"
+                                            , AST.ExternalWord emptyRange [ "some", "ext" ] "word"
+                                            , AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    expectedRequiredModules =
+                        Set.fromList
+                            [ "/robheghan/dummy/list/of/names"
+                            , "/robheghan/dummy/some/ext"
+                            , "/robheghan/html/external/html"
+                            , "/robheghan/html/external/module"
+                            , "/robheghan/html/external/types"
+                            , "/robheghan/html/external/double"
+                            , "/package/test/internal/alias"
+                            , "/package/test/internal/types"
+                            , "/package/test/internal/match"
+                            , "/package/test/package/module"
+                            , "/play/standard_library/core"
+                            ]
+
+                    actualRequiredModules =
+                        requiredModules
+                            { packageName = "package/test"
+                            , ast = unqualifiedAst
+                            , externalModules =
+                                Dict.fromList
+                                    [ ( "/list/of/names", "robheghan/dummy" )
+                                    , ( "/some/ext", "robheghan/dummy" )
+                                    , ( "/external/html", "robheghan/html" )
+                                    , ( "/external/module", "robheghan/html" )
+                                    , ( "/external/types", "robheghan/html" )
+                                    , ( "/external/double", "robheghan/html" )
+                                    , ( "/core", "play/standard_library" )
+                                    ]
+                            }
+                in
+                Expect.equal expectedRequiredModules actualRequiredModules
+        , test "Reliance on standard_library/core only when standard_library is specified as externalModule" <|
+            \_ ->
+                let
+                    unqualifiedAst =
+                        { moduleDefinition = AST.Undefined
+                        , types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , typeSignature = AST.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.fromList [ ( "ali", "internal/alias" ) ]
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        AST.SoloImpl
+                                            [ AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            ]
+                                  }
+                                ]
+                        }
+
+                    expectedRequiredModules =
+                        Set.fromList
+                            [ "/package/test/internal/alias"
+                            ]
+
+                    actualRequiredModules =
+                        requiredModules
+                            { packageName = "package/test"
+                            , ast = unqualifiedAst
+                            , externalModules = Dict.empty
+                            }
+                in
+                Expect.equal expectedRequiredModules actualRequiredModules
+        , describe "Module resolution" <|
+            let
+                dummyWord name =
+                    dummyWordImpl name True
+
+                dummyWordUnexposed name =
+                    dummyWordImpl name False
+
+                dummyWordImpl name isExposed =
+                    ( name
+                    , { name = name
+                      , metadata =
+                            Metadata.default
+                                |> Metadata.isExposed isExposed
+                      , implementation =
+                            SoloImpl []
+                      }
+                    )
+
+                dummyType name =
+                    dummyTypeImpl name True
+
+                dummyTypeUnexposed name =
+                    dummyTypeImpl name False
+
+                dummyTypeImpl name isExposed =
+                    let
+                        genericName =
+                            name ++ "Generic"
+
+                        unionName =
+                            name ++ "Union"
+                    in
+                    [ ( name
+                      , CustomTypeDef name isExposed emptyRange [] []
+                      )
+                    , ( genericName
+                      , CustomTypeDef genericName isExposed emptyRange [ "a" ] []
+                      )
+                    , ( unionName
+                      , UnionTypeDef unionName
+                            isExposed
+                            emptyRange
+                            []
+                            [ Type.Custom name
+                            , Type.CustomGeneric genericName [ Type.Generic "a" ]
+                            ]
+                      )
+                    ]
+            in
+            [ test "Qualifies word in internal package" <|
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "call-external"
-                                      , metadata = Metadata.default
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.PackageWord emptyRange [ "package", "module" ] "sample"
+                                                , AST.PackageWord emptyRange [ "internal" ] "add"
                                                 ]
                                       }
                                     ]
                             }
 
                         expectedAst =
-                            { additionalModulesRequired =
-                                Set.fromList
-                                    [ "/play/test/package/module" ]
-                            , checkForExistingTypes = Set.empty
-                            , checkForExistingWords =
-                                Set.fromList
-                                    [ "/play/test/package/module/sample" ]
-                            , types = Dict.empty
+                            { types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "/play/test/package/tests/call-external"
+                                    [ { name = "external-call"
                                       , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , Word emptyRange "/play/test/package/module/sample"
+                                                , Word emptyRange "internal/add"
                                                 ]
                                       }
                                     ]
                             }
 
-                        result =
-                            run
-                                { packageName = "play/test"
-                                , modulePath = "package/tests"
-                                , ast = unqualifiedAst
-                                , externalModules = Dict.empty
-                                }
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "internal/add" ]
+                            }
                     in
-                    case result of
-                        Err err ->
-                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
-
-                        Ok actualAst ->
-                            Expect.equal expectedAst actualAst
-            , test "Detects external reference in simple word" <|
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in internal package (multiword)" <|
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "call-external"
-                                      , metadata = Metadata.default
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
-                                            AST.SoloImpl
-                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "sample" ]
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) []
+                                                  , [ AST.Integer emptyRange 0
+                                                    , AST.PackageWord emptyRange [ "mod" ] "add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "mod" ] "add"
+                                                ]
                                       }
                                     ]
                             }
 
                         expectedAst =
-                            { additionalModulesRequired =
-                                Set.fromList
-                                    [ "/external/test/package/module" ]
-                            , checkForExistingTypes = Set.empty
-                            , checkForExistingWords =
-                                Set.fromList
-                                    [ "/external/test/package/module/sample"
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange Type.Int []
+                                                  , [ Integer emptyRange 0
+                                                    , Word emptyRange "mod/add"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "mod/add"
+                                                ]
+                                      }
                                     ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "mod/add" ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in internal package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "/play/test/package/tests/call-external"
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input =
+                                                    [ AST.InternalRef [ "mod" ] "Tipe" []
+                                                    , AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
+                                                    , AST.InternalRef [ "mod" ] "TipeUnion" []
+                                                    ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Custom "mod/Tipe"
+                                                    , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
+                                                    , Type.Union
+                                                        [ Type.Custom "mod/Tipe"
+                                                        , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in internal package (multiword)" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.InternalRef [ "mod" ] "TipeUnion" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                , ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Union
+                                                        [ Type.Custom "mod/Tipe"
+                                                        , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Custom "mod/Tipe") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]) []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies member type in internal package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , AST.CustomTypeDef emptyRange
+                                            "SomeType"
+                                            []
+                                            [ ( "tipe", AST.InternalRef [ "mod" ] "Tipe" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , CustomTypeDef "SomeType"
+                                            True
+                                            emptyRange
+                                            []
+                                            [ ( "tipe", Type.Custom "mod/Tipe" ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
                                       , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
-                                                [ Word emptyRange "/external/test/package/module/sample" ]
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
                                       }
                                     ]
                             }
 
-                        result =
-                            run
-                                { packageName = "play/test"
-                                , modulePath = "package/tests"
-                                , ast = unqualifiedAst
-                                , externalModules =
-                                    Dict.fromList
-                                        [ ( "/package/module", "external/test" )
-                                        ]
-                                }
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add" ]
+                            }
                     in
-                    case result of
-                        Err err ->
-                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
-
-                        Ok actualAst ->
-                            Expect.equal expectedAst actualAst
-            , test "Detects package reference in multiword" <|
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies word in external package (multiword)" <|
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "call-external"
-                                      , metadata = Metadata.default
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
-                                                  , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) []
+                                                  , [ AST.Integer emptyRange 0
+                                                    , AST.ExternalWord emptyRange [ "mod" ] "add"
                                                     ]
                                                   )
                                                 ]
-                                                [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                                [ AST.Integer emptyRange 1
+                                                , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                ]
                                       }
                                     ]
                             }
 
                         expectedAst =
-                            { additionalModulesRequired =
-                                Set.fromList
-                                    [ "/play/test/package/module" ]
-                            , checkForExistingTypes = Set.empty
-                            , checkForExistingWords =
-                                Set.fromList
-                                    [ "/play/test/package/module/when-one"
-                                    , "/play/test/package/module/when-other-one"
-                                    ]
-                            , types = Dict.empty
+                            { types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
-                                    [ { name = "/play/test/package/tests/call-external"
+                                    [ { name = "external-call"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
-                                                  , [ Word emptyRange "/play/test/package/module/when-one"
+                                                [ ( TypeMatch emptyRange Type.Int []
+                                                  , [ Integer emptyRange 0
+                                                    , Word emptyRange "/external/package/mod/add"
                                                     ]
                                                   )
                                                 ]
-                                                [ Word emptyRange "/play/test/package/module/when-other-one" ]
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
                                       }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add" ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input =
+                                                    [ AST.ExternalRef [ "mod" ] "Tipe" []
+                                                    , AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
+                                                    , AST.ExternalRef [ "mod" ] "TipeUnion" []
+                                                    ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe"
+                                                    , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                    , Type.Union
+                                                        [ Type.Custom "/external/package/mod/Tipe"
+                                                        , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            SoloImpl
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies type in external package (multiword)" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.ExternalRef [ "mod" ] "TipeUnion" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                , ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    , AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                , AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.withType
+                                                    [ Type.Union
+                                                        [ Type.Custom "/external/package/mod/Tipe"
+                                                        , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
+                                                        ]
+                                                    ]
+                                                    []
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]) []
+                                                  , [ Builtin emptyRange Builtin.StackDrop
+                                                    , Builtin emptyRange Builtin.StackDrop
+                                                    ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackDrop
+                                                , Builtin emptyRange Builtin.StackDrop
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Qualifies member type in external package" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , AST.CustomTypeDef emptyRange
+                                            "SomeType"
+                                            []
+                                            [ ( "tipe", AST.ExternalRef [ "mod" ] "Tipe" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "SomeType"
+                                      , CustomTypeDef "SomeType"
+                                            True
+                                            emptyRange
+                                            []
+                                            [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe" ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module alias" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" )
+                                            , ( "internal", "internal/mod" )
+                                            ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.InternalRef [ "ext" ] "Tipe" [] ]
+                                                , output = [ AST.InternalRef [ "internal" ] "Tope" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "internal" ] "value"
+                                                , AST.PackageWord emptyRange [ "ext" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe"
+                                                    ]
+                                                    [ Type.Custom "internal/mod/Tope" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add"
+                                    , dummyWord "internal/mod/value"
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module and function aliases" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" ) ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.InternalRef [ "ext" ] "Tipe" [] ]
+                                                , output = [ AST.InternalRef [ "internal" ] "Tope" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.fromList [ ( "internal", "internal/mod" ) ]
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.PackageWord emptyRange [ "internal" ] "value"
+                                                , AST.PackageWord emptyRange [ "ext" ] "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe"
+                                                    ]
+                                                    [ Type.Custom "internal/mod/Tope" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add"
+                                    , dummyWord "internal/mod/value"
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module and function aliases in type match" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" ) ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.fromList [ ( "internal", "internal/mod" ) ]
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "ext" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop" ]
+                                                  )
+                                                , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal" ] "Tope" []) []
+                                                  , [ AST.Word emptyRange "drop" ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.Custom "internal/mod/Tope") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackDrop ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Type definition aliases" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases =
+                                        Dict.fromList
+                                            [ ( "ext", "/mod" )
+                                            , ( "mod", "internal/mod" )
+                                            ]
+                                    , imports = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types =
+                                Dict.fromList
+                                    [ ( "Tepip"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "Tepip"
+                                            []
+                                            [ ( "first", AST.InternalRef [ "ext" ] "Tipe" [] )
+                                            , ( "second", AST.InternalRef [ "mod" ] "Tope" [] )
+                                            ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "Tepip"
+                                      , CustomTypeDef
+                                            "Tepip"
+                                            True
+                                            emptyRange
+                                            []
+                                            [ ( "first", Type.Custom "/external/package/mod/Tipe" )
+                                            , ( "second", Type.Custom "internal/mod/Tope" )
+                                            ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module imports" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [ "add", "Tipe" ] )
+                                            , ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.LocalRef "Tipe" [] ]
+                                                , output = [ AST.LocalRef "Tope" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "value"
+                                                , AST.Word emptyRange "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe" ]
+                                                    [ Type.Custom "internal/mod/Tope" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add"
+                                    , dummyWord "internal/mod/value"
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module and function imports" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.LocalRef "Tipe" [] ]
+                                                , output = [ AST.LocalRef "Tope" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.fromList [ ( "/mod", [ "add", "Tipe" ] ) ]
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "value"
+                                                , AST.Word emptyRange "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                                |> Metadata.withType
+                                                    [ Type.Custom "/external/package/mod/Tipe" ]
+                                                    [ Type.Custom "internal/mod/Tope" ]
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Word emptyRange "internal/mod/value"
+                                                , Word emptyRange "/external/package/mod/add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/external/package/mod/add"
+                                    , dummyWord "internal/mod/value"
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Type definition imports" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [] )
+                                            , ( "internal/mod", [ "Tope" ] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types =
+                                Dict.fromList
+                                    [ ( "Tepip"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "Tepip"
+                                            []
+                                            [ ( "first", AST.LocalRef "Tipe" [] )
+                                            , ( "second", AST.LocalRef "Tope" [] )
+                                            ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        expectedAst =
+                            { types =
+                                Dict.fromList
+                                    [ ( "Tepip"
+                                      , CustomTypeDef
+                                            "Tepip"
+                                            True
+                                            emptyRange
+                                            []
+                                            [ ( "first", Type.Custom "/external/package/mod/Tipe" )
+                                            , ( "second", Type.Custom "internal/mod/Tope" )
+                                            ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "Module and function imports in type match" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [ "Tipe" ] ) ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports =
+                                            Dict.fromList
+                                                [ ( "internal/mod", [] ) ]
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop" ]
+                                                  )
+                                                , ( AST.TypeMatch emptyRange (AST.LocalRef "Tope" []) []
+                                                  , [ AST.Word emptyRange "drop" ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop" ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop ]
+                                                  )
+                                                , ( TypeMatch emptyRange (Type.Custom "internal/mod/Tope") []
+                                                  , [ Builtin emptyRange Builtin.StackDrop ]
+                                                  )
+                                                ]
+                                                [ Builtin emptyRange Builtin.StackDrop ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                [ dummyType "/external/package/mod/Tipe"
+                                , dummyType "internal/mod/Tope"
+                                ]
+                                    |> List.concat
+                                    |> Dict.fromList
+                            , words = Dict.empty
+                            }
+                    in
+                    QualifierUtil.expectExternalOutput
+                        inProgressAst
+                        unqualifiedAst
+                        expectedAst
+            , test "When module doesn't have a definition, all functions are exposed" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Integer emptyRange 3
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Integer emptyRange 2
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Integer emptyRange 3
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
+            , test "When module does have a definition, only functions defined to be exposed are" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports = Dict.empty
+                                    , exposes = Set.fromList [ "fn2" ]
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Integer emptyRange 2
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 2
+                                                , AST.Integer emptyRange 3
+                                                , AST.Word emptyRange "+"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        expectedAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "fn1"
+                                      , metadata =
+                                            Metadata.default
+                                                |> Metadata.isExposed False
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 1
+                                                , Integer emptyRange 2
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    , { name = "fn2"
+                                      , metadata = Metadata.default
+                                      , implementation =
+                                            SoloImpl
+                                                [ Integer emptyRange 2
+                                                , Integer emptyRange 3
+                                                , Builtin emptyRange Builtin.Plus
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    QualifierUtil.expectOutput unqualifiedAst expectedAst
+            , test "Referencing a function from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "internal/mod", [] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "value"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWordUnexposed "internal/mod/value"
                                     ]
                             }
 
                         result =
                             run
-                                { packageName = "play/test"
-                                , modulePath = "package/tests"
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed function is called"
+
+                        Err [ Problem.WordNotExposed _ "internal/mod/value" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a function from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { aliases = Dict.empty
+                                    , imports =
+                                        Dict.fromList
+                                            [ ( "/mod", [ "add" ] )
+                                            ]
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Word emptyRange "add"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWordUnexposed "/external/package/mod/add"
+                                    ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed function is called"
+
+                        Err [ Problem.WordNotExposed _ "/external/package/mod/add" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type signature from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.ExternalRef [ "mod" ] "Tipe" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type definition from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types =
+                                Dict.fromList
+                                    [ ( "BoxedTipe"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "BoxedTipe"
+                                            []
+                                            [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                      )
+                                    ]
+                            , words = Dict.empty
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/TipeUnion" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type match from an external module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "/external/package/mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/mod", "external/package" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type signature from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.InternalRef [ "mod" ] "Tipe" [] ]
+                                                , output = []
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
                                 , ast = unqualifiedAst
                                 , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
                                 }
                     in
                     case result of
-                        Err err ->
-                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
 
-                        Ok actualAst ->
-                            Expect.equal expectedAst actualAst
-            , test "Detects external reference in multiword" <|
+                        Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type definition from an internal module which isn't exposed ends in a error" <|
                 \_ ->
                     let
                         unqualifiedAst =
-                            { types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "call-external"
-                                      , metadata = Metadata.default
-                                      , implementation =
-                                            AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange Type.Int [ ( "value", AST.LiteralInt 1 ) ]
-                                                  , [ AST.ExternalWord emptyRange [ "package", "module" ] "when-one"
-                                                    ]
-                                                  )
-                                                ]
-                                                [ AST.ExternalWord emptyRange [ "package", "module" ] "when-other-one" ]
-                                      }
+                            { moduleDefinition = AST.Undefined
+                            , types =
+                                Dict.fromList
+                                    [ ( "BoxedTipe"
+                                      , AST.CustomTypeDef
+                                            emptyRange
+                                            "BoxedTipe"
+                                            []
+                                            [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                      )
                                     ]
+                            , words = Dict.empty
                             }
 
-                        expectedAst =
-                            { additionalModulesRequired =
-                                Set.fromList
-                                    [ "/external/test/package/module" ]
-                            , checkForExistingTypes = Set.empty
-                            , checkForExistingWords =
-                                Set.fromList
-                                    [ "/external/test/package/module/when-one"
-                                    , "/external/test/package/module/when-other-one"
-                                    ]
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "/play/test/package/tests/call-external"
-                                      , metadata = Metadata.default
-                                      , implementation =
-                                            MultiImpl
-                                                [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 1 ) ]
-                                                  , [ Word emptyRange "/external/test/package/module/when-one"
-                                                    ]
-                                                  )
-                                                ]
-                                                [ Word emptyRange "/external/test/package/module/when-other-one" ]
-                                      }
-                                    ]
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
                             }
 
                         result =
                             run
-                                { packageName = "play/test"
-                                , modulePath = "package/tests"
+                                { packageName = ""
+                                , modulePath = ""
                                 , ast = unqualifiedAst
-                                , externalModules =
-                                    Dict.fromList
-                                        [ ( "/package/module", "external/test" )
-                                        ]
+                                , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
                                 }
                     in
                     case result of
-                        Err err ->
-                            Expect.fail <| "Did not expect qualification to fail with error: " ++ Debug.toString err
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
 
-                        Ok actualAst ->
-                            Expect.equal expectedAst actualAst
+                        Err [ Problem.TypeNotExposed _ "mod/TipeUnion" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "Referencing a type in a type match from an internal module which isn't exposed ends in a error" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.MultiImpl
+                                                [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
+                                                  , [ AST.Word emptyRange "drop"
+                                                    ]
+                                                  )
+                                                ]
+                                                [ AST.Word emptyRange "drop"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types =
+                                Dict.fromList <|
+                                    dummyTypeUnexposed "mod/Tipe"
+                            , words = Dict.empty
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules = Dict.empty
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.fail "Expected qualification to fail because an unexposed type is referenced"
+
+                        Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "There's an implicit import on standard_library/core in anonymous modules" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition = AST.Undefined
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "over"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/play/standard_library/core/over" ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/core", "play/standard_library" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+            , test "There's an implicit import on standard_library/core in named modules" <|
+                \_ ->
+                    let
+                        unqualifiedAst =
+                            { moduleDefinition =
+                                AST.Defined
+                                    { imports = Dict.empty
+                                    , aliases = Dict.empty
+                                    , exposes = Set.empty
+                                    }
+                            , types = Dict.empty
+                            , words =
+                                Dict.fromListBy .name
+                                    [ { name = "external-call"
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            AST.SoloImpl
+                                                [ AST.Word emptyRange "over"
+                                                ]
+                                      }
+                                    ]
+                            }
+
+                        inProgressAst =
+                            { types = Dict.empty
+                            , words =
+                                Dict.fromList
+                                    [ dummyWord "/play/standard_library/core/over" ]
+                            }
+
+                        result =
+                            run
+                                { packageName = ""
+                                , modulePath = ""
+                                , ast = unqualifiedAst
+                                , externalModules =
+                                    Dict.fromList
+                                        [ ( "/core", "play/standard_library" ) ]
+                                , inProgressAST = inProgressAst
+                                }
+                    in
+                    case result of
+                        Ok _ ->
+                            Expect.pass
+
+                        Err errs ->
+                            Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
             ]
         ]

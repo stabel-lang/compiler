@@ -1,7 +1,7 @@
 const compiler = require('./compiler.wrapper');
 
 test('Basic pattern match', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Box
         : value Int
 
@@ -12,7 +12,6 @@ test('Basic pattern match', async () => {
           drop 0
 
         def: main
-        entry: true
         : 0 >Box not
     `);
 
@@ -22,7 +21,7 @@ test('Basic pattern match', async () => {
 });
 
 test('Basic pattern match with default implementation', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Box
         : value Int
 
@@ -32,7 +31,6 @@ test('Basic pattern match with default implementation', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 0 >Box not
     `);
 
@@ -42,7 +40,7 @@ test('Basic pattern match with default implementation', async () => {
 });
 
 test('Basic pattern match reverse case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Box
         : value Int
 
@@ -52,7 +50,6 @@ test('Basic pattern match reverse case', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 1 >Box not
     `);
 
@@ -62,7 +59,7 @@ test('Basic pattern match reverse case', async () => {
 });
 
 test('Multiple arguments', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Point
         : first Int
         : second Int
@@ -73,7 +70,6 @@ test('Multiple arguments', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 0 0 >Point origo?
     `);
 
@@ -83,7 +79,7 @@ test('Multiple arguments', async () => {
 });
 
 test('Multiple arguments reverse case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Point
         : first Int
         : second Int
@@ -94,7 +90,6 @@ test('Multiple arguments reverse case', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 0 1 >Point origo?
     `);
 
@@ -104,7 +99,7 @@ test('Multiple arguments reverse case', async () => {
 });
 
 test('Recursive match', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Box
         : value Int
 
@@ -117,7 +112,6 @@ test('Recursive match', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 1 >Box >BoxOfBox deep-one?
     `);
 
@@ -127,7 +121,7 @@ test('Recursive match', async () => {
 });
 
 test('Recursive match reverse case', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         defstruct: Box
         : value Int
 
@@ -140,7 +134,6 @@ test('Recursive match reverse case', async () => {
         else: drop 0
 
         def: main
-        entry: true
         : 2 >Box >BoxOfBox deep-one?
     `);
 

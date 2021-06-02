@@ -20,11 +20,15 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
-                                      , metadata = Metadata.default
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -32,9 +36,10 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -53,13 +58,15 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -74,13 +81,19 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types = Dict.empty
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types = Dict.empty
                             , words =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ Type.Custom "Ints" ] [ Type.Int ]
+                                      , typeSignature =
+                                            AST.UserProvided
+                                                { input = [ AST.LocalRef "Ints" [] ]
+                                                , output = [ AST.LocalRef "Int" [] ]
+                                                }
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -88,9 +101,10 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , typeSignature = AST.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
@@ -107,20 +121,21 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef
                                         emptyRange
                                         "USMoney"
                                         []
-                                        [ Type.Custom "Dollar"
-                                        , Type.Custom "Cent"
+                                        [ AST.LocalRef "Dollar" []
+                                        , AST.LocalRef "Cent" []
                                         ]
                                     , AST.CustomTypeDef
                                         emptyRange
                                         "Dollar"
                                         []
-                                        [ ( "dollar-value", Type.Int ) ]
+                                        [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                     ]
                             , words = Dict.empty
                             }
@@ -130,13 +145,14 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { types =
+                            { moduleDefinition = AST.emptyModuleDefinition
+                            , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.CustomTypeDef
                                         emptyRange
                                         "BoxWrapper"
                                         []
-                                        [ ( "box", Type.Custom "Box" ) ]
+                                        [ ( "box", AST.LocalRef "Box" [] ) ]
                                     ]
                             , words = Dict.empty
                             }
@@ -175,6 +191,10 @@ checkForError fn source =
                 , modulePath = ""
                 , ast = source
                 , externalModules = Dict.empty
+                , inProgressAST =
+                    { types = Dict.empty
+                    , words = Dict.empty
+                    }
                 }
     in
     case result of

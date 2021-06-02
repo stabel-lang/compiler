@@ -1,3 +1,11 @@
+defmodule:
+exposing:
+  Maybe
+  Nothing
+  map
+  when-nothing
+:
+
 defunion: Maybe a
 : a
 : Nothing

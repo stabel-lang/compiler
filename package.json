@@ -11,13 +11,13 @@
     "elm-test": "^0.19.1-revision6",
     "jest": "^26.6.3",
     "strip-indent": "^3.0.0",
-    "wabt": "^1.0.20"
+    "wabt": "^1.0.23"
   },
   "scripts": {
     "test": "npm run test:elm && npm run test:wasm",
     "test:elm": "elm-test",
     "test:elm:watch": "elm-test --watch",
-    "test:wasm": "elm make src/Main.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest",
+    "test:wasm": "elm make src/TestCompiler.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest",
     "build": "elm make src/CLI.elm --output bin/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" bin/compiler.js"
   },
   "bin": {

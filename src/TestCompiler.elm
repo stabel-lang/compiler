@@ -1,8 +1,9 @@
-port module Main exposing (main)
+port module TestCompiler exposing (main)
 
 import Dict
 import Platform exposing (Program)
 import Play.Codegen as Codegen
+import Play.Data.Metadata as Metadata
 import Play.Parser as Parser
 import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
@@ -17,7 +18,7 @@ type alias Model =
 
 
 type Msg
-    = CompileString String
+    = CompileString ( String, String )
 
 
 main : Program () Model Msg
@@ -39,8 +40,8 @@ init _ =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg _ =
     case msg of
-        CompileString sourceCode ->
-            case compile sourceCode of
+        CompileString ( entry, sourceCode ) ->
+            case compile entry sourceCode of
                 Ok wasm ->
                     ( ()
                     , compileFinished ( True, Wasm.toString wasm )
@@ -52,8 +53,8 @@ update msg _ =
                     )
 
 
-compile : String -> Result String Wasm.Module
-compile sourceCode =
+compile : String -> String -> Result String Wasm.Module
+compile entry sourceCode =
     case Parser.run sourceCode of
         Err parserErrors ->
             formatErrors (ParserProblem.toString sourceCode) parserErrors
@@ -66,7 +67,15 @@ compile sourceCode =
                         , modulePath = ""
                         , ast = ast
                         , externalModules = Dict.empty
+                        , inProgressAST =
+                            { types = Dict.empty
+                            , words = Dict.empty
+                            }
                         }
+                        |> Result.map (\qast -> { qast | words = Dict.update entry (Maybe.map setEntryPoint) qast.words })
+
+                setEntryPoint word =
+                    { word | metadata = Metadata.asEntryPoint word.metadata }
             in
             case qualifierResult of
                 Err qualifierErrors ->
@@ -95,7 +104,7 @@ subscriptions _ =
     compileString CompileString
 
 
-port compileString : (String -> msg) -> Sub msg
+port compileString : (( String, String ) -> msg) -> Sub msg
 
 
 port compileFinished : ( Bool, String ) -> Cmd msg

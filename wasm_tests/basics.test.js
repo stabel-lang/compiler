@@ -1,9 +1,8 @@
 const compiler = require('./compiler.wrapper');
 
 test('Simple expression', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 1 1 +
     `);
 
@@ -13,9 +12,8 @@ test('Simple expression', async () => {
 });
 
 test('Function calls', async () => {
-    const wat = await compiler.toWat(`
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
         : 1 inc inc
 
         def: inc

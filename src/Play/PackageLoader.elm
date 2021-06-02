@@ -5,6 +5,7 @@ module Play.PackageLoader exposing
     , SideEffect(..)
     , getSideEffect
     , init
+    , problemToString
     , update
     )
 
@@ -18,7 +19,9 @@ import Play.Data.PackageName as PackageName exposing (PackageName)
 import Play.Data.PackagePath as PackagePath exposing (PackagePath)
 import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
 import Play.Parser as Parser
+import Play.Parser.Problem as ParserProblem
 import Play.Qualifier as Qualifier
+import Play.Qualifier.Problem as QualifierProblem
 import Result.Extra as Result
 import Set exposing (Set)
 
@@ -28,7 +31,38 @@ type Problem
     | UnknownMessageForState String
     | NoExposedModulesInRootProject
     | ModuleNotFound String
+    | ParserError String (List ParserProblem.Problem)
+    | QualifierError String (List QualifierProblem.Problem)
     | InternalError String
+
+
+problemToString : Problem -> String
+problemToString problem =
+    case problem of
+        InvalidPackageMetadata path err ->
+            "Something is wrong with file located at '" ++ path ++ "':\n\n" ++ err
+
+        UnknownMessageForState msg ->
+            "Unknown message for state: " ++ msg
+
+        NoExposedModulesInRootProject ->
+            "No exposed modules in root project"
+
+        ModuleNotFound mod ->
+            "Failed to locate module '" ++ mod ++ "' on disk"
+
+        ParserError source errs ->
+            errs
+                |> List.map (ParserProblem.toString source)
+                |> String.join "\n\n"
+
+        QualifierError source errs ->
+            errs
+                |> List.map (QualifierProblem.toString source)
+                |> String.join "\n\n"
+
+        InternalError msg ->
+            "Internal error: " ++ msg
 
 
 type alias InitOptions =
@@ -42,8 +76,8 @@ type Model
     = Initializing InitOptions SideEffect
     | LoadingMetadata State (List PackagePath) SideEffect
     | ResolvingModulePaths State (List PackageInfo) SideEffect
-    | Compiling State (List ( PackageInfo, ModuleName )) SideEffect
-    | Done Qualifier.ExposedAST
+    | Parsing State (List ( PackageInfo, ModuleName )) SideEffect
+    | Done Qualifier.AST
     | Failed Problem
 
 
@@ -55,8 +89,8 @@ type alias State =
     , filePathToModule : Dict String ( PackageName, ModuleName )
     , moduleNameToPackageName : Dict String String
     , absoluteModuleNameToDetails : Dict String ( PackageInfo, ModuleName )
-    , inProgressAst : Maybe Qualifier.AST
-    , parsedModules : Set String
+    , parsedModuleNames : Set String
+    , parsedModules : List ParsedModuleInfo
     }
 
 
@@ -64,6 +98,15 @@ type alias PackageInfo =
     { path : String
     , metadata : PackageMetadata
     , modules : List ModuleName
+    }
+
+
+type alias ParsedModuleInfo =
+    { packageName : PackageName
+    , modulePath : ModuleName
+    , ast : Parser.AST
+    , requiredModules : Set String
+    , source : String
     }
 
 
@@ -76,8 +119,8 @@ emptyState initOptions rootPackage =
     , filePathToModule = Dict.empty
     , moduleNameToPackageName = Dict.empty
     , absoluteModuleNameToDetails = Dict.empty
-    , inProgressAst = Nothing
-    , parsedModules = Set.empty
+    , parsedModuleNames = Set.empty
+    , parsedModules = []
     }
 
 
@@ -111,7 +154,7 @@ getSideEffect model =
         ResolvingModulePaths _ _ sf ->
             Just sf
 
-        Compiling _ _ sf ->
+        Parsing _ _ sf ->
             Just sf
 
 
@@ -171,8 +214,8 @@ update msg model =
         ResolvingModulePaths state remainingPackages _ ->
             resolvingModulePathsUpdate msg state remainingPackages
 
-        Compiling state remainingModules _ ->
-            compilingUpdate msg state remainingModules
+        Parsing state remainingModules _ ->
+            parsingUpdate msg state remainingModules
 
         Done _ ->
             model
@@ -354,7 +397,7 @@ initCompileStep state =
                             |> List.map (\( pInfo, mName ) -> ( absoluteModuleName pInfo.metadata.name mName, ( pInfo, mName ) ))
                             |> Dict.fromList
                 in
-                Compiling
+                Parsing
                     { state
                         | filePathToModule = pathsToModuleNames
                         , moduleNameToPackageName = moduleNameToPackageName
@@ -422,8 +465,8 @@ absolutePathsOfModules package acc =
     Dict.union acc absolutePathsForModule
 
 
-compilingUpdate : Msg -> State -> List ( PackageInfo, ModuleName ) -> Model
-compilingUpdate msg state remainingModules =
+parsingUpdate : Msg -> State -> List ( PackageInfo, ModuleName ) -> Model
+parsingUpdate msg state remainingModules =
     case msg of
         FileContents path fileName content ->
             let
@@ -435,67 +478,51 @@ compilingUpdate msg state remainingModules =
             in
             case ( possibleModuleInfo, Parser.run content ) of
                 ( _, Err parserError ) ->
-                    Failed <| InternalError <| "Parser error: " ++ Debug.toString parserError
+                    Failed <| ParserError content parserError
 
                 ( Just ( packageName, moduleName ), Ok parserAst ) ->
                     let
-                        qualifierResult =
-                            Qualifier.run
+                        fullModuleName =
+                            absoluteModuleName packageName moduleName
+
+                        updatedParsedModules =
+                            Set.insert fullModuleName state.parsedModuleNames
+
+                        requiredModules =
+                            Qualifier.requiredModules
                                 { packageName = PackageName.toString packageName
-                                , modulePath = ModuleName.toString moduleName
                                 , ast = parserAst
                                 , externalModules = state.moduleNameToPackageName
                                 }
+
+                        updatedState =
+                            { state
+                                | parsedModuleNames = updatedParsedModules
+                                , parsedModules =
+                                    { packageName = packageName
+                                    , modulePath = moduleName
+                                    , ast = parserAst
+                                    , requiredModules = requiredModules
+                                    , source = content
+                                    }
+                                        :: state.parsedModules
+                            }
+
+                        modulesQueuedForOrAlreadyParsed =
+                            remainingModules
+                                |> List.map (\( pInfo, mName ) -> absoluteModuleName pInfo.metadata.name mName)
+                                |> Set.fromList
+                                |> Set.union updatedParsedModules
+
+                        missingModulesInParseQueue =
+                            Set.diff requiredModules modulesQueuedForOrAlreadyParsed
+                                |> Set.toList
+                                |> List.filterMap (\absName -> Dict.get absName state.absoluteModuleNameToDetails)
+
+                        updatedRemainingModules =
+                            remainingModules ++ missingModulesInParseQueue
                     in
-                    case qualifierResult of
-                        Err qualifierError ->
-                            Failed <| InternalError <| "Qualifier error: " ++ Debug.toString qualifierError
-
-                        Ok qualifiedAST ->
-                            let
-                                fullModuleName =
-                                    absoluteModuleName packageName moduleName
-
-                                mergedQualifiedAst =
-                                    state.inProgressAst
-                                        |> Maybe.map
-                                            (\ipa ->
-                                                { additionalModulesRequired =
-                                                    Set.union
-                                                        ipa.additionalModulesRequired
-                                                        qualifiedAST.additionalModulesRequired
-                                                , checkForExistingTypes =
-                                                    Set.union
-                                                        ipa.checkForExistingTypes
-                                                        qualifiedAST.checkForExistingTypes
-                                                , checkForExistingWords =
-                                                    Set.union
-                                                        ipa.checkForExistingWords
-                                                        qualifiedAST.checkForExistingWords
-                                                , types = Dict.union ipa.types qualifiedAST.types
-                                                , words = Dict.union ipa.words qualifiedAST.words
-                                                }
-                                            )
-                                        |> Maybe.withDefault qualifiedAST
-
-                                updatedParsedModules =
-                                    Set.insert fullModuleName state.parsedModules
-
-                                modulesQueuedForOrAlreadyParsed =
-                                    remainingModules
-                                        |> List.map (\( pInfo, mName ) -> absoluteModuleName pInfo.metadata.name mName)
-                                        |> Set.fromList
-                                        |> Set.union updatedParsedModules
-
-                                missingModulesInParseQueue =
-                                    Set.diff mergedQualifiedAst.additionalModulesRequired modulesQueuedForOrAlreadyParsed
-                                        |> Set.toList
-                                        |> List.filterMap (\absName -> Dict.get absName state.absoluteModuleNameToDetails)
-
-                                updatedRemainingModules =
-                                    missingModulesInParseQueue ++ remainingModules
-                            in
-                            nextCompileStep updatedParsedModules mergedQualifiedAst updatedRemainingModules state
+                    nextCompileStep updatedRemainingModules updatedState
 
                 ( Nothing, _ ) ->
                     Failed <| InternalError <| "Don't know why we read file: " ++ fullPath
@@ -509,43 +536,94 @@ absoluteModuleName packageName moduleName =
     "/" ++ PackageName.toString packageName ++ "/" ++ ModuleName.toString moduleName
 
 
-nextCompileStep : Set String -> Qualifier.AST -> List ( PackageInfo, ModuleName ) -> State -> Model
-nextCompileStep parsedModules inProgressAst remainingModules state =
+nextCompileStep : List ( PackageInfo, ModuleName ) -> State -> Model
+nextCompileStep remainingModules state =
     case remainingModules of
         [] ->
             let
+                sortedParsedModules =
+                    List.sortWith sortByRequiredModules state.parsedModules
+
+                ( qualifiedAst, errs ) =
+                    sortedParsedModules
+                        |> List.foldl qualifyAst ( { types = Dict.empty, words = Dict.empty }, [] )
+
+                qualifyAst parsedModInfo ( qast, es ) =
+                    let
+                        qualifierResult =
+                            Qualifier.run
+                                { packageName = PackageName.toString parsedModInfo.packageName
+                                , modulePath = ModuleName.toString parsedModInfo.modulePath
+                                , ast = parsedModInfo.ast
+                                , externalModules = state.moduleNameToPackageName
+                                , inProgressAST = qast
+                                }
+                    in
+                    case qualifierResult of
+                        Err qualifierError ->
+                            ( qast
+                            , QualifierError parsedModInfo.source qualifierError :: es
+                            )
+
+                        Ok qualifiedAST ->
+                            let
+                                mergedQualifiedAst =
+                                    { types = Dict.union qast.types qualifiedAST.types
+                                    , words = Dict.union qast.words qualifiedAST.words
+                                    }
+                            in
+                            ( mergedQualifiedAst, es )
+
                 wordsWithEntryPoint =
                     state.possibleEntryPoint
-                        |> Maybe.map (setEntryPoint inProgressAst.words)
-                        |> Maybe.withDefault inProgressAst.words
+                        |> Maybe.map (setEntryPoint qualifiedAst.words)
+                        |> Maybe.withDefault qualifiedAst.words
 
                 setEntryPoint words entryPointName =
                     Dict.update
                         entryPointName
-                        (\maybeWord ->
-                            case maybeWord of
-                                Nothing ->
-                                    Nothing
-
-                                Just word ->
-                                    Just { word | metadata = Metadata.asEntryPoint word.metadata }
-                        )
+                        (Maybe.map (\w -> { w | metadata = Metadata.asEntryPoint w.metadata }))
                         words
             in
-            Done
-                { types = inProgressAst.types
-                , words = wordsWithEntryPoint
-                }
+            case errs of
+                [] ->
+                    Done
+                        { types = qualifiedAst.types
+                        , words = wordsWithEntryPoint
+                        }
+
+                err :: _ ->
+                    Failed <| err
 
         ( packageInfo, moduleName ) :: otherModules ->
             let
                 ( path, fileName ) =
                     readModuleFromDisk packageInfo.path moduleName
             in
-            Compiling
-                { state
-                    | parsedModules = parsedModules
-                    , inProgressAst = Just inProgressAst
-                }
-                otherModules
-                (ReadFile path fileName)
+            Parsing state otherModules (ReadFile path fileName)
+
+
+sortByRequiredModules : ParsedModuleInfo -> ParsedModuleInfo -> Order
+sortByRequiredModules a b =
+    let
+        aQualifiedName =
+            absoluteModuleName a.packageName a.modulePath
+
+        bQualifiedName =
+            absoluteModuleName b.packageName b.modulePath
+
+        aRequiredByB =
+            Set.member aQualifiedName b.requiredModules
+
+        bRequiredByA =
+            Set.member bQualifiedName a.requiredModules
+    in
+    case ( aRequiredByB, bRequiredByA ) of
+        ( True, False ) ->
+            LT
+
+        ( False, True ) ->
+            GT
+
+        otherwise ->
+            EQ

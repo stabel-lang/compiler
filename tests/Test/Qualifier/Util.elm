@@ -1,11 +1,12 @@
 module Test.Qualifier.Util exposing
     ( addFunctionsForStructs
+    , expectExternalOutput
     , expectModuleOutput
     , expectOutput
     , stripLocations
     )
 
-import Dict exposing (Dict)
+import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Play.Data.Metadata as Metadata
@@ -14,7 +15,7 @@ import Play.Data.Type as Type exposing (Type)
 import Play.Parser as Parser
 import Play.Qualifier as AST
     exposing
-        ( ExposedAST
+        ( AST
         , Node(..)
         , TypeDefinition
         , TypeMatch(..)
@@ -24,13 +25,14 @@ import Play.Qualifier as AST
         )
 
 
-type alias FullyLoadedAST =
-    { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
+emptyAst : AST
+emptyAst =
+    { types = Dict.empty
+    , words = Dict.empty
     }
 
 
-expectOutput : Parser.AST -> FullyLoadedAST -> Expectation
+expectOutput : Parser.AST -> AST -> Expectation
 expectOutput parserAst expectedAst =
     let
         result =
@@ -39,6 +41,7 @@ expectOutput parserAst expectedAst =
                 , modulePath = ""
                 , ast = parserAst
                 , externalModules = Dict.empty
+                , inProgressAST = emptyAst
                 }
     in
     case result of
@@ -52,7 +55,7 @@ expectOutput parserAst expectedAst =
                 }
 
 
-expectModuleOutput : Parser.AST -> FullyLoadedAST -> Expectation
+expectModuleOutput : Parser.AST -> AST -> Expectation
 expectModuleOutput parserAst expectedAst =
     let
         result =
@@ -61,6 +64,7 @@ expectModuleOutput parserAst expectedAst =
                 , modulePath = "some/module"
                 , ast = parserAst
                 , externalModules = Dict.empty
+                , inProgressAST = emptyAst
                 }
     in
     case result of
@@ -74,12 +78,41 @@ expectModuleOutput parserAst expectedAst =
                 }
 
 
-addFunctionsForStructs : FullyLoadedAST -> FullyLoadedAST
+expectExternalOutput : AST -> Parser.AST -> AST -> Expectation
+expectExternalOutput inProgressAst parserAst expectedAst =
+    let
+        config =
+            { packageName = ""
+            , modulePath = ""
+            , ast = parserAst
+            , externalModules =
+                Dict.fromList
+                    [ ( "/mod", "external/package" ) ]
+            , inProgressAST = emptyAst
+            }
+
+        result =
+            AST.run config
+    in
+    case result of
+        Ok _ ->
+            Expect.fail "Expected qualification to fail when inProgressAST is missing"
+
+        Err _ ->
+            case AST.run { config | inProgressAST = inProgressAst } of
+                Err errors ->
+                    Expect.fail <| "Did not expect qualification to fail: " ++ Debug.toString errors
+
+                Ok ast ->
+                    Expect.equal expectedAst ast
+
+
+addFunctionsForStructs : AST -> AST
 addFunctionsForStructs ast =
     let
         helper _ t wipAst =
             case t of
-                AST.CustomTypeDef name _ generics members ->
+                AST.CustomTypeDef name _ _ generics members ->
                     addFunctionsForStructsHelper name generics members wipAst
 
                 _ ->
@@ -88,7 +121,7 @@ addFunctionsForStructs ast =
     Dict.foldl helper ast ast.types
 
 
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> FullyLoadedAST -> FullyLoadedAST
+addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
 addFunctionsForStructsHelper name generics members ast =
     let
         selfType =
@@ -147,7 +180,7 @@ addFunctionsForStructsHelper name generics members ast =
     { ast | words = Dict.union ast.words allFuncs }
 
 
-stripLocations : ExposedAST -> ExposedAST
+stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
     , words = Dict.map (\_ d -> stripWordLocation d) ast.words
@@ -157,11 +190,11 @@ stripLocations ast =
 stripTypeLocation : TypeDefinition -> TypeDefinition
 stripTypeLocation typeDef =
     case typeDef of
-        AST.CustomTypeDef name _ generics members ->
-            AST.CustomTypeDef name emptyRange generics members
+        AST.CustomTypeDef exposed name _ generics members ->
+            AST.CustomTypeDef exposed name emptyRange generics members
 
-        AST.UnionTypeDef name _ generics members ->
-            AST.UnionTypeDef name emptyRange generics members
+        AST.UnionTypeDef exposed name _ generics members ->
+            AST.UnionTypeDef exposed name emptyRange generics members
 
 
 stripWordLocation : WordDefinition -> WordDefinition

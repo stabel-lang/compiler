@@ -23,6 +23,7 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ CustomTypeDef "Box"
+                                    False
                                     emptyRange
                                     [ "a" ]
                                     [ ( "value", Type.Generic "b" ) ]
@@ -88,6 +89,7 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ CustomTypeDef "IntBox"
+                                    False
                                     emptyRange
                                     []
                                     [ ( "value", Type.Int ) ]
@@ -178,13 +180,14 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef "Bool"
+                                    False
                                     emptyRange
                                     []
                                     [ Type.Custom "True"
                                     , Type.Custom "False"
                                     ]
-                                , CustomTypeDef "True" emptyRange [] []
-                                , CustomTypeDef "False" emptyRange [] []
+                                , CustomTypeDef "True" False emptyRange [] []
+                                , CustomTypeDef "False" False emptyRange [] []
                                 ]
                         , words =
                             Dict.fromListBy .name
@@ -346,6 +349,7 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ CustomTypeDef "IntBox"
+                                        False
                                         emptyRange
                                         []
                                         [ ( "value", Type.Int ) ]
@@ -520,16 +524,18 @@ suite =
                             { types =
                                 Dict.fromListBy typeDefinitionName
                                     [ UnionTypeDef "Maybe"
+                                        False
                                         emptyRange
                                         [ "a" ]
                                         [ Type.Generic "a"
                                         , Type.Custom "Nil"
                                         ]
                                     , CustomTypeDef "IntBox"
+                                        False
                                         emptyRange
                                         []
                                         [ ( "value", Type.Int ) ]
-                                    , CustomTypeDef "Nil" emptyRange [] []
+                                    , CustomTypeDef "Nil" False emptyRange [] []
                                     ]
                             , words =
                                 Dict.fromListBy .name
