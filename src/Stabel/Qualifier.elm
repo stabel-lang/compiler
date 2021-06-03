@@ -125,7 +125,7 @@ moduleDefinition : ModuleDefinitionConfig a -> Parser.ModuleDefinitionRec
 moduleDefinition config =
     let
         defaultImports =
-            if Dict.get "/core" config.externalModules == Just "play/standard_library" then
+            if Dict.get "/core" config.externalModules == Just "stabel/standard_library" then
                 Dict.fromList [ ( "/core", [] ) ]
 
             else

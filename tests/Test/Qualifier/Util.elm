@@ -60,7 +60,7 @@ expectModuleOutput parserAst expectedAst =
     let
         result =
             AST.run
-                { packageName = "play/test"
+                { packageName = "stabel/test"
                 , modulePath = "some/module"
                 , ast = parserAst
                 , externalModules = Dict.empty
