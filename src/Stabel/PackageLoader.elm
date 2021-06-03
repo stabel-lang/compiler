@@ -1,4 +1,4 @@
-module Play.PackageLoader exposing
+module Stabel.PackageLoader exposing
     ( Model(..)
     , Msg(..)
     , Problem(..)
@@ -12,18 +12,18 @@ module Play.PackageLoader exposing
 import Dict exposing (Dict)
 import Json.Decode as Json
 import List.Extra as List
-import Play.Data.Metadata as Metadata
-import Play.Data.ModuleName as ModuleName exposing (ModuleName)
-import Play.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
-import Play.Data.PackageName as PackageName exposing (PackageName)
-import Play.Data.PackagePath as PackagePath exposing (PackagePath)
-import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
-import Play.Parser as Parser
-import Play.Parser.Problem as ParserProblem
-import Play.Qualifier as Qualifier
-import Play.Qualifier.Problem as QualifierProblem
 import Result.Extra as Result
 import Set exposing (Set)
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.ModuleName as ModuleName exposing (ModuleName)
+import Stabel.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
+import Stabel.Data.PackageName as PackageName exposing (PackageName)
+import Stabel.Data.PackagePath as PackagePath exposing (PackagePath)
+import Stabel.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
+import Stabel.Parser as Parser
+import Stabel.Parser.Problem as ParserProblem
+import Stabel.Qualifier as Qualifier
+import Stabel.Qualifier.Problem as QualifierProblem
 
 
 type Problem
@@ -161,7 +161,7 @@ getSideEffect model =
 init : InitOptions -> Model
 init initOptions =
     Initializing initOptions <|
-        ReadFile initOptions.projectDirPath "play.json"
+        ReadFile initOptions.projectDirPath "stabel.json"
 
 
 update : Msg -> Model -> Model
@@ -196,7 +196,7 @@ update msg model =
 
                                 (PackagePath.Directory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
-                                        ReadFile nextPathDir "play.json"
+                                        ReadFile nextPathDir "stabel.json"
 
                                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
@@ -239,7 +239,7 @@ loadingMetadataUpdate msg state remainingPaths =
 
                 (PackagePath.Directory nextPathDir) :: _ ->
                     LoadingMetadata nextState pathsToLoad <|
-                        ReadFile nextPathDir "play.json"
+                        ReadFile nextPathDir "stabel.json"
 
                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
                     LoadingMetadata nextState pathsToLoad <|
@@ -329,7 +329,7 @@ resolvingModulePathsUpdate msg state remainingPackages =
                     state.rootPackage
 
                 moduleNameResults =
-                    List.map (String.replace ".play" "") modules
+                    List.map (String.replace ".stbl" "") modules
                         |> List.map ModuleName.fromString
                         |> Result.combine
 
@@ -419,7 +419,7 @@ readModuleFromDisk packagePath moduleName =
                     ( reversePath
                         |> List.reverse
                         |> String.join "/"
-                    , name ++ ".play"
+                    , name ++ ".stbl"
                     )
 
                 _ ->

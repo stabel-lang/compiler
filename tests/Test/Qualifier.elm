@@ -3,14 +3,14 @@ module Test.Qualifier exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Play.Data.Builtin as Builtin
-import Play.Data.Metadata as Metadata
-import Play.Data.SourceLocation exposing (emptyRange)
-import Play.Data.Type as Type
-import Play.Parser as AST
-import Play.Qualifier exposing (..)
-import Play.Qualifier.Problem as Problem
 import Set
+import Stabel.Data.Builtin as Builtin
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.Data.Type as Type
+import Stabel.Parser as AST
+import Stabel.Qualifier exposing (..)
+import Stabel.Qualifier.Problem as Problem
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
@@ -697,8 +697,8 @@ suite =
             \_ ->
                 let
                     qualifiedUsMoneyUnion =
-                        [ Type.Custom "/play/test/some/module/Dollar"
-                        , Type.Custom "/play/test/some/module/Cent"
+                        [ Type.Custom "/stabel/test/some/module/Dollar"
+                        , Type.Custom "/stabel/test/some/module/Cent"
                         ]
 
                     unqualifiedAst =
@@ -791,17 +791,17 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
-                                    "/play/test/some/module/USMoney"
+                                    "/stabel/test/some/module/USMoney"
                                     True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
-                                , CustomTypeDef "/play/test/some/module/Dollar"
+                                , CustomTypeDef "/stabel/test/some/module/Dollar"
                                     True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/play/test/some/module/Cent"
+                                , CustomTypeDef "/stabel/test/some/module/Cent"
                                     True
                                     emptyRange
                                     []
@@ -809,7 +809,7 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = "/play/test/some/module/into-cents"
+                                [ { name = "/stabel/test/some/module/into-cents"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -817,20 +817,20 @@ suite =
                                                 [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Dollar") []
-                                              , [ Word emptyRange "/play/test/some/module/dollar-value>"
+                                            [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
+                                              , [ Word emptyRange "/stabel/test/some/module/dollar-value>"
                                                 , Integer emptyRange 100
                                                 , Builtin emptyRange Builtin.Multiply
                                                 ]
                                               )
-                                            , ( TypeMatch emptyRange (Type.Custom "/play/test/some/module/Cent") []
-                                              , [ Word emptyRange "/play/test/some/module/cent-value>"
+                                            , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
+                                              , [ Word emptyRange "/stabel/test/some/module/cent-value>"
                                                 ]
                                               )
                                             ]
                                             []
                                   }
-                                , { name = "/play/test/some/module/add-money"
+                                , { name = "/stabel/test/some/module/add-money"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
@@ -838,27 +838,27 @@ suite =
                                                 [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         SoloImpl
-                                            [ Word emptyRange "/play/test/some/module/into-cents"
+                                            [ Word emptyRange "/stabel/test/some/module/into-cents"
                                             , Builtin emptyRange Builtin.StackSwap
-                                            , Word emptyRange "/play/test/some/module/into-cents"
+                                            , Word emptyRange "/stabel/test/some/module/into-cents"
                                             , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
-                                , { name = "/play/test/some/module/quote-excuse"
+                                , { name = "/stabel/test/some/module/quote-excuse"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Custom "/play/test/some/module/Dollar" ]
-                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
                                         SoloImpl
-                                            [ Word emptyRange "/play/test/some/module/dollar-value>"
-                                            , WordRef emptyRange "quote:/play/test/some/module/quote-excuse/1"
+                                            [ Word emptyRange "/stabel/test/some/module/dollar-value>"
+                                            , WordRef emptyRange "quote:/stabel/test/some/module/quote-excuse/1"
                                             , Builtin emptyRange Builtin.Apply
-                                            , Word emptyRange "/play/test/some/module/>Dollar"
+                                            , Word emptyRange "/stabel/test/some/module/>Dollar"
                                             ]
                                   }
-                                , { name = "quote:/play/test/some/module/quote-excuse/1"
+                                , { name = "quote:/stabel/test/some/module/quote-excuse/1"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.isQuoted
@@ -868,55 +868,55 @@ suite =
                                             , Builtin emptyRange Builtin.Multiply
                                             ]
                                   }
-                                , { name = "/play/test/some/module/>Dollar"
+                                , { name = "/stabel/test/some/module/>Dollar"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Dollar" ]
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
-                                        SoloImpl [ ConstructType "/play/test/some/module/Dollar" ]
+                                        SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
-                                , { name = "/play/test/some/module/>Cent"
+                                , { name = "/stabel/test/some/module/>Cent"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Cent" ]
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
                                   , implementation =
-                                        SoloImpl [ ConstructType "/play/test/some/module/Cent" ]
+                                        SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
-                                , { name = "/play/test/some/module/>dollar-value"
+                                , { name = "/stabel/test/some/module/>dollar-value"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                            [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
-                                , { name = "/play/test/some/module/>cent-value"
+                                , { name = "/stabel/test/some/module/>cent-value"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/play/test/some/module/Cent" ]
+                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Cent" "cent-value" ]
+                                            [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
-                                , { name = "/play/test/some/module/dollar-value>"
+                                , { name = "/stabel/test/some/module/dollar-value>"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Dollar" ] [ Type.Int ]
+                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                            [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
-                                , { name = "/play/test/some/module/cent-value>"
+                                , { name = "/stabel/test/some/module/cent-value>"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Cent" ] [ Type.Int ]
+                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Cent" "cent-value" ]
+                                            [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 ]
                         }
@@ -926,8 +926,8 @@ suite =
             \_ ->
                 let
                     qualifiedUsMoneyUnion =
-                        [ Type.Custom "/play/test/some/module/Dollar"
-                        , Type.Custom "/play/test/some/module/Cent"
+                        [ Type.Custom "/stabel/test/some/module/Dollar"
+                        , Type.Custom "/stabel/test/some/module/Cent"
                         ]
 
                     unqualifiedAst =
@@ -963,22 +963,22 @@ suite =
                         { types =
                             Dict.fromListBy typeDefinitionName
                                 [ UnionTypeDef
-                                    "/play/test/some/module/USMoney"
+                                    "/stabel/test/some/module/USMoney"
                                     True
                                     emptyRange
                                     []
                                     qualifiedUsMoneyUnion
-                                , CustomTypeDef "/play/test/some/module/Dollar"
+                                , CustomTypeDef "/stabel/test/some/module/Dollar"
                                     True
                                     emptyRange
                                     []
                                     [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/play/test/some/module/Cent"
+                                , CustomTypeDef "/stabel/test/some/module/Cent"
                                     True
                                     emptyRange
                                     []
                                     [ ( "cent-value", Type.Int ) ]
-                                , CustomTypeDef "/play/test/some/module/Wallet"
+                                , CustomTypeDef "/stabel/test/some/module/Wallet"
                                     True
                                     emptyRange
                                     []
@@ -988,101 +988,101 @@ suite =
                                 ]
                         , words =
                             Dict.fromListBy .name
-                                [ { name = "/play/test/some/module/>Dollar"
+                                [ { name = "/stabel/test/some/module/>Dollar"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Dollar" ]
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
-                                        SoloImpl [ ConstructType "/play/test/some/module/Dollar" ]
+                                        SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
-                                , { name = "/play/test/some/module/>Cent"
+                                , { name = "/stabel/test/some/module/>Cent"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/play/test/some/module/Cent" ]
+                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
                                   , implementation =
-                                        SoloImpl [ ConstructType "/play/test/some/module/Cent" ]
+                                        SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
-                                , { name = "/play/test/some/module/>Wallet"
+                                , { name = "/stabel/test/some/module/>Wallet"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType [ Type.Int, Type.Union qualifiedUsMoneyUnion ]
-                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                   , implementation =
-                                        SoloImpl [ ConstructType "/play/test/some/module/Wallet" ]
+                                        SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
                                   }
-                                , { name = "/play/test/some/module/>dollar-value"
+                                , { name = "/stabel/test/some/module/>dollar-value"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/play/test/some/module/Dollar" ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                            [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
-                                , { name = "/play/test/some/module/>cent-value"
+                                , { name = "/stabel/test/some/module/>cent-value"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/play/test/some/module/Cent" ]
+                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Cent" "cent-value" ]
+                                            [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
-                                , { name = "/play/test/some/module/>user-id"
+                                , { name = "/stabel/test/some/module/>user-id"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Wallet", Type.Int ]
-                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Wallet" "user-id" ]
+                                            [ SetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
-                                , { name = "/play/test/some/module/>value"
+                                , { name = "/stabel/test/some/module/>value"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Wallet", Type.Union qualifiedUsMoneyUnion ]
-                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet", Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                   , implementation =
                                         SoloImpl
-                                            [ SetMember "/play/test/some/module/Wallet" "value" ]
+                                            [ SetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
-                                , { name = "/play/test/some/module/dollar-value>"
+                                , { name = "/stabel/test/some/module/dollar-value>"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Dollar" ] [ Type.Int ]
+                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Dollar" "dollar-value" ]
+                                            [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
-                                , { name = "/play/test/some/module/cent-value>"
+                                , { name = "/stabel/test/some/module/cent-value>"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Cent" ] [ Type.Int ]
+                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Cent" "cent-value" ]
+                                            [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
-                                , { name = "/play/test/some/module/user-id>"
+                                , { name = "/stabel/test/some/module/user-id>"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/play/test/some/module/Wallet" ] [ Type.Int ]
+                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Wallet" ] [ Type.Int ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Wallet" "user-id" ]
+                                            [ GetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
-                                , { name = "/play/test/some/module/value>"
+                                , { name = "/stabel/test/some/module/value>"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/play/test/some/module/Wallet" ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                                 [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         SoloImpl
-                                            [ GetMember "/play/test/some/module/Wallet" "value" ]
+                                            [ GetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 ]
                         }
@@ -1162,7 +1162,7 @@ suite =
                             , "/package/test/internal/types"
                             , "/package/test/internal/match"
                             , "/package/test/package/module"
-                            , "/play/standard_library/core"
+                            , "/stabel/standard_library/core"
                             ]
 
                     actualRequiredModules =
@@ -1177,7 +1177,7 @@ suite =
                                     , ( "/external/module", "robheghan/html" )
                                     , ( "/external/types", "robheghan/html" )
                                     , ( "/external/double", "robheghan/html" )
-                                    , ( "/core", "play/standard_library" )
+                                    , ( "/core", "stabel/standard_library" )
                                     ]
                             }
                 in
@@ -2997,7 +2997,7 @@ suite =
                             { types = Dict.empty
                             , words =
                                 Dict.fromList
-                                    [ dummyWord "/play/standard_library/core/over" ]
+                                    [ dummyWord "/stabel/standard_library/core/over" ]
                             }
 
                         result =
@@ -3007,7 +3007,7 @@ suite =
                                 , ast = unqualifiedAst
                                 , externalModules =
                                     Dict.fromList
-                                        [ ( "/core", "play/standard_library" ) ]
+                                        [ ( "/core", "stabel/standard_library" ) ]
                                 , inProgressAST = inProgressAst
                                 }
                     in
@@ -3047,7 +3047,7 @@ suite =
                             { types = Dict.empty
                             , words =
                                 Dict.fromList
-                                    [ dummyWord "/play/standard_library/core/over" ]
+                                    [ dummyWord "/stabel/standard_library/core/over" ]
                             }
 
                         result =
@@ -3057,7 +3057,7 @@ suite =
                                 , ast = unqualifiedAst
                                 , externalModules =
                                     Dict.fromList
-                                        [ ( "/core", "play/standard_library" ) ]
+                                        [ ( "/core", "stabel/standard_library" ) ]
                                 , inProgressAST = inProgressAst
                                 }
                     in

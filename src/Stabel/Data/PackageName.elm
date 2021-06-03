@@ -1,4 +1,4 @@
-module Play.Data.PackageName exposing
+module Stabel.Data.PackageName exposing
     ( PackageName
     , fromString
     , invalidPart

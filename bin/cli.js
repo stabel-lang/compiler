@@ -25,7 +25,7 @@ function initProject() {
 
     fs.mkdirSync(path.join(cwd, "src"));
 
-    const playJson = {
+    const stabelJson = {
         name: subCmdFlags[0],
         version: "0.1.0",
         "language-version": "0.2.0",
@@ -33,14 +33,14 @@ function initProject() {
             "main"
         ],
         dependencies: {
-            "play/standard_library": "0.2.0"
+            "stabel/standard_library": "0.2.0"
         },
         "package-paths": []
     };
 
-    fs.writeFileSync(path.join(cwd, "play.json"), JSON.stringify(playJson, null, 4));
+    fs.writeFileSync(path.join(cwd, "stabel.json"), JSON.stringify(stabelJson, null, 4));
 
-    fs.writeFileSync(path.join(cwd, "src", "main.play"), `
+    fs.writeFileSync(path.join(cwd, "src", "main.stbl"), `
 def: execute
 : 0
 `.trim());
@@ -56,9 +56,9 @@ function runProject() {
 }
 
 function compileProject(entryPoint) {
-    const rootJsonMetaPath = path.join(cwd, "play.json");
+    const rootJsonMetaPath = path.join(cwd, "stabel.json");
     if (!fs.existsSync(rootJsonMetaPath)) {
-        console.error("No 'play.json' file found in this directory.");
+        console.error("No 'stabel.json' file found in this directory.");
         return;
     }
 
@@ -86,7 +86,7 @@ function compileProject(entryPoint) {
             case "resolvePackageModules":
                 const srcPath = path.join(msg.path, "src");
                 const childrenFiles = expandDir(msg.path)("src")
-                    .filter(name => name.endsWith(".play"))
+                    .filter(name => name.endsWith(".stbl"))
                     .map(name => name.replace(srcPath + "/", ""));
 
                 compiler.ports.incomingPort.send({
@@ -138,12 +138,12 @@ function packageDirs(parentDir) {
     return fs.readdirSync(parentDir)
         .map(dir => path.join(parentDir, dir))
         .filter(dir => fs.statSync(dir).isDirectory())
-        .filter(dir => fs.readdirSync(dir).indexOf('play.json') >= 0);
+        .filter(dir => fs.readdirSync(dir).indexOf('stabel.json') >= 0);
 }
 
 function printHelp() {
     console.log(`
-Play compiler. Alpha-2.
+Stabel v0.2.0-alpha
 
 Possible options are:
 * init <package_name>: initialize a new project in the current directory.

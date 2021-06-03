@@ -1,16 +1,16 @@
-module Play.Qualifier exposing (..)
+module Stabel.Qualifier exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
-import Play.Data.Builtin as Builtin exposing (Builtin)
-import Play.Data.Metadata as Metadata exposing (Metadata)
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
-import Play.Data.Type as Type exposing (Type, WordType)
-import Play.Data.TypeSignature as TypeSignature
-import Play.Parser as Parser
-import Play.Qualifier.Problem exposing (Problem(..))
 import Result.Extra as Result
 import Set exposing (Set)
+import Stabel.Data.Builtin as Builtin exposing (Builtin)
+import Stabel.Data.Metadata as Metadata exposing (Metadata)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Data.TypeSignature as TypeSignature
+import Stabel.Parser as Parser
+import Stabel.Qualifier.Problem exposing (Problem(..))
 
 
 type alias AST =
@@ -125,7 +125,7 @@ moduleDefinition : ModuleDefinitionConfig a -> Parser.ModuleDefinitionRec
 moduleDefinition config =
     let
         defaultImports =
-            if Dict.get "/core" config.externalModules == Just "play/standard_library" then
+            if Dict.get "/core" config.externalModules == Just "stabel/standard_library" then
                 Dict.fromList [ ( "/core", [] ) ]
 
             else

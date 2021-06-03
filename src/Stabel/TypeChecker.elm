@@ -1,16 +1,16 @@
-module Play.TypeChecker exposing (..)
+module Stabel.TypeChecker exposing (..)
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import List.Extra as List
-import Play.Data.Builtin as Builtin exposing (Builtin)
-import Play.Data.Metadata exposing (Metadata)
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
-import Play.Data.Type as Type exposing (Type, WordType)
-import Play.Data.TypeSignature as TypeSignature exposing (TypeSignature)
-import Play.Qualifier as Qualifier
-import Play.TypeChecker.Problem exposing (Problem(..))
 import Set exposing (Set)
+import Stabel.Data.Builtin as Builtin exposing (Builtin)
+import Stabel.Data.Metadata exposing (Metadata)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Data.TypeSignature as TypeSignature exposing (TypeSignature)
+import Stabel.Qualifier as Qualifier
+import Stabel.TypeChecker.Problem exposing (Problem(..))
 
 
 type alias AST =

@@ -1,7 +1,7 @@
 module Test.Data.PackagePath exposing (suite)
 
 import Expect
-import Play.Data.PackagePath as PackagePath
+import Stabel.Data.PackagePath as PackagePath
 import Test exposing (Test, describe, test)
 
 

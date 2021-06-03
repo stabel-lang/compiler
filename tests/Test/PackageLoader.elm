@@ -4,12 +4,12 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import List.Extra as List
-import Play.Data.Builtin as Builtin
-import Play.Data.Metadata as Metadata
-import Play.Data.PackagePath as PackagePath
-import Play.Data.SourceLocation exposing (emptyRange)
-import Play.PackageLoader as PackageLoader
-import Play.Qualifier as Qualifier
+import Stabel.Data.Builtin as Builtin
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.PackagePath as PackagePath
+import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.PackageLoader as PackageLoader
+import Stabel.Qualifier as Qualifier
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as Util
 
@@ -27,22 +27,22 @@ suite =
         [ test "Passes the load package metadata step" <|
             \_ ->
                 PackageLoader.init initOpts
-                    |> Expect.equal (PackageLoader.Initializing initOpts <| PackageLoader.ReadFile "/project" "play.json")
+                    |> Expect.equal (PackageLoader.Initializing initOpts <| PackageLoader.ReadFile "/project" "stabel.json")
         , test "Retrieves necessary files" <|
             \_ ->
                 PackageLoader.init initOpts
                     |> expectSideEffects testFiles
-                        [ PackageLoader.ReadFile "/project" "play.json"
-                        , PackageLoader.ReadFile "/project/lib/template_strings" "play.json"
+                        [ PackageLoader.ReadFile "/project" "stabel.json"
+                        , PackageLoader.ReadFile "/project/lib/template_strings" "stabel.json"
                         , PackageLoader.ResolveDirectories "/project/lib/template_strings/lib"
-                        , PackageLoader.ReadFile "/project/lib/template_strings/lib/version" "play.json"
-                        , PackageLoader.ReadFile "/project/lib/unused" "play.json"
-                        , PackageLoader.ReadFile "/project/lib/version" "play.json"
+                        , PackageLoader.ReadFile "/project/lib/template_strings/lib/version" "stabel.json"
+                        , PackageLoader.ReadFile "/project/lib/unused" "stabel.json"
+                        , PackageLoader.ReadFile "/project/lib/version" "stabel.json"
                         , PackageLoader.ResolvePackageModules "robheghan/fnv" "/project"
                         , PackageLoader.ResolvePackageModules "jarvis/template_strings" "/project/lib/template_strings"
-                        , PackageLoader.ResolvePackageModules "play/version" "/project/lib/template_strings/lib/version"
-                        , PackageLoader.ReadFile "/project/src" "mod1.play"
-                        , PackageLoader.ReadFile "/project/lib/template_strings/lib/version/src/version" "data.play"
+                        , PackageLoader.ResolvePackageModules "stabel/version" "/project/lib/template_strings/lib/version"
+                        , PackageLoader.ReadFile "/project/src" "mod1.stbl"
+                        , PackageLoader.ReadFile "/project/lib/template_strings/lib/version/src/version" "data.stbl"
                         ]
         , test "Compiles project with external dependencies to qualified AST" <|
             \_ ->
@@ -66,12 +66,12 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/play/version/version/data/number"
+                                                [ Qualifier.Word emptyRange "/stabel/version/version/data/number"
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "/play/version/version/data/number"
+                                    , { name = "/stabel/version/version/data/number"
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
@@ -131,7 +131,7 @@ suite =
                     loaderResult =
                         PackageLoader.init
                             { projectDirPath = "/project"
-                            , possibleEntryPoint = Just "/play/version/version/data/number"
+                            , possibleEntryPoint = Just "/stabel/version/version/data/number"
                             , stdLibPath = initOpts.stdLibPath
                             }
                             |> resolveSideEffects testFiles []
@@ -151,12 +151,12 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/play/version/version/data/number"
+                                                [ Qualifier.Word emptyRange "/stabel/version/version/data/number"
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "/play/version/version/data/number"
+                                    , { name = "/stabel/version/version/data/number"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.asEntryPoint
@@ -224,7 +224,7 @@ resolveSideEffects fileSystem seenSfs model =
                         childPaths =
                             Dict.keys fileSystem
                                 |> List.filter (childPackage dir)
-                                |> List.map (String.replace "/play.json" "")
+                                |> List.map (String.replace "/stabel.json" "")
                                 |> List.map PackagePath.Directory
                     in
                     resolveSideEffects
@@ -270,7 +270,7 @@ childPackage targetDir path =
                     |> String.split "/"
         in
         case pathParts of
-            [ _, "play.json" ] ->
+            [ _, "stabel.json" ] ->
                 True
 
             _ ->
@@ -280,7 +280,7 @@ childPackage targetDir path =
 stdLibFiles : Dict String String
 stdLibFiles =
     Dict.fromList
-        [ ( "/project/lib/unused/play.json"
+        [ ( "/project/lib/unused/stabel.json"
           , """
             {
                 "name": "some/useless",
@@ -296,7 +296,7 @@ stdLibFiles =
             }
           """
           )
-        , ( "/project/lib/unused/src/useless/mod.play"
+        , ( "/project/lib/unused/src/useless/mod.stbl"
           , """
             def: square
             : dup *
@@ -308,7 +308,7 @@ stdLibFiles =
 testFiles : Dict String String
 testFiles =
     Dict.fromList
-        [ ( "/project/play.json"
+        [ ( "/project/stabel.json"
           , """
             {
                 "name": "robheghan/fnv",
@@ -319,7 +319,7 @@ testFiles =
                 ],
                 "dependencies": {
                     "jarvis/template_strings": "1.2.0",
-                    "play/version": "1.0.0"
+                    "stabel/version": "1.0.0"
                 },
                 "package-paths": [
                     "lib/template_strings",
@@ -328,13 +328,13 @@ testFiles =
             }
             """
           )
-        , ( "/project/src/mod1.play"
+        , ( "/project/src/mod1.stbl"
           , """
             def: next-version
             : /version/data/number 1 +
             """
           )
-        , ( "/project/lib/template_strings/play.json"
+        , ( "/project/lib/template_strings/stabel.json"
           , """
             {
                 "name": "jarvis/template_strings",
@@ -344,7 +344,7 @@ testFiles =
                     "template_strings/mod"
                 ],
                 "dependencies": {
-                    "play/version": "1.1.0"
+                    "stabel/version": "1.1.0"
                 },
                 "package-paths": [
                     "lib/*"
@@ -352,16 +352,16 @@ testFiles =
             }
           """
           )
-        , ( "/project/lib/template_strings/src/template_strings/mod.play"
+        , ( "/project/lib/template_strings/src/template_strings/mod.stbl"
           , """
             def: dec
             : 1 =
             """
           )
-        , ( "/project/lib/version/play.json"
+        , ( "/project/lib/version/stabel.json"
           , """
             {
-                "name": "play/version",
+                "name": "stabel/version",
                 "version": "1.0.0",
                 "language-version": "0.2.0",
                 "exposed-modules": [
@@ -374,16 +374,16 @@ testFiles =
             }
           """
           )
-        , ( "/project/lib/version/src/version/data.play"
+        , ( "/project/lib/version/src/version/data.stbl"
           , """
             def: number
             : 1
             """
           )
-        , ( "/project/lib/template_strings/lib/version/play.json"
+        , ( "/project/lib/template_strings/lib/version/stabel.json"
           , """
             {
-                "name": "play/version",
+                "name": "stabel/version",
                 "version": "1.2.0",
                 "language-version": "0.2.0",
                 "exposed-modules": [
@@ -396,7 +396,7 @@ testFiles =
             }
           """
           )
-        , ( "/project/lib/template_strings/lib/version/src/version/data.play"
+        , ( "/project/lib/template_strings/lib/version/src/version/data.stbl"
           , """
             def: number
             : 2
@@ -409,7 +409,7 @@ testFiles =
 testFilesInternalConsistency : Dict String String
 testFilesInternalConsistency =
     Dict.fromList
-        [ ( "/project/play.json"
+        [ ( "/project/stabel.json"
           , """
             {
                 "name": "robheghan/dummy",
@@ -425,19 +425,19 @@ testFilesInternalConsistency =
             }
             """
           )
-        , ( "/project/src/mod1.play"
+        , ( "/project/src/mod1.stbl"
           , """
             def: bump-version
             : 1 +
             """
           )
-        , ( "/project/src/mod2.play"
+        , ( "/project/src/mod2.stbl"
           , """
             def: version
             : 5
             """
           )
-        , ( "/project/src/mod3.play"
+        , ( "/project/src/mod3.stbl"
           , """
             def: next-version
             : mod2/version mod1/bump-version

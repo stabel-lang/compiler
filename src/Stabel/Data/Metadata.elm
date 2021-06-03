@@ -1,9 +1,9 @@
-module Play.Data.Metadata exposing (..)
+module Stabel.Data.Metadata exposing (..)
 
 import Dict exposing (Dict)
-import Play.Data.SourceLocation exposing (SourceLocationRange)
-import Play.Data.Type exposing (Type)
-import Play.Data.TypeSignature exposing (TypeSignature(..))
+import Stabel.Data.SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.Type exposing (Type)
+import Stabel.Data.TypeSignature exposing (TypeSignature(..))
 
 
 type alias Metadata =

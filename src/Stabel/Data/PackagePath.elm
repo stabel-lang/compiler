@@ -1,4 +1,4 @@
-module Play.Data.PackagePath exposing
+module Stabel.Data.PackagePath exposing
     ( PackagePath(..)
     , fromString
     , prefix

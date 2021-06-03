@@ -1,4 +1,4 @@
-module Play.Codegen.BaseModule exposing (..)
+module Stabel.Codegen.BaseModule exposing (..)
 
 import Wasm
 

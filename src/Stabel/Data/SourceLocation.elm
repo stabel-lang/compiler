@@ -1,4 +1,4 @@
-module Play.Data.SourceLocation exposing (..)
+module Stabel.Data.SourceLocation exposing (..)
 
 
 type alias SourceLocationRange =

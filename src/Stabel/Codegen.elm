@@ -1,11 +1,11 @@
-module Play.Codegen exposing (..)
+module Stabel.Codegen exposing (..)
 
 import Dict exposing (Dict)
 import List.Extra as List
-import Play.Codegen.BaseModule as BaseModule
-import Play.Data.Builtin as Builtin exposing (Builtin)
-import Play.Data.Type as Type exposing (Type, WordType)
-import Play.TypeChecker as AST exposing (AST)
+import Stabel.Codegen.BaseModule as BaseModule
+import Stabel.Data.Builtin as Builtin exposing (Builtin)
+import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.TypeChecker as AST exposing (AST)
 import Wasm
 
 

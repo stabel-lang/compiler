@@ -1,11 +1,11 @@
-module Play.Data.ModuleName exposing
+module Stabel.Data.ModuleName exposing
     ( ModuleName
     , fromString
     , toPartStrings
     , toString
     )
 
-import Play.Data.PackageName as PackageName
+import Stabel.Data.PackageName as PackageName
 
 
 type ModuleName

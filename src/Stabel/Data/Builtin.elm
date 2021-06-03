@@ -1,6 +1,6 @@
-module Play.Data.Builtin exposing (..)
+module Stabel.Data.Builtin exposing (..)
 
-import Play.Data.Type as Type exposing (WordType)
+import Stabel.Data.Type as Type exposing (WordType)
 
 
 type Builtin
