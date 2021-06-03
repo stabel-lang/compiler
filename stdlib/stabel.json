@@ -1,5 +1,5 @@
 {
-    "name": "play/standard_library",
+    "name": "stabel/standard_library",
     "version": "0.2.0",
     "language-version": "0.2.0",
     "exposed-modules": [
