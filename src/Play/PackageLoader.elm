@@ -161,7 +161,7 @@ getSideEffect model =
 init : InitOptions -> Model
 init initOptions =
     Initializing initOptions <|
-        ReadFile initOptions.projectDirPath "play.json"
+        ReadFile initOptions.projectDirPath "stabel.json"
 
 
 update : Msg -> Model -> Model
@@ -196,7 +196,7 @@ update msg model =
 
                                 (PackagePath.Directory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
-                                        ReadFile nextPathDir "play.json"
+                                        ReadFile nextPathDir "stabel.json"
 
                                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
                                     LoadingMetadata state pathsToLoad <|
@@ -239,7 +239,7 @@ loadingMetadataUpdate msg state remainingPaths =
 
                 (PackagePath.Directory nextPathDir) :: _ ->
                     LoadingMetadata nextState pathsToLoad <|
-                        ReadFile nextPathDir "play.json"
+                        ReadFile nextPathDir "stabel.json"
 
                 (PackagePath.AllDirectoriesInDirectory nextPathDir) :: _ ->
                     LoadingMetadata nextState pathsToLoad <|
@@ -329,7 +329,7 @@ resolvingModulePathsUpdate msg state remainingPackages =
                     state.rootPackage
 
                 moduleNameResults =
-                    List.map (String.replace ".play" "") modules
+                    List.map (String.replace ".stbl" "") modules
                         |> List.map ModuleName.fromString
                         |> Result.combine
 
@@ -419,7 +419,7 @@ readModuleFromDisk packagePath moduleName =
                     ( reversePath
                         |> List.reverse
                         |> String.join "/"
-                    , name ++ ".play"
+                    , name ++ ".stbl"
                     )
 
                 _ ->
