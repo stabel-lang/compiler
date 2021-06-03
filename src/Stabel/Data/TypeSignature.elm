@@ -1,6 +1,6 @@
-module Play.Data.TypeSignature exposing (..)
+module Stabel.Data.TypeSignature exposing (..)
 
-import Play.Data.Type exposing (WordType)
+import Stabel.Data.Type exposing (WordType)
 
 
 type TypeSignature

@@ -1,14 +1,14 @@
-module Play.Data.PackageMetadata exposing
+module Stabel.Data.PackageMetadata exposing
     ( PackageMetadata
     , decoder
     )
 
 import Dict exposing (Dict)
 import Json.Decode as Json
-import Play.Data.ModuleName as ModuleName exposing (ModuleName)
-import Play.Data.PackageName as PackageName exposing (PackageName)
-import Play.Data.PackagePath as PackagePath exposing (PackagePath)
-import Play.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
+import Stabel.Data.ModuleName as ModuleName exposing (ModuleName)
+import Stabel.Data.PackageName as PackageName exposing (PackageName)
+import Stabel.Data.PackagePath as PackagePath exposing (PackagePath)
+import Stabel.Data.SemanticVersion as SemanticVersion exposing (SemanticVersion)
 
 
 type alias PackageMetadata =

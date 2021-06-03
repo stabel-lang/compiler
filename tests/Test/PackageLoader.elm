@@ -4,12 +4,12 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import List.Extra as List
-import Play.Data.Builtin as Builtin
-import Play.Data.Metadata as Metadata
-import Play.Data.PackagePath as PackagePath
-import Play.Data.SourceLocation exposing (emptyRange)
-import Play.PackageLoader as PackageLoader
-import Play.Qualifier as Qualifier
+import Stabel.Data.Builtin as Builtin
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.PackagePath as PackagePath
+import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.PackageLoader as PackageLoader
+import Stabel.Qualifier as Qualifier
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as Util
 

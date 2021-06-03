@@ -1,9 +1,9 @@
-module Play.Qualifier.Problem exposing
+module Stabel.Qualifier.Problem exposing
     ( Problem(..)
     , toString
     )
 
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type Problem

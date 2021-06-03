@@ -1,4 +1,4 @@
-module Play.Data.Type exposing
+module Stabel.Data.Type exposing
     ( Type(..)
     , WordType
     , compatibleWords

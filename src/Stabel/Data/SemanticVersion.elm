@@ -1,4 +1,4 @@
-module Play.Data.SemanticVersion exposing
+module Stabel.Data.SemanticVersion exposing
     ( Compatibility(..)
     , ParseError(..)
     , SemanticVersion

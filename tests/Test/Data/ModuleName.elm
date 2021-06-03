@@ -2,8 +2,8 @@ module Test.Data.ModuleName exposing (suite)
 
 import Expect
 import Fuzz
-import Play.Data.ModuleName as ModuleName
-import Play.Data.PackageName as PackageName
+import Stabel.Data.ModuleName as ModuleName
+import Stabel.Data.PackageName as PackageName
 import Test exposing (Test, describe, fuzz, test)
 
 

@@ -1,11 +1,11 @@
-module Play.TypeChecker.Problem exposing
+module Stabel.TypeChecker.Problem exposing
     ( Problem(..)
     , toString
     )
 
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
-import Play.Data.Type as Type exposing (Type, WordType)
 import Set exposing (Set)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.Type as Type exposing (Type, WordType)
 
 
 type Problem

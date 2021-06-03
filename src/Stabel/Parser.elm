@@ -1,4 +1,4 @@
-module Play.Parser exposing
+module Stabel.Parser exposing
     ( AST
     , AstNode(..)
     , ModuleDefinition(..)
@@ -19,9 +19,9 @@ module Play.Parser exposing
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
-import Play.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
-import Play.Parser.Problem exposing (..)
 import Set exposing (Set)
+import Stabel.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
+import Stabel.Parser.Problem exposing (..)
 
 
 type alias Parser a =

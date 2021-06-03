@@ -1,4 +1,4 @@
-module Test.PlayExpect exposing
+module Test.StabelExpect exposing
     ( allEqual
     , allErr
     , allOk

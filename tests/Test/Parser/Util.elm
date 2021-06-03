@@ -8,11 +8,11 @@ module Test.Parser.Util exposing
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Play.Data.Metadata as Metadata
-import Play.Data.SourceLocation exposing (emptyRange)
-import Play.Data.Type as Type exposing (Type)
-import Play.Parser as AST exposing (..)
-import Play.Parser.Problem exposing (Problem)
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.Data.Type as Type exposing (Type)
+import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.Problem exposing (Problem)
 import String.Extra as String
 
 

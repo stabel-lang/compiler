@@ -1,9 +1,9 @@
-module Play.Parser.Problem exposing
+module Stabel.Parser.Problem exposing
     ( Problem(..)
     , toString
     )
 
-import Play.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type Problem

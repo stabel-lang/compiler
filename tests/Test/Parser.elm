@@ -3,14 +3,14 @@ module Test.Parser exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Play.Data.SourceLocation
+import Set
+import Stabel.Data.SourceLocation
     exposing
         ( SourceLocation
         , SourceLocationRange
         , emptyRange
         )
-import Play.Parser as AST exposing (..)
-import Set
+import Stabel.Parser as AST exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util
     exposing

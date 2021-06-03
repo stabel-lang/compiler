@@ -2,14 +2,14 @@ port module TestCompiler exposing (main)
 
 import Dict
 import Platform exposing (Program)
-import Play.Codegen as Codegen
-import Play.Data.Metadata as Metadata
-import Play.Parser as Parser
-import Play.Parser.Problem as ParserProblem
-import Play.Qualifier as Qualifier
-import Play.Qualifier.Problem as QualifierProblem
-import Play.TypeChecker as TypeChecker
-import Play.TypeChecker.Problem as TypeCheckerProblem
+import Stabel.Codegen as Codegen
+import Stabel.Data.Metadata as Metadata
+import Stabel.Parser as Parser
+import Stabel.Parser.Problem as ParserProblem
+import Stabel.Qualifier as Qualifier
+import Stabel.Qualifier.Problem as QualifierProblem
+import Stabel.TypeChecker as TypeChecker
+import Stabel.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
 
 

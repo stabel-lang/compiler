@@ -3,11 +3,11 @@ port module CLI exposing (main)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Platform exposing (Program)
-import Play.Codegen as Codegen
-import Play.Data.PackagePath as PackagePath
-import Play.PackageLoader as PackageLoader
-import Play.TypeChecker as TypeChecker
-import Play.TypeChecker.Problem as TypeCheckerProblem
+import Stabel.Codegen as Codegen
+import Stabel.Data.PackagePath as PackagePath
+import Stabel.PackageLoader as PackageLoader
+import Stabel.TypeChecker as TypeChecker
+import Stabel.TypeChecker.Problem as TypeCheckerProblem
 import Wasm
 
 

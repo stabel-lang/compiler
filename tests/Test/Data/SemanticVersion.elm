@@ -1,9 +1,9 @@
 module Test.Data.SemanticVersion exposing (suite)
 
 import Expect
-import Play.Data.SemanticVersion as SemanticVersion
+import Stabel.Data.SemanticVersion as SemanticVersion
 import Test exposing (Test, describe, test)
-import Test.PlayExpect as PlayExpect
+import Test.StabelExpect as StabelExpect
 
 
 suite : Test
@@ -11,7 +11,7 @@ suite =
     describe "SemanticVersion"
         [ test "Valid versions" <|
             \_ ->
-                PlayExpect.allOk SemanticVersion.fromString
+                StabelExpect.allOk SemanticVersion.fromString
                     [ "1.2.3"
                     , "10.100.1000"
                     , "0.0.1"
@@ -23,7 +23,7 @@ suite =
                     |> Expect.equal (Err <| SemanticVersion.InvalidFormat "1.2.3.4")
         , test "Cannot contain less than three parts" <|
             \_ ->
-                PlayExpect.allEqual SemanticVersion.fromString
+                StabelExpect.allEqual SemanticVersion.fromString
                     [ ( "1", Err <| SemanticVersion.InvalidFormat "1" )
                     , ( "1.2", Err <| SemanticVersion.InvalidFormat "1.2" )
                     ]
@@ -33,7 +33,7 @@ suite =
                     |> Expect.equal (Err <| SemanticVersion.InvalidFormat "")
         , test "Must be numbers" <|
             \_ ->
-                PlayExpect.allEqual SemanticVersion.fromString
+                StabelExpect.allEqual SemanticVersion.fromString
                     [ ( "A", Err <| SemanticVersion.InvalidFormat "A" )
                     , ( "*", Err <| SemanticVersion.InvalidFormat "*" )
                     , ( "~", Err <| SemanticVersion.InvalidFormat "~" )
@@ -49,7 +49,7 @@ suite =
                     |> Expect.equal (Err <| SemanticVersion.LessThanMinimumVersion "0.0.0")
         , test "Cannot contain negative versions" <|
             \_ ->
-                PlayExpect.allEqual SemanticVersion.fromString
+                StabelExpect.allEqual SemanticVersion.fromString
                     [ ( "-1.0.0", Err <| SemanticVersion.NegativeVersions "-1.0.0" )
                     , ( "1.-2.0", Err <| SemanticVersion.NegativeVersions "1.-2.0" )
                     , ( "1.2.-3", Err <| SemanticVersion.NegativeVersions "1.2.-3" )
@@ -61,7 +61,7 @@ suite =
             in
             [ test "Same version, or greater version, returns GreaterThanOrEqual" <|
                 \_ ->
-                    PlayExpect.allEqual helper
+                    StabelExpect.allEqual helper
                         [ ( ( "1.0.0", "1.0.0" ), Ok SemanticVersion.GreaterThanOrEqual )
                         , ( ( "0.2.1", "0.2.1" ), Ok SemanticVersion.GreaterThanOrEqual )
                         , ( ( "2.0.8", "2.0.8" ), Ok SemanticVersion.GreaterThanOrEqual )
@@ -71,7 +71,7 @@ suite =
                         ]
             , test "Lesser version returns LessThan" <|
                 \_ ->
-                    PlayExpect.allEqual helper
+                    StabelExpect.allEqual helper
                         [ ( ( "0.2.1", "0.2.0" ), Ok SemanticVersion.LessThan )
                         , ( ( "1.1.0", "1.0.5" ), Ok SemanticVersion.LessThan )
                         , ( ( "2.1.3", "2.1.1" ), Ok SemanticVersion.LessThan )
@@ -79,7 +79,7 @@ suite =
                         ]
             , test "Incompatible versions" <|
                 \_ ->
-                    PlayExpect.allEqual helper
+                    StabelExpect.allEqual helper
                         [ ( ( "0.2.1", "0.3.0" ), Ok SemanticVersion.Incompatible )
                         , ( ( "1.0.0", "2.0.0" ), Ok SemanticVersion.Incompatible )
                         , ( ( "1.2.0", "2.2.0" ), Ok SemanticVersion.Incompatible )

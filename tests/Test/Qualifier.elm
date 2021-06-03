@@ -3,14 +3,14 @@ module Test.Qualifier exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Play.Data.Builtin as Builtin
-import Play.Data.Metadata as Metadata
-import Play.Data.SourceLocation exposing (emptyRange)
-import Play.Data.Type as Type
-import Play.Parser as AST
-import Play.Qualifier exposing (..)
-import Play.Qualifier.Problem as Problem
 import Set
+import Stabel.Data.Builtin as Builtin
+import Stabel.Data.Metadata as Metadata
+import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.Data.Type as Type
+import Stabel.Parser as AST
+import Stabel.Qualifier exposing (..)
+import Stabel.Qualifier.Problem as Problem
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
