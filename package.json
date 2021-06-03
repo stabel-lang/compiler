@@ -1,7 +1,7 @@
 {
-  "name": "play",
-  "version": "0.0.1",
-  "description": "",
+  "name": "stabel",
+  "version": "0.2.0",
+  "description": "A pure concatinative programming language, that targets web assembly",
   "author": "Robin Heggelund Hansen",
   "license": "MIT",
   "dependencies": {},
@@ -21,6 +21,6 @@
     "build": "elm make src/CLI.elm --output bin/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" bin/compiler.js"
   },
   "bin": {
-    "play": "bin/cli.js"
+    "stabel": "bin/cli.js"
   }
 }
