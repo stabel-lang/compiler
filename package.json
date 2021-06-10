@@ -1,9 +1,16 @@
 {
   "name": "stabel",
-  "version": "0.2.0",
-  "description": "A pure concatinative programming language, that targets web assembly",
+  "version": "0.2.0-alpha",
+  "description": "A pure concatinative programming language that targets web assembly",
   "author": "Robin Heggelund Hansen",
   "license": "MIT",
+  "repository": {
+    "type": "fossil",
+    "url": "https://fossils.stabel-lang.org/compiler"
+  },
+  "engines": {
+    "node": ">= 14.0.0"
+  },
   "dependencies": {},
   "devDependencies": {
     "elm": "^0.19.1-5",
