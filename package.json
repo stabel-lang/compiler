@@ -4,6 +4,7 @@
   "description": "A pure concatinative programming language that targets web assembly",
   "author": "Robin Heggelund Hansen",
   "license": "MIT",
+  "homepage": "https://stabel-lang.org",
   "repository": {
     "type": "fossil",
     "url": "https://fossils.stabel-lang.org/compiler"
@@ -11,21 +12,24 @@
   "engines": {
     "node": ">= 14.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "wabt": "^1.0.23"
+  },
   "devDependencies": {
     "elm": "^0.19.1-5",
     "elm-format": "^0.8.5",
     "elm-test": "^0.19.1-revision7",
     "jest": "^27.0.0",
     "strip-indent": "^3.0.0",
-    "wabt": "^1.0.23"
+    "terser": "^5.7.0"
   },
   "scripts": {
     "test": "npm run test:elm && npm run test:wasm",
     "test:elm": "elm-test",
     "test:elm:watch": "elm-test --watch",
     "test:wasm": "elm make src/TestCompiler.elm --output wasm_tests/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" wasm_tests/compiler.js && jest",
-    "build": "elm make src/CLI.elm --output bin/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" bin/compiler.js"
+    "build": "elm make src/CLI.elm --output bin/compiler.js && sed -i '' \"s/console.warn\\(.*\\);/\\/*&*\\//g\" bin/compiler.js",
+    "prepublishOnly": "npm run build && terser bin/compiler.js -c -m -o bin/compiler.js"
   },
   "bin": {
     "stabel": "bin/cli.js"
