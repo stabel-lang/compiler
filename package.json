@@ -1,5 +1,5 @@
 {
-  "name": "stabel",
+  "name": "stabel-lang",
   "version": "0.2.0-alpha",
   "description": "A pure concatinative programming language that targets web assembly",
   "author": "Robin Heggelund Hansen",
