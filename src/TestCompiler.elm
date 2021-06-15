@@ -88,7 +88,7 @@ compile entry sourceCode =
 
                         Ok typedAst ->
                             Codegen.codegen typedAst
-                                |> Result.mapError Debug.toString
+                                |> Result.mapError (always "Codegen failed for unknown reason :(")
 
 
 formatErrors : (a -> String) -> List a -> Result String b
