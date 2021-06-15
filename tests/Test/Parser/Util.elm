@@ -2,15 +2,14 @@ module Test.Parser.Util exposing
     ( addFunctionsForStructs
     , compile
     , compileRetainLocations
+    , expectAst
     , expectCompiles
     )
 
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Parser as AST exposing (..)
 import Stabel.Parser.Problem exposing (Problem)
 import String.Extra as String
@@ -194,8 +193,18 @@ addFunctionsForStructsHelper name generics members ast =
 expectCompiles : String -> Expect.Expectation
 expectCompiles code =
     case compile code of
-        Err _ ->
-            Expect.fail "Did not expect compilation to fail."
+        Err err ->
+            Expect.fail <| "Did not expect compilation to fail: " ++ Debug.toString err
 
         Ok _ ->
             Expect.pass
+
+
+expectAst : String -> AST -> Expect.Expectation
+expectAst code expectedAst =
+    case compile code of
+        Err err ->
+            Expect.fail <| "Did not expect compilation to fail: " ++ Debug.toString err
+
+        Ok actualAst ->
+            Expect.equal expectedAst actualAst

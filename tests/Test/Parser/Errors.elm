@@ -1,4 +1,4 @@
-module Test.Parser.Error exposing (..)
+module Test.Parser.Errors exposing (..)
 
 import Expect exposing (Expectation)
 import Stabel.Parser exposing (..)
@@ -9,7 +9,7 @@ import Test.Parser.Util exposing (compile)
 
 suite : Test
 suite =
-    describe "Parser errors"
+    describe "Parser -- Errors"
         [ describe "Double definitions" <|
             let
                 wordAlreadyDefined name problem =

@@ -3,7 +3,6 @@ module Test.Parser exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
-import Set
 import Stabel.Data.SourceLocation
     exposing
         ( SourceLocation
@@ -15,8 +14,8 @@ import Test exposing (Test, describe, test)
 import Test.Parser.Util
     exposing
         ( addFunctionsForStructs
-        , compile
         , compileRetainLocations
+        , expectAst
         , expectCompiles
         )
 
@@ -89,12 +88,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , test "Multi args and type signature" <|
             \_ ->
                 let
@@ -128,12 +122,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , test ", is a valid fn name" <|
             \_ ->
                 let
@@ -185,12 +174,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , describe "Custom data structures"
             [ test "Without members" <|
                 \_ ->
@@ -230,12 +214,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "With members" <|
                 \_ ->
                     let
@@ -281,12 +260,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Generic members" <|
                 \_ ->
                     let
@@ -347,12 +321,7 @@ suite =
                                     ]
                             }
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             ]
         , test "Parser understands generic types" <|
             \_ ->
@@ -387,12 +356,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , describe "Unions and multifunctions"
             [ test "Non-generic" <|
                 \_ ->
@@ -448,12 +412,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Generic" <|
                 \_ ->
                     let
@@ -506,12 +465,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Generic with generic members" <|
                 \_ ->
                     let
@@ -568,12 +522,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Generic with generic members (with type annotation)" <|
                 \_ ->
                     let
@@ -635,12 +584,7 @@ suite =
                             }
                                 |> addFunctionsForStructs
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             ]
         , test "Parser understands quotations" <|
             \_ ->
@@ -699,12 +643,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , test "Parser understands stack ranges" <|
             \_ ->
                 let
@@ -761,12 +700,7 @@ suite =
                                 ]
                         }
                 in
-                case compile source of
-                    Err _ ->
-                        Expect.fail "Did not expect parsing to fail"
-
-                    Ok ast ->
-                        Expect.equal expectedAst ast
+                expectAst source expectedAst
         , describe "Pattern matching"
             [ test "Single match" <|
                 \_ ->
@@ -804,12 +738,7 @@ suite =
                                     ]
                             }
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Recursive match" <|
                 \_ ->
                     let
@@ -852,12 +781,7 @@ suite =
                                     ]
                             }
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             , test "Multiple match" <|
                 \_ ->
                     let
@@ -894,287 +818,14 @@ suite =
                                     ]
                             }
                     in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
+                    expectAst source expectedAst
             ]
-        , describe "Modules" <|
-            [ test "Internal word reference" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: test
-                            : some/module/sample
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature = NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.PackageWord emptyRange [ "some", "module" ] "sample" ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "External word reference" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: test
-                            : /some/module/sample
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature = NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.ExternalWord emptyRange [ "some", "module" ] "sample" ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "Internal _and_ external word reference" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: test
-                            : internal/sample /some/module/sample
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature = NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.PackageWord emptyRange [ "internal" ] "sample"
-                                                , AST.ExternalWord emptyRange [ "some", "module" ] "sample"
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err _ ->
-                            Expect.fail "Did not expect parsing to fail"
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "Internal types in type signature" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: test
-                            type: internal/Tipe -- Int
-                            : drop 1
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature =
-                                            UserProvided
-                                                { input = [ InternalRef [ "internal" ] "Tipe" [] ]
-                                                , output = [ LocalRef "Int" [] ]
-                                                }
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.Word emptyRange "drop"
-                                                , AST.Integer emptyRange 1
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "External types in type signature" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: test
-                            type: /external/Tipe -- Int
-                            : drop 1
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature =
-                                            UserProvided
-                                                { input = [ ExternalRef [ "external" ] "Tipe" [] ]
-                                                , output = [ LocalRef "Int" [] ]
-                                                }
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.Word emptyRange "drop"
-                                                , AST.Integer emptyRange 1
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "External type in multifn" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            defmulti: test
-                            type: /external/Tipe -- Int
-                            : /external/Tipe( value 1 )
-                              drop 1
-                            else:
-                              drop 0
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature =
-                                            UserProvided
-                                                { input = [ ExternalRef [ "external" ] "Tipe" [] ]
-                                                , output = [ LocalRef "Int" [] ]
-                                                }
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            MultiImpl
-                                                [ ( TypeMatch emptyRange (ExternalRef [ "external" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
-                                                  , [ AST.Word emptyRange "drop"
-                                                    , AST.Integer emptyRange 1
-                                                    ]
-                                                  )
-                                                ]
-                                                [ AST.Word emptyRange "drop"
-                                                , AST.Integer emptyRange 0
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "Internal type in multifn" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            defmulti: test
-                            type: internal/Tipe -- Int
-                            : internal/Tipe( value 1 )
-                              drop 1
-                            else:
-                              drop 0
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "test"
-                                      , typeSignature =
-                                            UserProvided
-                                                { input = [ InternalRef [ "internal" ] "Tipe" [] ]
-                                                , output = [ LocalRef "Int" [] ]
-                                                }
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            MultiImpl
-                                                [ ( TypeMatch emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
-                                                  , [ AST.Word emptyRange "drop"
-                                                    , AST.Integer emptyRange 1
-                                                    ]
-                                                  )
-                                                ]
-                                                [ AST.Word emptyRange "drop"
-                                                , AST.Integer emptyRange 0
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            ]
+        , test "Definition without implementation should be legal" <|
+            \_ ->
+                expectCompiles
+                    """
+                    def: someword
+                    """
         , test "Support code comments" <|
             \_ ->
                 expectCompiles
@@ -1197,12 +848,6 @@ suite =
 
                     # And thats it!
                      # wonder what else we should do...
-                    """
-        , test "Definition without implementation should be legal" <|
-            \_ ->
-                expectCompiles
-                    """
-                    def: someword
                     """
         , test "Correct line information" <|
             \_ ->
@@ -1415,126 +1060,4 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , describe "Module definitions"
-            [ test "Imports and aliases" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            defmodule:
-                            alias: other /some/mod
-                            alias: moar local/mod
-                            import: /some/other/mod test1 word2
-                            import: internals foo
-                            import: internal/mod
-                            exposing: inc
-                            :
-
-                            defstruct: Pair a b
-                            : first a
-                            : second b
-
-                            def: inc
-                            : 1 +
-                            """
-
-                        expectedAst =
-                            { moduleDefinition =
-                                Defined
-                                    { aliases =
-                                        Dict.fromList
-                                            [ ( "other", "/some/mod" )
-                                            , ( "moar", "local/mod" )
-                                            ]
-                                    , imports =
-                                        Dict.fromList
-                                            [ ( "/some/other/mod", [ "test1", "word2" ] )
-                                            , ( "internals", [ "foo" ] )
-                                            , ( "internal/mod", [] )
-                                            ]
-                                    , exposes = Set.fromList [ "inc" ]
-                                    }
-                            , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef
-                                        emptyRange
-                                        "Pair"
-                                        [ "a", "b" ]
-                                        [ ( "first", Generic "a" )
-                                        , ( "second", Generic "b" )
-                                        ]
-                                    ]
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "inc"
-                                      , typeSignature = NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
-                                                ]
-                                      }
-                                    ]
-                            }
-                                |> addFunctionsForStructs
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            , test "Functions can have its own aliases and imports" <|
-                \_ ->
-                    let
-                        source =
-                            """
-                            def: inc
-                            alias: other /some/mod
-                            alias: moar local/mod
-                            import: /some/other/mod test1 word2
-                            import: internals foo
-                            import: internal/mod
-                            : 1 +
-                            """
-
-                        expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
-                            , types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "inc"
-                                      , typeSignature = NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases =
-                                            Dict.fromList
-                                                [ ( "other", "/some/mod" )
-                                                , ( "moar", "local/mod" )
-                                                ]
-                                      , imports =
-                                            Dict.fromList
-                                                [ ( "/some/other/mod", [ "test1", "word2" ] )
-                                                , ( "internals", [ "foo" ] )
-                                                , ( "internal/mod", [] )
-                                                ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
-                                                ]
-                                      }
-                                    ]
-                            }
-                                |> addFunctionsForStructs
-                    in
-                    case compile source of
-                        Err err ->
-                            Expect.fail <| "Did not expect parsing to fail: " ++ Debug.toString err
-
-                        Ok ast ->
-                            Expect.equal expectedAst ast
-            ]
         ]
