@@ -13,8 +13,13 @@ suite =
         [ fuzz Fuzz.string "Valid 2-part module names are also valid package names" <|
             \name ->
                 let
+                    goodName =
+                        String.split "/" name
+                            |> List.head
+                            |> Maybe.withDefault "good"
+
                     combinedModuleName =
-                        String.join "/" [ name, name ]
+                        String.join "/" [ goodName, goodName ]
                 in
                 expectSameResult
                     (PackageName.fromString combinedModuleName)
