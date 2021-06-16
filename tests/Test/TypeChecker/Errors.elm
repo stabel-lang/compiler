@@ -1,4 +1,4 @@
-module Test.TypeChecker.Error exposing (..)
+module Test.TypeChecker.Errors exposing (..)
 
 import Dict
 import Dict.Extra as Dict
@@ -15,7 +15,7 @@ import Test exposing (Test, describe, test)
 
 suite : Test
 suite =
-    describe "TypeChecker errors"
+    describe "TypeChecker -- Errors"
         [ test "Undeclared generic" <|
             \_ ->
                 let

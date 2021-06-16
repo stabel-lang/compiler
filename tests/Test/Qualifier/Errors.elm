@@ -1,11 +1,9 @@
-module Test.Qualifier.Error exposing (..)
+module Test.Qualifier.Errors exposing (..)
 
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type
 import Stabel.Parser as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem exposing (Problem(..))
@@ -14,7 +12,7 @@ import Test exposing (Test, describe, test)
 
 suite : Test
 suite =
-    describe "Qualifier errors"
+    describe "Qualifier -- Errors"
         [ describe "No such reference" <|
             [ test "Word" <|
                 \_ ->
