@@ -2,16 +2,20 @@ module Test.TypeChecker exposing (..)
 
 import Dict
 import Dict.Extra as Dict
-import Expect
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Qualifier as QAST
 import Stabel.TypeChecker exposing (..)
-import Stabel.TypeChecker.Problem as Problem
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as QualifierUtil
+import Test.TypeChecker.Util
+    exposing
+        ( expectAst
+        , expectTypeCheck
+        , expectTypeCheckFailure
+        )
 
 
 suite : Test
@@ -97,12 +101,7 @@ suite =
                                 ]
                         }
                 in
-                case run input of
-                    Err _ ->
-                        Expect.fail "Did not expect typecheck to fail."
-
-                    Ok typedAst ->
-                        Expect.equal expectedResult typedAst
+                expectAst input expectedResult
         , test "Bad type annotation" <|
             \_ ->
                 let
@@ -124,12 +123,7 @@ suite =
                                 ]
                         }
                 in
-                case run input of
-                    Err _ ->
-                        Expect.pass
-
-                    Ok _ ->
-                        Expect.fail "Did not expect type check to succeed."
+                expectTypeCheckFailure input
         , test "Custom data structure without fields" <|
             \_ ->
                 let
@@ -163,12 +157,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run source of
-                    Err _ ->
-                        Expect.fail "Did not expect type check to fail"
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck source
         , test "Custom data structure with fields" <|
             \_ ->
                 let
@@ -207,12 +196,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run source of
-                    Err _ ->
-                        Expect.fail "Did not expect type check to fail"
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck source
         , test "Generic types" <|
             \_ ->
                 let
@@ -254,12 +238,7 @@ suite =
                                 ]
                         }
                 in
-                case run input of
-                    Err _ ->
-                        Expect.fail "Did not expect type check to fail."
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck input
         , test "Generic types with type annotation" <|
             \_ ->
                 let
@@ -290,12 +269,7 @@ suite =
                                 ]
                         }
                 in
-                case run input of
-                    Err _ ->
-                        Expect.fail "Did not expect type check to fail."
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck input
         , test "Generic custom type" <|
             \_ ->
                 let
@@ -329,12 +303,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run input of
-                    Err _ ->
-                        Expect.fail "Did not expect type check to fail."
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck input
         , test "Generic types with rotations and quotations" <|
             \_ ->
                 let
@@ -395,16 +364,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run input of
-                    Err err ->
-                        err
-                            |> List.map (Problem.toString "")
-                            |> String.join "\n"
-                            |> (++) "Did not expect type check to fail.\n"
-                            |> Expect.fail
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck input
         , test "Generic types with generic quotations" <|
             \_ ->
                 let
@@ -593,17 +553,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run input of
-                    Err err ->
-                        err
-                            |> Debug.log "err"
-                            |> List.map (Problem.toString "")
-                            |> String.join "\n"
-                            |> (++) "Did not expect type check to fail.\n"
-                            |> Expect.fail
-
-                    Ok _ ->
-                        Expect.pass
+                expectTypeCheck input
         , test "Generic custom type fails if not generic is listed" <|
             \_ ->
                 let
@@ -621,12 +571,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run input of
-                    Ok _ ->
-                        Expect.fail "Expected type check to fail."
-
-                    Err _ ->
-                        Expect.pass
+                expectTypeCheckFailure input
         , test "Generic custom type fails if wrong generic is listed" <|
             \_ ->
                 let
@@ -644,12 +589,7 @@ suite =
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
-                case run input of
-                    Ok _ ->
-                        Expect.fail "Expected type check to fail."
-
-                    Err _ ->
-                        Expect.pass
+                expectTypeCheckFailure input
         , describe "Unions and multifunctions" <|
             let
                 boolUnion =
@@ -714,12 +654,7 @@ suite =
                                         []
                                 }
                     in
-                    case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
-
-                        Ok _ ->
-                            Expect.pass
+                    expectTypeCheck input
             , test "With type signature" <|
                 \_ ->
                     let
@@ -745,12 +680,7 @@ suite =
                                         []
                                 }
                     in
-                    case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
-
-                        Ok _ ->
-                            Expect.pass
+                    expectTypeCheck input
             , test "With default branch" <|
                 \_ ->
                     let
@@ -773,12 +703,7 @@ suite =
                                         ]
                                 }
                     in
-                    case run input of
-                        Err err ->
-                            Expect.fail <| "Did not expect type check to fail." ++ Debug.toString err
-
-                        Ok _ ->
-                            Expect.pass
+                    expectTypeCheck input
             , test "With default branch (no type meta)" <|
                 \_ ->
                     let
@@ -799,12 +724,7 @@ suite =
                                         ]
                                 }
                     in
-                    case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
-
-                        Ok _ ->
-                            Expect.pass
+                    expectTypeCheck input
             , test "When returning union" <|
                 \_ ->
                     let
@@ -886,12 +806,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
-
-                        Ok _ ->
-                            Expect.pass
+                    expectTypeCheck input
             , test "Function requiring a concrete type should not accept an union with that type" <|
                 \_ ->
                     let
@@ -952,12 +867,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.fail "Did not expect type check to pass."
-
-                        Err _ ->
-                            Expect.pass
+                    expectTypeCheckFailure input
             , test "Generic union" <|
                 \_ ->
                     let
@@ -1032,12 +942,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err _ ->
-                            Expect.fail "Expected type check to pass."
+                    expectTypeCheck input
             , test "Union with generic branch" <|
                 \_ ->
                     let
@@ -1170,12 +1075,7 @@ suite =
                                     ]
                             }
                     in
-                    case run input of
-                        Ok typedAst ->
-                            Expect.equal expectedResult typedAst
-
-                        Err errs ->
-                            Expect.fail <| "Expected type check to pass, failed with: " ++ Debug.toString errs
+                    expectAst input expectedResult
             , test "Generic union fails if not generic is listed" <|
                 \_ ->
                     let
@@ -1200,12 +1100,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.fail "Expected type check to fail."
-
-                        Err _ ->
-                            Expect.pass
+                    expectTypeCheckFailure input
             ]
         , describe "Quotations"
             [ test "Simple example" <|
@@ -1258,12 +1153,7 @@ suite =
                                     ]
                             }
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                    expectTypeCheck input
             , test "With type annotation" <|
                 \_ ->
                     let
@@ -1323,12 +1213,7 @@ suite =
                                     ]
                             }
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                    expectTypeCheck input
             , test "Typechecking involving a multi-arity quotation is fine _if_ arity info is in type annotation" <|
                 \_ ->
                     let
@@ -1376,12 +1261,7 @@ suite =
                                     ]
                             }
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err err ->
-                            Expect.fail <| "Did not expect type check to fail:" ++ Debug.toString err
+                    expectTypeCheck input
             , test "With generics" <|
                 \_ ->
                     let
@@ -1429,12 +1309,7 @@ suite =
                                     ]
                             }
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err err ->
-                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
+                    expectTypeCheck input
             , test "Within multiwords" <|
                 \_ ->
                     let
@@ -1511,12 +1386,7 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err err ->
-                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString err
+                    expectTypeCheck input
             ]
         , describe "Recursive word definitions"
             [ test "With type annotation" <|
@@ -1606,94 +1476,82 @@ suite =
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
-                    case run input of
-                        Ok _ ->
-                            Expect.pass
-
-                        Err _ ->
-                            Expect.fail "Did not expect type check to fail."
+                    expectTypeCheck input
             ]
-        , describe "Correct node types"
-            [ test "Simple case" <|
-                \_ ->
-                    let
-                        input =
-                            { types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Integer emptyRange 2
-                                                , QAST.Word emptyRange "drop-first"
-                                                ]
-                                      }
-                                    , { name = "drop-first"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Generic "a", Type.Generic "b" ]
-                                                    [ Type.Generic "b" ]
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.Builtin emptyRange Builtin.StackDrop
-                                                ]
-                                      }
-                                    ]
-                            }
+        , test "Correct node types" <|
+            \_ ->
+                let
+                    input =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Integer emptyRange 1
+                                            , QAST.Integer emptyRange 2
+                                            , QAST.Word emptyRange "drop-first"
+                                            ]
+                                  }
+                                , { name = "drop-first"
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "b" ]
+                                  , implementation =
+                                        QAST.SoloImpl
+                                            [ QAST.Builtin emptyRange Builtin.StackSwap
+                                            , QAST.Builtin emptyRange Builtin.StackDrop
+                                            ]
+                                  }
+                                ]
+                        }
 
-                        expectedResult =
-                            { types = Dict.empty
-                            , words =
-                                Dict.fromListBy .name
-                                    [ { name = "main"
-                                      , type_ =
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
-                                      , implementation =
-                                            SoloImpl
-                                                [ IntLiteral emptyRange 1
-                                                , IntLiteral emptyRange 2
-                                                , Word emptyRange
-                                                    "drop-first"
-                                                    { input = [ Type.Int, Type.Int ]
-                                                    , output = [ Type.Int ]
-                                                    }
-                                                ]
-                                      }
-                                    , { name = "drop-first"
-                                      , type_ =
-                                            { input = [ Type.Generic "a", Type.Generic "b" ]
-                                            , output = [ Type.Generic "b" ]
-                                            }
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ Type.Generic "a", Type.Generic "b" ]
-                                                    [ Type.Generic "b" ]
-                                      , implementation =
-                                            SoloImpl
-                                                [ Builtin emptyRange Builtin.StackSwap
-                                                , Builtin emptyRange Builtin.StackDrop
-                                                ]
-                                      }
-                                    ]
-                            }
-                    in
-                    case run input of
-                        Ok result ->
-                            Expect.equal expectedResult result
-
-                        Err errs ->
-                            Expect.fail <| "Did not expect type check to fail: " ++ Debug.toString errs
-            ]
+                    expectedResult =
+                        { types = Dict.empty
+                        , words =
+                            Dict.fromListBy .name
+                                [ { name = "main"
+                                  , type_ =
+                                        { input = []
+                                        , output = [ Type.Int ]
+                                        }
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.asEntryPoint
+                                  , implementation =
+                                        SoloImpl
+                                            [ IntLiteral emptyRange 1
+                                            , IntLiteral emptyRange 2
+                                            , Word emptyRange
+                                                "drop-first"
+                                                { input = [ Type.Int, Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
+                                            ]
+                                  }
+                                , { name = "drop-first"
+                                  , type_ =
+                                        { input = [ Type.Generic "a", Type.Generic "b" ]
+                                        , output = [ Type.Generic "b" ]
+                                        }
+                                  , metadata =
+                                        Metadata.default
+                                            |> Metadata.withType
+                                                [ Type.Generic "a", Type.Generic "b" ]
+                                                [ Type.Generic "b" ]
+                                  , implementation =
+                                        SoloImpl
+                                            [ Builtin emptyRange Builtin.StackSwap
+                                            , Builtin emptyRange Builtin.StackDrop
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst input expectedResult
         ]
