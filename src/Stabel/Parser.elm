@@ -294,15 +294,31 @@ modulePathFinalizer symbols =
             ( List.reverse rest, first )
 
 
+metadataParser : Parser String
+metadataParser =
+    metadataParserHelp Set.empty
+
+
 definitionMetadataParser : Parser String
 definitionMetadataParser =
+    metadataParserHelp <| Set.fromList [ "def", "defmulti", "defstruct", "defunion" ]
+
+
+metadataParserHelp : Set String -> Parser String
+metadataParserHelp reserved =
     Parser.variable
         { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
         , inner = validSymbolChar
-        , reserved = Set.fromList [ "def", "defmulti", "defstruct", "defunion" ]
-        , expecting = NotSymbol
+        , reserved = reserved
+        , expecting = NotMetadata
         }
         |. Parser.symbol (Token ":" NotMetadata)
+
+
+textParser : Parser String
+textParser =
+    Parser.chompWhile (\c -> not <| Set.member c whitespaceChars)
+        |> Parser.getChompedString
 
 
 genericParser : Parser String
@@ -503,7 +519,8 @@ moduleDefinitionParser =
     Parser.succeed identity
         |. Parser.keyword (Token "defmodule:" NoProblem)
         |. noiseParser
-        |= Parser.map Defined (Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser)
+        |= Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser
+        |> Parser.map Defined
 
 
 moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDefinitionRec ModuleDefinitionRec)
@@ -529,7 +546,7 @@ moduleDefinitionMetaParser def =
             |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
             |. noiseParser
         , Parser.succeed UnknownMetadata
-            |= definitionMetadataParser
+            |= metadataParser
             |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done def)
             |. Parser.keyword (Token ":" NoProblem)
@@ -614,6 +631,11 @@ definitionParser ast =
             |. noiseParser
             |> Parser.andThen unionTypeDefinitionParser
             |> Parser.andThen insertType
+        , Parser.succeed (\start text end -> BadDefinition (SourceLocationRange start end) text)
+            |= sourceLocationParser
+            |= textParser
+            |= sourceLocationParser
+            |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done ast)
         ]
 

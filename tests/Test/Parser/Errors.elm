@@ -109,6 +109,27 @@ suite =
                         member: Male
                         member: Female
                         """
+            , test "module" <|
+                \_ ->
+                    checkForError (expectedError "expose") <|
+                        """
+                        defmodule:
+                        #typo
+                        expose: fn
+                        :
+
+                        def: inc
+                        : 1 +
+                        """
+            , test "module definition without colon" <|
+                \_ ->
+                    checkForError (expectedError "def") <|
+                        """
+                        defmodule:
+
+                        def: inc
+                        : 1 +
+                        """
             ]
         , test "Only compiler can create functions which names begins with an upper case letter" <|
             \_ ->
@@ -192,6 +213,60 @@ suite =
                             """
                     in
                     checkForError emptyModuleErr source
+            ]
+        , test "Module should not be named" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmodule: name
+                        :
+                        """
+                in
+                checkForError ((==) NotMetadata) source
+        , describe "Top level definitions must start with one of the pre-defined def's" <|
+            let
+                badDefinition name problem =
+                    case problem of
+                        BadDefinition _ definitionName ->
+                            name == definitionName
+
+                        _ ->
+                            False
+            in
+            [ test "No module definition" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defit: test
+                            : 1
+                            """
+                    in
+                    checkForError (badDefinition "defit:") source
+            , test "With module definition" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defmodule:
+                            exposing: test
+                            :
+
+                            that: test
+                            : 1
+                            """
+                    in
+                    checkForError (badDefinition "that:") source
+            , test "Doesn't have to be keyword" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            test
+                            """
+                    in
+                    checkForError (badDefinition "test") source
             ]
         ]
 

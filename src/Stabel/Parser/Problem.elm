@@ -25,6 +25,7 @@ type Problem
     | UnknownMetadata String
     | InvalidModulePath String
     | ModuleIsEmpty
+    | BadDefinition SourceLocationRange String
 
 
 toString : String -> Problem -> String
@@ -103,3 +104,10 @@ toString source problem =
 
         ModuleIsEmpty ->
             "A module is required to contain at least one definition."
+
+        BadDefinition sourceRange name ->
+            SourceLocation.extractFromString source sourceRange
+                ++ "\n\n"
+                ++ "'"
+                ++ name
+                ++ "' is not a valid definition. Expected either def:, defmulti:, defstruct: or defunion:"
