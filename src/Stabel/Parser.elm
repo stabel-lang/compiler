@@ -476,6 +476,13 @@ parser =
             , types = Dict.empty
             , words = Dict.empty
             }
+
+        checkIfEmpty ast =
+            if Dict.isEmpty ast.types && Dict.isEmpty ast.words then
+                Parser.problem ModuleIsEmpty
+
+            else
+                Parser.succeed ast
     in
     Parser.succeed identity
         |. noiseParser
@@ -488,6 +495,7 @@ parser =
                 |= Parser.loop emptyAst definitionParser
             ]
         |. Parser.end ExpectedEnd
+        |> Parser.andThen checkIfEmpty
 
 
 moduleDefinitionParser : Parser ModuleDefinition

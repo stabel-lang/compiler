@@ -163,6 +163,36 @@ suite =
                         : /some
                         """
             ]
+        , describe "ModuleIsEmpty" <|
+            let
+                emptyModuleErr problem =
+                    case problem of
+                        ModuleIsEmpty ->
+                            True
+
+                        _ ->
+                            False
+            in
+            [ test "Truly empty module" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            """
+                    in
+                    checkForError emptyModuleErr source
+            , test "Only module definition" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defmodule:
+                            exposing: fn1
+                            :
+                            """
+                    in
+                    checkForError emptyModuleErr source
+            ]
         ]
 
 

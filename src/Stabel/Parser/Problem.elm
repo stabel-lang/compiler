@@ -24,6 +24,7 @@ type Problem
     | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
     | UnknownMetadata String
     | InvalidModulePath String
+    | ModuleIsEmpty
 
 
 toString : String -> Problem -> String
@@ -99,3 +100,6 @@ toString source problem =
 
         InvalidModulePath path ->
             "'" ++ path ++ "' is not a valid module path. Note: Upper case characters are not allowed."
+
+        ModuleIsEmpty ->
+            "A module is required to contain at least one definition."
