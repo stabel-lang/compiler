@@ -960,7 +960,7 @@ suite =
                                               , [ Word
                                                     (SourceLocationRange
                                                         (SourceLocation 12 3 121)
-                                                        (SourceLocation 13 1 127)
+                                                        (SourceLocation 12 8 126)
                                                     )
                                                     "False"
                                                 ]
@@ -968,14 +968,14 @@ suite =
                                             , ( TypeMatch
                                                     (SourceLocationRange
                                                         (SourceLocation 13 3 129)
-                                                        (SourceLocation 14 3 135)
+                                                        (SourceLocation 13 6 132)
                                                     )
                                                     (LocalRef "Int" [])
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
                                                         (SourceLocation 14 3 135)
-                                                        (SourceLocation 16 1 141)
+                                                        (SourceLocation 14 7 139)
                                                     )
                                                     "True"
                                                 ]
@@ -998,19 +998,19 @@ suite =
                                             [ Word
                                                 (SourceLocationRange
                                                     (SourceLocation 17 3 154)
-                                                    (SourceLocation 17 5 156)
+                                                    (SourceLocation 17 4 155)
                                                 )
                                                 "-"
                                             , Word
                                                 (SourceLocationRange
                                                     (SourceLocation 17 5 156)
-                                                    (SourceLocation 17 14 165)
+                                                    (SourceLocation 17 13 164)
                                                 )
                                                 "from-int"
                                             , Word
                                                 (SourceLocationRange
                                                     (SourceLocation 17 14 165)
-                                                    (SourceLocation 19 1 170)
+                                                    (SourceLocation 17 17 168)
                                                 )
                                                 "not"
                                             ]
@@ -1030,14 +1030,14 @@ suite =
                                             [ ( TypeMatch
                                                     (SourceLocationRange
                                                         (SourceLocation 20 3 186)
-                                                        (SourceLocation 21 3 193)
+                                                        (SourceLocation 20 7 190)
                                                     )
                                                     (LocalRef "True" [])
                                                     []
                                               , [ Word
                                                     (SourceLocationRange
                                                         (SourceLocation 21 3 193)
-                                                        (SourceLocation 22 1 199)
+                                                        (SourceLocation 21 8 198)
                                                     )
                                                     "False"
                                                 ]
@@ -1046,7 +1046,7 @@ suite =
                                             [ Word
                                                 (SourceLocationRange
                                                     (SourceLocation 22 7 205)
-                                                    (SourceLocation 23 1 210)
+                                                    (SourceLocation 22 11 209)
                                                 )
                                                 "True"
                                             ]

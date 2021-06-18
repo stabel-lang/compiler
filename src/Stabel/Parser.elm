@@ -200,7 +200,6 @@ intParser =
         , reserved = Set.empty
         , expecting = NotInt
         }
-        |. noiseParser
         |> Parser.andThen helper
 
 
@@ -214,43 +213,20 @@ sourceLocationParser =
 
 symbolParser : Parser String
 symbolParser =
-    Parser.variable
-        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-        , inner = validSymbolChar
-        , reserved = Set.empty
-        , expecting = NotSymbol
-        }
-        |. Parser.oneOf
-            [ Parser.succeed identity
-                |. Parser.symbol (Token ":" NotMetadata)
-                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
-            , Parser.succeed identity
-            ]
-        |. noiseParser
-        |> Parser.backtrackable
-
-
-symbolParser2 : Parser String
-symbolParser2 =
-    Parser.variable
-        { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
-        , inner = validSymbolChar
-        , reserved = Set.empty
-        , expecting = NotSymbol
-        }
-        |. Parser.oneOf
-            [ Parser.succeed identity
-                |. Parser.symbol (Token ":" NotMetadata)
-                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
-            , Parser.succeed identity
-            ]
-        |> Parser.backtrackable
+    symbolParserHelp
+        (\c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars))
 
 
 symbolImplParser : Parser String
 symbolImplParser =
+    symbolParserHelp
+        (\c -> not (Char.isDigit c || Set.member c invalidSymbolChars))
+
+
+symbolParserHelp : (Char -> Bool) -> Parser String
+symbolParserHelp startPred =
     Parser.variable
-        { start = \c -> not (Char.isDigit c || Set.member c invalidSymbolChars)
+        { start = startPred
         , inner = validSymbolChar
         , reserved = Set.empty
         , expecting = NotSymbol
@@ -272,61 +248,6 @@ symbolImplListParser symbols =
             |. noiseParser
         , Parser.succeed (Parser.Done <| List.reverse symbols)
         ]
-
-
-symbolImplParser2 : Parser (SourceLocationRange -> AstNode)
-symbolImplParser2 =
-    let
-        externalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
-            let
-                path =
-                    firstSymbol :: partialPath
-            in
-            if checkForUpperCaseLetterInPath path then
-                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
-
-            else if modulePathResult == ( [], "" ) then
-                Parser.problem <| InvalidModulePath <| "/" ++ firstSymbol
-
-            else
-                Parser.succeed <|
-                    \loc ->
-                        ExternalWord loc path reference
-
-        internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
-            let
-                path =
-                    firstSymbol :: partialPath
-            in
-            if checkForUpperCaseLetterInPath path && partialPath /= [] then
-                Parser.problem <| InvalidModulePath <| String.join "/" path
-
-            else
-                Parser.succeed <|
-                    \loc ->
-                        if modulePathResult == ( [], "" ) then
-                            Word loc firstSymbol
-
-                        else
-                            PackageWord loc path reference
-
-        checkForUpperCaseLetterInPath path =
-            List.any (String.any Char.isUpper) path
-    in
-    Parser.oneOf
-        [ Parser.succeed externalBuilder
-            |. Parser.symbol (Token "/" NotMetadata)
-            |= symbolImplParser
-            |= Parser.loop [] modulePathParser
-        , Parser.succeed internalBuilder
-            |= symbolImplParser
-            |= Parser.oneOf
-                [ Parser.loop [] modulePathParser
-                , Parser.succeed ( [], "" )
-                ]
-        ]
-        |. noiseParser
-        |> Parser.andThen identity
 
 
 modulePathStringParser : Parser String
@@ -392,7 +313,6 @@ genericParser =
             |> Parser.andThen (\_ -> Parser.problem NotGeneric)
         , symbolParser
         ]
-        |. noiseParser
         |> Parser.backtrackable
 
 
@@ -404,7 +324,6 @@ typeNameParser =
         , reserved = Set.empty
         , expecting = NotType
         }
-        |. noiseParser
 
 
 genericOrRangeParser : Parser PossiblyQualifiedType
@@ -414,7 +333,6 @@ genericOrRangeParser =
             Parser.oneOf
                 [ Parser.succeed (StackRange value)
                     |. Parser.symbol (Token "..." NoProblem)
-                    |. noiseParser
                 , Parser.succeed (Generic value)
                     |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
                 ]
@@ -439,7 +357,6 @@ typeSignatureRefParser =
             |. noiseParser
             |= typeRefParser
             |. Parser.symbol (Token ")" ExpectedRightParen)
-            |. noiseParser
         ]
 
 
@@ -448,16 +365,20 @@ typeRefParser =
     Parser.oneOf
         [ Parser.succeed LocalRef
             |= typeNameParser
+            |. noiseParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed (\( path, name ) binds -> ExternalRef path name binds)
             |. Parser.symbol (Token "/" NoProblem)
             |= Parser.loop [] modularizedTypeRefParser
+            |. noiseParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed (\( path, name ) binds -> InternalRef path name binds)
             |= Parser.loop [] modularizedTypeRefParser
+            |. noiseParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed Generic
             |= genericParser
+            |. noiseParser
         , Parser.succeed identity
             |. Parser.symbol (Token "(" ExpectedLeftParen)
             |. noiseParser
@@ -484,7 +405,6 @@ typeMatchTypeParser =
             |. noiseParser
             |= typeRefParser
             |. Parser.symbol (Token ")" ExpectedRightParen)
-            |. noiseParser
         ]
 
 
@@ -506,7 +426,7 @@ modularizedTypeRefParser reversedPath =
         [ Parser.succeed onType
             |= typeNameParser
         , Parser.succeed addToPath
-            |= symbolParser2
+            |= symbolParser
             |. Parser.symbol (Token "/" NoProblem)
         ]
 
@@ -516,8 +436,10 @@ typeOrGenericParser types =
     Parser.oneOf
         [ Parser.succeed (\name -> Parser.Loop (LocalRef name [] :: types))
             |= typeNameParser
+            |. noiseParser
         , Parser.succeed (\name -> Parser.Loop (Generic name :: types))
             |= genericParser
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse types))
         ]
 
@@ -776,6 +698,7 @@ wordDefinitionParser startLocation =
     in
     Parser.succeed joinParseResults
         |= symbolParser
+        |. noiseParser
         |= Parser.loop emptyDef wordMetadataParser
         |= sourceLocationParser
 
@@ -845,6 +768,7 @@ multiWordDefinitionParser startLocation =
     in
     Parser.succeed joinParseResults
         |= symbolParser
+        |. noiseParser
         |= Parser.loop emptyDef multiWordMetadataParser
         |= sourceLocationParser
 
@@ -881,6 +805,7 @@ multiWordMetadataParser def =
             |. Parser.keyword (Token ":" NoProblem)
             |. noiseParser
             |= typeMatchParser
+            |. noiseParser
             |= implementationParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
@@ -901,6 +826,7 @@ typeDefinitionParser startLocation =
     in
     Parser.succeed ctor
         |= typeNameParser
+        |. noiseParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] typeMemberParser
         |= sourceLocationParser
@@ -911,6 +837,7 @@ typeGenericParser generics =
     Parser.oneOf
         [ Parser.succeed (\name -> Parser.Loop (name :: generics))
             |= genericParser
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse generics))
         ]
 
@@ -924,6 +851,7 @@ typeMemberParser types =
             |. Parser.symbol (Token ":" NoProblem)
             |. noiseParser
             |= symbolParser
+            |. noiseParser
             |= typeRefParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
@@ -944,6 +872,7 @@ unionTypeDefinitionParser startLocation =
     in
     Parser.succeed ctor
         |= typeNameParser
+        |. noiseParser
         |= Parser.loop [] typeGenericParser
         |= Parser.loop [] unionTypeMemberParser
         |= sourceLocationParser
@@ -985,8 +914,10 @@ typeLoopParser reverseTypes =
     Parser.oneOf
         [ Parser.succeed step
             |= genericOrRangeParser
+            |. noiseParser
         , Parser.succeed step
             |= typeSignatureRefParser
+            |. noiseParser
         , Parser.succeed (\wordType -> step (QuotationType wordType))
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
@@ -1011,7 +942,6 @@ typeMatchParser =
             , Parser.succeed []
             ]
         |= sourceLocationParser
-        |. noiseParser
 
 
 typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))
@@ -1019,7 +949,9 @@ typeMatchConditionParser nodes =
     Parser.oneOf
         [ Parser.succeed (\name value -> Parser.Loop (( name, value ) :: nodes))
             |= symbolParser
+            |. noiseParser
             |= typeMatchValueParser
+            |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
 
@@ -1053,6 +985,7 @@ implementationParserHelp nodes =
     Parser.oneOf
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
+            |. noiseParser
         , Parser.succeed (\startLoc quotImpl endLoc -> Parser.Loop (Quotation (SourceLocationRange startLoc endLoc) quotImpl :: nodes))
             |= sourceLocationParser
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
@@ -1074,9 +1007,60 @@ nodeParser =
             |= sourceLocationParser
         , Parser.succeed (\startLoc builder endLoc -> builder (SourceLocationRange startLoc endLoc))
             |= sourceLocationParser
-            |= symbolImplParser2
+            |= qualifiedSymbolImplParser
             |= sourceLocationParser
         ]
+
+
+qualifiedSymbolImplParser : Parser (SourceLocationRange -> AstNode)
+qualifiedSymbolImplParser =
+    let
+        externalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path then
+                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
+
+            else if modulePathResult == ( [], "" ) then
+                Parser.problem <| InvalidModulePath <| "/" ++ firstSymbol
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        ExternalWord loc path reference
+
+        internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+            let
+                path =
+                    firstSymbol :: partialPath
+            in
+            if checkForUpperCaseLetterInPath path && partialPath /= [] then
+                Parser.problem <| InvalidModulePath <| String.join "/" path
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        if modulePathResult == ( [], "" ) then
+                            Word loc firstSymbol
+
+                        else
+                            PackageWord loc path reference
+
+        checkForUpperCaseLetterInPath path =
+            List.any (String.any Char.isUpper) path
+    in
+    Parser.oneOf
+        [ Parser.succeed externalBuilder
+            |. Parser.symbol (Token "/" NotMetadata)
+            |= symbolImplParser
+            |= Parser.loop [] modulePathParser
+        , Parser.succeed internalBuilder
+            |= symbolImplParser
+            |= Parser.loop [] modulePathParser
+        ]
+        |> Parser.andThen identity
 
 
 typeDefinitionName : TypeDefinition -> String
