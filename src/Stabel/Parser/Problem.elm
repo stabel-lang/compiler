@@ -7,16 +7,18 @@ import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRang
 
 
 type Problem
-    = NotInt
-    | NotSymbol
-    | NotMetadata
-    | NotGeneric
-    | NotType
-    | NoProblem
-    | FoundMetadata
+    = ExpectedInt
+    | ExpectedSymbol
+    | ExpectedMetadata
+    | ExpectedGeneric
+    | ExpectedType
+    | UnknownError
+    | ExpectedForwardSlash
+    | ExpectedWhitespace
+    | UnexpectedMetadata
     | ExpectedLeftParen
     | ExpectedRightParen
-    | ExpectedEnd
+    | ExpectedEndOfFile
     | ExpectedTypeSeperator
     | ExpectedLeftBracket
     | ExpectedRightBracket
@@ -31,25 +33,31 @@ type Problem
 toString : String -> Problem -> String
 toString source problem =
     case problem of
-        NotInt ->
+        ExpectedInt ->
             "this is not an integer"
 
-        NotSymbol ->
+        ExpectedSymbol ->
             "this is not a symbol"
 
-        NotMetadata ->
+        ExpectedMetadata ->
             "this is not metadata"
 
-        NotGeneric ->
+        ExpectedGeneric ->
             "this is not a generic variable"
 
-        NotType ->
+        ExpectedType ->
             "this is not a type"
 
-        NoProblem ->
+        UnknownError ->
             "not sure how we got this error"
 
-        FoundMetadata ->
+        ExpectedForwardSlash ->
+            "Expected a forward slash"
+
+        ExpectedWhitespace ->
+            "Expected whitespace"
+
+        UnexpectedMetadata ->
             "found metadata where we did not expect too"
 
         ExpectedLeftParen ->
@@ -58,7 +66,7 @@ toString source problem =
         ExpectedRightParen ->
             "expected an closing parenthesis"
 
-        ExpectedEnd ->
+        ExpectedEndOfFile ->
             "expected end of file"
 
         ExpectedTypeSeperator ->

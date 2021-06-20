@@ -133,7 +133,7 @@ suite =
             ]
         , test "Only compiler can create functions which names begins with an upper case letter" <|
             \_ ->
-                checkForError ((==) NotSymbol) <|
+                checkForError ((==) ExpectedSymbol) <|
                     """
                     def: Person
                     : 1
@@ -223,7 +223,7 @@ suite =
                         :
                         """
                 in
-                checkForError ((==) NotMetadata) source
+                checkForError ((==) ExpectedMetadata) source
         , describe "Top level definitions must start with one of the pre-defined def's" <|
             let
                 badDefinition name problem =

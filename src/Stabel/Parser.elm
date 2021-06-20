@@ -192,13 +192,13 @@ intParser =
                     Parser.succeed num
 
                 Nothing ->
-                    Parser.problem NotInt
+                    Parser.problem ExpectedInt
     in
     Parser.variable
         { start = Char.isDigit
         , inner = Char.isDigit
         , reserved = Set.empty
-        , expecting = NotInt
+        , expecting = ExpectedInt
         }
         |> Parser.andThen helper
 
@@ -229,12 +229,12 @@ symbolParserHelp startPred =
         { start = startPred
         , inner = validSymbolChar
         , reserved = Set.empty
-        , expecting = NotSymbol
+        , expecting = ExpectedSymbol
         }
         |. Parser.oneOf
             [ Parser.succeed identity
-                |. Parser.symbol (Token ":" NotMetadata)
-                |> Parser.andThen (\_ -> Parser.problem FoundMetadata)
+                |. Parser.symbol (Token ":" ExpectedMetadata)
+                |> Parser.andThen (\_ -> Parser.problem UnexpectedMetadata)
             , Parser.succeed identity
             ]
         |> Parser.backtrackable
@@ -270,7 +270,7 @@ modulePathParser : List String -> Parser (Parser.Step (List String) ( List Strin
 modulePathParser symbols =
     Parser.oneOf
         [ Parser.succeed (\name -> Parser.Loop (name :: symbols))
-            |. Parser.symbol (Token "/" NotMetadata)
+            |. Parser.symbol (Token "/" ExpectedMetadata)
             |= symbolImplParser
         , Parser.succeed (Parser.Done (modulePathFinalizer symbols))
         ]
@@ -305,9 +305,9 @@ metadataParserHelp reserved =
         { start = \c -> not (Char.isDigit c || Char.isUpper c || Set.member c invalidSymbolChars)
         , inner = validSymbolChar
         , reserved = reserved
-        , expecting = NotMetadata
+        , expecting = ExpectedMetadata
         }
-        |. Parser.symbol (Token ":" NotMetadata)
+        |. Parser.symbol (Token ":" ExpectedMetadata)
 
 
 textParser : Parser String
@@ -320,8 +320,8 @@ genericParser : Parser String
 genericParser =
     Parser.oneOf
         [ Parser.succeed identity
-            |. Parser.symbol (Token "-" NoProblem)
-            |> Parser.andThen (\_ -> Parser.problem NotGeneric)
+            |. Parser.symbol (Token "-" UnknownError)
+            |> Parser.andThen (\_ -> Parser.problem ExpectedGeneric)
         , symbolParser
         ]
         |> Parser.backtrackable
@@ -333,7 +333,7 @@ typeNameParser =
         { start = Char.isUpper
         , inner = validSymbolChar
         , reserved = Set.empty
-        , expecting = NotType
+        , expecting = ExpectedType
         }
 
 
@@ -343,9 +343,9 @@ genericOrRangeParser =
         helper value =
             Parser.oneOf
                 [ Parser.succeed (StackRange value)
-                    |. Parser.symbol (Token "..." NoProblem)
+                    |. Parser.symbol (Token "..." UnknownError)
                 , Parser.succeed (Generic value)
-                    |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
+                    |. Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
                 ]
     in
     Parser.andThen helper genericParser
@@ -357,7 +357,7 @@ typeSignatureRefParser =
         [ Parser.succeed (\name -> LocalRef name [])
             |= typeNameParser
         , Parser.succeed (\( path, name ) -> ExternalRef path name [])
-            |. Parser.symbol (Token "/" NoProblem)
+            |. Parser.symbol (Token "/" ExpectedForwardSlash)
             |= Parser.loop [] modularizedTypeRefParser
         , Parser.succeed (\( path, name ) -> InternalRef path name [])
             |= Parser.loop [] modularizedTypeRefParser
@@ -379,7 +379,7 @@ typeRefParser =
             |. noiseParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed (\( path, name ) binds -> ExternalRef path name binds)
-            |. Parser.symbol (Token "/" NoProblem)
+            |. Parser.symbol (Token "/" ExpectedForwardSlash)
             |= Parser.loop [] modularizedTypeRefParser
             |. noiseParser
             |= Parser.loop [] typeOrGenericParser
@@ -405,7 +405,7 @@ typeMatchTypeParser =
         [ Parser.succeed (\name -> LocalRef name [])
             |= typeNameParser
         , Parser.succeed (\( path, name ) -> ExternalRef path name [])
-            |. Parser.symbol (Token "/" NoProblem)
+            |. Parser.symbol (Token "/" ExpectedForwardSlash)
             |= Parser.loop [] modularizedTypeRefParser
         , Parser.succeed (\( path, name ) -> InternalRef path name [])
             |= Parser.loop [] modularizedTypeRefParser
@@ -438,7 +438,7 @@ modularizedTypeRefParser reversedPath =
             |= typeNameParser
         , Parser.succeed addToPath
             |= symbolParser
-            |. Parser.symbol (Token "/" NoProblem)
+            |. Parser.symbol (Token "/" ExpectedForwardSlash)
         ]
 
 
@@ -464,9 +464,9 @@ noiseParserLoop : () -> Parser (Parser.Step () ())
 noiseParserLoop _ =
     Parser.oneOf
         [ Parser.succeed (Parser.Loop ())
-            |. Parser.lineComment (Token "#" NoProblem)
+            |. Parser.lineComment (Token "#" UnknownError)
         , Parser.succeed (Parser.Loop ())
-            |. Parser.chompIf (\c -> Set.member c whitespaceChars) NoProblem
+            |. Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
             |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
         , Parser.succeed (Parser.Done ())
         ]
@@ -505,14 +505,14 @@ parser =
             , Parser.succeed (joinParseResults emptyModuleDefinition)
                 |= Parser.loop emptyAst definitionParser
             ]
-        |. Parser.end ExpectedEnd
+        |. Parser.end ExpectedEndOfFile
         |> Parser.andThen checkIfEmpty
 
 
 moduleDefinitionParser : Parser ModuleDefinition
 moduleDefinitionParser =
     Parser.succeed identity
-        |. Parser.keyword (Token "defmodule:" NoProblem)
+        |. Parser.keyword (Token "defmodule:" UnknownError)
         |. noiseParser
         |= Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser
         |> Parser.map Defined
@@ -522,21 +522,21 @@ moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDe
 moduleDefinitionMetaParser def =
     Parser.oneOf
         [ Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-            |. Parser.keyword (Token "alias:" NoProblem)
+            |. Parser.keyword (Token "alias:" UnknownError)
             |. noiseParser
             |= symbolParser
             |. noiseParser
             |= modulePathStringParser
             |. noiseParser
         , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
-            |. Parser.keyword (Token "import:" NoProblem)
+            |. Parser.keyword (Token "import:" UnknownError)
             |. noiseParser
             |= modulePathStringParser
             |. noiseParser
             |= Parser.loop [] symbolImplListParser
             |. noiseParser
         , Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
-            |. Parser.keyword (Token "exposing:" NoProblem)
+            |. Parser.keyword (Token "exposing:" UnknownError)
             |. noiseParser
             |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
             |. noiseParser
@@ -544,7 +544,7 @@ moduleDefinitionMetaParser def =
             |= metadataParser
             |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done def)
-            |. Parser.keyword (Token ":" NoProblem)
+            |. Parser.keyword (Token ":" UnknownError)
             |. noiseParser
         ]
 
@@ -607,22 +607,22 @@ definitionParser ast =
     in
     Parser.oneOf
         [ sourceLocationParser
-            |. Parser.keyword (Token "def:" NoProblem)
+            |. Parser.keyword (Token "def:" UnknownError)
             |. noiseParser
             |> Parser.andThen wordDefinitionParser
             |> Parser.andThen insertWord
         , sourceLocationParser
-            |. Parser.keyword (Token "defmulti:" NoProblem)
+            |. Parser.keyword (Token "defmulti:" UnknownError)
             |. noiseParser
             |> Parser.andThen multiWordDefinitionParser
             |> Parser.andThen insertWord
         , sourceLocationParser
-            |. Parser.keyword (Token "defstruct:" NoProblem)
+            |. Parser.keyword (Token "defstruct:" UnknownError)
             |. noiseParser
             |> Parser.andThen typeDefinitionParser
             |> Parser.andThen insertType
         , sourceLocationParser
-            |. Parser.keyword (Token "defunion:" NoProblem)
+            |. Parser.keyword (Token "defunion:" UnknownError)
             |. noiseParser
             |> Parser.andThen unionTypeDefinitionParser
             |> Parser.andThen insertType
@@ -732,25 +732,25 @@ wordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDe
 wordMetadataParser def =
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
-            |. Parser.keyword (Token "type:" NoProblem)
+            |. Parser.keyword (Token "type:" UnknownError)
             |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-            |. Parser.keyword (Token "alias:" NoProblem)
+            |. Parser.keyword (Token "alias:" UnknownError)
             |. noiseParser
             |= symbolParser
             |. noiseParser
             |= modulePathStringParser
             |. noiseParser
         , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
-            |. Parser.keyword (Token "import:" NoProblem)
+            |. Parser.keyword (Token "import:" UnknownError)
             |. noiseParser
             |= modulePathStringParser
             |. noiseParser
             |= Parser.loop [] symbolImplListParser
             |. noiseParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
-            |. Parser.keyword (Token ":" NoProblem)
+            |. Parser.keyword (Token ":" UnknownError)
             |. noiseParser
             |= implementationParser
         , Parser.succeed UnknownMetadata
@@ -819,15 +819,15 @@ multiWordMetadataParser def =
     in
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
-            |. Parser.keyword (Token "type:" NoProblem)
+            |. Parser.keyword (Token "type:" UnknownError)
             |. noiseParser
             |= typeSignatureParser
         , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
-            |. Parser.keyword (Token "else:" NoProblem)
+            |. Parser.keyword (Token "else:" UnknownError)
             |. noiseParser
             |= implementationParser
         , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
-            |. Parser.keyword (Token ":" NoProblem)
+            |. Parser.keyword (Token ":" UnknownError)
             |. noiseParser
             |= typeMatchParser
             |. noiseParser
@@ -873,7 +873,7 @@ typeMemberParser :
 typeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
-            |. Parser.symbol (Token ":" NoProblem)
+            |. Parser.symbol (Token ":" UnknownError)
             |. noiseParser
             |= symbolParser
             |. noiseParser
@@ -909,7 +909,7 @@ unionTypeMemberParser :
 unionTypeMemberParser types =
     Parser.oneOf
         [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
-            |. Parser.symbol (Token ":" NoProblem)
+            |. Parser.symbol (Token ":" UnknownError)
             |. noiseParser
             |= typeRefParser
         , Parser.succeed UnknownMetadata
