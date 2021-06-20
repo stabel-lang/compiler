@@ -64,7 +64,7 @@ suite =
                                     , ( "second", Generic "b" )
                                     ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , typeSignature = NotProvided
@@ -74,7 +74,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 ]
@@ -99,7 +99,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , typeSignature = NotProvided
@@ -118,7 +118,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 ]

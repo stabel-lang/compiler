@@ -12,17 +12,17 @@ suite =
     describe "Parser -- Errors"
         [ describe "Double definitions" <|
             let
-                wordAlreadyDefined name problem =
+                functionAlreadyDefined name problem =
                     case problem of
-                        WordAlreadyDefined definedName _ _ ->
+                        FunctionAlreadyDefined definedName _ _ ->
                             name == definedName
 
                         _ ->
                             False
             in
-            [ test "Word definition" <|
+            [ test "Function definition" <|
                 \_ ->
-                    checkForError (wordAlreadyDefined "not") <|
+                    checkForError (functionAlreadyDefined "not") <|
                         """
                         def: not
                         : drop 0
@@ -34,7 +34,7 @@ suite =
                         """
             , test "Generated double definitions" <|
                 \_ ->
-                    checkForError (wordAlreadyDefined "age>") <|
+                    checkForError (functionAlreadyDefined "age>") <|
                         """
                         def: age>
                         : 1
@@ -74,7 +74,7 @@ suite =
                         _ ->
                             False
             in
-            [ test "word" <|
+            [ test "Function" <|
                 \_ ->
                     checkForError (expectedError "typ") <|
                         """
@@ -83,7 +83,7 @@ suite =
                         typ: Int -- Int
                         : 1 +
                         """
-            , test "multiword" <|
+            , test "Multifunction" <|
                 \_ ->
                     checkForError (expectedError "whn") <|
                         """

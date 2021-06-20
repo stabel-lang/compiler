@@ -22,7 +22,7 @@ type Problem
     | ExpectedTypeSeperator
     | ExpectedLeftBracket
     | ExpectedRightBracket
-    | WordAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
+    | FunctionAlreadyDefined String (Maybe SourceLocationRange) (Maybe SourceLocationRange)
     | TypeAlreadyDefined String SourceLocationRange SourceLocationRange
     | UnknownMetadata String
     | InvalidModulePath String
@@ -78,7 +78,7 @@ toString source problem =
         ExpectedRightBracket ->
             "expected closing brakcet"
 
-        WordAlreadyDefined wordName maybePreviousDefinitionRange maybeDefinitionRange ->
+        FunctionAlreadyDefined functionName maybePreviousDefinitionRange maybeDefinitionRange ->
             let
                 definitionRange =
                     Maybe.withDefault SourceLocation.emptyRange maybeDefinitionRange
@@ -86,15 +86,15 @@ toString source problem =
             case maybePreviousDefinitionRange of
                 Nothing ->
                     SourceLocation.toString definitionRange.start
-                        ++ ": You're trying to define a new word called '"
-                        ++ wordName
-                        ++ "', but this word has already been defined."
+                        ++ ": You're trying to define a new function called '"
+                        ++ functionName
+                        ++ "', but this function has already been defined."
 
                 Just previousDefinitionRange ->
                     SourceLocation.toString definitionRange.start
-                        ++ ": You're trying to define a new word called '"
-                        ++ wordName
-                        ++ "', but this word has already been defined here:\n\n"
+                        ++ ": You're trying to define a new function called '"
+                        ++ functionName
+                        ++ "', but this function has already been defined here:\n\n"
                         ++ SourceLocation.extractFromString source previousDefinitionRange
 
         TypeAlreadyDefined typeName previousDefinitionRange definitionRange ->

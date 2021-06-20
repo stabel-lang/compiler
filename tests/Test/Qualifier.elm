@@ -10,7 +10,6 @@ import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Parser as AST
 import Stabel.Qualifier exposing (..)
-import Stabel.Qualifier.Problem as Problem
 import Test exposing (Test, describe, test)
 import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
@@ -25,7 +24,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , typeSignature = AST.NotProvided
@@ -35,7 +34,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "dec"
@@ -46,7 +45,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "-"
+                                            , AST.Function emptyRange "-"
                                             ]
                                   }
                                 , { name = "main"
@@ -57,11 +56,11 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "inc"
-                                            , AST.Word emptyRange "inc"
-                                            , AST.Word emptyRange "dec"
+                                            , AST.Function emptyRange "inc"
+                                            , AST.Function emptyRange "inc"
+                                            , AST.Function emptyRange "dec"
                                             , AST.Integer emptyRange 2
-                                            , AST.Word emptyRange "="
+                                            , AST.Function emptyRange "="
                                             ]
                                   }
                                 ]
@@ -109,7 +108,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
                                   , typeSignature =
@@ -122,9 +121,9 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "swap"
-                                            , AST.Word emptyRange "dup"
-                                            , AST.Word emptyRange "rotate"
+                                            [ AST.Function emptyRange "swap"
+                                            , AST.Function emptyRange "dup"
+                                            , AST.Function emptyRange "rotate"
                                             ]
                                   }
                                 ]
@@ -170,7 +169,7 @@ suite =
                                 , AST.CustomTypeDef emptyRange "True" [] []
                                 , AST.CustomTypeDef emptyRange "False" [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
                                   , typeSignature = AST.NotProvided
@@ -224,14 +223,14 @@ suite =
                         unqualifiedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
                                       , typeSignature =
                                             AST.UserProvided
                                                 { input =
                                                     [ AST.LocalRef "Int" []
-                                                    , AST.QuotationType
+                                                    , AST.FunctionType
                                                         { input = [ AST.LocalRef "Int" [] ]
                                                         , output = [ AST.LocalRef "Int" [] ]
                                                         }
@@ -243,7 +242,7 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Word emptyRange "!"
+                                                [ AST.Function emptyRange "!"
                                                 ]
                                       }
                                     , { name = "main"
@@ -254,16 +253,16 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Quotation emptyRange
+                                                , AST.InlineFunction emptyRange
                                                     [ AST.Integer emptyRange 1
-                                                    , AST.Word emptyRange "+"
+                                                    , AST.Function emptyRange "+"
                                                     ]
-                                                , AST.Word emptyRange "apply-to-num"
-                                                , AST.Quotation emptyRange
+                                                , AST.Function emptyRange "apply-to-num"
+                                                , AST.InlineFunction emptyRange
                                                     [ AST.Integer emptyRange 1
-                                                    , AST.Word emptyRange "-"
+                                                    , AST.Function emptyRange "-"
                                                     ]
-                                                , AST.Word emptyRange "apply-to-num"
+                                                , AST.Function emptyRange "apply-to-num"
                                                 ]
                                       }
                                     ]
@@ -327,7 +326,7 @@ suite =
                         unqualifiedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "a"
                                       , typeSignature = AST.NotProvided
@@ -337,10 +336,10 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Quotation emptyRange
-                                                    [ AST.Word emptyRange "inc"
+                                                , AST.InlineFunction emptyRange
+                                                    [ AST.Function emptyRange "inc"
                                                     ]
-                                                , AST.Word emptyRange "!"
+                                                , AST.Function emptyRange "!"
                                                 ]
                                       }
                                     , { name = "inc"
@@ -351,7 +350,7 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
+                                                , AST.Function emptyRange "+"
                                                 ]
                                       }
                                     ]
@@ -397,7 +396,7 @@ suite =
                         unqualifiedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , typeSignature = AST.NotProvided
@@ -407,16 +406,16 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Quotation emptyRange
+                                                , AST.InlineFunction emptyRange
                                                     [ AST.Integer emptyRange 1
-                                                    , AST.Quotation emptyRange
+                                                    , AST.InlineFunction emptyRange
                                                         [ AST.Integer emptyRange 1
-                                                        , AST.Word emptyRange "+"
+                                                        , AST.Function emptyRange "+"
                                                         ]
-                                                    , AST.Word emptyRange "!"
-                                                    , AST.Word emptyRange "+"
+                                                    , AST.Function emptyRange "!"
+                                                    , AST.Function emptyRange "+"
                                                     ]
-                                                , AST.Word emptyRange "!"
+                                                , AST.Function emptyRange "!"
                                                 ]
                                       }
                                     ]
@@ -483,7 +482,7 @@ suite =
                                         []
                                         [ ( "value", AST.LocalRef "Int" [] ) ]
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
                                       , typeSignature = AST.NotProvided
@@ -493,10 +492,10 @@ suite =
                                       , implementation =
                                             AST.MultiImpl
                                                 [ ( AST.TypeMatch emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
-                                                  , [ AST.Word emptyRange "True" ]
+                                                  , [ AST.Function emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange "False" ]
+                                                [ AST.Function emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -550,7 +549,7 @@ suite =
                                         ]
                                     , AST.CustomTypeDef emptyRange "Nothing" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
                                       , typeSignature = AST.NotProvided
@@ -560,11 +559,11 @@ suite =
                                       , implementation =
                                             AST.MultiImpl
                                                 [ ( AST.TypeMatch emptyRange (AST.Generic "a") []
-                                                  , [ AST.Word emptyRange "drop" ]
+                                                  , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange "swap"
-                                                , AST.Word emptyRange "drop"
+                                                [ AST.Function emptyRange "swap"
+                                                , AST.Function emptyRange "drop"
                                                 ]
                                       }
                                     ]
@@ -629,7 +628,7 @@ suite =
                                     []
                                     [ ( "value", AST.LocalRef "Bool" [] ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "true?"
                                   , typeSignature =
@@ -645,10 +644,10 @@ suite =
                                             [ ( AST.TypeMatch emptyRange
                                                     (AST.LocalRef "Box" [])
                                                     [ ( "value", AST.LiteralType (AST.LocalRef "True" []) ) ]
-                                              , [ AST.Word emptyRange "True" ]
+                                              , [ AST.Function emptyRange "True" ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "False" ]
+                                            [ AST.Function emptyRange "False" ]
                                   }
                                 ]
                         }
@@ -720,7 +719,7 @@ suite =
                                     []
                                     [ ( "cent-value", AST.LocalRef "Int" [] ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "into-cents"
                                   , typeSignature =
@@ -734,13 +733,13 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Dollar" []) []
-                                              , [ AST.Word emptyRange "dollar-value>"
+                                              , [ AST.Function emptyRange "dollar-value>"
                                                 , AST.Integer emptyRange 100
-                                                , AST.Word emptyRange "*"
+                                                , AST.Function emptyRange "*"
                                                 ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.LocalRef "Cent" []) []
-                                              , [ AST.Word emptyRange "cent-value>"
+                                              , [ AST.Function emptyRange "cent-value>"
                                                 ]
                                               )
                                             ]
@@ -757,10 +756,10 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "into-cents"
-                                            , AST.Word emptyRange "swap"
-                                            , AST.Word emptyRange "into-cents"
-                                            , AST.Word emptyRange "+"
+                                            [ AST.Function emptyRange "into-cents"
+                                            , AST.Function emptyRange "swap"
+                                            , AST.Function emptyRange "into-cents"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "quote-excuse"
@@ -774,13 +773,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "dollar-value>"
-                                            , AST.Quotation emptyRange
+                                            [ AST.Function emptyRange "dollar-value>"
+                                            , AST.InlineFunction emptyRange
                                                 [ AST.Integer emptyRange 2
-                                                , AST.Word emptyRange "*"
+                                                , AST.Function emptyRange "*"
                                                 ]
-                                            , AST.Word emptyRange "!"
-                                            , AST.Word emptyRange ">Dollar"
+                                            , AST.Function emptyRange "!"
+                                            , AST.Function emptyRange ">Dollar"
                                             ]
                                   }
                                 ]
@@ -955,7 +954,7 @@ suite =
                                     []
                                     [ ( "cent-value", AST.LocalRef "Int" [] ) ]
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                             |> ParserUtil.addFunctionsForStructs
 
@@ -1111,7 +1110,7 @@ suite =
                                         [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
                                   )
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "call-external"
                                   , typeSignature =
@@ -1125,14 +1124,14 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
-                                              , [ AST.PackageWord emptyRange [ "package", "module" ] "when-one"
+                                              , [ AST.PackageFunction emptyRange [ "package", "module" ] "when-one"
                                                 ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
-                                              , [ AST.Word emptyRange "drop" ]
+                                              , [ AST.Function emptyRange "drop" ]
                                               )
                                             ]
-                                            [ AST.PackageWord emptyRange [ "package", "module" ] "when-other-one" ]
+                                            [ AST.PackageFunction emptyRange [ "package", "module" ] "when-other-one" ]
                                   }
                                 , { name = "main"
                                   , typeSignature = AST.NotProvided
@@ -1141,10 +1140,10 @@ suite =
                                   , imports = Dict.fromList [ ( "/list/of/names", [ "one" ] ) ]
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageWord emptyRange [ "html" ] "div"
-                                            , AST.Word emptyRange "call-external"
-                                            , AST.ExternalWord emptyRange [ "some", "ext" ] "word"
-                                            , AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction emptyRange [ "html" ] "div"
+                                            , AST.Function emptyRange "call-external"
+                                            , AST.ExternalFunction emptyRange [ "some", "ext" ] "word"
+                                            , AST.PackageFunction emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]
@@ -1188,7 +1187,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , typeSignature = AST.NotProvided
@@ -1197,7 +1196,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageWord emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]

@@ -24,7 +24,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -34,7 +34,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.PackageWord emptyRange [ "internal" ] "add"
+                                            , AST.PackageFunction emptyRange [ "internal" ] "add"
                                             ]
                                   }
                                 ]
@@ -72,7 +72,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -83,12 +83,12 @@ suite =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) []
                                               , [ AST.Integer emptyRange 0
-                                                , AST.PackageWord emptyRange [ "mod" ] "add"
+                                                , AST.PackageFunction emptyRange [ "mod" ] "add"
                                                 ]
                                               )
                                             ]
                                             [ AST.Integer emptyRange 1
-                                            , AST.PackageWord emptyRange [ "mod" ] "add"
+                                            , AST.PackageFunction emptyRange [ "mod" ] "add"
                                             ]
                                   }
                                 ]
@@ -132,7 +132,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -149,9 +149,9 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -201,7 +201,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -215,18 +215,18 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop"
-                                                , AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
+                                                , AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]) []
-                                              , [ AST.Word emptyRange "drop"
-                                                , AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
+                                                , AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -292,7 +292,7 @@ suite =
                                         [ ( "tipe", AST.InternalRef [ "mod" ] "Tipe" [] ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     expectedAst =
@@ -327,7 +327,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -337,7 +337,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                            , AST.ExternalFunction emptyRange [ "mod" ] "add"
                                             ]
                                   }
                                 ]
@@ -375,7 +375,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -386,12 +386,12 @@ suite =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) []
                                               , [ AST.Integer emptyRange 0
-                                                , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                                , AST.ExternalFunction emptyRange [ "mod" ] "add"
                                                 ]
                                               )
                                             ]
                                             [ AST.Integer emptyRange 1
-                                            , AST.ExternalWord emptyRange [ "mod" ] "add"
+                                            , AST.ExternalFunction emptyRange [ "mod" ] "add"
                                             ]
                                   }
                                 ]
@@ -435,7 +435,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -452,9 +452,9 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -504,7 +504,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -518,18 +518,18 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop"
-                                                , AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
+                                                , AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]) []
-                                              , [ AST.Word emptyRange "drop"
-                                                , AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
+                                                , AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
-                                            , AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
+                                            , AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -595,7 +595,7 @@ suite =
                                         [ ( "tipe", AST.ExternalRef [ "mod" ] "Tipe" [] ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     expectedAst =
@@ -639,7 +639,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -653,8 +653,8 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.PackageWord emptyRange [ "internal" ] "value"
-                                            , AST.PackageWord emptyRange [ "ext" ] "add"
+                                            , AST.PackageFunction emptyRange [ "internal" ] "value"
+                                            , AST.PackageFunction emptyRange [ "ext" ] "add"
                                             ]
                                   }
                                 ]
@@ -713,7 +713,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -727,8 +727,8 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.PackageWord emptyRange [ "internal" ] "value"
-                                            , AST.PackageWord emptyRange [ "ext" ] "add"
+                                            , AST.PackageFunction emptyRange [ "internal" ] "value"
+                                            , AST.PackageFunction emptyRange [ "ext" ] "add"
                                             ]
                                   }
                                 ]
@@ -787,7 +787,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -797,13 +797,13 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "ext" ] "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop" ]
+                                              , [ AST.Function emptyRange "drop" ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal" ] "Tope" []) []
-                                              , [ AST.Word emptyRange "drop" ]
+                                              , [ AST.Function emptyRange "drop" ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop" ]
+                                            [ AST.Function emptyRange "drop" ]
                                   }
                                 ]
                         }
@@ -870,7 +870,7 @@ suite =
                                         ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     expectedAst =
@@ -919,7 +919,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -933,8 +933,8 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "value"
-                                            , AST.Word emptyRange "add"
+                                            , AST.Function emptyRange "value"
+                                            , AST.Function emptyRange "add"
                                             ]
                                   }
                                 ]
@@ -993,7 +993,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -1007,8 +1007,8 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "value"
-                                            , AST.Word emptyRange "add"
+                                            , AST.Function emptyRange "value"
+                                            , AST.Function emptyRange "add"
                                             ]
                                   }
                                 ]
@@ -1079,7 +1079,7 @@ suite =
                                         ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     expectedAst =
@@ -1126,7 +1126,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1138,13 +1138,13 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.LocalRef "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop" ]
+                                              , [ AST.Function emptyRange "drop" ]
                                               )
                                             , ( AST.TypeMatch emptyRange (AST.LocalRef "Tope" []) []
-                                              , [ AST.Word emptyRange "drop" ]
+                                              , [ AST.Function emptyRange "drop" ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop" ]
+                                            [ AST.Function emptyRange "drop" ]
                                   }
                                 ]
                         }
@@ -1191,7 +1191,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
                                   , typeSignature = AST.NotProvided
@@ -1202,7 +1202,7 @@ suite =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
                                             , AST.Integer emptyRange 2
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "fn2"
@@ -1214,7 +1214,7 @@ suite =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 2
                                             , AST.Integer emptyRange 3
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 ]
@@ -1257,7 +1257,7 @@ suite =
                                 , exposes = Set.fromList [ "fn2" ]
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
                                   , typeSignature = AST.NotProvided
@@ -1268,7 +1268,7 @@ suite =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
                                             , AST.Integer emptyRange 2
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "fn2"
@@ -1280,7 +1280,7 @@ suite =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 2
                                             , AST.Integer emptyRange 3
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 ]
@@ -1328,7 +1328,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1338,7 +1338,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "value"
+                                            , AST.Function emptyRange "value"
                                             ]
                                   }
                                 ]
@@ -1386,7 +1386,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1396,7 +1396,7 @@ suite =
                                   , implementation =
                                         AST.SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "add"
+                                            , AST.Function emptyRange "add"
                                             ]
                                   }
                                 ]
@@ -1436,7 +1436,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -1449,7 +1449,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -1497,7 +1497,7 @@ suite =
                                         [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -1533,7 +1533,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1543,11 +1543,11 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -1586,7 +1586,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
@@ -1599,7 +1599,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -1645,7 +1645,7 @@ suite =
                                         [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -1679,7 +1679,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1689,11 +1689,11 @@ suite =
                                   , implementation =
                                         AST.MultiImpl
                                             [ ( AST.TypeMatch emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             ]
                                   }
                                 ]
@@ -1730,7 +1730,7 @@ suite =
                     unqualifiedAst =
                         { moduleDefinition = AST.Undefined
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1739,7 +1739,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "over"
+                                            [ AST.Function emptyRange "over"
                                             ]
                                   }
                                 ]
@@ -1780,7 +1780,7 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature = AST.NotProvided
@@ -1789,7 +1789,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Word emptyRange "over"
+                                            [ AST.Function emptyRange "over"
                                             ]
                                   }
                                 ]

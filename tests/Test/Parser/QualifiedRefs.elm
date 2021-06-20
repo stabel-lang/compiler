@@ -11,7 +11,7 @@ import Test.Parser.Util exposing (expectAst)
 suite : Test
 suite =
     describe "Parser -- QualifiedRefs"
-        [ test "Internal word reference" <|
+        [ test "Internal function reference" <|
             \_ ->
                 let
                     source =
@@ -23,7 +23,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature = NotProvided
@@ -32,13 +32,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.PackageWord emptyRange [ "some", "module" ] "sample" ]
+                                            [ AST.PackageFunction emptyRange [ "some", "module" ] "sample" ]
                                   }
                                 ]
                         }
                 in
                 expectAst source expectedAst
-        , test "External word reference" <|
+        , test "External function reference" <|
             \_ ->
                 let
                     source =
@@ -50,7 +50,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature = NotProvided
@@ -59,13 +59,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.ExternalWord emptyRange [ "some", "module" ] "sample" ]
+                                            [ AST.ExternalFunction emptyRange [ "some", "module" ] "sample" ]
                                   }
                                 ]
                         }
                 in
                 expectAst source expectedAst
-        , test "Internal _and_ external word reference" <|
+        , test "Internal _and_ external function reference" <|
             \_ ->
                 let
                     source =
@@ -77,7 +77,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature = NotProvided
@@ -86,8 +86,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.PackageWord emptyRange [ "internal" ] "sample"
-                                            , AST.ExternalWord emptyRange [ "some", "module" ] "sample"
+                                            [ AST.PackageFunction emptyRange [ "internal" ] "sample"
+                                            , AST.ExternalFunction emptyRange [ "some", "module" ] "sample"
                                             ]
                                   }
                                 ]
@@ -107,7 +107,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
@@ -120,7 +120,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             , AST.Integer emptyRange 1
                                             ]
                                   }
@@ -141,7 +141,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
@@ -154,7 +154,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             , AST.Integer emptyRange 1
                                             ]
                                   }
@@ -178,7 +178,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
@@ -192,12 +192,12 @@ suite =
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (ExternalRef [ "external" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
-                                              , [ AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
                                                 , AST.Integer emptyRange 1
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             , AST.Integer emptyRange 0
                                             ]
                                   }
@@ -221,7 +221,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
@@ -235,12 +235,12 @@ suite =
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", LiteralInt 1 ) ]
-                                              , [ AST.Word emptyRange "drop"
+                                              , [ AST.Function emptyRange "drop"
                                                 , AST.Integer emptyRange 1
                                                 ]
                                               )
                                             ]
-                                            [ AST.Word emptyRange "drop"
+                                            [ AST.Function emptyRange "drop"
                                             , AST.Integer emptyRange 0
                                             ]
                                   }

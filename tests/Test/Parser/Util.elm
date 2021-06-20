@@ -31,7 +31,7 @@ stripLocations : AST -> AST
 stripLocations ast =
     { moduleDefinition = ast.moduleDefinition
     , types = Dict.map (\_ t -> stripTypeLocation t) ast.types
-    , words = Dict.map (\_ d -> stripWordLocation d) ast.words
+    , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
     }
 
 
@@ -45,7 +45,7 @@ stripTypeLocation typeDef =
             AST.UnionTypeDef emptyRange name generics members
 
 
-stripWordLocation : WordDefinition -> WordDefinition
+stripWordLocation : FunctionDefinition -> FunctionDefinition
 stripWordLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
@@ -53,7 +53,7 @@ stripWordLocation word =
     }
 
 
-stripImplementationLocation : WordImplementation -> WordImplementation
+stripImplementationLocation : FunctionImplementation -> FunctionImplementation
 stripImplementationLocation impl =
     case impl of
         SoloImpl nodes ->
@@ -71,17 +71,17 @@ stripNodeLocation node =
         AST.Integer _ val ->
             AST.Integer emptyRange val
 
-        AST.Word _ val ->
-            AST.Word emptyRange val
+        AST.Function _ val ->
+            AST.Function emptyRange val
 
-        AST.PackageWord _ path val ->
-            AST.PackageWord emptyRange path val
+        AST.PackageFunction _ path val ->
+            AST.PackageFunction emptyRange path val
 
-        AST.ExternalWord _ path val ->
-            AST.ExternalWord emptyRange path val
+        AST.ExternalFunction _ path val ->
+            AST.ExternalFunction emptyRange path val
 
-        AST.Quotation _ val ->
-            AST.Quotation emptyRange (List.map stripNodeLocation val)
+        AST.InlineFunction _ val ->
+            AST.InlineFunction emptyRange (List.map stripNodeLocation val)
 
         _ ->
             node
@@ -187,7 +187,7 @@ addFunctionsForStructsHelper name generics members ast =
                 ++ getters
                 |> Dict.fromListBy .name
     in
-    { ast | words = Dict.union ast.words allFuncs }
+    { ast | functions = Dict.union ast.functions allFuncs }
 
 
 expectCompiles : String -> Expect.Expectation

@@ -101,7 +101,7 @@ run config =
             Dict.union qualifiedTypes config.inProgressAST.types
 
         ( wordErrors, qualifiedWords ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.words
+            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.functions
     in
     case ( typeErrors, wordErrors ) of
         ( [], [] ) ->
@@ -444,7 +444,7 @@ qualifyMemberType config modRefs range type_ =
         Parser.StackRange sym ->
             Ok (Type.Generic sym)
 
-        Parser.QuotationType sign ->
+        Parser.FunctionType sign ->
             let
                 inputResult =
                     sign.input
@@ -474,7 +474,7 @@ qualifyMemberType config modRefs range type_ =
 qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
-    -> Parser.WordDefinition
+    -> Parser.FunctionDefinition
     -> ( List Problem, Dict String WordDefinition )
     -> ( List Problem, Dict String WordDefinition )
 qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
@@ -551,7 +551,7 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
 qualifyMetadata :
     RunConfig
     -> Dict String TypeDefinition
-    -> Parser.WordDefinition
+    -> Parser.FunctionDefinition
     -> Result Problem Metadata
 qualifyMetadata config qualifiedTypes word =
     let
@@ -913,12 +913,12 @@ qualifyNode config currentDefName modRefs node acc =
         Parser.Integer loc value ->
             { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
 
-        Parser.Word loc value ->
+        Parser.Function loc value ->
             let
                 qualifiedName =
                     qualifyName config value
             in
-            if Dict.member value config.ast.words then
+            if Dict.member value config.ast.functions then
                 { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
 
             else
@@ -943,7 +943,7 @@ qualifyNode config currentDefName modRefs node acc =
                                         config
                                         currentDefName
                                         modRefs
-                                        (Parser.ExternalWord loc path value)
+                                        (Parser.ExternalFunction loc path value)
                                         acc
 
                                 else
@@ -955,10 +955,10 @@ qualifyNode config currentDefName modRefs node acc =
                                         config
                                         currentDefName
                                         modRefs
-                                        (Parser.PackageWord loc path value)
+                                        (Parser.PackageFunction loc path value)
                                         acc
 
-        Parser.PackageWord loc path value ->
+        Parser.PackageFunction loc path value ->
             let
                 normalizedPathPreAliasCheck =
                     String.join "/" path
@@ -970,7 +970,7 @@ qualifyNode config currentDefName modRefs node acc =
             if String.startsWith "/" normalizedPath then
                 let
                     externalWordNode =
-                        Parser.ExternalWord
+                        Parser.ExternalFunction
                             loc
                             (List.drop 1 <| String.split "/" normalizedPath)
                             value
@@ -999,7 +999,7 @@ qualifyNode config currentDefName modRefs node acc =
                         else
                             { acc | qualifiedNodes = Err (WordNotExposed loc qualifiedName) :: acc.qualifiedNodes }
 
-        Parser.ExternalWord loc path value ->
+        Parser.ExternalFunction loc path value ->
             let
                 normalizedPath =
                     "/" ++ String.join "/" path
@@ -1039,7 +1039,7 @@ qualifyNode config currentDefName modRefs node acc =
         Parser.GetMember typeName memberName ->
             { acc | qualifiedNodes = Ok (GetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes }
 
-        Parser.Quotation sourceLocation quotImpl ->
+        Parser.InlineFunction sourceLocation quotImpl ->
             let
                 quoteName =
                     if String.startsWith "quote:" currentDefName then
@@ -1229,7 +1229,7 @@ requiredModules config =
                     Set.empty
 
         wordRequirements =
-            config.ast.words
+            config.ast.functions
                 |> Dict.foldl
                     (\_ w acc -> Set.union (requiredModulesOfWord topLevelAliases w) acc)
                     Set.empty
@@ -1275,7 +1275,7 @@ requiredModulesOfType typeDef =
                 |> Set.fromList
 
 
-requiredModulesOfWord : Dict String String -> Parser.WordDefinition -> Set String
+requiredModulesOfWord : Dict String String -> Parser.FunctionDefinition -> Set String
 requiredModulesOfWord topLevelAliases word =
     let
         wordAliases =
@@ -1354,10 +1354,10 @@ extractModuleReferenceFromType ref =
             Nothing
 
 
-extractModuleReferenceFromNode : Dict String String -> Parser.WordDefinition -> Parser.AstNode -> Maybe String
+extractModuleReferenceFromNode : Dict String String -> Parser.FunctionDefinition -> Parser.AstNode -> Maybe String
 extractModuleReferenceFromNode topLevelAliases meta node =
     case node of
-        Parser.PackageWord _ [ potentialAlias ] _ ->
+        Parser.PackageFunction _ [ potentialAlias ] _ ->
             case
                 ( Dict.get potentialAlias topLevelAliases
                 , Dict.get potentialAlias meta.aliases
@@ -1372,10 +1372,10 @@ extractModuleReferenceFromNode topLevelAliases meta node =
                 ( Nothing, Nothing ) ->
                     Just potentialAlias
 
-        Parser.PackageWord _ path _ ->
+        Parser.PackageFunction _ path _ ->
             Just (String.join "/" path)
 
-        Parser.ExternalWord _ path _ ->
+        Parser.ExternalFunction _ path _ ->
             Just ("/" ++ String.join "/" path)
 
         _ ->

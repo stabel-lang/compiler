@@ -42,7 +42,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , typeSignature = NotProvided
@@ -52,7 +52,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "+"
+                                            , AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "dec"
@@ -67,7 +67,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "-"
+                                            , AST.Function emptyRange "-"
                                             ]
                                   }
                                 , { name = "main"
@@ -78,11 +78,11 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Word emptyRange "inc"
-                                            , AST.Word emptyRange "inc"
-                                            , AST.Word emptyRange "dec"
+                                            , AST.Function emptyRange "inc"
+                                            , AST.Function emptyRange "inc"
+                                            , AST.Function emptyRange "dec"
                                             , AST.Integer emptyRange 2
-                                            , AST.Word emptyRange "="
+                                            , AST.Function emptyRange "="
                                             ]
                                   }
                                 ]
@@ -102,7 +102,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "int="
                                   , typeSignature =
@@ -115,8 +115,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "-"
-                                            , AST.Word emptyRange "zero?"
+                                            [ AST.Function emptyRange "-"
+                                            , AST.Function emptyRange "zero?"
                                             ]
                                   }
                                 ]
@@ -140,7 +140,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = ","
                                   , typeSignature =
@@ -153,7 +153,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "+"
+                                            [ AST.Function emptyRange "+"
                                             ]
                                   }
                                 , { name = "add2"
@@ -168,7 +168,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 2
-                                            , AST.Word emptyRange ","
+                                            , AST.Function emptyRange ","
                                             ]
                                   }
                                 ]
@@ -194,7 +194,7 @@ suite =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange "True" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "as-int"
                                       , typeSignature =
@@ -240,7 +240,7 @@ suite =
                                         , ( "jobs", LocalRef "Int" [] )
                                         ]
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "get-age"
                                       , typeSignature =
@@ -253,7 +253,7 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
-                                                [ AST.Word emptyRange "age>"
+                                                [ AST.Function emptyRange "age>"
                                                 ]
                                       }
                                     ]
@@ -280,7 +280,7 @@ suite =
                                         [ ( "element", Generic "a" )
                                         ]
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
                                       , typeSignature =
@@ -336,7 +336,7 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
                                   , typeSignature =
@@ -349,8 +349,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "dup"
-                                            , AST.Word emptyRange "rotate"
+                                            [ AST.Function emptyRange "dup"
+                                            , AST.Function emptyRange "rotate"
                                             ]
                                   }
                                 ]
@@ -390,7 +390,7 @@ suite =
                                     , CustomTypeDef emptyRange "True" [] []
                                     , CustomTypeDef emptyRange "False" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "to-int"
                                       , typeSignature = NotProvided
@@ -400,10 +400,10 @@ suite =
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (LocalRef "True" []) []
-                                                  , [ AST.Word emptyRange "drop", AST.Integer emptyRange 1 ]
+                                                  , [ AST.Function emptyRange "drop", AST.Integer emptyRange 1 ]
                                                   )
                                                 , ( TypeMatch emptyRange (LocalRef "False" []) []
-                                                  , [ AST.Word emptyRange "drop", AST.Integer emptyRange 0 ]
+                                                  , [ AST.Function emptyRange "drop", AST.Integer emptyRange 0 ]
                                                   )
                                                 ]
                                                 []
@@ -443,7 +443,7 @@ suite =
                                         ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
                                       , typeSignature = NotProvided
@@ -453,10 +453,10 @@ suite =
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (Generic "a") []
-                                                  , [ AST.Word emptyRange "!" ]
+                                                  , [ AST.Function emptyRange "!" ]
                                                   )
                                                 , ( TypeMatch emptyRange (LocalRef "Nil" []) []
-                                                  , [ AST.Word emptyRange "drop" ]
+                                                  , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -500,7 +500,7 @@ suite =
                                     , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
                                       , typeSignature = NotProvided
@@ -510,10 +510,10 @@ suite =
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
-                                                  , [ AST.Word emptyRange "!" ]
+                                                  , [ AST.Function emptyRange "!" ]
                                                   )
                                                 , ( TypeMatch emptyRange (LocalRef "Nil" []) []
-                                                  , [ AST.Word emptyRange "drop" ]
+                                                  , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -558,7 +558,7 @@ suite =
                                     , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
                                     , CustomTypeDef emptyRange "Nil" [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
                                       , typeSignature =
@@ -572,10 +572,10 @@ suite =
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
-                                                  , [ AST.Word emptyRange "!" ]
+                                                  , [ AST.Function emptyRange "!" ]
                                                   )
                                                 , ( TypeMatch emptyRange (LocalRef "Nil" []) []
-                                                  , [ AST.Word emptyRange "drop" ]
+                                                  , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
                                                 []
@@ -602,14 +602,14 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
                                   , typeSignature =
                                         UserProvided
                                             { input =
                                                 [ LocalRef "Int" []
-                                                , QuotationType
+                                                , FunctionType
                                                     { input = [ LocalRef "Int" [] ]
                                                     , output = [ LocalRef "Int" [] ]
                                                     }
@@ -621,7 +621,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "!"
+                                            [ AST.Function emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
@@ -632,12 +632,12 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Quotation
+                                            , AST.InlineFunction
                                                 emptyRange
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
+                                                , AST.Function emptyRange "+"
                                                 ]
-                                            , AST.Word emptyRange "apply-to-num"
+                                            , AST.Function emptyRange "apply-to-num"
                                             ]
                                   }
                                 ]
@@ -660,14 +660,14 @@ suite =
                     expectedAst =
                         { moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
                                   , typeSignature =
                                         UserProvided
                                             { input =
                                                 [ StackRange "a"
-                                                , QuotationType
+                                                , FunctionType
                                                     { input = [ StackRange "a" ]
                                                     , output = [ StackRange "b" ]
                                                     }
@@ -679,7 +679,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ AST.Word emptyRange "!"
+                                            [ AST.Function emptyRange "!"
                                             ]
                                   }
                                 , { name = "main"
@@ -690,11 +690,11 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ AST.Integer emptyRange 1
-                                            , AST.Quotation emptyRange
+                                            , AST.InlineFunction emptyRange
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
+                                                , AST.Function emptyRange "+"
                                                 ]
-                                            , AST.Word emptyRange "apply-to-num"
+                                            , AST.Function emptyRange "apply-to-num"
                                             ]
                                   }
                                 ]
@@ -716,7 +716,7 @@ suite =
                         expectedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
                                       , typeSignature = NotProvided
@@ -730,10 +730,10 @@ suite =
                                                         (LocalRef "Int" [])
                                                         [ ( "value", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange "True" ]
+                                                  , [ AST.Function emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange "False" ]
+                                                [ AST.Function emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -753,7 +753,7 @@ suite =
                         expectedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "pair?"
                                       , typeSignature = NotProvided
@@ -773,10 +773,10 @@ suite =
                                                                 )
                                                           )
                                                         ]
-                                                  , [ AST.Word emptyRange "True" ]
+                                                  , [ AST.Function emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange "False" ]
+                                                [ AST.Function emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -796,7 +796,7 @@ suite =
                         expectedAst =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "origo?"
                                       , typeSignature = NotProvided
@@ -810,10 +810,10 @@ suite =
                                                         [ ( "first", AST.LiteralInt 0 )
                                                         , ( "second", AST.LiteralInt 0 )
                                                         ]
-                                                  , [ AST.Word emptyRange "True" ]
+                                                  , [ AST.Function emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Word emptyRange "False" ]
+                                                [ AST.Function emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -824,7 +824,7 @@ suite =
             \_ ->
                 expectCompiles
                     """
-                    def: someword
+                    def: somefunc
                     """
         , test "Support code comments" <|
             \_ ->
@@ -910,7 +910,7 @@ suite =
                                     []
                                     []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "True"
                                   , typeSignature =
@@ -957,7 +957,7 @@ suite =
                                                     )
                                                     (LocalRef "Int" [])
                                                     [ ( "value", LiteralInt 0 ) ]
-                                              , [ Word
+                                              , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 12 3 121)
                                                         (SourceLocation 12 8 126)
@@ -972,7 +972,7 @@ suite =
                                                     )
                                                     (LocalRef "Int" [])
                                                     []
-                                              , [ Word
+                                              , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 14 3 135)
                                                         (SourceLocation 14 7 139)
@@ -995,19 +995,19 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         SoloImpl
-                                            [ Word
+                                            [ Function
                                                 (SourceLocationRange
                                                     (SourceLocation 17 3 154)
                                                     (SourceLocation 17 4 155)
                                                 )
                                                 "-"
-                                            , Word
+                                            , Function
                                                 (SourceLocationRange
                                                     (SourceLocation 17 5 156)
                                                     (SourceLocation 17 13 164)
                                                 )
                                                 "from-int"
-                                            , Word
+                                            , Function
                                                 (SourceLocationRange
                                                     (SourceLocation 17 14 165)
                                                     (SourceLocation 17 17 168)
@@ -1034,7 +1034,7 @@ suite =
                                                     )
                                                     (LocalRef "True" [])
                                                     []
-                                              , [ Word
+                                              , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 21 3 193)
                                                         (SourceLocation 21 8 198)
@@ -1043,7 +1043,7 @@ suite =
                                                 ]
                                               )
                                             ]
-                                            [ Word
+                                            [ Function
                                                 (SourceLocationRange
                                                     (SourceLocation 22 7 205)
                                                     (SourceLocation 22 11 209)

@@ -20,7 +20,7 @@ suite =
                         ast =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
                                       , typeSignature = AST.NotProvided
@@ -30,7 +30,7 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
+                                                , AST.Function emptyRange "+"
                                                 ]
                                       }
                                     , { name = "main"
@@ -41,11 +41,11 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "inc"
-                                                , AST.Word emptyRange "inc"
-                                                , AST.Word emptyRange "dec"
+                                                , AST.Function emptyRange "inc"
+                                                , AST.Function emptyRange "inc"
+                                                , AST.Function emptyRange "dec"
                                                 , AST.Integer emptyRange 2
-                                                , AST.Word emptyRange "="
+                                                , AST.Function emptyRange "="
                                                 ]
                                       }
                                     ]
@@ -58,7 +58,7 @@ suite =
                         ast =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , typeSignature = AST.NotProvided
@@ -68,7 +68,7 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "/external/module/inc"
+                                                , AST.Function emptyRange "/external/module/inc"
                                                 ]
                                       }
                                     ]
@@ -81,7 +81,7 @@ suite =
                         ast =
                             { moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
                                       , typeSignature =
@@ -95,7 +95,7 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "+"
+                                                , AST.Function emptyRange "+"
                                                 ]
                                       }
                                     , { name = "main"
@@ -106,9 +106,9 @@ suite =
                                       , implementation =
                                             AST.SoloImpl
                                                 [ AST.Integer emptyRange 1
-                                                , AST.Word emptyRange "inc"
+                                                , AST.Function emptyRange "inc"
                                                 , AST.Integer emptyRange 2
-                                                , AST.Word emptyRange "="
+                                                , AST.Function emptyRange "="
                                                 ]
                                       }
                                     ]
@@ -135,7 +135,7 @@ suite =
                                         []
                                         [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                     ]
-                            , words = Dict.empty
+                            , functions = Dict.empty
                             }
                     in
                     checkForError (noSuchTypeReferenceError "Cent") ast
@@ -152,7 +152,7 @@ suite =
                                         []
                                         [ ( "box", AST.LocalRef "Box" [] ) ]
                                     ]
-                            , words = Dict.empty
+                            , functions = Dict.empty
                             }
                     in
                     checkForError (noSuchTypeReferenceError "Box") ast

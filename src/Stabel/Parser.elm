@@ -1,6 +1,8 @@
 module Stabel.Parser exposing
     ( AST
     , AstNode(..)
+    , FunctionDefinition
+    , FunctionImplementation(..)
     , ModuleDefinition(..)
     , ModuleDefinitionRec
     , PossiblyQualifiedType(..)
@@ -8,8 +10,6 @@ module Stabel.Parser exposing
     , TypeMatch(..)
     , TypeMatchValue(..)
     , TypeSignature(..)
-    , WordDefinition
-    , WordImplementation(..)
     , emptyModuleDefinition
     , run
     , typeDefinitionName
@@ -31,7 +31,7 @@ type alias Parser a =
 type alias AST =
     { moduleDefinition : ModuleDefinition
     , types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
+    , functions : Dict String FunctionDefinition
     }
 
 
@@ -52,17 +52,17 @@ type TypeDefinition
     | UnionTypeDef SourceLocationRange String (List String) (List PossiblyQualifiedType)
 
 
-type alias WordDefinition =
+type alias FunctionDefinition =
     { name : String
     , typeSignature : TypeSignature
     , sourceLocationRange : Maybe SourceLocationRange
     , aliases : Dict String String
     , imports : Dict String (List String)
-    , implementation : WordImplementation
+    , implementation : FunctionImplementation
     }
 
 
-type alias ParserWordType =
+type alias ParserFunctionType =
     { input : List PossiblyQualifiedType
     , output : List PossiblyQualifiedType
     }
@@ -70,11 +70,11 @@ type alias ParserWordType =
 
 type TypeSignature
     = NotProvided
-    | UserProvided ParserWordType
-    | Verified ParserWordType
+    | UserProvided ParserFunctionType
+    | Verified ParserFunctionType
 
 
-typeSignatureToMaybe : TypeSignature -> Maybe ParserWordType
+typeSignatureToMaybe : TypeSignature -> Maybe ParserFunctionType
 typeSignatureToMaybe ts =
     case ts of
         NotProvided ->
@@ -93,10 +93,10 @@ type PossiblyQualifiedType
     | ExternalRef (List String) String (List PossiblyQualifiedType)
     | Generic String
     | StackRange String
-    | QuotationType ParserWordType
+    | FunctionType ParserFunctionType
 
 
-type WordImplementation
+type FunctionImplementation
     = SoloImpl (List AstNode)
     | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
 
@@ -113,10 +113,10 @@ type TypeMatchValue
 
 type AstNode
     = Integer SourceLocationRange Int
-    | Word SourceLocationRange String
-    | PackageWord SourceLocationRange (List String) String
-    | ExternalWord SourceLocationRange (List String) String
-    | Quotation SourceLocationRange (List AstNode)
+    | Function SourceLocationRange String
+    | PackageFunction SourceLocationRange (List String) String
+    | ExternalFunction SourceLocationRange (List String) String
+    | InlineFunction SourceLocationRange (List AstNode)
     | ConstructType String
     | GetMember String String
     | SetMember String String
@@ -485,11 +485,11 @@ parser =
         emptyAst =
             { moduleDefinition = emptyModuleDefinition
             , types = Dict.empty
-            , words = Dict.empty
+            , functions = Dict.empty
             }
 
         checkIfEmpty ast =
-            if Dict.isEmpty ast.types && Dict.isEmpty ast.words then
+            if Dict.isEmpty ast.types && Dict.isEmpty ast.functions then
                 Parser.problem ModuleIsEmpty
 
             else
@@ -552,23 +552,23 @@ moduleDefinitionMetaParser def =
 definitionParser : AST -> Parser (Parser.Step AST AST)
 definitionParser ast =
     let
-        insertWord wordDef =
-            case maybeInsertWordProblem wordDef of
+        insertFunction funcDef =
+            case maybeInsertFunctionProblem funcDef of
                 Just problem ->
                     Parser.problem problem
 
                 Nothing ->
-                    { ast | words = Dict.insert wordDef.name wordDef ast.words }
+                    { ast | functions = Dict.insert funcDef.name funcDef ast.functions }
                         |> Parser.Loop
                         |> Parser.succeed
 
-        maybeInsertWordProblem wordDef =
-            Dict.get wordDef.name ast.words
+        maybeInsertFunctionProblem funcDef =
+            Dict.get funcDef.name ast.functions
                 |> Maybe.map
                     (\prevDef ->
-                        WordAlreadyDefined wordDef.name
+                        FunctionAlreadyDefined funcDef.name
                             prevDef.sourceLocationRange
-                            wordDef.sourceLocationRange
+                            funcDef.sourceLocationRange
                     )
 
         insertType typeDef =
@@ -586,21 +586,21 @@ definitionParser ast =
 
                 Nothing ->
                     let
-                        typeWords =
-                            generateDefaultWordsForType typeDef
+                        typeFunctions =
+                            generateDefaultFunctionsForType typeDef
 
-                        typeWordsProblem =
-                            List.filterMap maybeInsertWordProblem typeWords
+                        typeFunctionsProblem =
+                            List.filterMap maybeInsertFunctionProblem typeFunctions
                                 |> List.head
                     in
-                    case typeWordsProblem of
+                    case typeFunctionsProblem of
                         Just problem ->
                             Parser.problem problem
 
                         Nothing ->
                             { ast
                                 | types = Dict.insert typeName typeDef ast.types
-                                , words = Dict.union (Dict.fromListBy .name typeWords) ast.words
+                                , functions = Dict.union (Dict.fromListBy .name typeFunctions) ast.functions
                             }
                                 |> Parser.Loop
                                 |> Parser.succeed
@@ -609,13 +609,13 @@ definitionParser ast =
         [ sourceLocationParser
             |. Parser.keyword (Token "def:" UnknownError)
             |. noiseParser
-            |> Parser.andThen wordDefinitionParser
-            |> Parser.andThen insertWord
+            |> Parser.andThen functionDefinitionParser
+            |> Parser.andThen insertFunction
         , sourceLocationParser
             |. Parser.keyword (Token "defmulti:" UnknownError)
             |. noiseParser
-            |> Parser.andThen multiWordDefinitionParser
-            |> Parser.andThen insertWord
+            |> Parser.andThen multiFunctionDefinitionParser
+            |> Parser.andThen insertFunction
         , sourceLocationParser
             |. Parser.keyword (Token "defstruct:" UnknownError)
             |. noiseParser
@@ -635,8 +635,8 @@ definitionParser ast =
         ]
 
 
-generateDefaultWordsForType : TypeDefinition -> List WordDefinition
-generateDefaultWordsForType typeDef =
+generateDefaultFunctionsForType : TypeDefinition -> List FunctionDefinition
+generateDefaultFunctionsForType typeDef =
     case typeDef of
         UnionTypeDef _ _ _ _ ->
             []
@@ -699,8 +699,8 @@ generateDefaultWordsForType typeDef =
                 |> (::) ctorDef
 
 
-wordDefinitionParser : SourceLocation -> Parser WordDefinition
-wordDefinitionParser startLocation =
+functionDefinitionParser : SourceLocation -> Parser FunctionDefinition
+functionDefinitionParser startLocation =
     let
         joinParseResults name def endLocation =
             { def
@@ -724,12 +724,12 @@ wordDefinitionParser startLocation =
     Parser.succeed joinParseResults
         |= symbolParser
         |. noiseParser
-        |= Parser.loop emptyDef wordMetadataParser
+        |= Parser.loop emptyDef functionMetadataParser
         |= sourceLocationParser
 
 
-wordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
-wordMetadataParser def =
+functionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
+functionMetadataParser def =
     Parser.oneOf
         [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
             |. Parser.keyword (Token "type:" UnknownError)
@@ -760,8 +760,8 @@ wordMetadataParser def =
         ]
 
 
-multiWordDefinitionParser : SourceLocation -> Parser WordDefinition
-multiWordDefinitionParser startLocation =
+multiFunctionDefinitionParser : SourceLocation -> Parser FunctionDefinition
+multiFunctionDefinitionParser startLocation =
     let
         joinParseResults name def endLocation =
             reverseWhens <|
@@ -794,12 +794,12 @@ multiWordDefinitionParser startLocation =
     Parser.succeed joinParseResults
         |= symbolParser
         |. noiseParser
-        |= Parser.loop emptyDef multiWordMetadataParser
+        |= Parser.loop emptyDef multiFunctionMetadataParser
         |= sourceLocationParser
 
 
-multiWordMetadataParser : WordDefinition -> Parser (Parser.Step WordDefinition WordDefinition)
-multiWordMetadataParser def =
+multiFunctionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
+multiFunctionMetadataParser def =
     let
         addWhenImpl impl =
             case def.implementation of
@@ -919,7 +919,7 @@ unionTypeMemberParser types =
         ]
 
 
-typeSignatureParser : Parser ParserWordType
+typeSignatureParser : Parser ParserFunctionType
 typeSignatureParser =
     Parser.succeed (\input output -> { input = input, output = output })
         |= Parser.loop [] typeLoopParser
@@ -943,7 +943,7 @@ typeLoopParser reverseTypes =
         , Parser.succeed step
             |= typeSignatureRefParser
             |. noiseParser
-        , Parser.succeed (\wordType -> step (QuotationType wordType))
+        , Parser.succeed (\functionType -> step (FunctionType functionType))
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= typeSignatureParser
@@ -1011,7 +1011,7 @@ implementationParserHelp nodes =
         [ Parser.succeed (\node -> Parser.Loop (node :: nodes))
             |= nodeParser
             |. noiseParser
-        , Parser.succeed (\startLoc quotImpl endLoc -> Parser.Loop (Quotation (SourceLocationRange startLoc endLoc) quotImpl :: nodes))
+        , Parser.succeed (\startLoc quotImpl endLoc -> Parser.Loop (InlineFunction (SourceLocationRange startLoc endLoc) quotImpl :: nodes))
             |= sourceLocationParser
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
@@ -1050,7 +1050,7 @@ qualifiedSymbolImplParser =
             else
                 Parser.succeed <|
                     \loc ->
-                        ExternalWord loc path reference
+                        ExternalFunction loc path reference
 
         internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
             let
@@ -1064,10 +1064,10 @@ qualifiedSymbolImplParser =
                 Parser.succeed <|
                     \loc ->
                         if modulePathResult == ( [], "" ) then
-                            Word loc firstSymbol
+                            Function loc firstSymbol
 
                         else
-                            PackageWord loc path reference
+                            PackageFunction loc path reference
 
         checkForUpperCaseLetterInPath path =
             List.any (String.any Char.isUpper) path
