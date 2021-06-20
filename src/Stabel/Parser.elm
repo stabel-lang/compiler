@@ -25,7 +25,7 @@ import Stabel.Parser.Problem exposing (..)
 
 
 type alias Parser a =
-    Parser.Parser () Problem a
+    Parser.Parser Context Problem a
 
 
 type alias AST =
@@ -495,51 +495,61 @@ parser =
             else
                 Parser.succeed ast
     in
-    Parser.succeed identity
-        |. noiseParser
-        |= Parser.oneOf
-            [ Parser.succeed joinParseResults
-                |= moduleDefinitionParser
-                |. noiseParser
-                |= Parser.loop emptyAst definitionParser
-            , Parser.succeed (joinParseResults emptyModuleDefinition)
-                |= Parser.loop emptyAst definitionParser
-            ]
-        |. Parser.end ExpectedEndOfFile
-        |> Parser.andThen checkIfEmpty
+    Parser.inContext TopLevel
+        (Parser.succeed identity
+            |. noiseParser
+            |= Parser.oneOf
+                [ Parser.succeed joinParseResults
+                    |= moduleDefinitionParser
+                    |. noiseParser
+                    |= Parser.loop emptyAst definitionParser
+                , Parser.succeed (joinParseResults emptyModuleDefinition)
+                    |= Parser.loop emptyAst definitionParser
+                ]
+            |. Parser.end ExpectedEndOfFile
+            |> Parser.andThen checkIfEmpty
+        )
 
 
 moduleDefinitionParser : Parser ModuleDefinition
 moduleDefinitionParser =
-    Parser.succeed identity
-        |. Parser.keyword (Token "defmodule:" UnknownError)
-        |. noiseParser
-        |= Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser
-        |> Parser.map Defined
+    Parser.inContext ModuleDefinition
+        (Parser.succeed identity
+            |. Parser.keyword (Token "defmodule:" UnknownError)
+            |. noiseParser
+            |= Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser
+            |> Parser.map Defined
+        )
 
 
 moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDefinitionRec ModuleDefinitionRec)
 moduleDefinitionMetaParser def =
     Parser.oneOf
-        [ Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-            |. Parser.keyword (Token "alias:" UnknownError)
-            |. noiseParser
-            |= symbolParser
-            |. noiseParser
-            |= modulePathStringParser
-            |. noiseParser
-        , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
-            |. Parser.keyword (Token "import:" UnknownError)
-            |. noiseParser
-            |= modulePathStringParser
-            |. noiseParser
-            |= Parser.loop [] symbolImplListParser
-            |. noiseParser
-        , Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
-            |. Parser.keyword (Token "exposing:" UnknownError)
-            |. noiseParser
-            |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
-            |. noiseParser
+        [ Parser.inContext AliasKeyword
+            (Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |. Parser.keyword (Token "alias:" UnknownError)
+                |. noiseParser
+                |= symbolParser
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+            )
+        , Parser.inContext ImportKeyword
+            (Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+                |. Parser.keyword (Token "import:" UnknownError)
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+                |= Parser.loop [] symbolImplListParser
+                |. noiseParser
+            )
+        , Parser.inContext ExposingKeyword
+            (Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
+                |. Parser.keyword (Token "exposing:" UnknownError)
+                |. noiseParser
+                |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
+                |. noiseParser
+            )
         , Parser.succeed UnknownMetadata
             |= metadataParser
             |> Parser.andThen Parser.problem

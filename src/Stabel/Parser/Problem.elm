@@ -1,9 +1,26 @@
 module Stabel.Parser.Problem exposing
-    ( Problem(..)
+    ( Context(..)
+    , Problem(..)
     , toString
     )
 
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+
+
+type Context
+    = TopLevel
+    | ModuleDefinition
+    | AliasKeyword
+    | ImportKeyword
+    | ExposingKeyword
+    | FunctionDefinition String
+    | MultifunctionDefinition String
+    | StructDefinition String
+    | UnionDefinition String
+    | TypeKeyword
+    | MemberKeyword
+    | ImplementationKeyword
+    | ElseKeyword
 
 
 type Problem
