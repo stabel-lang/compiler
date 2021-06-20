@@ -252,22 +252,17 @@ symbolImplListParser symbols =
 
 modulePathStringParser : Parser String
 modulePathStringParser =
+    let
+        joiner ( path, sym ) =
+            String.join "/" (path ++ [ sym ])
+    in
     Parser.oneOf
         [ Parser.succeed identity
             |= symbolImplParser
-            |> Parser.andThen (\sym -> Parser.loop sym moduleRefParser)
-        , Parser.succeed identity
-            |= Parser.loop "" moduleRefParser
-        ]
-
-
-moduleRefParser : String -> Parser (Parser.Step String String)
-moduleRefParser path =
-    Parser.oneOf
-        [ Parser.succeed (\part -> Parser.Loop (path ++ "/" ++ part))
-            |. Parser.symbol (Token "/" NotMetadata)
-            |= symbolImplParser
-        , Parser.succeed (Parser.Done path)
+            |> Parser.andThen (\sym -> Parser.loop [ sym ] modulePathParser)
+            |> Parser.map joiner
+        , Parser.succeed (\res -> "/" ++ joiner res)
+            |= Parser.loop [] modulePathParser
         ]
 
 
@@ -1045,16 +1040,12 @@ nodeParser =
 qualifiedSymbolImplParser : Parser (SourceLocationRange -> AstNode)
 qualifiedSymbolImplParser =
     let
-        externalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
-            let
-                path =
-                    firstSymbol :: partialPath
-            in
+        externalBuilder ( path, reference ) =
             if checkForUpperCaseLetterInPath path then
                 Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
 
-            else if modulePathResult == ( [], "" ) then
-                Parser.problem <| InvalidModulePath <| "/" ++ firstSymbol
+            else if List.length path <= 1 then
+                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path ++ "/" ++ reference
 
             else
                 Parser.succeed <|
@@ -1082,15 +1073,14 @@ qualifiedSymbolImplParser =
             List.any (String.any Char.isUpper) path
     in
     Parser.oneOf
-        [ Parser.succeed externalBuilder
-            |. Parser.symbol (Token "/" NotMetadata)
+        [ Parser.succeed internalBuilder
             |= symbolImplParser
             |= Parser.loop [] modulePathParser
-        , Parser.succeed internalBuilder
-            |= symbolImplParser
+            |> Parser.andThen identity
+        , Parser.succeed identity
             |= Parser.loop [] modulePathParser
+            |> Parser.andThen externalBuilder
         ]
-        |> Parser.andThen identity
 
 
 typeDefinitionName : TypeDefinition -> String
