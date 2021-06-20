@@ -4,7 +4,11 @@ module Stabel.Parser.Problem exposing
     , toString
     )
 
-import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.SourceLocation as SourceLocation
+    exposing
+        ( SourceLocation
+        , SourceLocationRange
+        )
 
 
 type Context
@@ -13,10 +17,10 @@ type Context
     | AliasKeyword
     | ImportKeyword
     | ExposingKeyword
-    | FunctionDefinition String
-    | MultifunctionDefinition String
-    | StructDefinition String
-    | UnionDefinition String
+    | FunctionDefinition SourceLocation String
+    | MultifunctionDefinition SourceLocation String
+    | StructDefinition SourceLocation String
+    | UnionDefinition SourceLocation String
     | TypeKeyword
     | MemberKeyword
     | ImplementationKeyword

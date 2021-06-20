@@ -21,7 +21,7 @@ import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Set exposing (Set)
 import Stabel.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
-import Stabel.Parser.Problem exposing (..)
+import Stabel.Parser.Problem as Problem exposing (..)
 
 
 type alias Parser a =
@@ -616,23 +616,35 @@ definitionParser ast =
                                 |> Parser.succeed
     in
     Parser.oneOf
-        [ sourceLocationParser
+        [ Parser.succeed Tuple.pair
+            |= sourceLocationParser
             |. Parser.keyword (Token "def:" UnknownError)
+            |. noiseParser
+            |= symbolParser
             |. noiseParser
             |> Parser.andThen functionDefinitionParser
             |> Parser.andThen insertFunction
-        , sourceLocationParser
+        , Parser.succeed Tuple.pair
+            |= sourceLocationParser
             |. Parser.keyword (Token "defmulti:" UnknownError)
+            |. noiseParser
+            |= symbolParser
             |. noiseParser
             |> Parser.andThen multiFunctionDefinitionParser
             |> Parser.andThen insertFunction
-        , sourceLocationParser
+        , Parser.succeed Tuple.pair
+            |= sourceLocationParser
             |. Parser.keyword (Token "defstruct:" UnknownError)
+            |. noiseParser
+            |= typeNameParser
             |. noiseParser
             |> Parser.andThen typeDefinitionParser
             |> Parser.andThen insertType
-        , sourceLocationParser
+        , Parser.succeed Tuple.pair
+            |= sourceLocationParser
             |. Parser.keyword (Token "defunion:" UnknownError)
+            |. noiseParser
+            |= typeNameParser
             |. noiseParser
             |> Parser.andThen unionTypeDefinitionParser
             |> Parser.andThen insertType
@@ -709,13 +721,12 @@ generateDefaultFunctionsForType typeDef =
                 |> (::) ctorDef
 
 
-functionDefinitionParser : SourceLocation -> Parser FunctionDefinition
-functionDefinitionParser startLocation =
+functionDefinitionParser : ( SourceLocation, String ) -> Parser FunctionDefinition
+functionDefinitionParser ( startLocation, name ) =
     let
-        joinParseResults name def endLocation =
+        joinParseResults def endLocation =
             { def
-                | name = name
-                , sourceLocationRange =
+                | sourceLocationRange =
                     Just
                         { start = startLocation
                         , end = endLocation
@@ -723,7 +734,7 @@ functionDefinitionParser startLocation =
             }
 
         emptyDef =
-            { name = ""
+            { name = name
             , typeSignature = NotProvided
             , sourceLocationRange = Nothing
             , aliases = Dict.empty
@@ -731,38 +742,41 @@ functionDefinitionParser startLocation =
             , implementation = SoloImpl []
             }
     in
-    Parser.succeed joinParseResults
-        |= symbolParser
-        |. noiseParser
-        |= Parser.loop emptyDef functionMetadataParser
-        |= sourceLocationParser
+    Parser.inContext (Problem.FunctionDefinition startLocation name) <|
+        Parser.succeed joinParseResults
+            |= Parser.loop emptyDef functionMetadataParser
+            |= sourceLocationParser
 
 
 functionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
 functionMetadataParser def =
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
-            |. Parser.keyword (Token "type:" UnknownError)
-            |. noiseParser
-            |= typeSignatureParser
-        , Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-            |. Parser.keyword (Token "alias:" UnknownError)
-            |. noiseParser
-            |= symbolParser
-            |. noiseParser
-            |= modulePathStringParser
-            |. noiseParser
-        , Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
-            |. Parser.keyword (Token "import:" UnknownError)
-            |. noiseParser
-            |= modulePathStringParser
-            |. noiseParser
-            |= Parser.loop [] symbolImplListParser
-            |. noiseParser
-        , Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
-            |. Parser.keyword (Token ":" UnknownError)
-            |. noiseParser
-            |= implementationParser
+        [ Parser.inContext TypeKeyword <|
+            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
+                |. Parser.keyword (Token "type:" UnknownError)
+                |. noiseParser
+                |= typeSignatureParser
+        , Parser.inContext AliasKeyword <|
+            Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |. Parser.keyword (Token "alias:" UnknownError)
+                |. noiseParser
+                |= symbolParser
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+        , Parser.inContext ImportKeyword <|
+            Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+                |. Parser.keyword (Token "import:" UnknownError)
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+                |= Parser.loop [] symbolImplListParser
+                |. noiseParser
+        , Parser.inContext ImplementationKeyword <|
+            Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
+                |. Parser.keyword (Token ":" UnknownError)
+                |. noiseParser
+                |= implementationParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
@@ -770,22 +784,21 @@ functionMetadataParser def =
         ]
 
 
-multiFunctionDefinitionParser : SourceLocation -> Parser FunctionDefinition
-multiFunctionDefinitionParser startLocation =
+multiFunctionDefinitionParser : ( SourceLocation, String ) -> Parser FunctionDefinition
+multiFunctionDefinitionParser ( startLocation, name ) =
     let
-        joinParseResults name def endLocation =
-            reverseWhens <|
-                { def
-                    | name = name
-                    , sourceLocationRange =
-                        Just
-                            { start = startLocation
-                            , end = endLocation
-                            }
-                }
+        joinParseResults def endLocation =
+            { def
+                | sourceLocationRange =
+                    Just
+                        { start = startLocation
+                        , end = endLocation
+                        }
+                , implementation = reverseWhens def.implementation
+            }
 
         emptyDef =
-            { name = ""
+            { name = name
             , typeSignature = NotProvided
             , sourceLocationRange = Nothing
             , aliases = Dict.empty
@@ -793,19 +806,18 @@ multiFunctionDefinitionParser startLocation =
             , implementation = SoloImpl []
             }
 
-        reverseWhens def =
-            case def.implementation of
+        reverseWhens implementation =
+            case implementation of
                 SoloImpl _ ->
-                    def
+                    implementation
 
                 MultiImpl whens impl ->
-                    { def | implementation = MultiImpl (List.reverse whens) impl }
+                    MultiImpl (List.reverse whens) impl
     in
-    Parser.succeed joinParseResults
-        |= symbolParser
-        |. noiseParser
-        |= Parser.loop emptyDef multiFunctionMetadataParser
-        |= sourceLocationParser
+    Parser.inContext (Problem.MultifunctionDefinition startLocation name) <|
+        Parser.succeed joinParseResults
+            |= Parser.loop emptyDef multiFunctionMetadataParser
+            |= sourceLocationParser
 
 
 multiFunctionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
@@ -828,20 +840,23 @@ multiFunctionMetadataParser def =
                     MultiImpl [] impl
     in
     Parser.oneOf
-        [ Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
-            |. Parser.keyword (Token "type:" UnknownError)
-            |. noiseParser
-            |= typeSignatureParser
-        , Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
-            |. Parser.keyword (Token "else:" UnknownError)
-            |. noiseParser
-            |= implementationParser
-        , Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
-            |. Parser.keyword (Token ":" UnknownError)
-            |. noiseParser
-            |= typeMatchParser
-            |. noiseParser
-            |= implementationParser
+        [ Parser.inContext TypeKeyword <|
+            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
+                |. Parser.keyword (Token "type:" UnknownError)
+                |. noiseParser
+                |= typeSignatureParser
+        , Parser.inContext ElseKeyword <|
+            Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
+                |. Parser.keyword (Token "else:" UnknownError)
+                |. noiseParser
+                |= implementationParser
+        , Parser.inContext ImplementationKeyword <|
+            Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
+                |. Parser.keyword (Token ":" UnknownError)
+                |. noiseParser
+                |= typeMatchParser
+                |. noiseParser
+                |= implementationParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
@@ -849,22 +864,21 @@ multiFunctionMetadataParser def =
         ]
 
 
-typeDefinitionParser : SourceLocation -> Parser TypeDefinition
-typeDefinitionParser startLocation =
+typeDefinitionParser : ( SourceLocation, String ) -> Parser TypeDefinition
+typeDefinitionParser ( startLocation, typeName ) =
     let
-        ctor typeName generics members endLocation =
+        ctor generics members endLocation =
             CustomTypeDef
                 (SourceLocationRange startLocation endLocation)
                 typeName
                 generics
                 members
     in
-    Parser.succeed ctor
-        |= typeNameParser
-        |. noiseParser
-        |= Parser.loop [] typeGenericParser
-        |= Parser.loop [] typeMemberParser
-        |= sourceLocationParser
+    Parser.inContext (Problem.StructDefinition startLocation typeName) <|
+        Parser.succeed ctor
+            |= Parser.loop [] typeGenericParser
+            |= Parser.loop [] typeMemberParser
+            |= sourceLocationParser
 
 
 typeGenericParser : List String -> Parser (Parser.Step (List String) (List String))
@@ -882,12 +896,13 @@ typeMemberParser :
     -> Parser (Parser.Step (List ( String, PossiblyQualifiedType )) (List ( String, PossiblyQualifiedType )))
 typeMemberParser types =
     Parser.oneOf
-        [ Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
-            |. Parser.symbol (Token ":" UnknownError)
-            |. noiseParser
-            |= symbolParser
-            |. noiseParser
-            |= typeRefParser
+        [ Parser.inContext MemberKeyword <|
+            Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
+                |. Parser.symbol (Token ":" UnknownError)
+                |. noiseParser
+                |= symbolParser
+                |. noiseParser
+                |= typeRefParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
@@ -895,22 +910,21 @@ typeMemberParser types =
         ]
 
 
-unionTypeDefinitionParser : SourceLocation -> Parser TypeDefinition
-unionTypeDefinitionParser startLocation =
+unionTypeDefinitionParser : ( SourceLocation, String ) -> Parser TypeDefinition
+unionTypeDefinitionParser ( startLocation, typeName ) =
     let
-        ctor typeName generics members endLocation =
+        ctor generics members endLocation =
             UnionTypeDef
                 (SourceLocationRange startLocation endLocation)
                 typeName
                 generics
                 members
     in
-    Parser.succeed ctor
-        |= typeNameParser
-        |. noiseParser
-        |= Parser.loop [] typeGenericParser
-        |= Parser.loop [] unionTypeMemberParser
-        |= sourceLocationParser
+    Parser.inContext (Problem.UnionDefinition startLocation typeName) <|
+        Parser.succeed ctor
+            |= Parser.loop [] typeGenericParser
+            |= Parser.loop [] unionTypeMemberParser
+            |= sourceLocationParser
 
 
 unionTypeMemberParser :
@@ -918,10 +932,11 @@ unionTypeMemberParser :
     -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
 unionTypeMemberParser types =
     Parser.oneOf
-        [ Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
-            |. Parser.symbol (Token ":" UnknownError)
-            |. noiseParser
-            |= typeRefParser
+        [ Parser.inContext MemberKeyword <|
+            Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
+                |. Parser.symbol (Token ":" UnknownError)
+                |. noiseParser
+                |= typeRefParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
