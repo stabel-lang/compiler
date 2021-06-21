@@ -12,6 +12,7 @@ module Stabel.PackageLoader exposing
 import Dict exposing (Dict)
 import Json.Decode as Json
 import List.Extra as List
+import Parser.Advanced exposing (DeadEnd)
 import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Metadata as Metadata
@@ -31,7 +32,7 @@ type Problem
     | UnknownMessageForState String
     | NoExposedModulesInRootProject
     | ModuleNotFound String
-    | ParserError String (List ParserProblem.Problem)
+    | ParserError String (List (DeadEnd ParserProblem.Context ParserProblem.Problem))
     | QualifierError String (List QualifierProblem.Problem)
     | InternalError String
 

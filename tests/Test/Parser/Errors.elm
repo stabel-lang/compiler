@@ -14,7 +14,7 @@ suite =
             let
                 functionAlreadyDefined name problem =
                     case problem of
-                        FunctionAlreadyDefined definedName _ _ ->
+                        FunctionAlreadyDefined definedName _ ->
                             name == definedName
 
                         _ ->
@@ -56,7 +56,7 @@ suite =
 
                         typeAlreadyDefined name problem =
                             case problem of
-                                TypeAlreadyDefined definedName _ _ ->
+                                TypeAlreadyDefined definedName _ ->
                                     name == definedName
 
                                 _ ->
@@ -228,7 +228,7 @@ suite =
             let
                 badDefinition name problem =
                     case problem of
-                        BadDefinition _ definitionName ->
+                        BadDefinition definitionName ->
                             name == definitionName
 
                         _ ->
@@ -275,7 +275,7 @@ checkForError : (Problem -> Bool) -> String -> Expectation
 checkForError fn source =
     case compile source of
         Err errors ->
-            if List.any fn errors then
+            if List.any (.problem >> fn) errors then
                 Expect.pass
 
             else
