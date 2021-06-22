@@ -207,7 +207,6 @@ sourceLocationParser =
     Parser.succeed SourceLocation
         |= Parser.getRow
         |= Parser.getCol
-        |= Parser.getOffset
 
 
 symbolParser : Parser String

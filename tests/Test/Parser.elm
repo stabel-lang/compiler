@@ -885,8 +885,8 @@ suite =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ UnionTypeDef
                                     (SourceLocationRange
-                                        (SourceLocation 2 1 1)
-                                        (SourceLocation 6 1 32)
+                                        (SourceLocation 2 1)
+                                        (SourceLocation 6 1)
                                     )
                                     "Bool"
                                     []
@@ -895,16 +895,16 @@ suite =
                                     ]
                                 , CustomTypeDef
                                     (SourceLocationRange
-                                        (SourceLocation 6 1 32)
-                                        (SourceLocation 7 1 48)
+                                        (SourceLocation 6 1)
+                                        (SourceLocation 7 1)
                                     )
                                     "True"
                                     []
                                     []
                                 , CustomTypeDef
                                     (SourceLocationRange
-                                        (SourceLocation 7 1 48)
-                                        (SourceLocation 9 1 66)
+                                        (SourceLocation 7 1)
+                                        (SourceLocation 9 1)
                                     )
                                     "False"
                                     []
@@ -943,8 +943,8 @@ suite =
                                   , sourceLocationRange =
                                         Just
                                             (SourceLocationRange
-                                                (SourceLocation 9 1 66)
-                                                (SourceLocation 16 1 141)
+                                                (SourceLocation 9 1)
+                                                (SourceLocation 16 1)
                                             )
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -952,30 +952,30 @@ suite =
                                         MultiImpl
                                             [ ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 11 3 104)
-                                                        (SourceLocation 11 17 118)
+                                                        (SourceLocation 11 3)
+                                                        (SourceLocation 11 17)
                                                     )
                                                     (LocalRef "Int" [])
                                                     [ ( "value", LiteralInt 0 ) ]
                                               , [ Function
                                                     (SourceLocationRange
-                                                        (SourceLocation 12 3 121)
-                                                        (SourceLocation 12 8 126)
+                                                        (SourceLocation 12 3)
+                                                        (SourceLocation 12 8)
                                                     )
                                                     "False"
                                                 ]
                                               )
                                             , ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 13 3 129)
-                                                        (SourceLocation 13 6 132)
+                                                        (SourceLocation 13 3)
+                                                        (SourceLocation 13 6)
                                                     )
                                                     (LocalRef "Int" [])
                                                     []
                                               , [ Function
                                                     (SourceLocationRange
-                                                        (SourceLocation 14 3 135)
-                                                        (SourceLocation 14 7 139)
+                                                        (SourceLocation 14 3)
+                                                        (SourceLocation 14 7)
                                                     )
                                                     "True"
                                                 ]
@@ -988,8 +988,8 @@ suite =
                                   , sourceLocationRange =
                                         Just
                                             (SourceLocationRange
-                                                (SourceLocation 16 1 141)
-                                                (SourceLocation 19 1 170)
+                                                (SourceLocation 16 1)
+                                                (SourceLocation 19 1)
                                             )
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -997,20 +997,20 @@ suite =
                                         SoloImpl
                                             [ Function
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 3 154)
-                                                    (SourceLocation 17 4 155)
+                                                    (SourceLocation 17 3)
+                                                    (SourceLocation 17 4)
                                                 )
                                                 "-"
                                             , Function
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 5 156)
-                                                    (SourceLocation 17 13 164)
+                                                    (SourceLocation 17 5)
+                                                    (SourceLocation 17 13)
                                                 )
                                                 "from-int"
                                             , Function
                                                 (SourceLocationRange
-                                                    (SourceLocation 17 14 165)
-                                                    (SourceLocation 17 17 168)
+                                                    (SourceLocation 17 14)
+                                                    (SourceLocation 17 17)
                                                 )
                                                 "not"
                                             ]
@@ -1020,8 +1020,8 @@ suite =
                                   , sourceLocationRange =
                                         Just
                                             (SourceLocationRange
-                                                (SourceLocation 19 1 170)
-                                                (SourceLocation 23 1 210)
+                                                (SourceLocation 19 1)
+                                                (SourceLocation 23 1)
                                             )
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1029,15 +1029,15 @@ suite =
                                         MultiImpl
                                             [ ( TypeMatch
                                                     (SourceLocationRange
-                                                        (SourceLocation 20 3 186)
-                                                        (SourceLocation 20 7 190)
+                                                        (SourceLocation 20 3)
+                                                        (SourceLocation 20 7)
                                                     )
                                                     (LocalRef "True" [])
                                                     []
                                               , [ Function
                                                     (SourceLocationRange
-                                                        (SourceLocation 21 3 193)
-                                                        (SourceLocation 21 8 198)
+                                                        (SourceLocation 21 3)
+                                                        (SourceLocation 21 8)
                                                     )
                                                     "False"
                                                 ]
@@ -1045,8 +1045,8 @@ suite =
                                             ]
                                             [ Function
                                                 (SourceLocationRange
-                                                    (SourceLocation 22 7 205)
-                                                    (SourceLocation 22 11 209)
+                                                    (SourceLocation 22 7)
+                                                    (SourceLocation 22 11)
                                                 )
                                                 "True"
                                             ]
