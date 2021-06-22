@@ -29,7 +29,8 @@ type alias Parser a =
 
 
 type alias AST =
-    { moduleDefinition : ModuleDefinition
+    { sourceReference : String
+    , moduleDefinition : ModuleDefinition
     , types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
     }
@@ -122,9 +123,9 @@ type AstNode
     | SetMember String String
 
 
-run : String -> Result (List (Parser.DeadEnd Context Problem)) AST
-run sourceCode =
-    Parser.run parser sourceCode
+run : String -> String -> Result (List (Parser.DeadEnd Context Problem)) AST
+run ref sourceCode =
+    Parser.run (parser ref) sourceCode
 
 
 
@@ -474,14 +475,15 @@ noiseParserLoop _ =
 -- Grammar
 
 
-parser : Parser AST
-parser =
+parser : String -> Parser AST
+parser ref =
     let
         joinParseResults modDef ast =
             { ast | moduleDefinition = modDef }
 
         emptyAst =
-            { moduleDefinition = emptyModuleDefinition
+            { sourceReference = ref
+            , moduleDefinition = emptyModuleDefinition
             , types = Dict.empty
             , functions = Dict.empty
             }

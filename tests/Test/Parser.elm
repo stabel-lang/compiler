@@ -40,7 +40,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -100,7 +101,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -138,7 +140,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -189,7 +192,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange "True" [] []
@@ -230,7 +234,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange
@@ -271,7 +276,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ CustomTypeDef emptyRange
@@ -334,7 +340,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -378,7 +385,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
@@ -432,7 +440,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
@@ -488,7 +497,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
@@ -546,7 +556,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ UnionTypeDef emptyRange
@@ -600,7 +611,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -658,7 +670,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -714,7 +727,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -751,7 +765,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -794,7 +809,8 @@ suite =
                             """
 
                         expectedAst =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -880,7 +896,8 @@ suite =
                     -- The ending source location for most definitions now ends where the next definition beings
                     -- This is not what we want (it includes too much white space), but it'll do for now.
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types =
                             Dict.fromListBy AST.typeDefinitionName
                                 [ UnionTypeDef

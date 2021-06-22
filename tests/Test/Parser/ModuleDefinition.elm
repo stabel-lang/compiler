@@ -39,7 +39,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             Defined
                                 { aliases =
                                     Dict.fromList
@@ -97,7 +98,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name

@@ -55,7 +55,7 @@ update msg _ =
 
 compile : String -> String -> Result String Wasm.Module
 compile entry sourceCode =
-    case Parser.run sourceCode of
+    case Parser.run "test" sourceCode of
         Err parserErrors ->
             formatErrors (ParserProblem.toString sourceCode) parserErrors
 

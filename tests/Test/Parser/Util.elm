@@ -25,12 +25,13 @@ compile str =
 compileRetainLocations : String -> Result (List (Parser.DeadEnd Context Problem)) AST
 compileRetainLocations str =
     String.unindent str
-        |> run
+        |> run ""
 
 
 stripLocations : AST -> AST
 stripLocations ast =
-    { moduleDefinition = ast.moduleDefinition
+    { sourceReference = ast.sourceReference
+    , moduleDefinition = ast.moduleDefinition
     , types = Dict.map (\_ t -> stripTypeLocation t) ast.types
     , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
     }

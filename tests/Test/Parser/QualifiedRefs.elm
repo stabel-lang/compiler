@@ -21,7 +21,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -48,7 +49,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -75,7 +77,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -105,7 +108,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -139,7 +143,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -176,7 +181,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -219,7 +225,8 @@ suite =
                         """
 
                     expectedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name

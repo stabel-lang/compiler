@@ -18,7 +18,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -56,7 +57,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -79,7 +81,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
@@ -119,7 +122,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.UnionTypeDef
@@ -143,7 +147,8 @@ suite =
                 \_ ->
                     let
                         ast =
-                            { moduleDefinition = AST.emptyModuleDefinition
+                            { sourceReference = ""
+                            , moduleDefinition = AST.emptyModuleDefinition
                             , types =
                                 Dict.fromListBy AST.typeDefinitionName
                                     [ AST.CustomTypeDef

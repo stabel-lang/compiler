@@ -477,7 +477,7 @@ parsingUpdate msg state remainingModules =
                 possibleModuleInfo =
                     Dict.get fullPath state.filePathToModule
             in
-            case ( possibleModuleInfo, Parser.run content ) of
+            case ( possibleModuleInfo, Parser.run fullPath content ) of
                 ( _, Err parserError ) ->
                     Failed <| ParserError content parserError
 

@@ -22,7 +22,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -70,7 +71,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -130,7 +132,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -199,7 +202,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -282,7 +286,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types =
                             Dict.fromList
                                 [ ( "SomeType"
@@ -325,7 +330,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -373,7 +379,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -433,7 +440,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -502,7 +510,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -585,7 +594,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.emptyModuleDefinition
+                        { sourceReference = ""
+                        , moduleDefinition = AST.emptyModuleDefinition
                         , types =
                             Dict.fromList
                                 [ ( "SomeType"
@@ -628,7 +638,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases =
                                     Dict.fromList
@@ -704,7 +715,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases =
                                     Dict.fromList
@@ -778,7 +790,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases =
                                     Dict.fromList
@@ -848,7 +861,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases =
                                     Dict.fromList
@@ -908,7 +922,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -983,7 +998,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -1057,7 +1073,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -1117,7 +1134,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -1189,7 +1207,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1250,7 +1269,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports = Dict.empty
@@ -1318,7 +1338,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -1376,7 +1397,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { aliases = Dict.empty
                                 , imports =
@@ -1434,7 +1456,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1486,7 +1509,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types =
                             Dict.fromList
                                 [ ( "BoxedTipe"
@@ -1531,7 +1555,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1584,7 +1609,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1634,7 +1660,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types =
                             Dict.fromList
                                 [ ( "BoxedTipe"
@@ -1677,7 +1704,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1728,7 +1756,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition = AST.Undefined
+                        { sourceReference = ""
+                        , moduleDefinition = AST.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
@@ -1773,7 +1802,8 @@ suite =
             \_ ->
                 let
                     unqualifiedAst =
-                        { moduleDefinition =
+                        { sourceReference = ""
+                        , moduleDefinition =
                             AST.Defined
                                 { imports = Dict.empty
                                 , aliases = Dict.empty
