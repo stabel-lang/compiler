@@ -26,11 +26,22 @@ toString location =
     String.fromInt location.row ++ ":" ++ String.fromInt location.col
 
 
-extractFromString : String -> SourceLocationRange -> String
-extractFromString sourceCode range =
+extractFromString : String -> Int -> Int -> String
+extractFromString sourceCode startLine endLine =
+    let
+        numPadding =
+            endLine
+                |> String.fromInt
+                |> String.length
+    in
     sourceCode
-        |> String.slice range.start.offset range.end.offset
-        |> String.trim
         |> String.lines
-        |> List.indexedMap (\i l -> String.fromInt (range.start.row + i) ++ " | " ++ l)
+        |> List.indexedMap (\idx line -> ( idx + 1, line ))
+        |> List.filter (\( idx, _ ) -> idx >= startLine && idx <= endLine)
+        |> List.map
+            (\( idx, line ) ->
+                String.padLeft numPadding ' ' (String.fromInt idx)
+                    ++ " | "
+                    ++ line
+            )
         |> String.join "\n"

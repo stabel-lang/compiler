@@ -122,10 +122,9 @@ type AstNode
     | SetMember String String
 
 
-run : String -> Result (List Problem) AST
+run : String -> Result (List (Parser.DeadEnd Context Problem)) AST
 run sourceCode =
     Parser.run parser sourceCode
-        |> Result.mapError (List.map .problem)
 
 
 
@@ -495,20 +494,18 @@ parser =
             else
                 Parser.succeed ast
     in
-    Parser.inContext TopLevel
-        (Parser.succeed identity
-            |. noiseParser
-            |= Parser.oneOf
-                [ Parser.succeed joinParseResults
-                    |= moduleDefinitionParser
-                    |. noiseParser
-                    |= Parser.loop emptyAst definitionParser
-                , Parser.succeed (joinParseResults emptyModuleDefinition)
-                    |= Parser.loop emptyAst definitionParser
-                ]
-            |. Parser.end ExpectedEndOfFile
-            |> Parser.andThen checkIfEmpty
-        )
+    Parser.succeed identity
+        |. noiseParser
+        |= Parser.oneOf
+            [ Parser.succeed joinParseResults
+                |= moduleDefinitionParser
+                |. noiseParser
+                |= Parser.loop emptyAst definitionParser
+            , Parser.succeed (joinParseResults emptyModuleDefinition)
+                |= Parser.loop emptyAst definitionParser
+            ]
+        |. Parser.end ExpectedEndOfFile
+        |> Parser.andThen checkIfEmpty
 
 
 moduleDefinitionParser : Parser ModuleDefinition
@@ -563,57 +560,40 @@ definitionParser : AST -> Parser (Parser.Step AST AST)
 definitionParser ast =
     let
         insertFunction funcDef =
-            case maybeInsertFunctionProblem funcDef of
-                Just problem ->
-                    Parser.problem problem
-
-                Nothing ->
-                    { ast | functions = Dict.insert funcDef.name funcDef ast.functions }
-                        |> Parser.Loop
-                        |> Parser.succeed
-
-        maybeInsertFunctionProblem funcDef =
-            Dict.get funcDef.name ast.functions
-                |> Maybe.map
-                    (\prevDef ->
-                        FunctionAlreadyDefined funcDef.name
-                            prevDef.sourceLocationRange
-                            funcDef.sourceLocationRange
-                    )
+            { ast | functions = Dict.insert funcDef.name funcDef ast.functions }
+                |> Parser.Loop
+                |> Parser.succeed
 
         insertType typeDef =
             let
                 typeName =
                     typeDefinitionName typeDef
+
+                typeFunctions =
+                    generateDefaultFunctionsForType typeDef
+
+                typeFunctionsProblem =
+                    typeFunctions
+                        |> List.filterMap (\tf -> Dict.get tf.name ast.functions)
+                        |> List.head
+                        |> Maybe.map
+                            (\f ->
+                                Problem.FunctionAlreadyDefined
+                                    f.name
+                                    f.sourceLocationRange
+                            )
             in
-            case Dict.get typeName ast.types of
-                Just previousDefinition ->
-                    Parser.problem <|
-                        TypeAlreadyDefined
-                            typeName
-                            (typeDefinitionLocation previousDefinition)
-                            (typeDefinitionLocation typeDef)
+            case typeFunctionsProblem of
+                Just problem ->
+                    Parser.problem problem
 
                 Nothing ->
-                    let
-                        typeFunctions =
-                            generateDefaultFunctionsForType typeDef
-
-                        typeFunctionsProblem =
-                            List.filterMap maybeInsertFunctionProblem typeFunctions
-                                |> List.head
-                    in
-                    case typeFunctionsProblem of
-                        Just problem ->
-                            Parser.problem problem
-
-                        Nothing ->
-                            { ast
-                                | types = Dict.insert typeName typeDef ast.types
-                                , functions = Dict.union (Dict.fromListBy .name typeFunctions) ast.functions
-                            }
-                                |> Parser.Loop
-                                |> Parser.succeed
+                    { ast
+                        | types = Dict.insert typeName typeDef ast.types
+                        , functions = Dict.union (Dict.fromListBy .name typeFunctions) ast.functions
+                    }
+                        |> Parser.Loop
+                        |> Parser.succeed
     in
     Parser.oneOf
         [ Parser.succeed Tuple.pair
@@ -621,37 +601,31 @@ definitionParser ast =
             |. Parser.keyword (Token "def:" UnknownError)
             |. noiseParser
             |= symbolParser
-            |. noiseParser
-            |> Parser.andThen functionDefinitionParser
+            |> Parser.andThen (functionDefinitionParser ast.functions)
             |> Parser.andThen insertFunction
         , Parser.succeed Tuple.pair
             |= sourceLocationParser
             |. Parser.keyword (Token "defmulti:" UnknownError)
             |. noiseParser
             |= symbolParser
-            |. noiseParser
-            |> Parser.andThen multiFunctionDefinitionParser
+            |> Parser.andThen (multiFunctionDefinitionParser ast.functions)
             |> Parser.andThen insertFunction
         , Parser.succeed Tuple.pair
             |= sourceLocationParser
             |. Parser.keyword (Token "defstruct:" UnknownError)
             |. noiseParser
             |= typeNameParser
-            |. noiseParser
-            |> Parser.andThen typeDefinitionParser
+            |> Parser.andThen (typeDefinitionParser ast.types)
             |> Parser.andThen insertType
         , Parser.succeed Tuple.pair
             |= sourceLocationParser
             |. Parser.keyword (Token "defunion:" UnknownError)
             |. noiseParser
             |= typeNameParser
-            |. noiseParser
-            |> Parser.andThen unionTypeDefinitionParser
+            |> Parser.andThen (unionTypeDefinitionParser ast.types)
             |> Parser.andThen insertType
-        , Parser.succeed (\start text end -> BadDefinition (SourceLocationRange start end) text)
-            |= sourceLocationParser
+        , Parser.succeed BadDefinition
             |= textParser
-            |= sourceLocationParser
             |> Parser.andThen Parser.problem
         , Parser.succeed (Parser.Done ast)
         ]
@@ -721,8 +695,8 @@ generateDefaultFunctionsForType typeDef =
                 |> (::) ctorDef
 
 
-functionDefinitionParser : ( SourceLocation, String ) -> Parser FunctionDefinition
-functionDefinitionParser ( startLocation, name ) =
+functionDefinitionParser : Dict String FunctionDefinition -> ( SourceLocation, String ) -> Parser FunctionDefinition
+functionDefinitionParser definedFunctions ( startLocation, name ) =
     let
         joinParseResults def endLocation =
             { def
@@ -743,9 +717,16 @@ functionDefinitionParser ( startLocation, name ) =
             }
     in
     Parser.inContext (Problem.FunctionDefinition startLocation name) <|
-        Parser.succeed joinParseResults
-            |= Parser.loop emptyDef functionMetadataParser
-            |= sourceLocationParser
+        case Dict.get name definedFunctions of
+            Just previousDefinition ->
+                Parser.problem <|
+                    Problem.FunctionAlreadyDefined name previousDefinition.sourceLocationRange
+
+            _ ->
+                Parser.succeed joinParseResults
+                    |. noiseParser
+                    |= Parser.loop emptyDef functionMetadataParser
+                    |= sourceLocationParser
 
 
 functionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
@@ -784,8 +765,8 @@ functionMetadataParser def =
         ]
 
 
-multiFunctionDefinitionParser : ( SourceLocation, String ) -> Parser FunctionDefinition
-multiFunctionDefinitionParser ( startLocation, name ) =
+multiFunctionDefinitionParser : Dict String FunctionDefinition -> ( SourceLocation, String ) -> Parser FunctionDefinition
+multiFunctionDefinitionParser definedFunctions ( startLocation, name ) =
     let
         joinParseResults def endLocation =
             { def
@@ -815,9 +796,16 @@ multiFunctionDefinitionParser ( startLocation, name ) =
                     MultiImpl (List.reverse whens) impl
     in
     Parser.inContext (Problem.MultifunctionDefinition startLocation name) <|
-        Parser.succeed joinParseResults
-            |= Parser.loop emptyDef multiFunctionMetadataParser
-            |= sourceLocationParser
+        case Dict.get name definedFunctions of
+            Just previousDefinition ->
+                Parser.problem <|
+                    Problem.FunctionAlreadyDefined name previousDefinition.sourceLocationRange
+
+            _ ->
+                Parser.succeed joinParseResults
+                    |. noiseParser
+                    |= Parser.loop emptyDef multiFunctionMetadataParser
+                    |= sourceLocationParser
 
 
 multiFunctionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
@@ -864,8 +852,8 @@ multiFunctionMetadataParser def =
         ]
 
 
-typeDefinitionParser : ( SourceLocation, String ) -> Parser TypeDefinition
-typeDefinitionParser ( startLocation, typeName ) =
+typeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) -> Parser TypeDefinition
+typeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
         ctor generics members endLocation =
             CustomTypeDef
@@ -875,10 +863,19 @@ typeDefinitionParser ( startLocation, typeName ) =
                 members
     in
     Parser.inContext (Problem.StructDefinition startLocation typeName) <|
-        Parser.succeed ctor
-            |= Parser.loop [] typeGenericParser
-            |= Parser.loop [] typeMemberParser
-            |= sourceLocationParser
+        case Dict.get typeName definedTypes of
+            Just previousDefinition ->
+                Parser.problem <|
+                    TypeAlreadyDefined
+                        typeName
+                        (typeDefinitionLocation previousDefinition)
+
+            Nothing ->
+                Parser.succeed ctor
+                    |. noiseParser
+                    |= Parser.loop [] typeGenericParser
+                    |= Parser.loop [] typeMemberParser
+                    |= sourceLocationParser
 
 
 typeGenericParser : List String -> Parser (Parser.Step (List String) (List String))
@@ -910,8 +907,8 @@ typeMemberParser types =
         ]
 
 
-unionTypeDefinitionParser : ( SourceLocation, String ) -> Parser TypeDefinition
-unionTypeDefinitionParser ( startLocation, typeName ) =
+unionTypeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) -> Parser TypeDefinition
+unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
         ctor generics members endLocation =
             UnionTypeDef
@@ -921,10 +918,19 @@ unionTypeDefinitionParser ( startLocation, typeName ) =
                 members
     in
     Parser.inContext (Problem.UnionDefinition startLocation typeName) <|
-        Parser.succeed ctor
-            |= Parser.loop [] typeGenericParser
-            |= Parser.loop [] unionTypeMemberParser
-            |= sourceLocationParser
+        case Dict.get typeName definedTypes of
+            Just previousDefinition ->
+                Parser.problem <|
+                    TypeAlreadyDefined
+                        typeName
+                        (typeDefinitionLocation previousDefinition)
+
+            Nothing ->
+                Parser.succeed ctor
+                    |. noiseParser
+                    |= Parser.loop [] typeGenericParser
+                    |= Parser.loop [] unionTypeMemberParser
+                    |= sourceLocationParser
 
 
 unionTypeMemberParser :

@@ -9,19 +9,20 @@ module Test.Parser.Util exposing
 import Dict
 import Dict.Extra as Dict
 import Expect
+import Parser.Advanced as Parser
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST exposing (..)
-import Stabel.Parser.Problem exposing (Problem)
+import Stabel.Parser.Problem exposing (Context, Problem)
 import String.Extra as String
 
 
-compile : String -> Result (List Problem) AST
+compile : String -> Result (List (Parser.DeadEnd Context Problem)) AST
 compile str =
     compileRetainLocations str
         |> Result.map stripLocations
 
 
-compileRetainLocations : String -> Result (List Problem) AST
+compileRetainLocations : String -> Result (List (Parser.DeadEnd Context Problem)) AST
 compileRetainLocations str =
     String.unindent str
         |> run
