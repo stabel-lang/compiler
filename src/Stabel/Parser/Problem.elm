@@ -70,16 +70,7 @@ toString source deadEnd =
             )
 
         codeBlock =
-            source
-                |> String.trimRight
-                |> String.lines
-                |> List.indexedMap (\idx line -> ( idx + 1, line ))
-                |> List.filter (\( idx, _ ) -> idx >= startLine && idx <= endLine)
-                |> List.map
-                    (\( idx, line ) ->
-                        String.fromInt idx ++ " | " ++ line
-                    )
-                |> String.join "\n"
+            SourceLocation.extractFromString source startLine endLine
 
         problemDetail =
             problemToString source deadEnd.problem
@@ -177,22 +168,22 @@ problemToString : String -> Problem -> String
 problemToString source problem =
     case problem of
         ExpectedInt ->
-            "this is not an integer"
+            "Expected to find an integer"
 
         ExpectedSymbol ->
-            "this is not a symbol"
+            "Expected to find a symbol"
 
         ExpectedMetadata ->
-            "this is not metadata"
+            "Expected to find a keyword"
 
         ExpectedGeneric ->
-            "this is not a generic variable"
+            "Expected to find a generic variable"
 
         ExpectedType ->
-            "this is not a type"
+            "Expected to find a type"
 
         UnknownError ->
-            "not sure how we got this error"
+            "Not sure why there is an error"
 
         ExpectedForwardSlash ->
             "Expected a forward slash"
@@ -201,25 +192,25 @@ problemToString source problem =
             "Expected whitespace"
 
         UnexpectedMetadata ->
-            "found metadata where we did not expect too"
+            "Found metadata where we did not expect too"
 
         ExpectedLeftParen ->
-            "expected an opening parenthesis"
+            "Expected a opening parenthesis"
 
         ExpectedRightParen ->
-            "expected an closing parenthesis"
+            "Expected a closing parenthesis"
 
         ExpectedEndOfFile ->
-            "expected end of file"
+            "Expected end of file"
 
         ExpectedTypeSeperator ->
-            "expected type seperator"
+            "Expected type seperator (--)"
 
         ExpectedLeftBracket ->
-            "expected opening bracket"
+            "Expected opening bracket"
 
         ExpectedRightBracket ->
-            "expected closing brakcet"
+            "Expected closing bracket"
 
         FunctionAlreadyDefined functionName maybePreviousDefinitionRange ->
             case maybePreviousDefinitionRange of
@@ -232,16 +223,22 @@ problemToString source problem =
                     "You're trying to define a new function called '"
                         ++ functionName
                         ++ "', but this function has already been defined here:\n\n"
-                        ++ SourceLocation.extractFromString source previousDefinitionRange
+                        ++ SourceLocation.extractFromString
+                            source
+                            previousDefinitionRange.start.row
+                            previousDefinitionRange.end.row
 
         TypeAlreadyDefined typeName previousDefinitionRange ->
             "You're trying to define a new type called '"
                 ++ typeName
                 ++ "', but this type has already been defined here:\n\n"
-                ++ SourceLocation.extractFromString source previousDefinitionRange
+                ++ SourceLocation.extractFromString
+                    source
+                    previousDefinitionRange.start.row
+                    previousDefinitionRange.end.row
 
         UnknownMetadata meta ->
-            "'" ++ meta ++ "' is not a known keyword in this context."
+            "'" ++ meta ++ ":' is not a known keyword in this context."
 
         InvalidModulePath path ->
             "'" ++ path ++ "' is not a valid module path. Note: Upper case characters are not allowed."
@@ -252,4 +249,4 @@ problemToString source problem =
         BadDefinition name ->
             "'"
                 ++ name
-                ++ "' is not a valid definition. Expected either def:, defmulti:, defstruct: or defunion:"
+                ++ "' is not a valid definition. Expected either defmodule:, def:, defmulti:, defstruct: or defunion:"
