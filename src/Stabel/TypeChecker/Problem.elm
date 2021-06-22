@@ -4,8 +4,8 @@ module Stabel.TypeChecker.Problem exposing
     )
 
 import Set exposing (Set)
-import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type Problem

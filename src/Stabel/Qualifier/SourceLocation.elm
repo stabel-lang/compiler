@@ -1,4 +1,4 @@
-module Stabel.Data.SourceLocation exposing (..)
+module Stabel.Qualifier.SourceLocation exposing (..)
 
 
 type alias SourceLocationRange =

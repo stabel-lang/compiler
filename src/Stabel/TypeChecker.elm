@@ -6,10 +6,10 @@ import List.Extra as List
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Metadata exposing (Metadata)
-import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (Type, WordType)
 import Stabel.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Stabel.Qualifier as Qualifier
+import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.TypeChecker.Problem exposing (Problem(..))
 
 

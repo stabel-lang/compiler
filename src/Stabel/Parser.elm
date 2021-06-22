@@ -20,8 +20,8 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Set exposing (Set)
-import Stabel.Data.SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Stabel.Parser.Problem as Problem exposing (..)
+import Stabel.Parser.SourceLocation exposing (SourceLocation, SourceLocationRange)
 
 
 type alias Parser a =

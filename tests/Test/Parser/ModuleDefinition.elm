@@ -3,8 +3,8 @@ module Test.Parser.ModuleDefinition exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Set
-import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.SourceLocation exposing (emptyRange)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util
     exposing

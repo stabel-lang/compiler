@@ -10,9 +10,9 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Parser.Advanced as Parser
-import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST exposing (..)
 import Stabel.Parser.Problem exposing (Context, Problem)
+import Stabel.Parser.SourceLocation exposing (emptyRange)
 import String.Extra as String
 
 

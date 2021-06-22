@@ -6,11 +6,11 @@ import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Metadata as Metadata exposing (Metadata)
-import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (Type, WordType)
 import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
 import Stabel.Qualifier.Problem exposing (Problem(..))
+import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type alias AST =

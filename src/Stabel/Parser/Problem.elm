@@ -5,11 +5,12 @@ module Stabel.Parser.Problem exposing
     )
 
 import Parser.Advanced exposing (DeadEnd)
-import Stabel.Data.SourceLocation as SourceLocation
+import Stabel.Parser.SourceLocation
     exposing
         ( SourceLocation
         , SourceLocationRange
         )
+import Stabel.Qualifier.SourceLocation exposing (extractFromString)
 
 
 type Context
@@ -70,7 +71,7 @@ toString source deadEnd =
             )
 
         codeBlock =
-            SourceLocation.extractFromString source startLine endLine
+            extractFromString source startLine endLine
 
         problemDetail =
             problemToString source deadEnd.problem
@@ -223,7 +224,7 @@ problemToString source problem =
                     "You're trying to define a new function called '"
                         ++ functionName
                         ++ "', but this function has already been defined here:\n\n"
-                        ++ SourceLocation.extractFromString
+                        ++ extractFromString
                             source
                             previousDefinitionRange.start.row
                             previousDefinitionRange.end.row
@@ -232,7 +233,7 @@ problemToString source problem =
             "You're trying to define a new type called '"
                 ++ typeName
                 ++ "', but this type has already been defined here:\n\n"
-                ++ SourceLocation.extractFromString
+                ++ extractFromString
                     source
                     previousDefinitionRange.start.row
                     previousDefinitionRange.end.row

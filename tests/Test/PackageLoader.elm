@@ -7,9 +7,9 @@ import List.Extra as List
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
-import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.PackageLoader as PackageLoader
 import Stabel.Qualifier as Qualifier
+import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as Util
 

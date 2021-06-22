@@ -2,8 +2,8 @@ module Test.Parser.QualifiedRefs exposing (..)
 
 import Dict
 import Dict.Extra as Dict
-import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.SourceLocation exposing (emptyRange)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (expectAst)
 

@@ -4,9 +4,9 @@ import Dict
 import Dict.Extra as Dict
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
-import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Qualifier as QAST
+import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as QualifierUtil
