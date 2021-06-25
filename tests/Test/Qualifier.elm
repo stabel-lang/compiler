@@ -115,8 +115,15 @@ suite =
                                 [ { name = "over"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.Generic "a", AST.Generic "b" ]
-                                            , output = [ AST.Generic "a", AST.Generic "b", AST.Generic "a" ]
+                                            { input =
+                                                [ AST.NotStackRange <| AST.Generic "a"
+                                                , AST.NotStackRange <| AST.Generic "b"
+                                                ]
+                                            , output =
+                                                [ AST.NotStackRange <| AST.Generic "a"
+                                                , AST.NotStackRange <| AST.Generic "b"
+                                                , AST.NotStackRange <| AST.Generic "a"
+                                                ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -233,13 +240,14 @@ suite =
                                       , typeSignature =
                                             AST.UserProvided
                                                 { input =
-                                                    [ AST.LocalRef "Int" []
-                                                    , AST.FunctionType
-                                                        { input = [ AST.LocalRef "Int" [] ]
-                                                        , output = [ AST.LocalRef "Int" [] ]
-                                                        }
+                                                    [ AST.NotStackRange <| AST.LocalRef "Int" []
+                                                    , AST.NotStackRange <|
+                                                        AST.FunctionType
+                                                            { input = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
+                                                            , output = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
+                                                            }
                                                     ]
-                                                , output = [ AST.LocalRef "Int" [] ]
+                                                , output = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -642,8 +650,8 @@ suite =
                                 [ { name = "true?"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Box" [] ]
-                                            , output = [ AST.LocalRef "Bool" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "Box" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "Bool" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -734,8 +742,8 @@ suite =
                                 [ { name = "into-cents"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "USMoney" [] ]
-                                            , output = [ AST.LocalRef "USMoney" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -758,8 +766,8 @@ suite =
                                 , { name = "add-money"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "USMoney" [], AST.LocalRef "USMoney" [] ]
-                                            , output = [ AST.LocalRef "USMoney" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "USMoney" [], AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -775,8 +783,8 @@ suite =
                                 , { name = "quote-excuse"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Dollar" [] ]
-                                            , output = [ AST.LocalRef "Dollar" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "Dollar" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "Dollar" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -1127,8 +1135,8 @@ suite =
                                 [ { name = "call-external"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.InternalRef [ "internal", "types" ] "In" [] ]
-                                            , output = [ AST.ExternalRef [ "external", "types" ] "Out" [] ]
+                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "internal", "types" ] "In" [] ]
+                                            , output = [ AST.NotStackRange <| AST.ExternalRef [ "external", "types" ] "Out" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty

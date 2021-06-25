@@ -59,8 +59,8 @@ suite =
                                 , { name = "dec"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ LocalRef "Int" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -109,8 +109,8 @@ suite =
                                 [ { name = "int="
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Int" [], AST.LocalRef "Int" [] ]
-                                            , output = [ AST.LocalRef "Bool" [] ]
+                                            { input = [ NotStackRange <| AST.LocalRef "Int" [], NotStackRange <| AST.LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| AST.LocalRef "Bool" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -148,8 +148,8 @@ suite =
                                 [ { name = ","
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Int" [], AST.LocalRef "Int" [] ]
-                                            , output = [ AST.LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| AST.LocalRef "Int" [], NotStackRange <| AST.LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -162,8 +162,8 @@ suite =
                                 , { name = "add2"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Int" [] ]
-                                            , output = [ AST.LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| AST.LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -203,8 +203,8 @@ suite =
                                     [ { name = "as-int"
                                       , typeSignature =
                                             UserProvided
-                                                { input = [ LocalRef "True" [] ]
-                                                , output = [ LocalRef "Int" [] ]
+                                                { input = [ NotStackRange <| LocalRef "True" [] ]
+                                                , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -250,8 +250,8 @@ suite =
                                     [ { name = "get-age"
                                       , typeSignature =
                                             UserProvided
-                                                { input = [ LocalRef "Person" [] ]
-                                                , output = [ LocalRef "Int" [] ]
+                                                { input = [ NotStackRange <| LocalRef "Person" [] ]
+                                                , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -291,8 +291,8 @@ suite =
                                     [ { name = ">Box"
                                       , typeSignature =
                                             Verified
-                                                { input = [ Generic "a" ]
-                                                , output = [ LocalRef "Box" [ Generic "a" ] ]
+                                                { input = [ NotStackRange <| Generic "a" ]
+                                                , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -303,8 +303,8 @@ suite =
                                     , { name = ">element"
                                       , typeSignature =
                                             Verified
-                                                { input = [ LocalRef "Box" [ Generic "a" ], Generic "a" ]
-                                                , output = [ LocalRef "Box" [ Generic "a" ] ]
+                                                { input = [ NotStackRange <| LocalRef "Box" [ Generic "a" ], NotStackRange <| Generic "a" ]
+                                                , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -315,8 +315,8 @@ suite =
                                     , { name = "element>"
                                       , typeSignature =
                                             Verified
-                                                { input = [ LocalRef "Box" [ Generic "a" ] ]
-                                                , output = [ Generic "a" ]
+                                                { input = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
+                                                , output = [ NotStackRange <| Generic "a" ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -348,8 +348,8 @@ suite =
                                 [ { name = "over"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ Generic "a", Generic "b" ]
-                                            , output = [ Generic "a", Generic "b", Generic "a" ]
+                                            { input = [ NotStackRange <| Generic "a", NotStackRange <| Generic "b" ]
+                                            , output = [ NotStackRange <| Generic "a", NotStackRange <| Generic "b", NotStackRange <| Generic "a" ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -574,8 +574,8 @@ suite =
                                     [ { name = "if-present"
                                       , typeSignature =
                                             UserProvided
-                                                { input = [ LocalRef "MaybeBox" [ Generic "a" ], Generic "a" ]
-                                                , output = [ Generic "a" ]
+                                                { input = [ NotStackRange <| LocalRef "MaybeBox" [ Generic "a" ], NotStackRange <| Generic "a" ]
+                                                , output = [ NotStackRange <| Generic "a" ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
@@ -620,13 +620,14 @@ suite =
                                   , typeSignature =
                                         UserProvided
                                             { input =
-                                                [ LocalRef "Int" []
-                                                , FunctionType
-                                                    { input = [ LocalRef "Int" [] ]
-                                                    , output = [ LocalRef "Int" [] ]
-                                                    }
+                                                [ NotStackRange <| LocalRef "Int" []
+                                                , NotStackRange <|
+                                                    FunctionType
+                                                        { input = [ NotStackRange <| LocalRef "Int" [] ]
+                                                        , output = [ NotStackRange <| LocalRef "Int" [] ]
+                                                        }
                                                 ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -680,10 +681,11 @@ suite =
                                         UserProvided
                                             { input =
                                                 [ StackRange "a"
-                                                , FunctionType
-                                                    { input = [ StackRange "a" ]
-                                                    , output = [ StackRange "b" ]
-                                                    }
+                                                , NotStackRange <|
+                                                    FunctionType
+                                                        { input = [ StackRange "a" ]
+                                                        , output = [ StackRange "b" ]
+                                                        }
                                                 ]
                                             , output = [ StackRange "b" ]
                                             }
@@ -933,7 +935,7 @@ suite =
                                   , typeSignature =
                                         Verified
                                             { input = []
-                                            , output = [ LocalRef "True" [] ]
+                                            , output = [ NotStackRange <| LocalRef "True" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -944,7 +946,7 @@ suite =
                                   , typeSignature =
                                         Verified
                                             { input = []
-                                            , output = [ LocalRef "False" [] ]
+                                            , output = [ NotStackRange <| LocalRef "False" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -954,8 +956,8 @@ suite =
                                 , { name = "from-int"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ LocalRef "Int" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange =
                                         Just

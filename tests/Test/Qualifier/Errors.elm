@@ -89,8 +89,8 @@ suite =
                                     [ { name = "inc"
                                       , typeSignature =
                                             AST.UserProvided
-                                                { input = [ AST.LocalRef "Ints" [] ]
-                                                , output = [ AST.LocalRef "Int" [] ]
+                                                { input = [ AST.NotStackRange <| AST.LocalRef "Ints" [] ]
+                                                , output = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty

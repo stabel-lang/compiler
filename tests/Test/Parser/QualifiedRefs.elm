@@ -116,8 +116,8 @@ suite =
                                 [ { name = "test"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ InternalRef [ "internal" ] "Tipe" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| InternalRef [ "internal" ] "Tipe" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -151,8 +151,8 @@ suite =
                                 [ { name = "test"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ ExternalRef [ "external" ] "Tipe" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| ExternalRef [ "external" ] "Tipe" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -189,8 +189,8 @@ suite =
                                 [ { name = "test"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ ExternalRef [ "external" ] "Tipe" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| ExternalRef [ "external" ] "Tipe" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -233,8 +233,8 @@ suite =
                                 [ { name = "test"
                                   , typeSignature =
                                         UserProvided
-                                            { input = [ InternalRef [ "internal" ] "Tipe" [] ]
-                                            , output = [ LocalRef "Int" [] ]
+                                            { input = [ NotStackRange <| InternalRef [ "internal" ] "Tipe" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty

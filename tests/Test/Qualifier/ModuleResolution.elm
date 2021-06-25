@@ -141,9 +141,9 @@ suite =
                                   , typeSignature =
                                         AST.UserProvided
                                             { input =
-                                                [ AST.InternalRef [ "mod" ] "Tipe" []
-                                                , AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
-                                                , AST.InternalRef [ "mod" ] "TipeUnion" []
+                                                [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "Tipe" []
+                                                , AST.NotStackRange <| AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
+                                                , AST.NotStackRange <| AST.InternalRef [ "mod" ] "TipeUnion" []
                                                 ]
                                             , output = []
                                             }
@@ -210,7 +210,7 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.InternalRef [ "mod" ] "TipeUnion" [] ]
+                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "TipeUnion" [] ]
                                             , output = []
                                             }
                                   , sourceLocationRange = Nothing
@@ -449,9 +449,9 @@ suite =
                                   , typeSignature =
                                         AST.UserProvided
                                             { input =
-                                                [ AST.ExternalRef [ "mod" ] "Tipe" []
-                                                , AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
-                                                , AST.ExternalRef [ "mod" ] "TipeUnion" []
+                                                [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "Tipe" []
+                                                , AST.NotStackRange <| AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
+                                                , AST.NotStackRange <| AST.ExternalRef [ "mod" ] "TipeUnion" []
                                                 ]
                                             , output = []
                                             }
@@ -518,7 +518,7 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.ExternalRef [ "mod" ] "TipeUnion" [] ]
+                                            { input = [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "TipeUnion" [] ]
                                             , output = []
                                             }
                                   , sourceLocationRange = Nothing
@@ -655,8 +655,8 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.InternalRef [ "ext" ] "Tipe" [] ]
-                                            , output = [ AST.InternalRef [ "internal" ] "Tope" [] ]
+                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "ext" ] "Tipe" [] ]
+                                            , output = [ AST.NotStackRange <| AST.InternalRef [ "internal" ] "Tope" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -730,8 +730,8 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.InternalRef [ "ext" ] "Tipe" [] ]
-                                            , output = [ AST.InternalRef [ "internal" ] "Tope" [] ]
+                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "ext" ] "Tipe" [] ]
+                                            , output = [ AST.NotStackRange <| AST.InternalRef [ "internal" ] "Tope" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.fromList [ ( "internal", "internal/mod" ) ]
@@ -939,8 +939,8 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Tipe" [] ]
-                                            , output = [ AST.LocalRef "Tope" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "Tipe" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "Tope" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -1014,8 +1014,8 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.LocalRef "Tipe" [] ]
-                                            , output = [ AST.LocalRef "Tope" [] ]
+                                            { input = [ AST.NotStackRange <| AST.LocalRef "Tipe" [] ]
+                                            , output = [ AST.NotStackRange <| AST.LocalRef "Tope" [] ]
                                             }
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
@@ -1464,7 +1464,7 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.ExternalRef [ "mod" ] "Tipe" [] ]
+                                            { input = [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "Tipe" [] ]
                                             , output = []
                                             }
                                   , sourceLocationRange = Nothing
@@ -1617,7 +1617,7 @@ suite =
                                 [ { name = "external-call"
                                   , typeSignature =
                                         AST.UserProvided
-                                            { input = [ AST.InternalRef [ "mod" ] "Tipe" [] ]
+                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "Tipe" [] ]
                                             , output = []
                                             }
                                   , sourceLocationRange = Nothing

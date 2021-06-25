@@ -130,7 +130,10 @@ addFunctionsForStructsHelper : String -> List String -> List ( String, AST.Possi
 addFunctionsForStructsHelper name generics members ast =
     let
         selfType =
-            LocalRef name (List.map Generic generics)
+            generics
+                |> List.map Generic
+                |> LocalRef name
+                |> NotStackRange
 
         ctor =
             { name =
@@ -141,7 +144,7 @@ addFunctionsForStructsHelper name generics members ast =
                     ">" ++ name
             , typeSignature =
                 Verified
-                    { input = List.map Tuple.second members
+                    { input = List.map (NotStackRange << Tuple.second) members
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
@@ -157,7 +160,7 @@ addFunctionsForStructsHelper name generics members ast =
             { name = ">" ++ memberName
             , typeSignature =
                 Verified
-                    { input = [ selfType, type_ ]
+                    { input = [ selfType, NotStackRange type_ ]
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
@@ -175,7 +178,7 @@ addFunctionsForStructsHelper name generics members ast =
             , typeSignature =
                 Verified
                     { input = [ selfType ]
-                    , output = [ type_ ]
+                    , output = [ NotStackRange type_ ]
                     }
             , sourceLocationRange = Nothing
             , aliases = Dict.empty

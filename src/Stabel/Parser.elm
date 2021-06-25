@@ -6,6 +6,7 @@ module Stabel.Parser exposing
     , ModuleDefinition(..)
     , ModuleDefinitionRec
     , PossiblyQualifiedType(..)
+    , PossiblyQualifiedTypeOrStackRange(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
@@ -64,8 +65,8 @@ type alias FunctionDefinition =
 
 
 type alias ParserFunctionType =
-    { input : List PossiblyQualifiedType
-    , output : List PossiblyQualifiedType
+    { input : List PossiblyQualifiedTypeOrStackRange
+    , output : List PossiblyQualifiedTypeOrStackRange
     }
 
 
@@ -93,8 +94,12 @@ type PossiblyQualifiedType
     | InternalRef (List String) String (List PossiblyQualifiedType)
     | ExternalRef (List String) String (List PossiblyQualifiedType)
     | Generic String
-    | StackRange String
     | FunctionType ParserFunctionType
+
+
+type PossiblyQualifiedTypeOrStackRange
+    = StackRange String
+    | NotStackRange PossiblyQualifiedType
 
 
 type FunctionImplementation
@@ -336,14 +341,14 @@ typeNameParser =
         }
 
 
-genericOrRangeParser : Parser PossiblyQualifiedType
+genericOrRangeParser : Parser PossiblyQualifiedTypeOrStackRange
 genericOrRangeParser =
     let
         helper value =
             Parser.oneOf
                 [ Parser.succeed (StackRange value)
                     |. Parser.symbol (Token "..." UnknownError)
-                , Parser.succeed (Generic value)
+                , Parser.succeed (NotStackRange <| Generic value)
                     |. Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
                 ]
     in
@@ -641,7 +646,10 @@ generateDefaultFunctionsForType typeDef =
         CustomTypeDef _ typeName binds typeMembers ->
             let
                 typeOfType =
-                    LocalRef typeName (List.map Generic binds)
+                    binds
+                        |> List.map Generic
+                        |> LocalRef typeName
+                        |> NotStackRange
 
                 ctorDef =
                     { name =
@@ -652,7 +660,8 @@ generateDefaultFunctionsForType typeDef =
                             ">" ++ typeName
                     , typeSignature =
                         Verified
-                            { input = List.map Tuple.second typeMembers
+                            { input =
+                                List.map (NotStackRange << Tuple.second) typeMembers
                             , output = [ typeOfType ]
                             }
                     , sourceLocationRange = Nothing
@@ -666,7 +675,7 @@ generateDefaultFunctionsForType typeDef =
                     [ { name = ">" ++ memberName
                       , typeSignature =
                             Verified
-                                { input = [ typeOfType, memberType ]
+                                { input = [ typeOfType, NotStackRange memberType ]
                                 , output = [ typeOfType ]
                                 }
                       , sourceLocationRange = Nothing
@@ -680,7 +689,7 @@ generateDefaultFunctionsForType typeDef =
                       , typeSignature =
                             Verified
                                 { input = [ typeOfType ]
-                                , output = [ memberType ]
+                                , output = [ NotStackRange memberType ]
                                 }
                       , sourceLocationRange = Nothing
                       , aliases = Dict.empty
@@ -961,8 +970,13 @@ typeSignatureParser =
 
 
 typeLoopParser :
-    List PossiblyQualifiedType
-    -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
+    List PossiblyQualifiedTypeOrStackRange
+    ->
+        Parser
+            (Parser.Step
+                (List PossiblyQualifiedTypeOrStackRange)
+                (List PossiblyQualifiedTypeOrStackRange)
+            )
 typeLoopParser reverseTypes =
     let
         step type_ =
@@ -972,10 +986,10 @@ typeLoopParser reverseTypes =
         [ Parser.succeed step
             |= genericOrRangeParser
             |. noiseParser
-        , Parser.succeed step
+        , Parser.succeed (NotStackRange >> step)
             |= typeSignatureRefParser
             |. noiseParser
-        , Parser.succeed (\functionType -> step (FunctionType functionType))
+        , Parser.succeed (\functionType -> step (NotStackRange <| FunctionType functionType))
             |. Parser.symbol (Token "[" ExpectedLeftBracket)
             |. noiseParser
             |= typeSignatureParser

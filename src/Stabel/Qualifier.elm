@@ -441,19 +441,16 @@ qualifyMemberType config modRefs range type_ =
         Parser.Generic sym ->
             Ok (Type.Generic sym)
 
-        Parser.StackRange sym ->
-            Ok (Type.Generic sym)
-
         Parser.FunctionType sign ->
             let
                 inputResult =
                     sign.input
-                        |> List.map (qualifyMemberType config modRefs range)
+                        |> List.map (qualifyFunctionType config modRefs range)
                         |> Result.combine
 
                 outputResult =
                     sign.output
-                        |> List.map (qualifyMemberType config modRefs range)
+                        |> List.map (qualifyFunctionType config modRefs range)
                         |> Result.combine
             in
             case ( inputResult, outputResult ) of
@@ -469,6 +466,21 @@ qualifyMemberType config modRefs range type_ =
 
                 ( _, Err output ) ->
                     Err output
+
+
+qualifyFunctionType :
+    RunConfig
+    -> ModuleReferences
+    -> SourceLocationRange
+    -> Parser.PossiblyQualifiedTypeOrStackRange
+    -> Result Problem Type
+qualifyFunctionType config modRefs range type_ =
+    case type_ of
+        Parser.StackRange sym ->
+            Ok (Type.StackRange sym)
+
+        Parser.NotStackRange pqt ->
+            qualifyMemberType config modRefs range pqt
 
 
 qualifyDefinition :
@@ -580,7 +592,7 @@ qualifyMetadata config qualifiedTypes word =
     Parser.typeSignatureToMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (qualifyMemberType config modRefs wordRange)
+        |> List.map (qualifyFunctionType config modRefs wordRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
@@ -1302,7 +1314,7 @@ requiredModulesOfWord topLevelAliases word =
         moduleReferenceFromWordType wordType =
             wordType.input
                 ++ wordType.output
-                |> List.filterMap extractModuleReferenceFromType
+                |> List.filterMap extractModuleReferenceFromFunctionType
                 |> Set.fromList
 
         matches =
@@ -1339,6 +1351,16 @@ requiredModulesOfWord topLevelAliases word =
         |> Set.union typeSignature
         |> Set.union matches
         |> Set.union wordReferences
+
+
+extractModuleReferenceFromFunctionType : Parser.PossiblyQualifiedTypeOrStackRange -> Maybe String
+extractModuleReferenceFromFunctionType ref =
+    case ref of
+        Parser.StackRange _ ->
+            Nothing
+
+        Parser.NotStackRange t ->
+            extractModuleReferenceFromType t
 
 
 extractModuleReferenceFromType : Parser.PossiblyQualifiedType -> Maybe String
