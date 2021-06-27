@@ -289,13 +289,14 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromList
-                                [ ( "SomeType"
-                                  , AST.CustomTypeDef emptyRange
-                                        "SomeType"
-                                        []
-                                        [ ( "tipe", AST.InternalRef [ "mod" ] "Tipe" [] ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "SomeType"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "tipe", AST.InternalRef [ "mod" ] "Tipe" [] ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -597,13 +598,14 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromList
-                                [ ( "SomeType"
-                                  , AST.CustomTypeDef emptyRange
-                                        "SomeType"
-                                        []
-                                        [ ( "tipe", AST.ExternalRef [ "mod" ] "Tipe" [] ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "SomeType"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "tipe", AST.ExternalRef [ "mod" ] "Tipe" [] ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -873,16 +875,16 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types =
-                            Dict.fromList
-                                [ ( "Tepip"
-                                  , AST.CustomTypeDef
-                                        emptyRange
-                                        "Tepip"
-                                        []
-                                        [ ( "first", AST.InternalRef [ "ext" ] "Tipe" [] )
-                                        , ( "second", AST.InternalRef [ "mod" ] "Tope" [] )
-                                        ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "Tepip"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "first", AST.InternalRef [ "ext" ] "Tipe" [] )
+                                            , ( "second", AST.InternalRef [ "mod" ] "Tope" [] )
+                                            ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -1085,16 +1087,16 @@ suite =
                                 , exposes = Set.empty
                                 }
                         , types =
-                            Dict.fromList
-                                [ ( "Tepip"
-                                  , AST.CustomTypeDef
-                                        emptyRange
-                                        "Tepip"
-                                        []
-                                        [ ( "first", AST.LocalRef "Tipe" [] )
-                                        , ( "second", AST.LocalRef "Tope" [] )
-                                        ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "Tepip"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "first", AST.LocalRef "Tipe" [] )
+                                            , ( "second", AST.LocalRef "Tope" [] )
+                                            ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -1512,14 +1514,14 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.Undefined
                         , types =
-                            Dict.fromList
-                                [ ( "BoxedTipe"
-                                  , AST.CustomTypeDef
-                                        emptyRange
-                                        "BoxedTipe"
-                                        []
-                                        [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "BoxedTipe"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -1663,14 +1665,14 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.Undefined
                         , types =
-                            Dict.fromList
-                                [ ( "BoxedTipe"
-                                  , AST.CustomTypeDef
-                                        emptyRange
-                                        "BoxedTipe"
-                                        []
-                                        [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "BoxedTipe"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }

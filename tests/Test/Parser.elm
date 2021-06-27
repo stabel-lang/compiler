@@ -195,8 +195,12 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef emptyRange "True" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "True"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -237,13 +241,16 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef emptyRange
-                                        "Person"
-                                        []
-                                        [ ( "age", LocalRef "Int" [] )
-                                        , ( "jobs", LocalRef "Int" [] )
-                                        ]
+                                Dict.fromListBy .name
+                                    [ { name = "Person"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "age", LocalRef "Int" [] )
+                                                , ( "jobs", LocalRef "Int" [] )
+                                                ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -279,12 +286,15 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ CustomTypeDef emptyRange
-                                        "Box"
-                                        [ "a" ]
-                                        [ ( "element", Generic "a" )
-                                        ]
+                                Dict.fromListBy .name
+                                    [ { name = "Box"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "element", Generic "a" )
+                                                ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -388,15 +398,26 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef emptyRange
-                                        "Bool"
-                                        []
-                                        [ LocalRef "True" []
-                                        , LocalRef "False" []
-                                        ]
-                                    , CustomTypeDef emptyRange "True" [] []
-                                    , CustomTypeDef emptyRange "False" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Bool"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.UnionMembers
+                                                [ LocalRef "True" []
+                                                , LocalRef "False" []
+                                                ]
+                                      }
+                                    , { name = "True"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
+                                    , { name = "False"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -443,14 +464,21 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef emptyRange
-                                        "Maybe"
-                                        [ "a" ]
-                                        [ Generic "a"
-                                        , LocalRef "Nil" []
-                                        ]
-                                    , CustomTypeDef emptyRange "Nil" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.UnionMembers
+                                                [ Generic "a"
+                                                , LocalRef "Nil" []
+                                                ]
+                                      }
+                                    , { name = "Nil"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -500,15 +528,28 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef emptyRange
-                                        "MaybeBox"
-                                        [ "a" ]
-                                        [ LocalRef "Box" [ Generic "a" ]
-                                        , LocalRef "Nil" []
-                                        ]
-                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
-                                    , CustomTypeDef emptyRange "Nil" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "MaybeBox"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.UnionMembers
+                                                [ LocalRef "Box" [ Generic "a" ]
+                                                , LocalRef "Nil" []
+                                                ]
+                                      }
+                                    , { name = "Box"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "element", Generic "a" ) ]
+                                      }
+                                    , { name = "Nil"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -559,15 +600,28 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ UnionTypeDef emptyRange
-                                        "MaybeBox"
-                                        [ "a" ]
-                                        [ LocalRef "Box" [ Generic "a" ]
-                                        , LocalRef "Nil" []
-                                        ]
-                                    , CustomTypeDef emptyRange "Box" [ "a" ] [ ( "element", Generic "a" ) ]
-                                    , CustomTypeDef emptyRange "Nil" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "MaybeBox"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.UnionMembers
+                                                [ LocalRef "Box" [ Generic "a" ]
+                                                , LocalRef "Nil" []
+                                                ]
+                                      }
+                                    , { name = "Box"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "element", Generic "a" ) ]
+                                      }
+                                    , { name = "Nil"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -901,33 +955,35 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ UnionTypeDef
-                                    (SourceLocationRange
-                                        (SourceLocation 2 1)
-                                        (SourceLocation 6 1)
-                                    )
-                                    "Bool"
-                                    []
-                                    [ LocalRef "True" []
-                                    , LocalRef "False" []
-                                    ]
-                                , CustomTypeDef
-                                    (SourceLocationRange
-                                        (SourceLocation 6 1)
-                                        (SourceLocation 7 1)
-                                    )
-                                    "True"
-                                    []
-                                    []
-                                , CustomTypeDef
-                                    (SourceLocationRange
-                                        (SourceLocation 7 1)
-                                        (SourceLocation 9 1)
-                                    )
-                                    "False"
-                                    []
-                                    []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , sourceLocation =
+                                        SourceLocationRange
+                                            (SourceLocation 2 1)
+                                            (SourceLocation 6 1)
+                                  , generics = []
+                                  , members =
+                                        AST.UnionMembers
+                                            [ LocalRef "True" []
+                                            , LocalRef "False" []
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , sourceLocation =
+                                        SourceLocationRange
+                                            (SourceLocation 6 1)
+                                            (SourceLocation 7 1)
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
+                                , { name = "False"
+                                  , sourceLocation =
+                                        SourceLocationRange
+                                            (SourceLocation 7 1)
+                                            (SourceLocation 9 1)
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name

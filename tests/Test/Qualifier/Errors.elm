@@ -125,19 +125,23 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ AST.UnionTypeDef
-                                        emptyRange
-                                        "USMoney"
-                                        []
-                                        [ AST.LocalRef "Dollar" []
-                                        , AST.LocalRef "Cent" []
-                                        ]
-                                    , AST.CustomTypeDef
-                                        emptyRange
-                                        "Dollar"
-                                        []
-                                        [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "USMoney"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.UnionMembers
+                                                [ AST.LocalRef "Dollar" []
+                                                , AST.LocalRef "Cent" []
+                                                ]
+                                      }
+                                    , { name = "Dollar"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
+                                      }
                                     ]
                             , functions = Dict.empty
                             }
@@ -150,12 +154,14 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ AST.CustomTypeDef
-                                        emptyRange
-                                        "BoxWrapper"
-                                        []
-                                        [ ( "box", AST.LocalRef "Box" [] ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "BoxWrapper"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "box", AST.LocalRef "Box" [] ) ]
+                                      }
                                     ]
                             , functions = Dict.empty
                             }

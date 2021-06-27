@@ -56,14 +56,16 @@ suite =
                                 , exposes = Set.fromList [ "inc" ]
                                 }
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ CustomTypeDef
-                                    emptyRange
-                                    "Pair"
-                                    [ "a", "b" ]
-                                    [ ( "first", Generic "a" )
-                                    , ( "second", Generic "b" )
-                                    ]
+                            Dict.fromListBy .name
+                                [ { name = "Pair"
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a", "b" ]
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "first", Generic "a" )
+                                            , ( "second", Generic "b" )
+                                            ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name

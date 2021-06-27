@@ -39,12 +39,7 @@ stripLocations ast =
 
 stripTypeLocation : TypeDefinition -> TypeDefinition
 stripTypeLocation typeDef =
-    case typeDef of
-        AST.CustomTypeDef _ name generics members ->
-            AST.CustomTypeDef emptyRange name generics members
-
-        AST.UnionTypeDef _ name generics members ->
-            AST.UnionTypeDef emptyRange name generics members
+    { typeDef | sourceLocation = emptyRange }
 
 
 stripWordLocation : FunctionDefinition -> FunctionDefinition
@@ -116,11 +111,11 @@ addFunctionsForStructs : AST -> AST
 addFunctionsForStructs ast =
     let
         helper _ t wipAst =
-            case t of
-                AST.CustomTypeDef _ name generics members ->
-                    addFunctionsForStructsHelper name generics members wipAst
+            case t.members of
+                AST.StructMembers members ->
+                    addFunctionsForStructsHelper t.name t.generics members wipAst
 
-                _ ->
+                AST.UnionMembers _ ->
                     wipAst
     in
     Dict.foldl helper ast ast.types

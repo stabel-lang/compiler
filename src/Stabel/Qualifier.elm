@@ -213,19 +213,19 @@ qualifyType config typeDef ( errors, acc ) =
             , modDef.exposes
             )
     in
-    case typeDef of
-        Parser.CustomTypeDef range name generics members ->
+    case typeDef.members of
+        Parser.StructMembers members ->
             let
                 qualifiedName =
-                    qualifyName config name
+                    qualifyName config typeDef.name
 
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs range)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs typeDef.sourceLocation)) members
                         |> List.map raiseTupleError
                         |> Result.combine
 
                 exposed =
-                    Set.isEmpty exposes || Set.member name exposes
+                    Set.isEmpty exposes || Set.member typeDef.name exposes
 
                 raiseTupleError ( label, result ) =
                     case result of
@@ -247,23 +247,23 @@ qualifyType config typeDef ( errors, acc ) =
                         (CustomTypeDef
                             qualifiedName
                             exposed
-                            range
-                            generics
+                            typeDef.sourceLocation
+                            typeDef.generics
                             qualifiedMembers
                         )
                         acc
                     )
 
-        Parser.UnionTypeDef range name generics memberTypes ->
+        Parser.UnionMembers memberTypes ->
             let
                 qualifiedName =
-                    qualifyName config name
+                    qualifyName config typeDef.name
 
                 exposed =
-                    Set.isEmpty exposes || Set.member name exposes
+                    Set.isEmpty exposes || Set.member typeDef.name exposes
 
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config modRefs range) memberTypes
+                    List.map (qualifyMemberType config modRefs typeDef.sourceLocation) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -278,8 +278,8 @@ qualifyType config typeDef ( errors, acc ) =
                         (UnionTypeDef
                             qualifiedName
                             exposed
-                            range
-                            generics
+                            typeDef.sourceLocation
+                            typeDef.generics
                             qualifiedMemberTypes
                         )
                         acc
@@ -1274,14 +1274,14 @@ requiredModules config =
 
 requiredModulesOfType : Parser.TypeDefinition -> Set String
 requiredModulesOfType typeDef =
-    case typeDef of
-        Parser.CustomTypeDef _ _ _ members ->
+    case typeDef.members of
+        Parser.StructMembers members ->
             members
                 |> List.map Tuple.second
                 |> List.filterMap extractModuleReferenceFromType
                 |> Set.fromList
 
-        Parser.UnionTypeDef _ _ _ members ->
+        Parser.UnionMembers members ->
             members
                 |> List.filterMap extractModuleReferenceFromType
                 |> Set.fromList

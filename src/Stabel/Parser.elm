@@ -7,13 +7,13 @@ module Stabel.Parser exposing
     , ModuleDefinitionRec
     , PossiblyQualifiedType(..)
     , PossiblyQualifiedTypeOrStackRange(..)
-    , TypeDefinition(..)
+    , TypeDefinition
+    , TypeDefinitionMembers(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
     , TypeSignature(..)
     , emptyModuleDefinition
     , run
-    , typeDefinitionName
     , typeSignatureToMaybe
     )
 
@@ -49,9 +49,17 @@ type alias ModuleDefinitionRec =
     }
 
 
-type TypeDefinition
-    = CustomTypeDef SourceLocationRange String (List String) (List ( String, PossiblyQualifiedType ))
-    | UnionTypeDef SourceLocationRange String (List String) (List PossiblyQualifiedType)
+type alias TypeDefinition =
+    { name : String
+    , sourceLocation : SourceLocationRange
+    , generics : List String
+    , members : TypeDefinitionMembers
+    }
+
+
+type TypeDefinitionMembers
+    = StructMembers (List ( String, PossiblyQualifiedType ))
+    | UnionMembers (List PossiblyQualifiedType)
 
 
 type alias FunctionDefinition =
@@ -573,7 +581,7 @@ definitionParser ast =
         insertType typeDef =
             let
                 typeName =
-                    typeDefinitionName typeDef
+                    typeDef.name
 
                 typeFunctions =
                     generateDefaultFunctionsForType typeDef
@@ -639,25 +647,25 @@ definitionParser ast =
 
 generateDefaultFunctionsForType : TypeDefinition -> List FunctionDefinition
 generateDefaultFunctionsForType typeDef =
-    case typeDef of
-        UnionTypeDef _ _ _ _ ->
+    case typeDef.members of
+        UnionMembers _ ->
             []
 
-        CustomTypeDef _ typeName binds typeMembers ->
+        StructMembers typeMembers ->
             let
                 typeOfType =
-                    binds
+                    typeDef.generics
                         |> List.map Generic
-                        |> LocalRef typeName
+                        |> LocalRef typeDef.name
                         |> NotStackRange
 
                 ctorDef =
                     { name =
                         if List.isEmpty typeMembers then
-                            typeName
+                            typeDef.name
 
                         else
-                            ">" ++ typeName
+                            ">" ++ typeDef.name
                     , typeSignature =
                         Verified
                             { input =
@@ -668,7 +676,7 @@ generateDefaultFunctionsForType typeDef =
                     , aliases = Dict.empty
                     , imports = Dict.empty
                     , implementation =
-                        SoloImpl [ ConstructType typeName ]
+                        SoloImpl [ ConstructType typeDef.name ]
                     }
 
                 setterGetterPair ( memberName, memberType ) =
@@ -683,7 +691,7 @@ generateDefaultFunctionsForType typeDef =
                       , imports = Dict.empty
                       , implementation =
                             SoloImpl
-                                [ SetMember typeName memberName ]
+                                [ SetMember typeDef.name memberName ]
                       }
                     , { name = memberName ++ ">"
                       , typeSignature =
@@ -696,7 +704,7 @@ generateDefaultFunctionsForType typeDef =
                       , imports = Dict.empty
                       , implementation =
                             SoloImpl
-                                [ GetMember typeName memberName ]
+                                [ GetMember typeDef.name memberName ]
                       }
                     ]
             in
@@ -866,11 +874,11 @@ typeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) 
 typeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
         ctor generics members endLocation =
-            CustomTypeDef
-                (SourceLocationRange startLocation endLocation)
-                typeName
-                generics
-                members
+            { name = typeName
+            , sourceLocation = SourceLocationRange startLocation endLocation
+            , generics = generics
+            , members = StructMembers members
+            }
     in
     Parser.inContext (Problem.StructDefinition startLocation typeName) <|
         case Dict.get typeName definedTypes of
@@ -878,7 +886,7 @@ typeDefinitionParser definedTypes ( startLocation, typeName ) =
                 Parser.problem <|
                     TypeAlreadyDefined
                         typeName
-                        (typeDefinitionLocation previousDefinition)
+                        previousDefinition.sourceLocation
 
             Nothing ->
                 Parser.succeed ctor
@@ -921,11 +929,11 @@ unionTypeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, Stri
 unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
         ctor generics members endLocation =
-            UnionTypeDef
-                (SourceLocationRange startLocation endLocation)
-                typeName
-                generics
-                members
+            { name = typeName
+            , sourceLocation = SourceLocationRange startLocation endLocation
+            , generics = generics
+            , members = UnionMembers members
+            }
     in
     Parser.inContext (Problem.UnionDefinition startLocation typeName) <|
         case Dict.get typeName definedTypes of
@@ -933,7 +941,7 @@ unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
                 Parser.problem <|
                     TypeAlreadyDefined
                         typeName
-                        (typeDefinitionLocation previousDefinition)
+                        previousDefinition.sourceLocation
 
             Nothing ->
                 Parser.succeed ctor
@@ -1127,23 +1135,3 @@ qualifiedSymbolImplParser =
             |= Parser.loop [] modulePathParser
             |> Parser.andThen externalBuilder
         ]
-
-
-typeDefinitionName : TypeDefinition -> String
-typeDefinitionName typeDef =
-    case typeDef of
-        CustomTypeDef _ name _ _ ->
-            name
-
-        UnionTypeDef _ name _ _ ->
-            name
-
-
-typeDefinitionLocation : TypeDefinition -> SourceLocationRange
-typeDefinitionLocation typeDef =
-    case typeDef of
-        CustomTypeDef range _ _ _ ->
-            range
-
-        UnionTypeDef range _ _ _ ->
-            range

@@ -169,15 +169,26 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ AST.UnionTypeDef emptyRange
-                                    "Bool"
-                                    []
-                                    [ AST.LocalRef "True" []
-                                    , AST.LocalRef "False" []
-                                    ]
-                                , AST.CustomTypeDef emptyRange "True" [] []
-                                , AST.CustomTypeDef emptyRange "False" [] []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.UnionMembers
+                                            [ AST.LocalRef "True" []
+                                            , AST.LocalRef "False" []
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
+                                , { name = "False"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
@@ -483,19 +494,33 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ AST.UnionTypeDef emptyRange
-                                        "Bool"
-                                        []
-                                        [ AST.LocalRef "True" []
-                                        , AST.LocalRef "False" []
-                                        ]
-                                    , AST.CustomTypeDef emptyRange "True" [] []
-                                    , AST.CustomTypeDef emptyRange "False" [] []
-                                    , AST.CustomTypeDef emptyRange
-                                        "Box"
-                                        []
-                                        [ ( "value", AST.LocalRef "Int" [] ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "Bool"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.UnionMembers
+                                                [ AST.LocalRef "True" []
+                                                , AST.LocalRef "False" []
+                                                ]
+                                      }
+                                    , { name = "True"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
+                                    , { name = "False"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
+                                    , { name = "Box"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "value", AST.LocalRef "Int" [] ) ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -556,14 +581,21 @@ suite =
                             { sourceReference = ""
                             , moduleDefinition = AST.emptyModuleDefinition
                             , types =
-                                Dict.fromListBy AST.typeDefinitionName
-                                    [ AST.UnionTypeDef emptyRange
-                                        "Maybe"
-                                        [ "a" ]
-                                        [ AST.Generic "a"
-                                        , AST.LocalRef "Nothing" []
-                                        ]
-                                    , AST.CustomTypeDef emptyRange "Nothing" [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.UnionMembers
+                                                [ AST.Generic "a"
+                                                , AST.LocalRef "Nothing" []
+                                                ]
+                                      }
+                                    , { name = "Nothing"
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
@@ -631,19 +663,33 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ AST.UnionTypeDef emptyRange
-                                    "Bool"
-                                    []
-                                    [ AST.LocalRef "True" []
-                                    , AST.LocalRef "False" []
-                                    ]
-                                , AST.CustomTypeDef emptyRange "True" [] []
-                                , AST.CustomTypeDef emptyRange "False" [] []
-                                , AST.CustomTypeDef emptyRange
-                                    "Box"
-                                    []
-                                    [ ( "value", AST.LocalRef "Bool" [] ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.UnionMembers
+                                            [ AST.LocalRef "True" []
+                                            , AST.LocalRef "False" []
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
+                                , { name = "False"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = AST.StructMembers []
+                                  }
+                                , { name = "Box"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "value", AST.LocalRef "Bool" [] ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
@@ -721,21 +767,30 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ AST.UnionTypeDef emptyRange
-                                    "USMoney"
-                                    []
-                                    [ AST.LocalRef "Dollar" []
-                                    , AST.LocalRef "Cent" []
-                                    ]
-                                , AST.CustomTypeDef emptyRange
-                                    "Dollar"
-                                    []
-                                    [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
-                                , AST.CustomTypeDef emptyRange
-                                    "Cent"
-                                    []
-                                    [ ( "cent-value", AST.LocalRef "Int" [] ) ]
+                            Dict.fromListBy .name
+                                [ { name = "USMoney"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.UnionMembers
+                                            [ AST.LocalRef "Dollar" []
+                                            , AST.LocalRef "Cent" []
+                                            ]
+                                  }
+                                , { name = "Dollar"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
+                                  }
+                                , { name = "Cent"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "cent-value", AST.LocalRef "Int" [] ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
@@ -951,27 +1006,39 @@ suite =
                         { sourceReference = ""
                         , moduleDefinition = AST.emptyModuleDefinition
                         , types =
-                            Dict.fromListBy AST.typeDefinitionName
-                                [ AST.UnionTypeDef emptyRange
-                                    "USMoney"
-                                    []
-                                    [ AST.LocalRef "Dollar" []
-                                    , AST.LocalRef "Cent" []
-                                    ]
-                                , AST.CustomTypeDef emptyRange
-                                    "Wallet"
-                                    []
-                                    [ ( "user-id", AST.LocalRef "Int" [] )
-                                    , ( "value", AST.LocalRef "USMoney" [] )
-                                    ]
-                                , AST.CustomTypeDef emptyRange
-                                    "Dollar"
-                                    []
-                                    [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
-                                , AST.CustomTypeDef emptyRange
-                                    "Cent"
-                                    []
-                                    [ ( "cent-value", AST.LocalRef "Int" [] ) ]
+                            Dict.fromListBy .name
+                                [ { name = "USMoney"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.UnionMembers
+                                            [ AST.LocalRef "Dollar" []
+                                            , AST.LocalRef "Cent" []
+                                            ]
+                                  }
+                                , { name = "Wallet"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "user-id", AST.LocalRef "Int" [] )
+                                            , ( "value", AST.LocalRef "USMoney" [] )
+                                            ]
+                                  }
+                                , { name = "Dollar"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
+                                  }
+                                , { name = "Cent"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "cent-value", AST.LocalRef "Int" [] ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
                         }
@@ -1122,13 +1189,14 @@ suite =
                                 , exposes = Set.fromList []
                                 }
                         , types =
-                            Dict.fromList
-                                [ ( "Tipe"
-                                  , AST.CustomTypeDef emptyRange
-                                        "Tipe"
-                                        []
-                                        [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "Tipe"
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        AST.StructMembers
+                                            [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
