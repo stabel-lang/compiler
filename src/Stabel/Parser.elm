@@ -525,29 +525,13 @@ definitionParser ast =
 
                 typeFunctions =
                     generateDefaultFunctionsForType typeDef
-
-                typeFunctionsProblem =
-                    typeFunctions
-                        |> List.filterMap (\tf -> Dict.get tf.name ast.functions)
-                        |> List.head
-                        |> Maybe.map
-                            (\f ->
-                                Problem.FunctionAlreadyDefined
-                                    f.name
-                                    f.sourceLocationRange
-                            )
             in
-            case typeFunctionsProblem of
-                Just problem ->
-                    Parser.problem problem
-
-                Nothing ->
-                    { ast
-                        | types = Dict.insert typeName typeDef ast.types
-                        , functions = Dict.union (Dict.fromListBy .name typeFunctions) ast.functions
-                    }
-                        |> Parser.Loop
-                        |> Parser.succeed
+            { ast
+                | types = Dict.insert typeName typeDef ast.types
+                , functions = Dict.union (Dict.fromListBy .name typeFunctions) ast.functions
+            }
+                |> Parser.Loop
+                |> Parser.succeed
     in
     Parser.oneOf
         [ Parser.succeed Tuple.pair
@@ -569,7 +553,7 @@ definitionParser ast =
             |. Parser.keyword (Token "defstruct:" UnknownError)
             |. noiseParser
             |= typeNameParser
-            |> Parser.andThen (typeDefinitionParser ast.types)
+            |> Parser.andThen (typeDefinitionParser ast.types ast.functions)
             |> Parser.andThen insertType
         , Parser.succeed Tuple.pair
             |= sourceLocationParser
@@ -810,8 +794,12 @@ multiFunctionMetadataParser def =
         ]
 
 
-typeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) -> Parser TypeDefinition
-typeDefinitionParser definedTypes ( startLocation, typeName ) =
+typeDefinitionParser :
+    Dict String TypeDefinition
+    -> Dict String FunctionDefinition
+    -> ( SourceLocation, String )
+    -> Parser TypeDefinition
+typeDefinitionParser definedTypes definedFunctions ( startLocation, typeName ) =
     let
         ctor generics members endLocation =
             { name = typeName
@@ -832,7 +820,7 @@ typeDefinitionParser definedTypes ( startLocation, typeName ) =
                 Parser.succeed ctor
                     |. noiseParser
                     |= Parser.loop [] typeGenericParser
-                    |= Parser.loop [] typeMemberParser
+                    |= Parser.loop [] (typeMemberParser definedFunctions)
                     |= sourceLocationParser
 
 
@@ -847,15 +835,46 @@ typeGenericParser generics =
 
 
 typeMemberParser :
-    List ( String, PossiblyQualifiedType )
-    -> Parser (Parser.Step (List ( String, PossiblyQualifiedType )) (List ( String, PossiblyQualifiedType )))
-typeMemberParser types =
+    Dict String FunctionDefinition
+    -> List ( String, PossiblyQualifiedType )
+    ->
+        Parser
+            (Parser.Step
+                (List ( String, PossiblyQualifiedType ))
+                (List ( String, PossiblyQualifiedType ))
+            )
+typeMemberParser functions types =
+    let
+        alreadyDefinedCheck name =
+            let
+                getterName =
+                    name ++ ">"
+
+                setterName =
+                    ">" ++ name
+            in
+            case ( Dict.get getterName functions, Dict.get setterName functions ) of
+                ( Just getter, _ ) ->
+                    Parser.problem <|
+                        Problem.FunctionAlreadyDefined
+                            getter.name
+                            getter.sourceLocationRange
+
+                ( _, Just setter ) ->
+                    Parser.problem <|
+                        Problem.FunctionAlreadyDefined
+                            setter.name
+                            setter.sourceLocationRange
+
+                ( Nothing, Nothing ) ->
+                    Parser.succeed name
+    in
     Parser.oneOf
         [ Parser.inContext MemberKeyword <|
             Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
-                |= symbolParser
+                |= Parser.andThen alreadyDefinedCheck symbolParser
                 |. noiseParser
                 |= typeRefParser
         , Parser.succeed UnknownMetadata
