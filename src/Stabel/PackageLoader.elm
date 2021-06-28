@@ -39,31 +39,35 @@ type Problem
 
 problemToString : Problem -> String
 problemToString problem =
-    case problem of
-        InvalidPackageMetadata path err ->
-            "Something is wrong with file located at '" ++ path ++ "':\n\n" ++ err
+    let
+        problemString =
+            case problem of
+                InvalidPackageMetadata path err ->
+                    "Something is wrong with file located at '" ++ path ++ "':\n\n" ++ err
 
-        UnknownMessageForState msg ->
-            "Unknown message for state: " ++ msg
+                UnknownMessageForState msg ->
+                    "Unknown message for state: " ++ msg
 
-        NoExposedModulesInRootProject ->
-            "No exposed modules in root project"
+                NoExposedModulesInRootProject ->
+                    "No exposed modules in root project"
 
-        ModuleNotFound mod ->
-            "Failed to locate module '" ++ mod ++ "' on disk"
+                ModuleNotFound mod ->
+                    "Failed to locate module '" ++ mod ++ "' on disk"
 
-        ParserError source errs ->
-            errs
-                |> List.map (ParserProblem.toString source)
-                |> String.join "\n\n"
+                ParserError source errs ->
+                    errs
+                        |> List.map (ParserProblem.toString source)
+                        |> String.join "\n\n"
 
-        QualifierError source errs ->
-            errs
-                |> List.map (QualifierProblem.toString source)
-                |> String.join "\n\n"
+                QualifierError source errs ->
+                    errs
+                        |> List.map (QualifierProblem.toString source)
+                        |> String.join "\n\n"
 
-        InternalError msg ->
-            "Internal error: " ++ msg
+                InternalError msg ->
+                    "Internal error: " ++ msg
+    in
+    problemString ++ "\n\n"
 
 
 type alias InitOptions =

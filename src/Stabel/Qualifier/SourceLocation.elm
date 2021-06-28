@@ -1,4 +1,10 @@
-module Stabel.Qualifier.SourceLocation exposing (..)
+module Stabel.Qualifier.SourceLocation exposing
+    ( SourceLocation
+    , SourceLocationRange
+    , emptyRange
+    , extractFromString
+    , toString
+    )
 
 
 type alias SourceLocationRange =
@@ -25,18 +31,36 @@ toString location =
     String.fromInt location.row ++ ":" ++ String.fromInt location.col
 
 
-extractFromString : String -> Int -> Int -> String
-extractFromString sourceCode startLine endLine =
+extractFromString : String -> SourceLocation -> SourceLocation -> String
+extractFromString sourceCode startLoc endLoc =
     let
         numPadding =
-            endLine
+            endLoc.row
                 |> String.fromInt
                 |> String.length
+
+        modifyLastLine idx line =
+            if idx == endLoc.row then
+                if
+                    line
+                        |> String.left (endLoc.col - 1)
+                        |> String.trim
+                        |> String.isEmpty
+                then
+                    ""
+
+                else
+                    line
+
+            else
+                line
     in
     sourceCode
         |> String.lines
         |> List.indexedMap (\idx line -> ( idx + 1, line ))
-        |> List.filter (\( idx, _ ) -> idx >= startLine && idx <= endLine)
+        |> List.map (\( idx, line ) -> ( idx, modifyLastLine idx line ))
+        |> List.filter (\( idx, _ ) -> idx >= startLoc.row && idx <= endLoc.row)
+        |> dropLastEmptyLines
         |> List.map
             (\( idx, line ) ->
                 String.padLeft numPadding ' ' (String.fromInt idx)
@@ -44,3 +68,25 @@ extractFromString sourceCode startLine endLine =
                     ++ line
             )
         |> String.join "\n"
+
+
+dropLastEmptyLines : List ( Int, String ) -> List ( Int, String )
+dropLastEmptyLines ls =
+    ls
+        |> List.reverse
+        |> dropLastEmptyLinesHelper
+        |> List.reverse
+
+
+dropLastEmptyLinesHelper : List ( Int, String ) -> List ( Int, String )
+dropLastEmptyLinesHelper ls =
+    case ls of
+        [] ->
+            []
+
+        ( _, line ) :: rest ->
+            if line |> String.trim |> String.isEmpty then
+                dropLastEmptyLinesHelper rest
+
+            else
+                ls

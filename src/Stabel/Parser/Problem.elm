@@ -70,8 +70,14 @@ toString source deadEnd =
             , max lineOfProblem lineOfContext
             )
 
+        startLoc =
+            { row = startLine, col = 1 }
+
+        endLoc =
+            { row = endLine, col = 1000 }
+
         codeBlock =
-            extractFromString source startLine endLine
+            extractFromString source startLoc endLoc
 
         problemDetail =
             problemToString source deadEnd.problem
@@ -226,8 +232,8 @@ problemToString source problem =
                         ++ "', but this function has already been defined here:\n\n"
                         ++ extractFromString
                             source
-                            previousDefinitionRange.start.row
-                            previousDefinitionRange.end.row
+                            previousDefinitionRange.start
+                            previousDefinitionRange.end
 
         TypeAlreadyDefined typeName previousDefinitionRange ->
             "You're trying to define a new type called '"
@@ -235,8 +241,8 @@ problemToString source problem =
                 ++ "', but this type has already been defined here:\n\n"
                 ++ extractFromString
                     source
-                    previousDefinitionRange.start.row
-                    previousDefinitionRange.end.row
+                    previousDefinitionRange.start
+                    previousDefinitionRange.end
 
         UnknownMetadata meta ->
             "'" ++ meta ++ ":' is not a known keyword in this context."
