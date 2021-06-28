@@ -11,8 +11,10 @@ import Dict.Extra as Dict
 import Expect
 import Parser.Advanced as Parser
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.Problem exposing (Context, Problem)
 import Stabel.Parser.SourceLocation exposing (emptyRange)
+import Stabel.Parser.Type as AST exposing (..)
 import String.Extra as String
 
 
@@ -138,7 +140,7 @@ addFunctionsForStructsHelper name generics members ast =
                 else
                     ">" ++ name
             , typeSignature =
-                Verified
+                AssociatedFunctionSignature.Verified
                     { input = List.map (NotStackRange << Tuple.second) members
                     , output = [ selfType ]
                     }
@@ -154,7 +156,7 @@ addFunctionsForStructsHelper name generics members ast =
         settersHelper ( memberName, type_ ) =
             { name = ">" ++ memberName
             , typeSignature =
-                Verified
+                AssociatedFunctionSignature.Verified
                     { input = [ selfType, NotStackRange type_ ]
                     , output = [ selfType ]
                     }
@@ -171,7 +173,7 @@ addFunctionsForStructsHelper name generics members ast =
         gettersHelper ( memberName, type_ ) =
             { name = memberName ++ ">"
             , typeSignature =
-                Verified
+                AssociatedFunctionSignature.Verified
                     { input = [ selfType ]
                     , output = [ NotStackRange type_ ]
                     }

@@ -4,6 +4,9 @@ import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Stabel.Parser as AST
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem exposing (Problem(..))
 import Stabel.Qualifier.SourceLocation exposing (emptyRange)
@@ -19,12 +22,12 @@ suite =
                     let
                         ast =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
-                                      , typeSignature = AST.NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -35,7 +38,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , typeSignature = AST.NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -58,12 +61,12 @@ suite =
                     let
                         ast =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , typeSignature = AST.NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -82,13 +85,13 @@ suite =
                     let
                         ast =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "inc"
                                       , typeSignature =
-                                            AST.UserProvided
+                                            AssociatedFunctionSignature.UserProvided
                                                 { input = [ AST.NotStackRange <| AST.LocalRef "Ints" [] ]
                                                 , output = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
                                                 }
@@ -102,7 +105,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , typeSignature = AST.NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -123,7 +126,7 @@ suite =
                     let
                         ast =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "USMoney"
@@ -152,7 +155,7 @@ suite =
                     let
                         ast =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "BoxWrapper"

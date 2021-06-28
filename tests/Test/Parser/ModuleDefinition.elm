@@ -4,7 +4,10 @@ import Dict
 import Dict.Extra as Dict
 import Set
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.SourceLocation exposing (emptyRange)
+import Stabel.Parser.Type exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util
     exposing
@@ -41,7 +44,7 @@ suite =
                     expectedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            Defined
+                            ModuleDefinition.Defined
                                 { aliases =
                                     Dict.fromList
                                         [ ( "other", "/some/mod" )
@@ -70,7 +73,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -101,12 +104,12 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases =
                                         Dict.fromList

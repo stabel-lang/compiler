@@ -8,6 +8,9 @@ import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.Type as Type
 import Stabel.Parser as AST
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem as Problem
 import Stabel.Qualifier.SourceLocation exposing (emptyRange)
@@ -23,12 +26,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -72,12 +75,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -133,13 +136,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input =
                                                 [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "Tipe" []
                                                 , AST.NotStackRange <| AST.InternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
@@ -203,13 +206,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "TipeUnion" [] ]
                                             , output = []
                                             }
@@ -287,7 +290,7 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "SomeType"
@@ -332,12 +335,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -381,12 +384,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -442,13 +445,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input =
                                                 [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "Tipe" []
                                                 , AST.NotStackRange <| AST.ExternalRef [ "mod" ] "TipeGeneric" [ AST.Generic "a" ]
@@ -512,13 +515,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "TipeUnion" [] ]
                                             , output = []
                                             }
@@ -596,7 +599,7 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "SomeType"
@@ -642,7 +645,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases =
                                     Dict.fromList
                                         [ ( "ext", "/mod" )
@@ -656,7 +659,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.InternalRef [ "ext" ] "Tipe" [] ]
                                             , output = [ AST.NotStackRange <| AST.InternalRef [ "internal" ] "Tope" [] ]
                                             }
@@ -719,7 +722,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases =
                                     Dict.fromList
                                         [ ( "ext", "/mod" ) ]
@@ -731,7 +734,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.InternalRef [ "ext" ] "Tipe" [] ]
                                             , output = [ AST.NotStackRange <| AST.InternalRef [ "internal" ] "Tope" [] ]
                                             }
@@ -794,7 +797,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases =
                                     Dict.fromList
                                         [ ( "ext", "/mod" ) ]
@@ -805,7 +808,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.fromList [ ( "internal", "internal/mod" ) ]
                                   , imports = Dict.empty
@@ -865,7 +868,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases =
                                     Dict.fromList
                                         [ ( "ext", "/mod" )
@@ -926,7 +929,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -940,7 +943,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.LocalRef "Tipe" [] ]
                                             , output = [ AST.NotStackRange <| AST.LocalRef "Tope" [] ]
                                             }
@@ -1002,7 +1005,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -1015,7 +1018,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.LocalRef "Tipe" [] ]
                                             , output = [ AST.NotStackRange <| AST.LocalRef "Tope" [] ]
                                             }
@@ -1077,7 +1080,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -1138,7 +1141,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -1149,7 +1152,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports =
@@ -1210,12 +1213,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1227,7 +1230,7 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1273,7 +1276,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports = Dict.empty
                                 , exposes = Set.fromList [ "fn2" ]
@@ -1282,7 +1285,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1294,7 +1297,7 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1342,7 +1345,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -1354,7 +1357,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1401,7 +1404,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { aliases = Dict.empty
                                 , imports =
                                     Dict.fromList
@@ -1413,7 +1416,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1459,13 +1462,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "Tipe" [] ]
                                             , output = []
                                             }
@@ -1512,7 +1515,7 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "BoxedTipe"
@@ -1558,12 +1561,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1612,13 +1615,13 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "Tipe" [] ]
                                             , output = []
                                             }
@@ -1663,7 +1666,7 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "BoxedTipe"
@@ -1707,12 +1710,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1759,12 +1762,12 @@ suite =
                 let
                     unqualifiedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.Undefined
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -1806,7 +1809,7 @@ suite =
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition =
-                            AST.Defined
+                            ModuleDefinition.Defined
                                 { imports = Dict.empty
                                 , aliases = Dict.empty
                                 , exposes = Set.empty
@@ -1815,7 +1818,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , typeSignature = AST.NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty

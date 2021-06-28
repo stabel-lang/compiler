@@ -3,26 +3,27 @@ module Stabel.Parser exposing
     , AstNode(..)
     , FunctionDefinition
     , FunctionImplementation(..)
-    , ModuleDefinition(..)
-    , ModuleDefinitionRec
-    , PossiblyQualifiedType(..)
-    , PossiblyQualifiedTypeOrStackRange(..)
     , TypeDefinition
     , TypeDefinitionMembers(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
-    , TypeSignature(..)
-    , emptyModuleDefinition
     , run
-    , typeSignatureToMaybe
     )
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Set exposing (Set)
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature exposing (AssociatedFunctionSignature)
+import Stabel.Parser.ModuleDefinition as ModuleDefinition exposing (ModuleDefinition)
 import Stabel.Parser.Problem as Problem exposing (..)
 import Stabel.Parser.SourceLocation exposing (SourceLocation, SourceLocationRange)
+import Stabel.Parser.Type
+    exposing
+        ( FunctionSignature
+        , PossiblyQualifiedType(..)
+        , PossiblyQualifiedTypeOrStackRange(..)
+        )
 
 
 type alias Parser a =
@@ -34,18 +35,6 @@ type alias AST =
     , moduleDefinition : ModuleDefinition
     , types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
-    }
-
-
-type ModuleDefinition
-    = Undefined
-    | Defined ModuleDefinitionRec
-
-
-type alias ModuleDefinitionRec =
-    { aliases : Dict String String
-    , imports : Dict String (List String)
-    , exposes : Set String
     }
 
 
@@ -64,50 +53,12 @@ type TypeDefinitionMembers
 
 type alias FunctionDefinition =
     { name : String
-    , typeSignature : TypeSignature
+    , typeSignature : AssociatedFunctionSignature
     , sourceLocationRange : Maybe SourceLocationRange
     , aliases : Dict String String
     , imports : Dict String (List String)
     , implementation : FunctionImplementation
     }
-
-
-type alias ParserFunctionType =
-    { input : List PossiblyQualifiedTypeOrStackRange
-    , output : List PossiblyQualifiedTypeOrStackRange
-    }
-
-
-type TypeSignature
-    = NotProvided
-    | UserProvided ParserFunctionType
-    | Verified ParserFunctionType
-
-
-typeSignatureToMaybe : TypeSignature -> Maybe ParserFunctionType
-typeSignatureToMaybe ts =
-    case ts of
-        NotProvided ->
-            Nothing
-
-        UserProvided wt ->
-            Just wt
-
-        Verified wt ->
-            Just wt
-
-
-type PossiblyQualifiedType
-    = LocalRef String (List PossiblyQualifiedType)
-    | InternalRef (List String) String (List PossiblyQualifiedType)
-    | ExternalRef (List String) String (List PossiblyQualifiedType)
-    | Generic String
-    | FunctionType ParserFunctionType
-
-
-type PossiblyQualifiedTypeOrStackRange
-    = StackRange String
-    | NotStackRange PossiblyQualifiedType
 
 
 type FunctionImplementation
@@ -143,19 +94,6 @@ run ref sourceCode =
 
 
 -- ATOMS
-
-
-emptyModuleDefinition : ModuleDefinition
-emptyModuleDefinition =
-    Undefined
-
-
-emptyModuleDefinitionRec : ModuleDefinitionRec
-emptyModuleDefinitionRec =
-    { aliases = Dict.empty
-    , imports = Dict.empty
-    , exposes = Set.empty
-    }
 
 
 validSymbolChar : Char -> Bool
@@ -496,7 +434,7 @@ parser ref =
 
         emptyAst =
             { sourceReference = ref
-            , moduleDefinition = emptyModuleDefinition
+            , moduleDefinition = ModuleDefinition.Undefined
             , types = Dict.empty
             , functions = Dict.empty
             }
@@ -515,7 +453,7 @@ parser ref =
                 |= moduleDefinitionParser
                 |. noiseParser
                 |= Parser.loop emptyAst definitionParser
-            , Parser.succeed (joinParseResults emptyModuleDefinition)
+            , Parser.succeed (joinParseResults ModuleDefinition.Undefined)
                 |= Parser.loop emptyAst definitionParser
             ]
         |. Parser.end ExpectedEndOfFile
@@ -528,12 +466,14 @@ moduleDefinitionParser =
         (Parser.succeed identity
             |. Parser.keyword (Token "defmodule:" UnknownError)
             |. noiseParser
-            |= Parser.loop emptyModuleDefinitionRec moduleDefinitionMetaParser
-            |> Parser.map Defined
+            |= Parser.loop ModuleDefinition.emptyDefinition moduleDefinitionMetaParser
+            |> Parser.map ModuleDefinition.Defined
         )
 
 
-moduleDefinitionMetaParser : ModuleDefinitionRec -> Parser (Parser.Step ModuleDefinitionRec ModuleDefinitionRec)
+moduleDefinitionMetaParser :
+    ModuleDefinition.Definition
+    -> Parser (Parser.Step ModuleDefinition.Definition ModuleDefinition.Definition)
 moduleDefinitionMetaParser def =
     Parser.oneOf
         [ Parser.inContext AliasKeyword
@@ -667,7 +607,7 @@ generateDefaultFunctionsForType typeDef =
                         else
                             ">" ++ typeDef.name
                     , typeSignature =
-                        Verified
+                        AssociatedFunctionSignature.Verified
                             { input =
                                 List.map (NotStackRange << Tuple.second) typeMembers
                             , output = [ typeOfType ]
@@ -682,7 +622,7 @@ generateDefaultFunctionsForType typeDef =
                 setterGetterPair ( memberName, memberType ) =
                     [ { name = ">" ++ memberName
                       , typeSignature =
-                            Verified
+                            AssociatedFunctionSignature.Verified
                                 { input = [ typeOfType, NotStackRange memberType ]
                                 , output = [ typeOfType ]
                                 }
@@ -695,7 +635,7 @@ generateDefaultFunctionsForType typeDef =
                       }
                     , { name = memberName ++ ">"
                       , typeSignature =
-                            Verified
+                            AssociatedFunctionSignature.Verified
                                 { input = [ typeOfType ]
                                 , output = [ NotStackRange memberType ]
                                 }
@@ -727,7 +667,7 @@ functionDefinitionParser definedFunctions ( startLocation, name ) =
 
         emptyDef =
             { name = name
-            , typeSignature = NotProvided
+            , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
             , aliases = Dict.empty
             , imports = Dict.empty
@@ -751,7 +691,7 @@ functionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefin
 functionMetadataParser def =
     Parser.oneOf
         [ Parser.inContext TypeKeyword <|
-            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
+            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = AssociatedFunctionSignature.UserProvided typeSign })
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
@@ -798,7 +738,7 @@ multiFunctionDefinitionParser definedFunctions ( startLocation, name ) =
 
         emptyDef =
             { name = name
-            , typeSignature = NotProvided
+            , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
             , aliases = Dict.empty
             , imports = Dict.empty
@@ -847,7 +787,7 @@ multiFunctionMetadataParser def =
     in
     Parser.oneOf
         [ Parser.inContext TypeKeyword <|
-            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = UserProvided typeSign })
+            Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = AssociatedFunctionSignature.UserProvided typeSign })
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
@@ -968,7 +908,7 @@ unionTypeMemberParser types =
         ]
 
 
-typeSignatureParser : Parser ParserFunctionType
+typeSignatureParser : Parser FunctionSignature
 typeSignatureParser =
     Parser.succeed (\input output -> { input = input, output = output })
         |= Parser.loop [] typeLoopParser

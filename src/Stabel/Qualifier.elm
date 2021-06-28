@@ -9,6 +9,9 @@ import Stabel.Data.Metadata as Metadata exposing (Metadata)
 import Stabel.Data.Type as Type exposing (Type, WordType)
 import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.Type as Parser
 import Stabel.Qualifier.Problem exposing (Problem(..))
 import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
@@ -121,7 +124,7 @@ type alias ModuleDefinitionConfig a =
     }
 
 
-moduleDefinition : ModuleDefinitionConfig a -> Parser.ModuleDefinitionRec
+moduleDefinition : ModuleDefinitionConfig a -> ModuleDefinition.Definition
 moduleDefinition config =
     let
         defaultImports =
@@ -130,19 +133,14 @@ moduleDefinition config =
 
             else
                 Dict.empty
-    in
-    case config.ast.moduleDefinition of
-        Parser.Undefined ->
-            { imports = defaultImports
-            , aliases = Dict.empty
-            , exposes = Set.empty
-            }
 
-        Parser.Defined def ->
-            { imports = Dict.union def.imports defaultImports
-            , aliases = def.aliases
-            , exposes = def.exposes
-            }
+        def =
+            ModuleDefinition.definition config.ast.moduleDefinition
+    in
+    { imports = Dict.union def.imports defaultImports
+    , aliases = def.aliases
+    , exposes = def.exposes
+    }
 
 
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
@@ -572,13 +570,13 @@ qualifyMetadata config qualifiedTypes word =
 
         inputLength =
             case word.typeSignature of
-                Parser.NotProvided ->
+                AssociatedFunctionSignature.NotProvided ->
                     0
 
-                Parser.UserProvided wt ->
+                AssociatedFunctionSignature.UserProvided wt ->
                     List.length wt.input
 
-                Parser.Verified wt ->
+                AssociatedFunctionSignature.Verified wt ->
                     List.length wt.input
 
         modDef =
@@ -589,7 +587,7 @@ qualifyMetadata config qualifiedTypes word =
             , imports = Dict.union modDef.imports word.imports
             }
     in
-    Parser.typeSignatureToMaybe word.typeSignature
+    AssociatedFunctionSignature.toMaybe word.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
         |> List.map (qualifyFunctionType config modRefs wordRange)
@@ -604,13 +602,13 @@ qualifyMetadata config qualifiedTypes word =
 
                     ts =
                         case word.typeSignature of
-                            Parser.NotProvided ->
+                            AssociatedFunctionSignature.NotProvided ->
                                 TypeSignature.NotProvided
 
-                            Parser.UserProvided _ ->
+                            AssociatedFunctionSignature.UserProvided _ ->
                                 TypeSignature.UserProvided wordType
 
-                            Parser.Verified _ ->
+                            AssociatedFunctionSignature.Verified _ ->
                                 TypeSignature.CompilerProvided wordType
 
                     baseMeta =
@@ -621,10 +619,10 @@ qualifyMetadata config qualifiedTypes word =
                         TypeSignature.map (resolveUnions qualifiedTypes) ts
                     , isExposed =
                         case config.ast.moduleDefinition of
-                            Parser.Undefined ->
+                            ModuleDefinition.Undefined ->
                                 True
 
-                            Parser.Defined def ->
+                            ModuleDefinition.Defined def ->
                                 Set.member word.name def.exposes
                 }
             )
@@ -1302,13 +1300,13 @@ requiredModulesOfWord topLevelAliases word =
 
         typeSignature =
             case word.typeSignature of
-                Parser.NotProvided ->
+                AssociatedFunctionSignature.NotProvided ->
                     Set.empty
 
-                Parser.UserProvided wordType ->
+                AssociatedFunctionSignature.UserProvided wordType ->
                     moduleReferenceFromWordType wordType
 
-                Parser.Verified wordType ->
+                AssociatedFunctionSignature.Verified wordType ->
                     moduleReferenceFromWordType wordType
 
         moduleReferenceFromWordType wordType =

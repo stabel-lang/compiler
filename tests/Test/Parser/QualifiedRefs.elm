@@ -3,7 +3,10 @@ module Test.Parser.QualifiedRefs exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.SourceLocation exposing (emptyRange)
+import Stabel.Parser.Type exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (expectAst)
 
@@ -22,12 +25,12 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -50,12 +53,12 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -78,12 +81,12 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -109,13 +112,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| InternalRef [ "internal" ] "Tipe" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
@@ -144,13 +147,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| ExternalRef [ "external" ] "Tipe" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
@@ -182,13 +185,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| ExternalRef [ "external" ] "Tipe" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
@@ -226,13 +229,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "test"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| InternalRef [ "internal" ] "Tipe" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }

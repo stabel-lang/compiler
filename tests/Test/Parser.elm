@@ -4,12 +4,15 @@ import Dict
 import Dict.Extra as Dict
 import Expect
 import Stabel.Parser as AST exposing (..)
+import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.SourceLocation
     exposing
         ( SourceLocation
         , SourceLocationRange
         , emptyRange
         )
+import Stabel.Parser.Type as AST exposing (..)
 import Test exposing (Test, describe, test)
 import Test.Parser.Util
     exposing
@@ -41,12 +44,12 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -58,7 +61,7 @@ suite =
                                   }
                                 , { name = "dec"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| LocalRef "Int" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
@@ -72,7 +75,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -102,13 +105,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "int="
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| AST.LocalRef "Int" [], NotStackRange <| AST.LocalRef "Int" [] ]
                                             , output = [ NotStackRange <| AST.LocalRef "Bool" [] ]
                                             }
@@ -141,13 +144,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = ","
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| AST.LocalRef "Int" [], NotStackRange <| AST.LocalRef "Int" [] ]
                                             , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
@@ -161,7 +164,7 @@ suite =
                                   }
                                 , { name = "add2"
                                   , typeSignature =
-                                        AST.UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
@@ -193,7 +196,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "True"
@@ -206,7 +209,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "as-int"
                                       , typeSignature =
-                                            UserProvided
+                                            AssociatedFunctionSignature.UserProvided
                                                 { input = [ NotStackRange <| LocalRef "True" [] ]
                                                 , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
@@ -239,7 +242,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Person"
@@ -256,7 +259,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "get-age"
                                       , typeSignature =
-                                            UserProvided
+                                            AssociatedFunctionSignature.UserProvided
                                                 { input = [ NotStackRange <| LocalRef "Person" [] ]
                                                 , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
@@ -284,7 +287,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Box"
@@ -300,7 +303,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = ">Box"
                                       , typeSignature =
-                                            Verified
+                                            AssociatedFunctionSignature.Verified
                                                 { input = [ NotStackRange <| Generic "a" ]
                                                 , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
@@ -312,7 +315,7 @@ suite =
                                       }
                                     , { name = ">element"
                                       , typeSignature =
-                                            Verified
+                                            AssociatedFunctionSignature.Verified
                                                 { input = [ NotStackRange <| LocalRef "Box" [ Generic "a" ], NotStackRange <| Generic "a" ]
                                                 , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
@@ -324,7 +327,7 @@ suite =
                                       }
                                     , { name = "element>"
                                       , typeSignature =
-                                            Verified
+                                            AssociatedFunctionSignature.Verified
                                                 { input = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 , output = [ NotStackRange <| Generic "a" ]
                                                 }
@@ -351,13 +354,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| Generic "a", NotStackRange <| Generic "b" ]
                                             , output = [ NotStackRange <| Generic "a", NotStackRange <| Generic "b", NotStackRange <| Generic "a" ]
                                             }
@@ -396,7 +399,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Bool"
@@ -422,7 +425,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "to-int"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -462,7 +465,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Maybe"
@@ -483,7 +486,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -526,7 +529,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "MaybeBox"
@@ -554,7 +557,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -598,7 +601,7 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "MaybeBox"
@@ -627,7 +630,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "if-present"
                                       , typeSignature =
-                                            UserProvided
+                                            AssociatedFunctionSignature.UserProvided
                                                 { input = [ NotStackRange <| LocalRef "MaybeBox" [ Generic "a" ], NotStackRange <| Generic "a" ]
                                                 , output = [ NotStackRange <| Generic "a" ]
                                                 }
@@ -666,13 +669,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input =
                                                 [ NotStackRange <| LocalRef "Int" []
                                                 , NotStackRange <|
@@ -692,7 +695,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -726,13 +729,13 @@ suite =
 
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types = Dict.empty
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "apply-to-num"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input =
                                                 [ StackRange "a"
                                                 , NotStackRange <|
@@ -752,7 +755,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
@@ -784,12 +787,12 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -822,12 +825,12 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "pair?"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -866,12 +869,12 @@ suite =
 
                         expectedAst =
                             { sourceReference = ""
-                            , moduleDefinition = AST.emptyModuleDefinition
+                            , moduleDefinition = ModuleDefinition.Undefined
                             , types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "origo?"
-                                      , typeSignature = NotProvided
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
@@ -953,7 +956,7 @@ suite =
                     -- This is not what we want (it includes too much white space), but it'll do for now.
                     expectedAst =
                         { sourceReference = ""
-                        , moduleDefinition = AST.emptyModuleDefinition
+                        , moduleDefinition = ModuleDefinition.Undefined
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Bool"
@@ -989,7 +992,7 @@ suite =
                             Dict.fromListBy .name
                                 [ { name = "True"
                                   , typeSignature =
-                                        Verified
+                                        AssociatedFunctionSignature.Verified
                                             { input = []
                                             , output = [ NotStackRange <| LocalRef "True" [] ]
                                             }
@@ -1000,7 +1003,7 @@ suite =
                                   }
                                 , { name = "False"
                                   , typeSignature =
-                                        Verified
+                                        AssociatedFunctionSignature.Verified
                                             { input = []
                                             , output = [ NotStackRange <| LocalRef "False" [] ]
                                             }
@@ -1011,7 +1014,7 @@ suite =
                                   }
                                 , { name = "from-int"
                                   , typeSignature =
-                                        UserProvided
+                                        AssociatedFunctionSignature.UserProvided
                                             { input = [ NotStackRange <| LocalRef "Int" [] ]
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
@@ -1059,7 +1062,7 @@ suite =
                                             []
                                   }
                                 , { name = "equal"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange =
                                         Just
                                             (SourceLocationRange
@@ -1091,7 +1094,7 @@ suite =
                                             ]
                                   }
                                 , { name = "not"
-                                  , typeSignature = NotProvided
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange =
                                         Just
                                             (SourceLocationRange
