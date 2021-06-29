@@ -580,15 +580,10 @@ qualifyMetadata config qualifiedTypes function =
             Maybe.withDefault SourceLocation.emptyRange function.sourceLocationRange
 
         inputLength =
-            case function.typeSignature of
-                AssociatedFunctionSignature.NotProvided ->
-                    0
-
-                AssociatedFunctionSignature.UserProvided wt ->
-                    List.length wt.input
-
-                AssociatedFunctionSignature.Verified wt ->
-                    List.length wt.input
+            function.typeSignature
+                |> AssociatedFunctionSignature.toMaybe
+                |> Maybe.map (.input >> List.length)
+                |> Maybe.withDefault 0
 
         modDef =
             moduleDefinition config
@@ -1310,15 +1305,10 @@ requiredModulesOfFunction topLevelAliases function =
                 |> Set.fromList
 
         typeSignature =
-            case function.typeSignature of
-                AssociatedFunctionSignature.NotProvided ->
-                    Set.empty
-
-                AssociatedFunctionSignature.UserProvided functionType ->
-                    moduleReferenceFromFunctionType functionType
-
-                AssociatedFunctionSignature.Verified functionType ->
-                    moduleReferenceFromFunctionType functionType
+            function.typeSignature
+                |> AssociatedFunctionSignature.toMaybe
+                |> Maybe.map moduleReferenceFromFunctionType
+                |> Maybe.withDefault Set.empty
 
         moduleReferenceFromFunctionType functionType =
             functionType.input

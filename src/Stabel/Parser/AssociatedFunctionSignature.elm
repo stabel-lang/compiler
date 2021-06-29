@@ -1,4 +1,7 @@
-module Stabel.Parser.AssociatedFunctionSignature exposing (..)
+module Stabel.Parser.AssociatedFunctionSignature exposing
+    ( AssociatedFunctionSignature(..)
+    , toMaybe
+    )
 
 import Stabel.Parser.Type exposing (FunctionSignature)
 
