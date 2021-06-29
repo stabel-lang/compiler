@@ -15,12 +15,12 @@ import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
         ( AST
+        , FunctionDefinition
+        , FunctionImplementation(..)
         , Node(..)
         , TypeDefinition
         , TypeMatch(..)
         , TypeMatchValue(..)
-        , WordDefinition
-        , WordImplementation(..)
         )
 import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 
@@ -28,7 +28,7 @@ import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 emptyAst : AST
 emptyAst =
     { types = Dict.empty
-    , words = Dict.empty
+    , functions = Dict.empty
     }
 
 
@@ -51,7 +51,7 @@ expectOutput parserAst expectedAst =
         Ok actualAst ->
             Expect.equal expectedAst
                 { types = actualAst.types
-                , words = actualAst.words
+                , functions = actualAst.functions
                 }
 
 
@@ -74,7 +74,7 @@ expectModuleOutput parserAst expectedAst =
         Ok actualAst ->
             Expect.equal expectedAst
                 { types = actualAst.types
-                , words = actualAst.words
+                , functions = actualAst.functions
                 }
 
 
@@ -177,13 +177,13 @@ addFunctionsForStructsHelper name generics members ast =
                 ++ getters
                 |> Dict.fromListBy .name
     in
-    { ast | words = Dict.union ast.words allFuncs }
+    { ast | functions = Dict.union ast.functions allFuncs }
 
 
 stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
-    , words = Dict.map (\_ d -> stripWordLocation d) ast.words
+    , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
     }
 
 
@@ -197,7 +197,7 @@ stripTypeLocation typeDef =
             AST.UnionTypeDef exposed name emptyRange generics members
 
 
-stripWordLocation : WordDefinition -> WordDefinition
+stripWordLocation : FunctionDefinition -> FunctionDefinition
 stripWordLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
@@ -205,7 +205,7 @@ stripWordLocation word =
     }
 
 
-stripImplementationLocation : WordImplementation -> WordImplementation
+stripImplementationLocation : FunctionImplementation -> FunctionImplementation
 stripImplementationLocation impl =
     case impl of
         SoloImpl nodes ->
@@ -223,11 +223,11 @@ stripNodeLocation node =
         AST.Integer _ val ->
             AST.Integer emptyRange val
 
-        AST.Word _ val ->
-            AST.Word emptyRange val
+        AST.Function _ val ->
+            AST.Function emptyRange val
 
-        AST.WordRef _ val ->
-            AST.WordRef emptyRange val
+        AST.FunctionRef _ val ->
+            AST.FunctionRef emptyRange val
 
         AST.Builtin _ val ->
             AST.Builtin emptyRange val

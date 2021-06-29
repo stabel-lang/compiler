@@ -72,7 +72,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
@@ -95,9 +95,9 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "inc"
-                                            , Word emptyRange "inc"
-                                            , Word emptyRange "dec"
+                                            , Function emptyRange "inc"
+                                            , Function emptyRange "inc"
+                                            , Function emptyRange "dec"
                                             , Integer emptyRange 2
                                             , Builtin emptyRange Builtin.Equal
                                             ]
@@ -143,7 +143,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
                                   , metadata =
@@ -224,7 +224,7 @@ suite =
                                 , CustomTypeDef "True" True emptyRange [] []
                                 , CustomTypeDef "False" True emptyRange [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
                                   , metadata = Metadata.default
@@ -296,14 +296,17 @@ suite =
 
                         expectedAst =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
                                                     [ Type.Int
-                                                    , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                                    , Type.FunctionSignature
+                                                        { input = [ Type.Int ]
+                                                        , output = [ Type.Int ]
+                                                        }
                                                     ]
                                                     [ Type.Int ]
                                       , implementation =
@@ -316,26 +319,26 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:main/2"
-                                                , Word emptyRange "apply-to-num"
-                                                , WordRef emptyRange "quote:main/1"
-                                                , Word emptyRange "apply-to-num"
+                                                , FunctionRef emptyRange "inlinefn:main/2"
+                                                , Function emptyRange "apply-to-num"
+                                                , FunctionRef emptyRange "inlinefn:main/1"
+                                                , Function emptyRange "apply-to-num"
                                                 ]
                                       }
-                                    , { name = "quote:main/2"
+                                    , { name = "inlinefn:main/2"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "quote:main/1"
+                                    , { name = "inlinefn:main/1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -385,14 +388,14 @@ suite =
 
                         expectedAst =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "a"
                                       , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:a/1"
+                                                , FunctionRef emptyRange "inlinefn:a/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
@@ -404,13 +407,13 @@ suite =
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "quote:a/1"
+                                    , { name = "inlinefn:a/1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             SoloImpl
-                                                [ Word emptyRange "inc"
+                                                [ Function emptyRange "inc"
                                                 ]
                                       }
                                     ]
@@ -451,33 +454,33 @@ suite =
 
                         expectedAst =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata = Metadata.default
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:main/1"
+                                                , FunctionRef emptyRange "inlinefn:main/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
-                                    , { name = "quote:main/1"
+                                    , { name = "inlinefn:main/1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , WordRef emptyRange "quote:main/1/1"
+                                                , FunctionRef emptyRange "inlinefn:main/1/1"
                                                 , Builtin emptyRange Builtin.Apply
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "quote:main/1/1"
+                                    , { name = "inlinefn:main/1/1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -562,15 +565,15 @@ suite =
                                         []
                                         [ ( "value", Type.Int ) ]
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
                                       , metadata = Metadata.default
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Word emptyRange "True" ] )
+                                                [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Function emptyRange "True" ] )
                                                 ]
-                                                [ Word emptyRange "False" ]
+                                                [ Function emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -633,7 +636,7 @@ suite =
                                         ]
                                     , CustomTypeDef "Nothing" True emptyRange [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
                                       , metadata = Metadata.default
@@ -737,7 +740,7 @@ suite =
                                     []
                                     [ ( "value", boolUnion ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "true?"
                                   , metadata =
@@ -748,10 +751,10 @@ suite =
                                             [ ( TypeMatch emptyRange
                                                     (Type.Custom "Box")
                                                     [ ( "value", LiteralType (Type.Custom "True") ) ]
-                                              , [ Word emptyRange "True" ]
+                                              , [ Function emptyRange "True" ]
                                               )
                                             ]
-                                            [ Word emptyRange "False" ]
+                                            [ Function emptyRange "False" ]
                                   }
                                 ]
                         }
@@ -882,7 +885,7 @@ suite =
                                     []
                                     [ ( "cent-value", Type.Int ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/into-cents"
                                   , metadata =
@@ -893,13 +896,13 @@ suite =
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
-                                              , [ Word emptyRange "/stabel/test/some/module/dollar-value>"
+                                              , [ Function emptyRange "/stabel/test/some/module/dollar-value>"
                                                 , Integer emptyRange 100
                                                 , Builtin emptyRange Builtin.Multiply
                                                 ]
                                               )
                                             , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
-                                              , [ Word emptyRange "/stabel/test/some/module/cent-value>"
+                                              , [ Function emptyRange "/stabel/test/some/module/cent-value>"
                                                 ]
                                               )
                                             ]
@@ -913,9 +916,9 @@ suite =
                                                 [ Type.Union qualifiedUsMoneyUnion ]
                                   , implementation =
                                         SoloImpl
-                                            [ Word emptyRange "/stabel/test/some/module/into-cents"
+                                            [ Function emptyRange "/stabel/test/some/module/into-cents"
                                             , Builtin emptyRange Builtin.StackSwap
-                                            , Word emptyRange "/stabel/test/some/module/into-cents"
+                                            , Function emptyRange "/stabel/test/some/module/into-cents"
                                             , Builtin emptyRange Builtin.Plus
                                             ]
                                   }
@@ -927,16 +930,16 @@ suite =
                                                 [ Type.Custom "/stabel/test/some/module/Dollar" ]
                                   , implementation =
                                         SoloImpl
-                                            [ Word emptyRange "/stabel/test/some/module/dollar-value>"
-                                            , WordRef emptyRange "quote:/stabel/test/some/module/quote-excuse/1"
+                                            [ Function emptyRange "/stabel/test/some/module/dollar-value>"
+                                            , FunctionRef emptyRange "inlinefn:/stabel/test/some/module/quote-excuse/1"
                                             , Builtin emptyRange Builtin.Apply
-                                            , Word emptyRange "/stabel/test/some/module/>Dollar"
+                                            , Function emptyRange "/stabel/test/some/module/>Dollar"
                                             ]
                                   }
-                                , { name = "quote:/stabel/test/some/module/quote-excuse/1"
+                                , { name = "inlinefn:/stabel/test/some/module/quote-excuse/1"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.isQuoted
+                                            |> Metadata.isInline
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
@@ -1074,7 +1077,7 @@ suite =
                                     , ( "value", Type.Union qualifiedUsMoneyUnion )
                                     ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/>Dollar"
                                   , metadata =

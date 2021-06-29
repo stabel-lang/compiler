@@ -1,14 +1,14 @@
 module Stabel.Data.Type exposing
-    ( Type(..)
-    , WordType
-    , compatibleWords
-    , emptyWordType
+    ( FunctionType
+    , Type(..)
+    , compatibleFunctions
+    , emptyFunctionType
+    , functionTypeToString
     , genericName
     , genericlyCompatible
     , isGeneric
     , referencedGenerics
     , toDisplayString
-    , wordTypeToString
     )
 
 import Dict exposing (Dict)
@@ -21,18 +21,18 @@ type Type
     | Custom String
     | CustomGeneric String (List Type)
     | Union (List Type)
-    | Quotation WordType
+    | FunctionSignature FunctionType
     | StackRange String
 
 
-type alias WordType =
+type alias FunctionType =
     { input : List Type
     , output : List Type
     }
 
 
-emptyWordType : WordType
-emptyWordType =
+emptyFunctionType : FunctionType
+emptyFunctionType =
     { input = []
     , output = []
     }
@@ -97,7 +97,7 @@ genericlyCompatible lhs rhs =
 sameCategory : Type -> Type -> Bool
 sameCategory lhs rhs =
     case ( lhs, rhs ) of
-        ( Quotation _, Quotation _ ) ->
+        ( FunctionSignature _, FunctionSignature _ ) ->
             True
 
         ( Union _, Union _ ) ->
@@ -125,8 +125,8 @@ toString t =
         Union _ ->
             "Union"
 
-        Quotation _ ->
-            "quot"
+        FunctionSignature _ ->
+            "function"
 
         StackRange name ->
             name ++ "..."
@@ -158,27 +158,27 @@ toDisplayString t =
                 ++ memberString
                 ++ ")"
 
-        Quotation quotType ->
-            "[ " ++ wordTypeToString quotType ++ " ]"
+        FunctionSignature quotType ->
+            "[ " ++ functionTypeToString quotType ++ " ]"
 
         StackRange name ->
             name ++ "..."
 
 
-wordTypeToString : WordType -> String
-wordTypeToString wordType =
+functionTypeToString : FunctionType -> String
+functionTypeToString functionType =
     let
         inputTypeStrings =
-            List.map toDisplayString wordType.input
+            List.map toDisplayString functionType.input
 
         outputTypeStrings =
-            List.map toDisplayString wordType.output
+            List.map toDisplayString functionType.output
     in
     String.join " " inputTypeStrings ++ " -- " ++ String.join " " outputTypeStrings
 
 
-compatibleWords : WordType -> WordType -> Bool
-compatibleWords annotated inferred =
+compatibleFunctions : FunctionType -> FunctionType -> Bool
+compatibleFunctions annotated inferred =
     let
         ( inputRangeDict, inputsCompatible ) =
             compatibleTypeLists annotated.input inferred.input Dict.empty
@@ -234,7 +234,7 @@ compatibleTypeLists annotated inferred rangeDict =
                         )
                         rangeDict
 
-        ( (Quotation annotatedQuotType) :: annotatedRest, (Quotation inferredQuotType) :: inferredRest ) ->
+        ( (FunctionSignature annotatedQuotType) :: annotatedRest, (FunctionSignature inferredQuotType) :: inferredRest ) ->
             let
                 annotatedInputRangeApplied =
                     applyRangeDict rangeDict annotatedQuotType.input

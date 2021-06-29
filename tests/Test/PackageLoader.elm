@@ -60,13 +60,13 @@ suite =
                         Expect.equal
                             { types =
                                 Dict.fromListBy Qualifier.typeDefinitionName []
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "/robheghan/fnv/mod1/next-version"
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/stabel/version/version/data/number"
+                                                [ Qualifier.Function emptyRange "/stabel/version/version/data/number"
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]
@@ -97,7 +97,7 @@ suite =
                         Expect.equal
                             { types =
                                 Dict.fromListBy Qualifier.typeDefinitionName []
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "/robheghan/dummy/mod1/bump-version"
                                       , metadata = Metadata.default
@@ -118,8 +118,8 @@ suite =
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/robheghan/dummy/mod2/version"
-                                                , Qualifier.Word emptyRange "/robheghan/dummy/mod1/bump-version"
+                                                [ Qualifier.Function emptyRange "/robheghan/dummy/mod2/version"
+                                                , Qualifier.Function emptyRange "/robheghan/dummy/mod1/bump-version"
                                                 ]
                                       }
                                     ]
@@ -145,13 +145,13 @@ suite =
                         Expect.equal
                             { types =
                                 Dict.fromListBy Qualifier.typeDefinitionName []
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "/robheghan/fnv/mod1/next-version"
                                       , metadata = Metadata.default
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Word emptyRange "/stabel/version/version/data/number"
+                                                [ Qualifier.Function emptyRange "/stabel/version/version/data/number"
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]

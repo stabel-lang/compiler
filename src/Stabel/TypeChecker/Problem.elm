@@ -4,13 +4,13 @@ module Stabel.TypeChecker.Problem exposing
     )
 
 import Set exposing (Set)
-import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Data.Type as Type exposing (FunctionType, Type)
 import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type Problem
     = UndeclaredGeneric SourceLocationRange String (Set String)
-    | TypeError SourceLocationRange String WordType WordType
+    | TypeError SourceLocationRange String FunctionType FunctionType
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
@@ -33,9 +33,9 @@ toString source problem =
                 ++ "The type of '"
                 ++ name
                 ++ "' is specified to be:\n\n"
-                ++ Type.wordTypeToString actual
+                ++ Type.functionTypeToString actual
                 ++ "\n\nHowever, it seems that the actual type is:\n\n"
-                ++ Type.wordTypeToString expected
+                ++ Type.functionTypeToString expected
 
         UnexpectedType range name actual expected ->
             SourceLocation.extractFromString source range.start range.end

@@ -26,7 +26,7 @@ suite =
                 let
                     input =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
                                   , metadata = Metadata.default
@@ -51,9 +51,9 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
-                                            , QAST.Word emptyRange "inc"
-                                            , QAST.Word emptyRange "inc"
-                                            , QAST.Word emptyRange "dec"
+                                            , QAST.Function emptyRange "inc"
+                                            , QAST.Function emptyRange "inc"
+                                            , QAST.Function emptyRange "dec"
                                             , QAST.Integer emptyRange 2
                                             , QAST.Builtin emptyRange Builtin.Equal
                                             ]
@@ -107,7 +107,7 @@ suite =
                 let
                     input =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -132,7 +132,7 @@ suite =
                             Dict.fromListBy QAST.typeDefinitionName
                                 [ QAST.CustomTypeDef "True" True emptyRange [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "as-int"
                                   , metadata =
@@ -149,8 +149,8 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "True"
-                                            , QAST.Word emptyRange "as-int"
+                                            [ QAST.Function emptyRange "True"
+                                            , QAST.Function emptyRange "as-int"
                                             ]
                                   }
                                 ]
@@ -166,7 +166,7 @@ suite =
                             Dict.fromListBy QAST.typeDefinitionName
                                 [ QAST.CustomTypeDef "Person" True emptyRange [] [ ( "age", Type.Int ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc-age"
                                   , metadata =
@@ -174,10 +174,10 @@ suite =
                                             |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "age>"
+                                            [ QAST.Function emptyRange "age>"
                                             , QAST.Integer emptyRange 1
                                             , QAST.Builtin emptyRange Builtin.Plus
-                                            , QAST.Word emptyRange ">Person"
+                                            , QAST.Function emptyRange ">Person"
                                             ]
                                   }
                                 , { name = "main"
@@ -187,9 +187,9 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
-                                            , QAST.Word emptyRange ">Person"
-                                            , QAST.Word emptyRange "inc-age"
-                                            , QAST.Word emptyRange "age>"
+                                            , QAST.Function emptyRange ">Person"
+                                            , QAST.Function emptyRange "inc-age"
+                                            , QAST.Function emptyRange "age>"
                                             ]
                                   }
                                 ]
@@ -202,7 +202,7 @@ suite =
                 let
                     input =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -212,7 +212,7 @@ suite =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
                                             , QAST.Integer emptyRange 2
-                                            , QAST.Word emptyRange "over"
+                                            , QAST.Function emptyRange "over"
                                             , QAST.Builtin emptyRange Builtin.Plus
                                             , QAST.Builtin emptyRange Builtin.Minus
                                             , QAST.Integer emptyRange 2
@@ -244,7 +244,7 @@ suite =
                 let
                     input =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -253,7 +253,7 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 5
-                                            , QAST.Word emptyRange "square"
+                                            , QAST.Function emptyRange "square"
                                             ]
                                   }
                                 , { name = "square"
@@ -282,7 +282,7 @@ suite =
                                     [ "a" ]
                                     [ ( "element", Type.Generic "a" ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -291,8 +291,8 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 5
-                                            , QAST.Word emptyRange ">Box"
-                                            , QAST.Word emptyRange "element>"
+                                            , QAST.Function emptyRange ">Box"
+                                            , QAST.Function emptyRange "element>"
                                             , QAST.Integer emptyRange 10
                                             , QAST.Builtin emptyRange Builtin.Plus
                                             , QAST.Integer emptyRange 15
@@ -318,7 +318,7 @@ suite =
                                     , ( "y", Type.Int )
                                     ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -328,10 +328,10 @@ suite =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
                                             , QAST.Integer emptyRange 2
-                                            , QAST.Word emptyRange ">Coordinate"
-                                            , QAST.WordRef emptyRange "main__quot1"
-                                            , QAST.Word emptyRange "update-x"
-                                            , QAST.Word emptyRange "x>"
+                                            , QAST.Function emptyRange ">Coordinate"
+                                            , QAST.FunctionRef emptyRange "main__quot1"
+                                            , QAST.Function emptyRange "update-x"
+                                            , QAST.Function emptyRange "x>"
                                             ]
                                   }
                                 , { name = "main__quot1"
@@ -347,17 +347,17 @@ suite =
                                         Metadata.default
                                             |> Metadata.withType
                                                 [ Type.Custom "Coordinate"
-                                                , Type.Quotation { input = [ Type.Int ], output = [ Type.Int ] }
+                                                , Type.FunctionSignature { input = [ Type.Int ], output = [ Type.Int ] }
                                                 ]
                                                 [ Type.Custom "Coordinate" ]
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackSwap
                                             , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                            , QAST.Word emptyRange "x>"
+                                            , QAST.Function emptyRange "x>"
                                             , QAST.Builtin emptyRange Builtin.StackLeftRotate
                                             , QAST.Builtin emptyRange Builtin.Apply
-                                            , QAST.Word emptyRange ">x"
+                                            , QAST.Function emptyRange ">x"
                                             ]
                                   }
                                 ]
@@ -397,7 +397,7 @@ suite =
                                     ]
                                 , QAST.CustomTypeDef "Empty" True emptyRange [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -408,13 +408,13 @@ suite =
                                             [ QAST.Integer emptyRange 1
                                             , QAST.Integer emptyRange 2
                                             , QAST.Integer emptyRange 3
-                                            , QAST.Word emptyRange "Empty"
-                                            , QAST.Word emptyRange ">NonEmpty"
-                                            , QAST.Word emptyRange ">NonEmpty"
-                                            , QAST.Word emptyRange ">NonEmpty"
+                                            , QAST.Function emptyRange "Empty"
+                                            , QAST.Function emptyRange ">NonEmpty"
+                                            , QAST.Function emptyRange ">NonEmpty"
+                                            , QAST.Function emptyRange ">NonEmpty"
                                             , QAST.Integer emptyRange 0
-                                            , QAST.WordRef emptyRange "main__quot1"
-                                            , QAST.Word emptyRange "fold"
+                                            , QAST.FunctionRef emptyRange "main__quot1"
+                                            , QAST.Function emptyRange "fold"
                                             ]
                                   }
                                 , { name = "main__quot1"
@@ -430,7 +430,7 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Union listUnion
                                                 , Type.Generic "b"
-                                                , Type.Quotation
+                                                , Type.FunctionSignature
                                                     { input =
                                                         [ Type.Generic "a"
                                                         , Type.Generic "b"
@@ -450,20 +450,20 @@ suite =
                                                 ]
                                               )
                                             , ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmpty" [ Type.Generic "a" ]) []
-                                              , [ QAST.Word emptyRange ">Pair"
+                                              , [ QAST.Function emptyRange ">Pair"
                                                 , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.WordRef emptyRange "fold_quot1"
-                                                , QAST.WordRef emptyRange "fold_quot2"
-                                                , QAST.Word emptyRange "split"
+                                                , QAST.FunctionRef emptyRange "fold_quot1"
+                                                , QAST.FunctionRef emptyRange "fold_quot2"
+                                                , QAST.Function emptyRange "split"
                                                 , QAST.Builtin emptyRange Builtin.StackRightRotate
                                                 , QAST.Builtin emptyRange Builtin.StackSwap
                                                 , QAST.Builtin emptyRange Builtin.StackDuplicate
                                                 , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                , QAST.Word emptyRange "spill"
+                                                , QAST.Function emptyRange "spill"
                                                 , QAST.Builtin emptyRange Builtin.Apply
                                                 , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.Word emptyRange "second>"
-                                                , QAST.Word emptyRange "fold"
+                                                , QAST.Function emptyRange "second>"
+                                                , QAST.Function emptyRange "fold"
                                                 ]
                                               )
                                             ]
@@ -472,29 +472,29 @@ suite =
                                 , { name = "fold_quot1"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.isQuoted
+                                            |> Metadata.isInline
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "head>" ]
+                                            [ QAST.Function emptyRange "head>" ]
                                   }
                                 , { name = "fold_quot2"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.isQuoted
+                                            |> Metadata.isInline
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "rest>" ]
+                                            [ QAST.Function emptyRange "rest>" ]
                                   }
                                 , { name = "split"
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
                                                 [ Type.Generic "a"
-                                                , Type.Quotation
+                                                , Type.FunctionSignature
                                                     { input = [ Type.Generic "a" ]
                                                     , output = [ Type.Generic "b" ]
                                                     }
-                                                , Type.Quotation
+                                                , Type.FunctionSignature
                                                     { input = [ Type.Generic "a" ]
                                                     , output = [ Type.Generic "c" ]
                                                     }
@@ -528,26 +528,26 @@ suite =
                                                 ]
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.WordRef emptyRange "spill_quot1"
-                                            , QAST.WordRef emptyRange "spill_quot2"
-                                            , QAST.Word emptyRange "split"
+                                            [ QAST.FunctionRef emptyRange "spill_quot1"
+                                            , QAST.FunctionRef emptyRange "spill_quot2"
+                                            , QAST.Function emptyRange "split"
                                             ]
                                   }
                                 , { name = "spill_quot1"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.isQuoted
+                                            |> Metadata.isInline
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "first>" ]
+                                            [ QAST.Function emptyRange "first>" ]
                                   }
                                 , { name = "spill_quot2"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.isQuoted
+                                            |> Metadata.isInline
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "second>" ]
+                                            [ QAST.Function emptyRange "second>" ]
                                   }
                                 ]
                         }
@@ -566,7 +566,7 @@ suite =
                                     []
                                     [ ( "element", Type.Generic "a" ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
@@ -584,7 +584,7 @@ suite =
                                     [ "a" ]
                                     [ ( "element", Type.Generic "b" ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
@@ -596,7 +596,7 @@ suite =
                     let
                         input =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
                                       , metadata = Metadata.default
@@ -612,16 +612,16 @@ suite =
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
-                                                , QAST.WordRef emptyRange "main__quot2"
-                                                , QAST.Word emptyRange "apply-to-num"
-                                                , QAST.WordRef emptyRange "main__quot1"
-                                                , QAST.Word emptyRange "apply-to-num"
+                                                , QAST.FunctionRef emptyRange "main__quot2"
+                                                , QAST.Function emptyRange "apply-to-num"
+                                                , QAST.FunctionRef emptyRange "main__quot1"
+                                                , QAST.Function emptyRange "apply-to-num"
                                                 ]
                                       }
                                     , { name = "main__quot2"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -631,7 +631,7 @@ suite =
                                     , { name = "main__quot1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -647,14 +647,14 @@ suite =
                     let
                         input =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
                                                     [ Type.Int
-                                                    , Type.Quotation
+                                                    , Type.FunctionSignature
                                                         { input = [ Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
@@ -672,16 +672,16 @@ suite =
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
-                                                , QAST.WordRef emptyRange "main__quot2"
-                                                , QAST.Word emptyRange "apply-to-num"
-                                                , QAST.WordRef emptyRange "main__quot1"
-                                                , QAST.Word emptyRange "apply-to-num"
+                                                , QAST.FunctionRef emptyRange "main__quot2"
+                                                , QAST.Function emptyRange "apply-to-num"
+                                                , QAST.FunctionRef emptyRange "main__quot1"
+                                                , QAST.Function emptyRange "apply-to-num"
                                                 ]
                                       }
                                     , { name = "main__quot2"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -691,7 +691,7 @@ suite =
                                     , { name = "main__quot1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -707,13 +707,13 @@ suite =
                     let
                         input =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-nums"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
-                                                    [ Type.Quotation
+                                                    [ Type.FunctionSignature
                                                         { input = [ Type.Int, Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
@@ -733,14 +733,14 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.WordRef emptyRange "main__quot1"
-                                                , QAST.Word emptyRange "apply-to-nums"
+                                                [ QAST.FunctionRef emptyRange "main__quot1"
+                                                , QAST.Function emptyRange "apply-to-nums"
                                                 ]
                                       }
                                     , { name = "main__quot1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Builtin emptyRange Builtin.Plus
@@ -755,14 +755,14 @@ suite =
                     let
                         input =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "map"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
                                                     [ Type.Generic "a"
-                                                    , Type.Quotation
+                                                    , Type.FunctionSignature
                                                         { input = [ Type.Generic "a" ]
                                                         , output = [ Type.Generic "b" ]
                                                         }
@@ -780,14 +780,14 @@ suite =
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
-                                                , QAST.WordRef emptyRange "main__quot1"
-                                                , QAST.Word emptyRange "map"
+                                                , QAST.FunctionRef emptyRange "main__quot1"
+                                                , QAST.Function emptyRange "map"
                                                 ]
                                       }
                                     , { name = "main__quot1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -823,14 +823,14 @@ suite =
                                         []
                                         []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "map"
                                       , metadata =
                                             Metadata.default
                                                 |> Metadata.withType
                                                     [ maybeUnion "a"
-                                                    , Type.Quotation
+                                                    , Type.FunctionSignature
                                                         { input = [ Type.Generic "a" ]
                                                         , output = [ Type.Generic "b" ]
                                                         }
@@ -855,15 +855,15 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             QAST.SoloImpl
-                                                [ QAST.Word emptyRange "Nil"
-                                                , QAST.WordRef emptyRange "main__quot1"
-                                                , QAST.Word emptyRange "map"
+                                                [ QAST.Function emptyRange "Nil"
+                                                , QAST.FunctionRef emptyRange "main__quot1"
+                                                , QAST.Function emptyRange "map"
                                                 ]
                                       }
                                     , { name = "main__quot1"
                                       , metadata =
                                             Metadata.default
-                                                |> Metadata.isQuoted
+                                                |> Metadata.isInline
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -909,14 +909,14 @@ suite =
                                         []
                                         []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "sum"
                                       , metadata = Metadata.default
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 0
-                                                , QAST.Word emptyRange "sum-helper"
+                                                , QAST.Function emptyRange "sum-helper"
                                                 ]
                                       }
                                     , { name = "sum-helper"
@@ -928,12 +928,12 @@ suite =
                                                 [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
                                                   , [ QAST.Builtin emptyRange Builtin.StackSwap
                                                     , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                                    , QAST.Word emptyRange "first>"
+                                                    , QAST.Function emptyRange "first>"
                                                     , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                    , QAST.Word emptyRange "rest>"
+                                                    , QAST.Function emptyRange "rest>"
                                                     , QAST.Builtin emptyRange Builtin.StackRightRotate
                                                     , QAST.Builtin emptyRange Builtin.Plus
-                                                    , QAST.Word emptyRange "sum-helper"
+                                                    , QAST.Function emptyRange "sum-helper"
                                                     ]
                                                   )
                                                 , ( QAST.TypeMatch emptyRange (Type.Custom "EmptyList") []
@@ -953,11 +953,11 @@ suite =
                                                 [ QAST.Integer emptyRange 1
                                                 , QAST.Integer emptyRange 2
                                                 , QAST.Integer emptyRange 3
-                                                , QAST.Word emptyRange "EmptyList"
-                                                , QAST.Word emptyRange ">NonEmptyList"
-                                                , QAST.Word emptyRange ">NonEmptyList"
-                                                , QAST.Word emptyRange ">NonEmptyList"
-                                                , QAST.Word emptyRange "sum"
+                                                , QAST.Function emptyRange "EmptyList"
+                                                , QAST.Function emptyRange ">NonEmptyList"
+                                                , QAST.Function emptyRange ">NonEmptyList"
+                                                , QAST.Function emptyRange ">NonEmptyList"
+                                                , QAST.Function emptyRange "sum"
                                                 ]
                                       }
                                     ]
@@ -971,7 +971,7 @@ suite =
                 let
                     input =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -981,7 +981,7 @@ suite =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
                                             , QAST.Integer emptyRange 2
-                                            , QAST.Word emptyRange "drop-first"
+                                            , QAST.Function emptyRange "drop-first"
                                             ]
                                   }
                                 , { name = "drop-first"

@@ -46,14 +46,14 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "internal/add"
+                                            , Function emptyRange "internal/add"
                                             ]
                                   }
                                 ]
@@ -61,7 +61,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "internal/add" ]
                         }
@@ -101,7 +101,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata = Metadata.default
@@ -109,12 +109,12 @@ suite =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int []
                                               , [ Integer emptyRange 0
-                                                , Word emptyRange "mod/add"
+                                                , Function emptyRange "mod/add"
                                                 ]
                                               )
                                             ]
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "mod/add"
+                                            , Function emptyRange "mod/add"
                                             ]
                                   }
                                 ]
@@ -122,7 +122,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "mod/add" ]
                         }
@@ -165,7 +165,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -194,7 +194,7 @@ suite =
                             [ dummyType "mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -241,7 +241,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -278,7 +278,7 @@ suite =
                             [ dummyType "mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -315,7 +315,7 @@ suite =
                                         [ ( "tipe", Type.Custom "mod/Tipe" ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -323,7 +323,7 @@ suite =
                             [ dummyType "mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -355,14 +355,14 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata = Metadata.default
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -370,7 +370,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add" ]
                         }
@@ -410,7 +410,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata = Metadata.default
@@ -418,12 +418,12 @@ suite =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int []
                                               , [ Integer emptyRange 0
-                                                , Word emptyRange "/external/package/mod/add"
+                                                , Function emptyRange "/external/package/mod/add"
                                                 ]
                                               )
                                             ]
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -431,7 +431,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add" ]
                         }
@@ -474,7 +474,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -503,7 +503,7 @@ suite =
                             [ dummyType "/external/package/mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -550,7 +550,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -587,7 +587,7 @@ suite =
                             [ dummyType "/external/package/mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -624,7 +624,7 @@ suite =
                                         [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -632,7 +632,7 @@ suite =
                             [ dummyType "/external/package/mod/Tipe" ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -678,7 +678,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -691,8 +691,8 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "internal/mod/value"
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "internal/mod/value"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -705,7 +705,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
@@ -753,7 +753,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -766,8 +766,8 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "internal/mod/value"
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "internal/mod/value"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -780,7 +780,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
@@ -828,7 +828,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -855,7 +855,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -906,7 +906,7 @@ suite =
                                         ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -916,7 +916,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -962,7 +962,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -974,8 +974,8 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "internal/mod/value"
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "internal/mod/value"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -988,7 +988,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
@@ -1037,7 +1037,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -1049,8 +1049,8 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "internal/mod/value"
-                                            , Word emptyRange "/external/package/mod/add"
+                                            , Function emptyRange "internal/mod/value"
+                                            , Function emptyRange "/external/package/mod/add"
                                             ]
                                   }
                                 ]
@@ -1063,7 +1063,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
@@ -1118,7 +1118,7 @@ suite =
                                         ]
                                   )
                                 ]
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     inProgressAst =
@@ -1128,7 +1128,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1174,7 +1174,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
                                   , metadata =
@@ -1201,7 +1201,7 @@ suite =
                             ]
                                 |> List.concat
                                 |> Dict.fromList
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1246,7 +1246,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
                                   , metadata = Metadata.default
@@ -1313,7 +1313,7 @@ suite =
 
                     expectedAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
                                   , metadata =
@@ -1372,7 +1372,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWordUnexposed "internal/mod/value"
                                 ]
@@ -1393,7 +1393,7 @@ suite =
                     Ok _ ->
                         Expect.fail "Expected qualification to fail because an unexposed function is called"
 
-                    Err [ Problem.WordNotExposed _ "internal/mod/value" ] ->
+                    Err [ Problem.FunctionNotExposed _ "internal/mod/value" ] ->
                         Expect.pass
 
                     Err errs ->
@@ -1431,7 +1431,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWordUnexposed "/external/package/mod/add"
                                 ]
@@ -1452,7 +1452,7 @@ suite =
                     Ok _ ->
                         Expect.fail "Expected qualification to fail because an unexposed function is called"
 
-                    Err [ Problem.WordNotExposed _ "/external/package/mod/add" ] ->
+                    Err [ Problem.FunctionNotExposed _ "/external/package/mod/add" ] ->
                         Expect.pass
 
                     Err errs ->
@@ -1487,7 +1487,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1533,7 +1533,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1587,7 +1587,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1640,7 +1640,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1684,7 +1684,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1736,7 +1736,7 @@ suite =
                         { types =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
-                        , words = Dict.empty
+                        , functions = Dict.empty
                         }
 
                     result =
@@ -1781,7 +1781,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/stabel/standard_library/core/over" ]
                         }
@@ -1832,7 +1832,7 @@ suite =
 
                     inProgressAst =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromList
                                 [ dummyWord "/stabel/standard_library/core/over" ]
                         }
@@ -1857,17 +1857,17 @@ suite =
         ]
 
 
-dummyWord : String -> ( String, WordDefinition )
+dummyWord : String -> ( String, FunctionDefinition )
 dummyWord name =
     dummyWordImpl name True
 
 
-dummyWordUnexposed : String -> ( String, WordDefinition )
+dummyWordUnexposed : String -> ( String, FunctionDefinition )
 dummyWordUnexposed name =
     dummyWordImpl name False
 
 
-dummyWordImpl : String -> Bool -> ( String, WordDefinition )
+dummyWordImpl : String -> Bool -> ( String, FunctionDefinition )
 dummyWordImpl name isExposed =
     ( name
     , { name = name

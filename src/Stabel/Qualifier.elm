@@ -1,11 +1,11 @@
 module Stabel.Qualifier exposing
     ( AST
+    , FunctionDefinition
+    , FunctionImplementation(..)
     , Node(..)
     , TypeDefinition(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
-    , WordDefinition
-    , WordImplementation(..)
     , requiredModules
     , run
     , typeDefinitionName
@@ -17,7 +17,7 @@ import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Metadata as Metadata exposing (Metadata)
-import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Data.Type as Type exposing (FunctionType, Type)
 import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
@@ -29,7 +29,7 @@ import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocatio
 
 type alias AST =
     { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
+    , functions : Dict String FunctionDefinition
     }
 
 
@@ -40,14 +40,14 @@ type
     | UnionTypeDef String Bool SourceLocationRange (List String) (List Type)
 
 
-type alias WordDefinition =
+type alias FunctionDefinition =
     { name : String
     , metadata : Metadata
-    , implementation : WordImplementation
+    , implementation : FunctionImplementation
     }
 
 
-type WordImplementation
+type FunctionImplementation
     = SoloImpl (List Node)
     | MultiImpl (List ( TypeMatch, List Node )) (List Node)
 
@@ -64,8 +64,8 @@ type TypeMatchValue
 
 type Node
     = Integer SourceLocationRange Int
-    | Word SourceLocationRange String
-    | WordRef SourceLocationRange String
+    | Function SourceLocationRange String
+    | FunctionRef SourceLocationRange String
     | ConstructType String
     | GetMember String String
     | SetMember String String
@@ -114,18 +114,18 @@ run config =
         allQualifiedTypes =
             Dict.union qualifiedTypes config.inProgressAST.types
 
-        ( wordErrors, qualifiedWords ) =
+        ( functionErrors, qualifiedFunctions ) =
             Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.functions
     in
-    case ( typeErrors, wordErrors ) of
+    case ( typeErrors, functionErrors ) of
         ( [], [] ) ->
             Ok
                 { types = qualifiedTypes
-                , words = qualifiedWords
+                , functions = qualifiedFunctions
                 }
 
         _ ->
-            Err <| typeErrors ++ wordErrors
+            Err <| typeErrors ++ functionErrors
 
 
 type alias ModuleDefinitionConfig a =
@@ -465,7 +465,7 @@ qualifyMemberType config modRefs range type_ =
             case ( inputResult, outputResult ) of
                 ( Ok input, Ok output ) ->
                     Ok <|
-                        Type.Quotation
+                        Type.FunctionSignature
                             { input = input
                             , output = output
                             }
@@ -496,12 +496,12 @@ qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
-    -> ( List Problem, Dict String WordDefinition )
-    -> ( List Problem, Dict String WordDefinition )
-qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
+    -> ( List Problem, Dict String FunctionDefinition )
+    -> ( List Problem, Dict String FunctionDefinition )
+qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
     let
         ( whens, impl ) =
-            case unqualifiedWord.implementation of
+            case unqualifiedFunction.implementation of
                 Parser.SoloImpl defImpl ->
                     ( [], defImpl )
 
@@ -512,30 +512,30 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
             moduleDefinition config
 
         moduleReferences =
-            { aliases = Dict.union unqualifiedWord.aliases modDef.aliases
-            , imports = Dict.union unqualifiedWord.imports modDef.imports
+            { aliases = Dict.union unqualifiedFunction.aliases modDef.aliases
+            , imports = Dict.union unqualifiedFunction.imports modDef.imports
             }
 
-        ( newWordsAfterWhens, qualifiedWhensResult ) =
+        ( newFunctionsAfterWhens, qualifiedWhensResult ) =
             whens
                 |> List.foldr
                     (qualifyWhen
                         config
                         qualifiedTypes
-                        unqualifiedWord.name
+                        unqualifiedFunction.name
                         moduleReferences
                     )
                     ( acc, [] )
                 |> Tuple.mapSecond Result.combine
 
-        ( newWordsAfterImpl, qualifiedImplementationResult ) =
-            initQualifyNode config unqualifiedWord.name moduleReferences newWordsAfterWhens impl
+        ( newFunctionsAfterImpl, qualifiedImplementationResult ) =
+            initQualifyNode config unqualifiedFunction.name moduleReferences newFunctionsAfterWhens impl
 
         qualifiedMetadataResult =
-            qualifyMetadata config qualifiedTypes unqualifiedWord
+            qualifyMetadata config qualifiedTypes unqualifiedFunction
 
         qualifiedName =
-            qualifyName config unqualifiedWord.name
+            qualifyName config unqualifiedFunction.name
     in
     case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
@@ -550,22 +550,22 @@ qualifyDefinition config qualifiedTypes unqualifiedWord ( errors, acc ) =
                     else
                         MultiImpl qualifiedWhens qualifiedImplementation
                 }
-                newWordsAfterImpl
+                newFunctionsAfterImpl
             )
 
         ( Err whenError, _, _ ) ->
             ( whenError :: errors
-            , newWordsAfterImpl
+            , newFunctionsAfterImpl
             )
 
         ( _, Err implError, _ ) ->
             ( implError :: errors
-            , newWordsAfterImpl
+            , newFunctionsAfterImpl
             )
 
         ( _, _, Err metaError ) ->
             ( metaError :: errors
-            , newWordsAfterImpl
+            , newFunctionsAfterImpl
             )
 
 
@@ -574,13 +574,13 @@ qualifyMetadata :
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
     -> Result Problem Metadata
-qualifyMetadata config qualifiedTypes word =
+qualifyMetadata config qualifiedTypes function =
     let
-        wordRange =
-            Maybe.withDefault SourceLocation.emptyRange word.sourceLocationRange
+        functionRange =
+            Maybe.withDefault SourceLocation.emptyRange function.sourceLocationRange
 
         inputLength =
-            case word.typeSignature of
+            case function.typeSignature of
                 AssociatedFunctionSignature.NotProvided ->
                     0
 
@@ -594,33 +594,33 @@ qualifyMetadata config qualifiedTypes word =
             moduleDefinition config
 
         modRefs =
-            { aliases = Dict.union modDef.aliases word.aliases
-            , imports = Dict.union modDef.imports word.imports
+            { aliases = Dict.union modDef.aliases function.aliases
+            , imports = Dict.union modDef.imports function.imports
             }
     in
-    AssociatedFunctionSignature.toMaybe word.typeSignature
+    AssociatedFunctionSignature.toMaybe function.typeSignature
         |> Maybe.map (\ts -> ts.input ++ ts.output)
         |> Maybe.withDefault []
-        |> List.map (qualifyFunctionType config modRefs wordRange)
+        |> List.map (qualifyFunctionType config modRefs functionRange)
         |> Result.combine
         |> Result.map
             (\qualifiedFlatTypeSignature ->
                 let
-                    wordType =
+                    functionType =
                         { input = List.take inputLength qualifiedFlatTypeSignature
                         , output = List.drop inputLength qualifiedFlatTypeSignature
                         }
 
                     ts =
-                        case word.typeSignature of
+                        case function.typeSignature of
                             AssociatedFunctionSignature.NotProvided ->
                                 TypeSignature.NotProvided
 
                             AssociatedFunctionSignature.UserProvided _ ->
-                                TypeSignature.UserProvided wordType
+                                TypeSignature.UserProvided functionType
 
                             AssociatedFunctionSignature.Verified _ ->
-                                TypeSignature.CompilerProvided wordType
+                                TypeSignature.CompilerProvided functionType
 
                     baseMeta =
                         Metadata.default
@@ -634,13 +634,13 @@ qualifyMetadata config qualifiedTypes word =
                                 True
 
                             ModuleDefinition.Defined def ->
-                                Set.member word.name def.exposes
+                                Set.member function.name def.exposes
                 }
             )
 
 
 validateTypeReferences : RunConfig -> Dict String TypeDefinition -> SourceLocationRange -> Type -> Result Problem Type
-validateTypeReferences config typeDefs wordRange type_ =
+validateTypeReferences config typeDefs functionRange type_ =
     case type_ of
         Type.Custom typeName ->
             let
@@ -652,7 +652,7 @@ validateTypeReferences config typeDefs wordRange type_ =
                     Ok <| Type.Custom qualifiedName
 
                 Nothing ->
-                    Err <| UnknownTypeRef wordRange qualifiedName
+                    Err <| UnknownTypeRef functionRange qualifiedName
 
         Type.CustomGeneric typeName types ->
             let
@@ -664,13 +664,13 @@ validateTypeReferences config typeDefs wordRange type_ =
                     Ok <| Type.CustomGeneric qualifiedName types
 
                 Nothing ->
-                    Err <| UnknownTypeRef wordRange qualifiedName
+                    Err <| UnknownTypeRef functionRange qualifiedName
 
         _ ->
             Ok type_
 
 
-resolveUnions : Dict String TypeDefinition -> WordType -> WordType
+resolveUnions : Dict String TypeDefinition -> FunctionType -> FunctionType
 resolveUnions typeDefs wt =
     { input = List.map (resolveUnion typeDefs) wt.input
     , output = List.map (resolveUnion typeDefs) wt.output
@@ -683,29 +683,29 @@ qualifyWhen :
     -> String
     -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String WordDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes wordName modRefs ( typeMatch, impl ) ( qualifiedWords, result ) =
+    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, result ) =
     let
-        ( newWords, qualifiedImplementationResult ) =
-            initQualifyNode config wordName modRefs qualifiedWords impl
+        ( newFunctions, qualifiedImplementationResult ) =
+            initQualifyNode config functionName modRefs qualifiedFunctions impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes modRefs typeMatch
     in
     case ( qualifiedImplementationResult, qualifiedMatchResult ) of
         ( Err err, _ ) ->
-            ( newWords
+            ( newFunctions
             , Err err :: result
             )
 
         ( _, Err err ) ->
-            ( newWords
+            ( newFunctions
             , Err err :: result
             )
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
-            ( newWords
+            ( newFunctions
             , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
             )
 
@@ -896,28 +896,28 @@ initQualifyNode :
     RunConfig
     -> String
     -> ModuleReferences
-    -> Dict String WordDefinition
+    -> Dict String FunctionDefinition
     -> List Parser.AstNode
-    -> ( Dict String WordDefinition, Result Problem (List Node) )
-initQualifyNode config currentDefName modRefs qualifiedWords impl =
+    -> ( Dict String FunctionDefinition, Result Problem (List Node) )
+initQualifyNode config currentDefName modRefs qualifiedFunctions impl =
     List.foldr
         (qualifyNode config currentDefName modRefs)
-        (initQualifyNodeAccumulator qualifiedWords)
+        (initQualifyNodeAccumulator qualifiedFunctions)
         impl
-        |> (\acc -> ( acc.qualifiedWords, Result.combine acc.qualifiedNodes ))
+        |> (\acc -> ( acc.qualifiedFunctions, Result.combine acc.qualifiedNodes ))
 
 
 type alias QualifyNodeAccumulator =
-    { availableQuoteId : Int
-    , qualifiedWords : Dict String WordDefinition
+    { availableInlineFuncId : Int
+    , qualifiedFunctions : Dict String FunctionDefinition
     , qualifiedNodes : List (Result Problem Node)
     }
 
 
-initQualifyNodeAccumulator : Dict String WordDefinition -> QualifyNodeAccumulator
-initQualifyNodeAccumulator qualifiedWords =
-    { availableQuoteId = 1
-    , qualifiedWords = qualifiedWords
+initQualifyNodeAccumulator : Dict String FunctionDefinition -> QualifyNodeAccumulator
+initQualifyNodeAccumulator qualifiedFunctions =
+    { availableInlineFuncId = 1
+    , qualifiedFunctions = qualifiedFunctions
     , qualifiedNodes = []
     }
 
@@ -940,7 +940,7 @@ qualifyNode config currentDefName modRefs node acc =
                     qualifyName config value
             in
             if Dict.member value config.ast.functions then
-                { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+                { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
 
             else
                 case Dict.get value builtinDict of
@@ -948,9 +948,9 @@ qualifyNode config currentDefName modRefs node acc =
                         { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
-                        case resolveImportedWord config modRefs value of
+                        case resolveImportedFunction config modRefs value of
                             Nothing ->
-                                { acc | qualifiedNodes = Err (UnknownWordRef loc value) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (UnknownFunctionRef loc value) :: acc.qualifiedNodes }
 
                             Just mod ->
                                 if String.startsWith "/" mod then
@@ -990,13 +990,13 @@ qualifyNode config currentDefName modRefs node acc =
             in
             if String.startsWith "/" normalizedPath then
                 let
-                    externalWordNode =
+                    externalFunctionNode =
                         Parser.ExternalFunction
                             loc
                             (List.drop 1 <| String.split "/" normalizedPath)
                             value
                 in
-                qualifyNode config currentDefName modRefs externalWordNode acc
+                qualifyNode config currentDefName modRefs externalFunctionNode acc
 
             else
                 let
@@ -1007,18 +1007,18 @@ qualifyNode config currentDefName modRefs node acc =
                         String.join "/" [ qualifiedPath, value ]
 
                     _ =
-                        Dict.keys config.inProgressAST.words
+                        Dict.keys config.inProgressAST.functions
                 in
-                case Dict.get qualifiedName config.inProgressAST.words of
+                case Dict.get qualifiedName config.inProgressAST.functions of
                     Nothing ->
-                        { acc | qualifiedNodes = Err (UnknownWordRef loc qualifiedName) :: acc.qualifiedNodes }
+                        { acc | qualifiedNodes = Err (UnknownFunctionRef loc qualifiedName) :: acc.qualifiedNodes }
 
-                    Just word ->
-                        if word.metadata.isExposed then
-                            { acc | qualifiedNodes = Ok (Word loc qualifiedName) :: acc.qualifiedNodes }
+                    Just function ->
+                        if function.metadata.isExposed then
+                            { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
 
                         else
-                            { acc | qualifiedNodes = Err (WordNotExposed loc qualifiedName) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (FunctionNotExposed loc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalFunction loc path value ->
             let
@@ -1027,7 +1027,7 @@ qualifyNode config currentDefName modRefs node acc =
             in
             case Dict.get normalizedPath config.externalModules of
                 Nothing ->
-                    { acc | qualifiedNodes = Err (UnknownWordRef loc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
+                    { acc | qualifiedNodes = Err (UnknownFunctionRef loc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
 
                 Just package ->
                     let
@@ -1040,16 +1040,16 @@ qualifyNode config currentDefName modRefs node acc =
                                 , value
                                 ]
                     in
-                    case Dict.get fullReference config.inProgressAST.words of
+                    case Dict.get fullReference config.inProgressAST.functions of
                         Nothing ->
-                            { acc | qualifiedNodes = Err (UnknownWordRef loc fullReference) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (UnknownFunctionRef loc fullReference) :: acc.qualifiedNodes }
 
                         Just def ->
                             if def.metadata.isExposed then
-                                { acc | qualifiedNodes = Ok (Word loc fullReference) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Ok (Function loc fullReference) :: acc.qualifiedNodes }
 
                             else
-                                { acc | qualifiedNodes = Err (WordNotExposed loc fullReference) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (FunctionNotExposed loc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -1062,30 +1062,30 @@ qualifyNode config currentDefName modRefs node acc =
 
         Parser.InlineFunction sourceLocation quotImpl ->
             let
-                quoteName =
-                    if String.startsWith "quote:" currentDefName then
-                        currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
+                inlineFuncName =
+                    if String.startsWith "inlinefn:" currentDefName then
+                        currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
 
                     else
-                        "quote:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableQuoteId
+                        "inlinefn:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
 
-                ( newWordsAfterQuot, qualifiedQuotImplResult ) =
-                    initQualifyNode config quoteName modRefs acc.qualifiedWords quotImpl
+                ( newFunctionsAfterInline, qualifiedQuotImplResult ) =
+                    initQualifyNode config inlineFuncName modRefs acc.qualifiedFunctions quotImpl
             in
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->
                     { acc
-                        | availableQuoteId = acc.availableQuoteId + 1
-                        , qualifiedWords =
-                            Dict.insert quoteName
-                                { name = quoteName
+                        | availableInlineFuncId = acc.availableInlineFuncId + 1
+                        , qualifiedFunctions =
+                            Dict.insert inlineFuncName
+                                { name = inlineFuncName
                                 , metadata =
                                     Metadata.default
-                                        |> Metadata.isQuoted
+                                        |> Metadata.isInline
                                 , implementation = SoloImpl qualifiedQuotImpl
                                 }
-                                newWordsAfterQuot
-                        , qualifiedNodes = Ok (WordRef sourceLocation quoteName) :: acc.qualifiedNodes
+                                newFunctionsAfterInline
+                        , qualifiedNodes = Ok (FunctionRef sourceLocation inlineFuncName) :: acc.qualifiedNodes
                     }
 
                 Err err ->
@@ -1132,8 +1132,8 @@ qualifyPackageModule packageName path =
             ]
 
 
-resolveImportedWord : RunConfig -> ModuleReferences -> String -> Maybe String
-resolveImportedWord config modRefs name =
+resolveImportedFunction : RunConfig -> ModuleReferences -> String -> Maybe String
+resolveImportedFunction config modRefs name =
     let
         explicitImports =
             modRefs.imports
@@ -1166,7 +1166,7 @@ resolveImportedWord config modRefs name =
 
         Nothing ->
             potentialCandidates
-                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.words ))
+                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.functions ))
                 |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
                 |> List.head
                 |> Maybe.map Tuple.first
@@ -1249,10 +1249,10 @@ requiredModules config =
                     (\_ t acc -> Set.union (requiredModulesOfType t) acc)
                     Set.empty
 
-        wordRequirements =
+        functionRequirements =
             config.ast.functions
                 |> Dict.foldl
-                    (\_ w acc -> Set.union (requiredModulesOfWord topLevelAliases w) acc)
+                    (\_ w acc -> Set.union (requiredModulesOfFunction topLevelAliases w) acc)
                     Set.empty
 
         fullyQualify mod acc =
@@ -1277,7 +1277,7 @@ requiredModules config =
     topLevelAliasTargets
         |> Set.union topLevelImports
         |> Set.union typeRequirements
-        |> Set.union wordRequirements
+        |> Set.union functionRequirements
         |> Set.foldl fullyQualify Set.empty
 
 
@@ -1296,38 +1296,38 @@ requiredModulesOfType typeDef =
                 |> Set.fromList
 
 
-requiredModulesOfWord : Dict String String -> Parser.FunctionDefinition -> Set String
-requiredModulesOfWord topLevelAliases word =
+requiredModulesOfFunction : Dict String String -> Parser.FunctionDefinition -> Set String
+requiredModulesOfFunction topLevelAliases function =
     let
-        wordAliases =
-            word.aliases
+        functionAliases =
+            function.aliases
                 |> Dict.values
                 |> Set.fromList
 
-        wordImports =
-            word.imports
+        functionImports =
+            function.imports
                 |> Dict.keys
                 |> Set.fromList
 
         typeSignature =
-            case word.typeSignature of
+            case function.typeSignature of
                 AssociatedFunctionSignature.NotProvided ->
                     Set.empty
 
-                AssociatedFunctionSignature.UserProvided wordType ->
-                    moduleReferenceFromWordType wordType
+                AssociatedFunctionSignature.UserProvided functionType ->
+                    moduleReferenceFromFunctionType functionType
 
-                AssociatedFunctionSignature.Verified wordType ->
-                    moduleReferenceFromWordType wordType
+                AssociatedFunctionSignature.Verified functionType ->
+                    moduleReferenceFromFunctionType functionType
 
-        moduleReferenceFromWordType wordType =
-            wordType.input
-                ++ wordType.output
+        moduleReferenceFromFunctionType functionType =
+            functionType.input
+                ++ functionType.output
                 |> List.filterMap extractModuleReferenceFromFunctionType
                 |> Set.fromList
 
         matches =
-            case word.implementation of
+            case function.implementation of
                 Parser.SoloImpl _ ->
                     Set.empty
 
@@ -1342,24 +1342,24 @@ requiredModulesOfWord topLevelAliases word =
             tipe
 
         impls =
-            case word.implementation of
+            case function.implementation of
                 Parser.SoloImpl impl ->
                     [ impl ]
 
                 Parser.MultiImpl branches impl ->
                     impl :: List.map Tuple.second branches
 
-        wordReferences =
+        functionReferences =
             impls
                 |> List.concat
-                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases word)
+                |> List.filterMap (extractModuleReferenceFromNode topLevelAliases function)
                 |> Set.fromList
     in
-    wordAliases
-        |> Set.union wordImports
+    functionAliases
+        |> Set.union functionImports
         |> Set.union typeSignature
         |> Set.union matches
-        |> Set.union wordReferences
+        |> Set.union functionReferences
 
 
 extractModuleReferenceFromFunctionType : Parser.PossiblyQualifiedTypeOrStackRange -> Maybe String

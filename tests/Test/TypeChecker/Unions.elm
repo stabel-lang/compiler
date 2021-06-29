@@ -4,7 +4,7 @@ import Dict
 import Dict.Extra as Dict
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
-import Stabel.Data.Type as Type
+import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Qualifier as QAST
 import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 import Stabel.TypeChecker exposing (..)
@@ -139,20 +139,20 @@ suite =
                                     []
                                     [ ( "man-years", Type.Int ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "add-to-age"
                                   , metadata = Metadata.default
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
-                                              , [ QAST.Word emptyRange ">age"
+                                              , [ QAST.Function emptyRange ">age"
                                                 ]
                                               )
                                             , ( QAST.TypeMatch emptyRange (Type.Custom "Dog") []
                                               , [ QAST.Integer emptyRange 4
                                                 , QAST.Builtin emptyRange Builtin.Multiply
-                                                , QAST.Word emptyRange ">man-years"
+                                                , QAST.Function emptyRange ">man-years"
                                                 ]
                                               )
                                             ]
@@ -163,10 +163,10 @@ suite =
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
-                                              , [ QAST.Word emptyRange "age>" ]
+                                              , [ QAST.Function emptyRange "age>" ]
                                               )
                                             , ( QAST.TypeMatch emptyRange (Type.Custom "Dog") []
-                                              , [ QAST.Word emptyRange "man-years>" ]
+                                              , [ QAST.Function emptyRange "man-years>" ]
                                               )
                                             ]
                                             []
@@ -178,16 +178,16 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 18
-                                            , QAST.Word emptyRange ">Person"
+                                            , QAST.Function emptyRange ">Person"
                                             , QAST.Integer emptyRange 10
-                                            , QAST.Word emptyRange "add-to-age"
+                                            , QAST.Function emptyRange "add-to-age"
                                             , QAST.Integer emptyRange 0
-                                            , QAST.Word emptyRange ">Dog"
+                                            , QAST.Function emptyRange ">Dog"
                                             , QAST.Integer emptyRange 2
-                                            , QAST.Word emptyRange "add-to-age"
-                                            , QAST.Word emptyRange "get-man-age"
+                                            , QAST.Function emptyRange "add-to-age"
+                                            , QAST.Function emptyRange "get-man-age"
                                             , QAST.Builtin emptyRange Builtin.StackSwap
-                                            , QAST.Word emptyRange "get-man-age"
+                                            , QAST.Function emptyRange "get-man-age"
                                             , QAST.Builtin emptyRange Builtin.StackSwap
                                             , QAST.Builtin emptyRange Builtin.Minus
                                             ]
@@ -213,7 +213,7 @@ suite =
                                 , QAST.CustomTypeDef "True" True emptyRange [] []
                                 , QAST.CustomTypeDef "False" True emptyRange [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "not"
                                   , metadata = Metadata.default
@@ -221,12 +221,12 @@ suite =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "True") []
                                               , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                , QAST.Word emptyRange "False"
+                                                , QAST.Function emptyRange "False"
                                                 ]
                                               )
                                             , ( QAST.TypeMatch emptyRange (Type.Custom "False") []
                                               , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                , QAST.Word emptyRange "True"
+                                                , QAST.Function emptyRange "True"
                                                 ]
                                               )
                                             ]
@@ -248,9 +248,9 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "True"
-                                            , QAST.Word emptyRange "not"
-                                            , QAST.Word emptyRange "true-to-int"
+                                            [ QAST.Function emptyRange "True"
+                                            , QAST.Function emptyRange "not"
+                                            , QAST.Function emptyRange "true-to-int"
                                             ]
                                   }
                                 ]
@@ -290,7 +290,7 @@ suite =
                                     []
                                     []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "first-or-default"
                                   , metadata =
@@ -302,7 +302,7 @@ suite =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
                                               , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                , QAST.Word emptyRange "first>"
+                                                , QAST.Function emptyRange "first>"
                                                 ]
                                               )
                                             , ( QAST.TypeMatch emptyRange (Type.Custom "EmptyList") []
@@ -320,10 +320,10 @@ suite =
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
-                                            , QAST.Word emptyRange "EmptyList"
-                                            , QAST.Word emptyRange ">NonEmptyList"
+                                            , QAST.Function emptyRange "EmptyList"
+                                            , QAST.Function emptyRange ">NonEmptyList"
                                             , QAST.Integer emptyRange 0
-                                            , QAST.Word emptyRange "first-or-default"
+                                            , QAST.Function emptyRange "first-or-default"
                                             , QAST.Integer emptyRange 1
                                             , QAST.Builtin emptyRange Builtin.Equal
                                             ]
@@ -358,7 +358,7 @@ suite =
                                     []
                                     []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "with-default"
                                   , metadata =
@@ -386,9 +386,9 @@ suite =
                                             |> Metadata.asEntryPoint
                                   , implementation =
                                         QAST.SoloImpl
-                                            [ QAST.Word emptyRange "Nil"
+                                            [ QAST.Function emptyRange "Nil"
                                             , QAST.Integer emptyRange 1
-                                            , QAST.Word emptyRange "with-default"
+                                            , QAST.Function emptyRange "with-default"
                                             ]
                                   }
                                 ]
@@ -485,7 +485,7 @@ suite =
                                     []
                                     []
                                 ]
-                        , words =
+                        , functions =
                             Dict.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
@@ -494,6 +494,7 @@ suite =
         ]
 
 
+boolUnion : Type
 boolUnion =
     Type.Union
         [ Type.Custom "True"
@@ -501,6 +502,7 @@ boolUnion =
         ]
 
 
+template : QAST.FunctionDefinition -> QAST.AST
 template multiFn =
     { types =
         Dict.fromListBy QAST.typeDefinitionName
@@ -514,7 +516,7 @@ template multiFn =
             , QAST.CustomTypeDef "True" True emptyRange [] []
             , QAST.CustomTypeDef "False" True emptyRange [] []
             ]
-    , words =
+    , functions =
         Dict.fromListBy .name
             [ multiFn
             , { name = "main"
@@ -523,10 +525,10 @@ template multiFn =
                         |> Metadata.asEntryPoint
               , implementation =
                     QAST.SoloImpl
-                        [ QAST.Word emptyRange "True"
-                        , QAST.Word emptyRange "to-int"
-                        , QAST.Word emptyRange "False"
-                        , QAST.Word emptyRange "to-int"
+                        [ QAST.Function emptyRange "True"
+                        , QAST.Function emptyRange "to-int"
+                        , QAST.Function emptyRange "False"
+                        , QAST.Function emptyRange "to-int"
                         , QAST.Builtin emptyRange Builtin.Equal
                         ]
               }

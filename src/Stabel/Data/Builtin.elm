@@ -1,6 +1,6 @@
 module Stabel.Data.Builtin exposing (..)
 
-import Stabel.Data.Type as Type exposing (WordType)
+import Stabel.Data.Type as Type exposing (FunctionType)
 
 
 type Builtin
@@ -17,7 +17,7 @@ type Builtin
     | Apply
 
 
-wordType : Builtin -> WordType
+wordType : Builtin -> FunctionType
 wordType builtin =
     case builtin of
         Plus ->
@@ -73,7 +73,7 @@ wordType builtin =
         Apply ->
             { input =
                 [ Type.StackRange "a"
-                , Type.Quotation
+                , Type.FunctionSignature
                     { input = [ Type.StackRange "a" ]
                     , output = [ Type.StackRange "b" ]
                     }

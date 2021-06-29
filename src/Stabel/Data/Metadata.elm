@@ -9,7 +9,7 @@ import Stabel.Qualifier.SourceLocation exposing (SourceLocationRange)
 type alias Metadata =
     { isEntryPoint : Bool
     , type_ : TypeSignature
-    , isQuoted : Bool
+    , isInline : Bool
     , sourceLocationRange : Maybe SourceLocationRange
     , isExposed : Bool
     }
@@ -19,7 +19,7 @@ default : Metadata
 default =
     { isEntryPoint = False
     , type_ = NotProvided
-    , isQuoted = False
+    , isInline = False
     , sourceLocationRange = Nothing
     , isExposed = True
     }
@@ -40,9 +40,9 @@ withVerifiedType inputs outputs meta =
     { meta | type_ = CompilerProvided { input = inputs, output = outputs } }
 
 
-isQuoted : Metadata -> Metadata
-isQuoted meta =
-    { meta | isQuoted = True }
+isInline : Metadata -> Metadata
+isInline meta =
+    { meta | isInline = True }
 
 
 withSourceLocationRange : SourceLocationRange -> Metadata -> Metadata

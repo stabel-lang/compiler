@@ -177,7 +177,7 @@ suite =
 noSuchWordReferenceError : String -> Problem -> Bool
 noSuchWordReferenceError name problem =
     case problem of
-        UnknownWordRef _ problemName ->
+        UnknownFunctionRef _ problemName ->
             name == problemName
 
         _ ->
@@ -205,7 +205,7 @@ checkForError fn source =
                 , externalModules = Dict.empty
                 , inProgressAST =
                     { types = Dict.empty
-                    , words = Dict.empty
+                    , functions = Dict.empty
                     }
                 }
     in

@@ -4,7 +4,7 @@ import Dict exposing (Dict)
 import List.Extra as List
 import Stabel.Codegen.BaseModule as BaseModule
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
-import Stabel.Data.Type as Type exposing (Type, WordType)
+import Stabel.Data.Type as Type exposing (FunctionType, Type)
 import Stabel.TypeChecker as AST exposing (AST)
 import Wasm
 
@@ -17,7 +17,7 @@ type alias TypeInformation =
 
 type AstNode
     = IntLiteral Int
-    | Word String WordType
+    | Word String FunctionType
     | WordRef String
     | ConstructType String
     | SetMember String String Type
@@ -160,7 +160,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     case Dict.get name ast.words of
                         Just def ->
                             { input = []
-                            , output = [ Type.Quotation def.type_ ]
+                            , output = [ Type.FunctionRef def.type_ ]
                             }
 
                         Nothing ->

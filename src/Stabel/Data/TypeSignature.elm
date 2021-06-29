@@ -1,15 +1,15 @@
 module Stabel.Data.TypeSignature exposing (..)
 
-import Stabel.Data.Type exposing (WordType)
+import Stabel.Data.Type exposing (FunctionType)
 
 
 type TypeSignature
     = NotProvided
-    | UserProvided WordType
-    | CompilerProvided WordType
+    | UserProvided FunctionType
+    | CompilerProvided FunctionType
 
 
-map : (WordType -> WordType) -> TypeSignature -> TypeSignature
+map : (FunctionType -> FunctionType) -> TypeSignature -> TypeSignature
 map fn ts =
     case ts of
         NotProvided ->
@@ -22,7 +22,7 @@ map fn ts =
             CompilerProvided (fn wt)
 
 
-toMaybe : TypeSignature -> Maybe WordType
+toMaybe : TypeSignature -> Maybe FunctionType
 toMaybe ts =
     case ts of
         NotProvided ->

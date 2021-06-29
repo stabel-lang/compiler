@@ -551,7 +551,7 @@ nextCompileStep remainingModules state =
 
                 ( qualifiedAst, errs ) =
                     sortedParsedModules
-                        |> List.foldl qualifyAst ( { types = Dict.empty, words = Dict.empty }, [] )
+                        |> List.foldl qualifyAst ( { types = Dict.empty, functions = Dict.empty }, [] )
 
                 qualifyAst parsedModInfo ( qast, es ) =
                     let
@@ -574,15 +574,15 @@ nextCompileStep remainingModules state =
                             let
                                 mergedQualifiedAst =
                                     { types = Dict.union qast.types qualifiedAST.types
-                                    , words = Dict.union qast.words qualifiedAST.words
+                                    , functions = Dict.union qast.functions qualifiedAST.functions
                                     }
                             in
                             ( mergedQualifiedAst, es )
 
                 wordsWithEntryPoint =
                     state.possibleEntryPoint
-                        |> Maybe.map (setEntryPoint qualifiedAst.words)
-                        |> Maybe.withDefault qualifiedAst.words
+                        |> Maybe.map (setEntryPoint qualifiedAst.functions)
+                        |> Maybe.withDefault qualifiedAst.functions
 
                 setEntryPoint words entryPointName =
                     Dict.update
@@ -594,7 +594,7 @@ nextCompileStep remainingModules state =
                 [] ->
                     Done
                         { types = qualifiedAst.types
-                        , words = wordsWithEntryPoint
+                        , functions = wordsWithEntryPoint
                         }
 
                 err :: _ ->

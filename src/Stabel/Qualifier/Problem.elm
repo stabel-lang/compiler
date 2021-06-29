@@ -7,23 +7,23 @@ import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocatio
 
 
 type Problem
-    = UnknownWordRef SourceLocationRange String
+    = UnknownFunctionRef SourceLocationRange String
     | UnknownTypeRef SourceLocationRange String
     | UnionTypeMatchWithPatterns SourceLocationRange
     | InvalidTypeMatch SourceLocationRange
     | NoSuchMemberOnType SourceLocationRange String String
-    | WordNotExposed SourceLocationRange String
+    | FunctionNotExposed SourceLocationRange String
     | TypeNotExposed SourceLocationRange String
 
 
 toString : String -> Problem -> String
 toString source problem =
     case problem of
-        UnknownWordRef range wordRef ->
+        UnknownFunctionRef range functionRef ->
             SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
-                ++ "No such word: '"
-                ++ wordRef
+                ++ "No such function: '"
+                ++ functionRef
                 ++ "'."
 
         UnknownTypeRef range typeRef ->
@@ -51,11 +51,11 @@ toString source problem =
                 ++ member
                 ++ "'."
 
-        WordNotExposed range wordRef ->
+        FunctionNotExposed range functionRef ->
             SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Trying to call '"
-                ++ wordRef
+                ++ functionRef
                 ++ "' but this function is not exposed."
 
         TypeNotExposed range typeRef ->

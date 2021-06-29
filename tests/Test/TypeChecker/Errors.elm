@@ -28,7 +28,7 @@ suite =
                                     [ "a" ]
                                     [ ( "value", Type.Generic "b" ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -56,7 +56,7 @@ suite =
                 let
                     ast =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -94,7 +94,7 @@ suite =
                                     []
                                     [ ( "value", Type.Int ) ]
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -104,7 +104,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
-                                            , Word emptyRange "value>"
+                                            , Function emptyRange "value>"
                                             ]
                                   }
                                 , { name = ">IntBox"
@@ -148,7 +148,7 @@ suite =
                 let
                     ast =
                         { types = Dict.empty
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -189,7 +189,7 @@ suite =
                                 , CustomTypeDef "True" False emptyRange [] []
                                 , CustomTypeDef "False" False emptyRange [] []
                                 ]
-                        , words =
+                        , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
                                   , metadata =
@@ -199,7 +199,7 @@ suite =
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 0
-                                            , Word emptyRange "true-or-false"
+                                            , Function emptyRange "true-or-false"
                                             ]
                                   }
                                 , { name = "true-or-false"
@@ -212,12 +212,12 @@ suite =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
                                               , [ Builtin emptyRange Builtin.StackDrop
-                                                , Word emptyRange ">False"
+                                                , Function emptyRange ">False"
                                                 ]
                                               )
                                             , ( TypeMatch emptyRange Type.Int []
                                               , [ Builtin emptyRange Builtin.StackDrop
-                                                , Word emptyRange ">True"
+                                                , Function emptyRange ">True"
                                                 ]
                                               )
                                             ]
@@ -266,7 +266,7 @@ suite =
                     let
                         ast =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata =
@@ -275,7 +275,7 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
-                                                , Word emptyRange "mword"
+                                                , Function emptyRange "mword"
                                                 ]
                                       }
                                     , { name = "mword"
@@ -307,7 +307,7 @@ suite =
                     let
                         ast =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata =
@@ -316,7 +316,7 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
-                                                , Word emptyRange "mword"
+                                                , Function emptyRange "mword"
                                                 ]
                                       }
                                     , { name = "mword"
@@ -354,7 +354,7 @@ suite =
                                         []
                                         [ ( "value", Type.Int ) ]
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata =
@@ -364,9 +364,9 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , Word emptyRange ">IntBox"
-                                                , Word emptyRange "mword"
-                                                , Word emptyRange "value>"
+                                                , Function emptyRange ">IntBox"
+                                                , Function emptyRange "mword"
+                                                , Function emptyRange "value>"
                                                 ]
                                       }
                                     , { name = "mword"
@@ -380,10 +380,10 @@ suite =
                                                                 (TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ])
                                                           )
                                                         ]
-                                                  , [ Word emptyRange "value>"
+                                                  , [ Function emptyRange "value>"
                                                     , Integer emptyRange 1
                                                     , Builtin emptyRange Builtin.Plus
-                                                    , Word emptyRange ">IntBox"
+                                                    , Function emptyRange ">IntBox"
                                                     ]
                                                   )
                                                 ]
@@ -430,7 +430,7 @@ suite =
                     let
                         ast =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata =
@@ -439,7 +439,7 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
-                                                , Word emptyRange "mword"
+                                                , Function emptyRange "mword"
                                                 ]
                                       }
                                     , { name = "mword"
@@ -473,7 +473,7 @@ suite =
                     let
                         ast =
                             { types = Dict.empty
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
                                       , metadata =
@@ -482,7 +482,7 @@ suite =
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
-                                                , Word emptyRange "mword"
+                                                , Function emptyRange "mword"
                                                 ]
                                       }
                                     , { name = "mword"
@@ -537,7 +537,7 @@ suite =
                                         [ ( "value", Type.Int ) ]
                                     , CustomTypeDef "Nil" False emptyRange [] []
                                     ]
-                            , words =
+                            , functions =
                                 Dict.fromListBy .name
                                     [ { name = ">Nil"
                                       , metadata =
@@ -588,7 +588,7 @@ suite =
                                                           )
                                                         ]
                                                   , [ Builtin emptyRange Builtin.StackDrop
-                                                    , Word emptyRange "value>"
+                                                    , Function emptyRange "value>"
                                                     ]
                                                   )
                                                 , ( TypeMatch emptyRange (Type.Custom "Nil") []
@@ -605,9 +605,9 @@ suite =
                                                 |> Metadata.asEntryPoint
                                       , implementation =
                                             SoloImpl
-                                                [ Word emptyRange ">Nil"
+                                                [ Function emptyRange ">Nil"
                                                 , Integer emptyRange 1
-                                                , Word emptyRange "with-default"
+                                                , Function emptyRange "with-default"
                                                 ]
                                       }
                                     ]

@@ -69,10 +69,10 @@ compile entry sourceCode =
                         , externalModules = Dict.empty
                         , inProgressAST =
                             { types = Dict.empty
-                            , words = Dict.empty
+                            , functions = Dict.empty
                             }
                         }
-                        |> Result.map (\qast -> { qast | words = Dict.update entry (Maybe.map setEntryPoint) qast.words })
+                        |> Result.map (\qast -> { qast | words = Dict.update entry (Maybe.map setEntryPoint) qast.functions })
 
                 setEntryPoint word =
                     { word | metadata = Metadata.asEntryPoint word.metadata }
