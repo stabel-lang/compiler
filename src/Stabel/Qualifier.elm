@@ -1098,46 +1098,16 @@ qualifyPackageModule packageName path =
 
 resolveImportedFunction : RunConfig -> ModuleReferences -> String -> Maybe String
 resolveImportedFunction config modRefs name =
-    let
-        explicitImports =
-            modRefs.imports
-                |> Dict.toList
-                |> List.find (\( _, v ) -> List.member name v)
-                |> Maybe.map Tuple.first
-                |> Maybe.andThen resolveMod
-
-        potentialCandidates =
-            modRefs.imports
-                |> Dict.filter (\_ v -> List.isEmpty v)
-                |> Dict.keys
-                |> List.filterMap resolveMod
-                |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
-
-        resolveMod mod =
-            if String.startsWith "/" mod then
-                Dict.get mod config.externalModules
-                    |> Maybe.map
-                        (\package ->
-                            qualifyPackageModule package (String.dropLeft 1 mod)
-                        )
-
-            else
-                Just <| qualifyPackageModule config.packageName mod
-    in
-    case explicitImports of
-        Just _ ->
-            explicitImports
-
-        Nothing ->
-            potentialCandidates
-                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.functions ))
-                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
-                |> List.head
-                |> Maybe.map Tuple.first
+    resolveImported config modRefs config.inProgressAST.functions name
 
 
 resolveImportedType : RunConfig -> ModuleReferences -> String -> Maybe String
 resolveImportedType config modRefs name =
+    resolveImported config modRefs config.inProgressAST.types name
+
+
+resolveImported : RunConfig -> ModuleReferences -> Dict String a -> String -> Maybe String
+resolveImported config modRefs lookupTable name =
     let
         explicitImports =
             modRefs.imports
@@ -1171,10 +1141,12 @@ resolveImportedType config modRefs name =
 
         Nothing ->
             potentialCandidates
-                |> List.map (\( mod, qName ) -> ( mod, Dict.get qName config.inProgressAST.types ))
-                |> List.filter (\( _, possibleDef ) -> possibleDef /= Nothing)
+                |> List.filterMap
+                    (\( mod, qName ) ->
+                        Dict.get qName lookupTable
+                            |> Maybe.map (always mod)
+                    )
                 |> List.head
-                |> Maybe.map Tuple.first
 
 
 
