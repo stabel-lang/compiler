@@ -634,37 +634,6 @@ qualifyMetadata config qualifiedTypes function =
             )
 
 
-validateTypeReferences : RunConfig -> Dict String TypeDefinition -> SourceLocationRange -> Type -> Result Problem Type
-validateTypeReferences config typeDefs functionRange type_ =
-    case type_ of
-        Type.Custom typeName ->
-            let
-                qualifiedName =
-                    qualifyName config typeName
-            in
-            case Dict.get qualifiedName typeDefs of
-                Just _ ->
-                    Ok <| Type.Custom qualifiedName
-
-                Nothing ->
-                    Err <| UnknownTypeRef functionRange qualifiedName
-
-        Type.CustomGeneric typeName types ->
-            let
-                qualifiedName =
-                    qualifyName config typeName
-            in
-            case Dict.get qualifiedName typeDefs of
-                Just _ ->
-                    Ok <| Type.CustomGeneric qualifiedName types
-
-                Nothing ->
-                    Err <| UnknownTypeRef functionRange qualifiedName
-
-        _ ->
-            Ok type_
-
-
 resolveUnions : Dict String TypeDefinition -> FunctionType -> FunctionType
 resolveUnions typeDefs wt =
     { input = List.map (resolveUnion typeDefs) wt.input
