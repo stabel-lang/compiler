@@ -1,4 +1,15 @@
-module Stabel.Qualifier exposing (..)
+module Stabel.Qualifier exposing
+    ( AST
+    , Node(..)
+    , TypeDefinition(..)
+    , TypeMatch(..)
+    , TypeMatchValue(..)
+    , WordDefinition
+    , WordImplementation(..)
+    , requiredModules
+    , run
+    , typeDefinitionName
+    )
 
 import Dict exposing (Dict)
 import List.Extra as List
