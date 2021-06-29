@@ -5,12 +5,12 @@ module Stabel.Parser.Problem exposing
     )
 
 import Parser.Advanced exposing (DeadEnd)
+import Stabel.Data.SourceLocation exposing (extractFromString)
 import Stabel.Parser.SourceLocation
     exposing
         ( SourceLocation
         , SourceLocationRange
         )
-import Stabel.Qualifier.SourceLocation exposing (extractFromString)
 
 
 type Context

@@ -1,4 +1,4 @@
-module Stabel.Qualifier.SourceLocation exposing
+module Stabel.Data.SourceLocation exposing
     ( SourceLocation
     , SourceLocationRange
     , emptyRange

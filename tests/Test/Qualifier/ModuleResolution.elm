@@ -6,6 +6,7 @@ import Expect
 import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
+import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
@@ -13,7 +14,6 @@ import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem as Problem
-import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 import Test exposing (Test, describe, test)
 import Test.Qualifier.Util as QualifierUtil
 

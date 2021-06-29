@@ -3,13 +3,13 @@ module Test.Qualifier.Errors exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem exposing (Problem(..))
-import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 import Test exposing (Test, describe, test)
 
 

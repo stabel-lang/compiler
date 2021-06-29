@@ -10,6 +10,7 @@ import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Stabel.Data.Metadata as Metadata
+import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
@@ -22,7 +23,6 @@ import Stabel.Qualifier as AST
         , TypeMatch(..)
         , TypeMatchValue(..)
         )
-import Stabel.Qualifier.SourceLocation exposing (emptyRange)
 
 
 emptyAst : AST

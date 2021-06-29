@@ -3,7 +3,7 @@ module Stabel.Qualifier.Problem exposing
     , toString
     )
 
-import Stabel.Qualifier.SourceLocation as SourceLocation exposing (SourceLocationRange)
+import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 
 
 type Problem

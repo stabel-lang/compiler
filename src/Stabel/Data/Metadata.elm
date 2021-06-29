@@ -1,9 +1,8 @@
 module Stabel.Data.Metadata exposing (..)
 
-import Dict exposing (Dict)
+import Stabel.Data.SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type exposing (Type)
 import Stabel.Data.TypeSignature exposing (TypeSignature(..))
-import Stabel.Qualifier.SourceLocation exposing (SourceLocationRange)
 
 
 type alias Metadata =
