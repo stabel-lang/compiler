@@ -72,7 +72,7 @@ compile entry sourceCode =
                             , functions = Dict.empty
                             }
                         }
-                        |> Result.map (\qast -> { qast | words = Dict.update entry (Maybe.map setEntryPoint) qast.functions })
+                        |> Result.map (\qast -> { qast | functions = Dict.update entry (Maybe.map setEntryPoint) qast.functions })
 
                 setEntryPoint word =
                     { word | metadata = Metadata.asEntryPoint word.metadata }

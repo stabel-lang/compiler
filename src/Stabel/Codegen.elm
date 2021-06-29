@@ -94,7 +94,7 @@ toWasmFuncDef typeInfo ast def =
     in
     { name = def.name
     , exported = def.metadata.isEntryPoint
-    , isIndirectlyCalled = def.metadata.isQuoted
+    , isIndirectlyCalled = def.metadata.isInline
     , args = []
     , results = []
     , locals = List.repeat numberOfLocals Wasm.Int32
@@ -160,7 +160,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     case Dict.get name ast.words of
                         Just def ->
                             { input = []
-                            , output = [ Type.FunctionRef def.type_ ]
+                            , output = [ Type.FunctionSignature def.type_ ]
                             }
 
                         Nothing ->
