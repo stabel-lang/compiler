@@ -221,20 +221,20 @@ qualifyType config typeDef ( errors, acc ) =
               }
             , modDef.exposes
             )
+
+        qualifiedName =
+            qualifyName config typeDef.name
+
+        exposed =
+            Set.isEmpty exposes || Set.member typeDef.name exposes
     in
     case typeDef.members of
         Parser.StructMembers members ->
             let
-                qualifiedName =
-                    qualifyName config typeDef.name
-
                 qualifiedMemberResult =
                     List.map (Tuple.mapSecond (qualifyMemberType config modRefs typeDef.sourceLocation)) members
                         |> List.map raiseTupleError
                         |> Result.combine
-
-                exposed =
-                    Set.isEmpty exposes || Set.member typeDef.name exposes
 
                 raiseTupleError ( label, result ) =
                     case result of
@@ -265,12 +265,6 @@ qualifyType config typeDef ( errors, acc ) =
 
         Parser.UnionMembers memberTypes ->
             let
-                qualifiedName =
-                    qualifyName config typeDef.name
-
-                exposed =
-                    Set.isEmpty exposes || Set.member typeDef.name exposes
-
                 qualifiedMemberTypesResult =
                     List.map (qualifyMemberType config modRefs typeDef.sourceLocation) memberTypes
                         |> Result.combine
@@ -338,12 +332,10 @@ qualifyMemberType config modRefs range type_ =
         importsLookup name binds =
             case resolveImportedType config modRefs name of
                 Just importedModule ->
-                    if String.startsWith "/" importedModule then
+                    if representsExternalModule importedModule then
                         let
                             nextPath =
-                                importedModule
-                                    |> String.dropLeft 1
-                                    |> String.split "/"
+                                splitExternalPackagePath importedModule
                                     -- Drop author/packageName part
                                     |> List.drop 2
                         in
@@ -394,12 +386,10 @@ qualifyMemberType config modRefs range type_ =
         Parser.InternalRef ([ possibleAlias ] as path) name binds ->
             case Dict.get possibleAlias modRefs.aliases of
                 Just val ->
-                    if String.startsWith "/" val then
+                    if representsExternalModule val then
                         let
                             newPath =
-                                val
-                                    |> String.split "/"
-                                    |> List.drop 1
+                                splitExternalPackagePath val
                         in
                         qualifyMemberType config modRefs range <|
                             Parser.ExternalRef newPath name binds
@@ -761,12 +751,10 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
         Parser.TypeMatch range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
             case Dict.get possibleAlias modRefs.aliases of
                 Just actualPath ->
-                    if String.startsWith "/" actualPath then
+                    if representsExternalModule actualPath then
                         let
                             extPath =
-                                actualPath
-                                    |> String.dropLeft 1
-                                    |> String.split "/"
+                                splitExternalPackagePath actualPath
                         in
                         qualifyMatch config qualifiedTypes modRefs <|
                             Parser.TypeMatch range (Parser.ExternalRef extPath name []) patterns
@@ -833,24 +821,14 @@ qualifyMatchValue config qualifiedTypes modRefs range typeName memberNames ( fie
                 Ok <| ( fieldName, LiteralInt val )
 
             Parser.LiteralType type_ ->
-                let
-                    qualifyTypeResult =
-                        qualifyMemberType config modRefs range type_
-                in
-                case qualifyTypeResult of
-                    Ok qualifiedType ->
-                        Ok <| ( fieldName, LiteralType qualifiedType )
-
-                    Err err ->
-                        Err err
+                type_
+                    |> qualifyMemberType config modRefs range
+                    |> Result.map (\qualifiedType -> ( fieldName, LiteralType qualifiedType ))
 
             Parser.RecursiveMatch typeMatch ->
-                case qualifyMatch config qualifiedTypes modRefs typeMatch of
-                    Err err ->
-                        Err err
-
-                    Ok match ->
-                        Ok <| ( fieldName, RecursiveMatch match )
+                typeMatch
+                    |> qualifyMatch config qualifiedTypes modRefs
+                    |> Result.map (\match -> ( fieldName, RecursiveMatch match ))
 
     else
         Err <| NoSuchMemberOnType range typeName fieldName
@@ -917,12 +895,12 @@ qualifyNode config currentDefName modRefs node acc =
                                 { acc | qualifiedNodes = Err (UnknownFunctionRef loc value) :: acc.qualifiedNodes }
 
                             Just mod ->
-                                if String.startsWith "/" mod then
+                                if representsExternalModule mod then
                                     let
                                         path =
-                                            mod
-                                                |> String.split "/"
-                                                |> List.drop 3
+                                            splitExternalPackagePath mod
+                                                -- drop author/package
+                                                |> List.drop 2
                                     in
                                     qualifyNode
                                         config
@@ -934,7 +912,7 @@ qualifyNode config currentDefName modRefs node acc =
                                 else
                                     let
                                         path =
-                                            String.split "/" mod
+                                            splitInternalPackagePath mod
                                     in
                                     qualifyNode
                                         config
@@ -952,12 +930,12 @@ qualifyNode config currentDefName modRefs node acc =
                     Dict.get normalizedPathPreAliasCheck modRefs.aliases
                         |> Maybe.withDefault normalizedPathPreAliasCheck
             in
-            if String.startsWith "/" normalizedPath then
+            if representsExternalModule normalizedPath then
                 let
                     externalFunctionNode =
                         Parser.ExternalFunction
                             loc
-                            (List.drop 1 <| String.split "/" normalizedPath)
+                            (splitExternalPackagePath normalizedPath)
                             value
                 in
                 qualifyNode config currentDefName modRefs externalFunctionNode acc
@@ -969,9 +947,6 @@ qualifyNode config currentDefName modRefs node acc =
 
                     qualifiedName =
                         String.join "/" [ qualifiedPath, value ]
-
-                    _ =
-                        Dict.keys config.inProgressAST.functions
                 in
                 case Dict.get qualifiedName config.inProgressAST.functions of
                     Nothing ->
@@ -1124,7 +1099,7 @@ resolveImported config modRefs lookupTable name =
                 |> List.map (\mod -> ( mod, mod ++ "/" ++ name ))
 
         resolveMod mod =
-            if String.startsWith "/" mod then
+            if representsExternalModule mod then
                 Dict.get mod config.externalModules
                     |> Maybe.map
                         (\package ->
@@ -1147,6 +1122,24 @@ resolveImported config modRefs lookupTable name =
                             |> Maybe.map (always mod)
                     )
                 |> List.head
+
+
+representsExternalModule : String -> Bool
+representsExternalModule path =
+    String.startsWith "/" path
+
+
+splitExternalPackagePath : String -> List String
+splitExternalPackagePath path =
+    path
+        |> String.split "/"
+        -- Due to leading /
+        |> List.drop 1
+
+
+splitInternalPackagePath : String -> List String
+splitInternalPackagePath =
+    String.split "/"
 
 
 
@@ -1192,17 +1185,10 @@ requiredModules config =
                     Set.empty
 
         fullyQualify mod acc =
-            if String.startsWith "/" mod then
+            if representsExternalModule mod then
                 case Dict.get mod config.externalModules of
                     Just package ->
-                        Set.insert
-                            (String.concat
-                                [ "/"
-                                , package
-                                , mod
-                                ]
-                            )
-                            acc
+                        Set.insert (String.concat [ "/", package, mod ]) acc
 
                     Nothing ->
                         acc
