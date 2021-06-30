@@ -109,7 +109,7 @@ initContext ast =
                         |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
             in
             case t of
-                CustomTypeDef name range generics members ->
+                CustomTypeDef _ range generics members ->
                     let
                         listedGenerics_ =
                             Set.fromList generics
@@ -119,7 +119,7 @@ initContext ast =
                         |> collectReferencedGenerics
                         |> collectUndeclaredGenericProblems range listedGenerics_
 
-                UnionTypeDef name range generics mts ->
+                UnionTypeDef _ range generics mts ->
                     let
                         listedGenerics_ =
                             Set.fromList generics
@@ -276,8 +276,8 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 Type.CustomGeneric name members ->
                     Type.CustomGeneric name (List.map (replaceType type_ with) members)
 
-                Type.Union members ->
-                    Type.Union (List.map (replaceType type_ with) members)
+                Type.Union name members ->
+                    Type.Union name (List.map (replaceType type_ with) members)
 
                 Type.FunctionSignature quotType ->
                     Type.FunctionSignature
@@ -553,7 +553,7 @@ unionOfTypeMatches whenBranches =
 
         flattenUnions t =
             case t of
-                Type.Union members ->
+                Type.Union _ members ->
                     List.concatMap flattenUnions members
 
                 _ ->
@@ -564,7 +564,7 @@ unionOfTypeMatches whenBranches =
             singleType
 
         _ ->
-            Type.Union uniqueTypes
+            Type.Union Nothing uniqueTypes
 
 
 replaceFirstType : Type -> FunctionType -> FunctionType
@@ -592,7 +592,7 @@ joinOutputs outputs result =
                                 lhs
 
                             else
-                                Type.Union [ lhs, rhs ]
+                                Type.Union Nothing [ lhs, rhs ]
             in
             joinOutputs (joined :: rest) result
 
@@ -1056,8 +1056,8 @@ tagGeneric idx type_ =
         Type.CustomGeneric name generics ->
             Type.CustomGeneric name (List.map (tagGeneric idx) generics)
 
-        Type.Union members ->
-            Type.Union (List.map (tagGeneric idx) members)
+        Type.Union name members ->
+            Type.Union name (List.map (tagGeneric idx) members)
 
         Type.FunctionSignature wt ->
             Type.FunctionSignature
@@ -1176,7 +1176,7 @@ compatibleTypes context typeA typeB =
 
             else
                 case ( boundA, boundB ) of
-                    ( Type.Union leftUnion, Type.Union rightUnion ) ->
+                    ( Type.Union _ leftUnion, Type.Union _ rightUnion ) ->
                         -- TODO: Requires unions to be sorted in same order
                         let
                             lengthTest =
@@ -1197,11 +1197,11 @@ compatibleTypes context typeA typeB =
                         , lengthTest && allMembersTest
                         )
 
-                    ( Type.Union _, _ ) ->
+                    ( Type.Union _ _, _ ) ->
                         -- Cannot go from union to concrete type
                         ( context, False )
 
-                    ( lhsType, Type.Union unionTypes ) ->
+                    ( lhsType, Type.Union _ unionTypes ) ->
                         List.map (compatibleTypes context lhsType) unionTypes
                             |> List.find Tuple.second
                             |> Maybe.withDefault ( context, False )
@@ -1390,8 +1390,8 @@ simplifyWordType ( context, wordType ) =
                                 Nothing ->
                                     type_
 
-                Type.Union members ->
-                    Type.Union (List.map reduceGenericName members)
+                Type.Union name members ->
+                    Type.Union name (List.map reduceGenericName members)
 
                 Type.CustomGeneric name members ->
                     Type.CustomGeneric name (List.map reduceGenericName members)
@@ -1419,12 +1419,12 @@ simplifyWordType ( context, wordType ) =
                             , Type.Generic newName :: acc
                             )
 
-                Type.Union members ->
+                Type.Union name members ->
                     let
                         ( newNextId, newSeenGenerics, newMembers ) =
                             List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
                     in
-                    ( newNextId, newSeenGenerics, Type.Union newMembers :: acc )
+                    ( newNextId, newSeenGenerics, Type.Union name newMembers :: acc )
 
                 Type.CustomGeneric name members ->
                     let
@@ -1512,8 +1512,9 @@ untypedToTypedNode idx context untypedNode =
                                             t
                             in
                             case boundType of
-                                Type.Union members ->
-                                    Type.Union (List.map replaceGenericWithBoundValue members)
+                                Type.Union unionName members ->
+                                    Type.Union unionName <|
+                                        List.map replaceGenericWithBoundValue members
 
                                 _ ->
                                     boundType

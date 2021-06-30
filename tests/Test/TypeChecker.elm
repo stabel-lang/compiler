@@ -393,7 +393,7 @@ suite =
                                     emptyRange
                                     [ "a" ]
                                     [ ( "head", Type.Generic "a" )
-                                    , ( "rest", Type.Union listUnion )
+                                    , ( "rest", Type.Union (Just "List") listUnion )
                                     ]
                                 , QAST.CustomTypeDef "Empty" True emptyRange [] []
                                 ]
@@ -428,7 +428,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union listUnion
+                                                [ Type.Union (Just "List") listUnion
                                                 , Type.Generic "b"
                                                 , Type.FunctionSignature
                                                     { input =
@@ -802,7 +802,7 @@ suite =
                 \_ ->
                     let
                         maybeUnion genericName =
-                            Type.Union
+                            Type.Union (Just "Maybe")
                                 [ Type.Generic genericName
                                 , Type.Custom "Nil"
                                 ]
@@ -881,7 +881,7 @@ suite =
                 \_ ->
                     let
                         listUnion =
-                            Type.Union
+                            Type.Union (Just "List")
                                 [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                                 , Type.Custom "EmptyList"
                                 ]

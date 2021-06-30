@@ -169,15 +169,15 @@ resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ _ _ members) ->
-                    Type.Union members
+                Just (UnionTypeDef name _ _ _ members) ->
+                    Type.Union (Just name) members
 
                 _ ->
                     type_
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef _ _ _ generics members) ->
+                Just (UnionTypeDef name _ _ generics members) ->
                     let
                         genericsMap =
                             List.map2 Tuple.pair generics types
@@ -196,7 +196,7 @@ resolveUnion typeDefs type_ =
                                 _ ->
                                     t
                     in
-                    Type.Union (List.map rebindGenerics members)
+                    Type.Union (Just name) (List.map rebindGenerics members)
 
                 _ ->
                     type_
@@ -321,7 +321,7 @@ qualifyMemberType config modRefs range type_ =
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
                 ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union memberTypes
+                    Ok <| Type.Union (Just qualifiedName) memberTypes
 
                 ( Just (UnionTypeDef _ False _ _ _), _ ) ->
                     Err <| TypeNotExposed range qualifiedName
@@ -429,7 +429,7 @@ qualifyMemberType config modRefs range type_ =
                     Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
 
                 ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union memberTypes
+                    Ok <| Type.Union (Just qualifiedName) memberTypes
 
                 ( Just (UnionTypeDef _ False _ _ _), _ ) ->
                     Err <| TypeNotExposed range qualifiedName
@@ -717,7 +717,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
 
                 Just (UnionTypeDef _ True _ _ types) ->
                     if List.isEmpty patterns then
-                        Ok <| TypeMatch range (Type.Union types) []
+                        Ok <| TypeMatch range (Type.Union (Just name) types) []
 
                     else
                         Err <| UnionTypeMatchWithPatterns range

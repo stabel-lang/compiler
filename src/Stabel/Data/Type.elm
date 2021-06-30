@@ -20,7 +20,7 @@ type Type
     | Generic String
     | Custom String
     | CustomGeneric String (List Type)
-    | Union (List Type)
+    | Union (Maybe String) (List Type)
     | FunctionSignature FunctionType
     | StackRange String
 
@@ -69,7 +69,7 @@ referencedGenerics t =
                 |> List.map referencedGenerics
                 |> List.foldl Set.union Set.empty
 
-        Union members ->
+        Union _ members ->
             members
                 |> List.map referencedGenerics
                 |> List.foldl Set.union Set.empty
@@ -100,7 +100,7 @@ sameCategory lhs rhs =
         ( FunctionSignature _, FunctionSignature _ ) ->
             True
 
-        ( Union _, Union _ ) ->
+        ( Union _ _, Union _ _ ) ->
             True
 
         _ ->
@@ -122,11 +122,14 @@ toString t =
         CustomGeneric name _ ->
             name ++ "_Custom"
 
-        Union _ ->
+        Union (Just name) _ ->
+            name ++ "_Union"
+
+        Union Nothing _ ->
             "Union"
 
         FunctionSignature _ ->
-            "function"
+            "Function"
 
         StackRange name ->
             name ++ "..."
@@ -147,7 +150,10 @@ toDisplayString t =
         CustomGeneric name _ ->
             name
 
-        Union members ->
+        Union (Just name) _ ->
+            name
+
+        Union Nothing members ->
             let
                 memberString =
                     members
@@ -294,7 +300,7 @@ compatibleTypeLists annotated inferred rangeDict =
             else
                 ( rangeDict, False )
 
-        ( (Union lMembers) :: annotatedRest, (Union rMembers) :: inferredRest ) ->
+        ( (Union _ lMembers) :: annotatedRest, (Union _ rMembers) :: inferredRest ) ->
             let
                 lSet =
                     Set.fromList (List.map toString lMembers)
@@ -321,10 +327,10 @@ compatibleTypeLists annotated inferred rangeDict =
                 _ ->
                     ( rangeDict, False )
 
-        ( (Union _) :: _, _ ) ->
+        ( (Union _ _) :: _, _ ) ->
             ( rangeDict, False )
 
-        ( _, (Union _) :: _ ) ->
+        ( _, (Union _ _) :: _ ) ->
             ( rangeDict, False )
 
         ( annotatedEl :: annotatedRest, inferredEl :: inferredRest ) ->

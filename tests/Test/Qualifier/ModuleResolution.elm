@@ -173,7 +173,7 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Custom "mod/Tipe"
                                                 , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
-                                                , Type.Union
+                                                , Type.Union (Just "mod/TipeUnion")
                                                     [ Type.Custom "mod/Tipe"
                                                     , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
@@ -247,7 +247,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union
+                                                [ Type.Union (Just "mod/TipeUnion")
                                                     [ Type.Custom "mod/Tipe"
                                                     , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
@@ -482,7 +482,7 @@ suite =
                                             |> Metadata.withType
                                                 [ Type.Custom "/external/package/mod/Tipe"
                                                 , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
-                                                , Type.Union
+                                                , Type.Union (Just "/external/package/mod/TipeUnion")
                                                     [ Type.Custom "/external/package/mod/Tipe"
                                                     , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
@@ -556,7 +556,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union
+                                                [ Type.Union (Just "/external/package/mod/TipeUnion")
                                                     [ Type.Custom "/external/package/mod/Tipe"
                                                     , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]

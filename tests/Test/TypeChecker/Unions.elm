@@ -262,7 +262,7 @@ suite =
             \_ ->
                 let
                     listUnion =
-                        Type.Union
+                        Type.Union (Just "List")
                             [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
                             , Type.Custom "EmptyList"
                             ]
@@ -337,7 +337,7 @@ suite =
             \_ ->
                 let
                     maybeUnion =
-                        Type.Union
+                        Type.Union (Just "Maybe")
                             [ Type.Generic "a"
                             , Type.Custom "Nil"
                             ]
@@ -457,7 +457,13 @@ suite =
                                             , IntLiteral emptyRange 1
                                             , Word emptyRange
                                                 "with-default"
-                                                { input = [ Type.Union [ Type.Int, Type.Custom "Nil" ], Type.Int ]
+                                                { input =
+                                                    [ Type.Union (Just "Maybe")
+                                                        [ Type.Int
+                                                        , Type.Custom "Nil"
+                                                        ]
+                                                    , Type.Int
+                                                    ]
                                                 , output = [ Type.Int ]
                                                 }
                                             ]
@@ -496,7 +502,7 @@ suite =
 
 boolUnion : Type
 boolUnion =
-    Type.Union
+    Type.Union (Just "Bool")
         [ Type.Custom "True"
         , Type.Custom "False"
         ]

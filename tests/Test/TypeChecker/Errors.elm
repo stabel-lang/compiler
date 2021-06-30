@@ -207,7 +207,11 @@ suite =
                                         Metadata.default
                                             |> Metadata.withType
                                                 [ Type.Int ]
-                                                [ Type.Union [ Type.Generic "a", Type.Generic "b" ] ]
+                                                [ Type.Union Nothing
+                                                    [ Type.Generic "a"
+                                                    , Type.Generic "b"
+                                                    ]
+                                                ]
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
@@ -250,11 +254,26 @@ suite =
                             [ Problem.TypeError emptyRange
                                 "main"
                                 { input = [], output = [ Type.Generic "a" ] }
-                                { input = [], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
+                                { input = []
+                                , output =
+                                    [ Type.Union Nothing
+                                        [ Type.Generic "b", Type.Generic "a" ]
+                                    ]
+                                }
                             , Problem.TypeError emptyRange
                                 "true-or-false"
-                                { input = [ Type.Int ], output = [ Type.Union [ Type.Generic "b", Type.Generic "a" ] ] }
-                                { input = [ Type.Int ], output = [ Type.Union [ Type.Custom "False", Type.Custom "True" ] ] }
+                                { input = [ Type.Int ]
+                                , output =
+                                    [ Type.Union Nothing
+                                        [ Type.Generic "b", Type.Generic "a" ]
+                                    ]
+                                }
+                                { input = [ Type.Int ]
+                                , output =
+                                    [ Type.Union Nothing
+                                        [ Type.Custom "False", Type.Custom "True" ]
+                                    ]
+                                }
                             ]
                             errors
 
@@ -515,7 +534,7 @@ suite =
                 \_ ->
                     let
                         maybeUnion =
-                            Type.Union
+                            Type.Union (Just "Maybe")
                                 [ Type.Custom "IntBox"
                                 , Type.Custom "Nil"
                                 ]

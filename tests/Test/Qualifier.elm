@@ -660,7 +660,7 @@ suite =
             \_ ->
                 let
                     boolUnion =
-                        Type.Union
+                        Type.Union (Just "Bool")
                             [ Type.Custom "True"
                             , Type.Custom "False"
                             ]
@@ -768,6 +768,10 @@ suite =
                         [ Type.Custom "/stabel/test/some/module/Dollar"
                         , Type.Custom "/stabel/test/some/module/Cent"
                         ]
+
+                    qualifiedUsMoneyUnionType =
+                        Type.Union (Just "/stabel/test/some/module/USMoney")
+                            qualifiedUsMoneyUnion
 
                     unqualifiedAst =
                         { sourceReference = ""
@@ -891,8 +895,10 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union qualifiedUsMoneyUnion ]
-                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                                [ qualifiedUsMoneyUnionType
+                                                ]
+                                                [ qualifiedUsMoneyUnionType
+                                                ]
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
@@ -912,8 +918,8 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withType
-                                                [ Type.Union qualifiedUsMoneyUnion, Type.Union qualifiedUsMoneyUnion ]
-                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                                [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
+                                                [ qualifiedUsMoneyUnionType ]
                                   , implementation =
                                         SoloImpl
                                             [ Function emptyRange "/stabel/test/some/module/into-cents"
@@ -1008,6 +1014,10 @@ suite =
                         , Type.Custom "/stabel/test/some/module/Cent"
                         ]
 
+                    qualifiedUsMoneyUnionType =
+                        Type.Union (Just "/stabel/test/some/module/USMoney")
+                            qualifiedUsMoneyUnion
+
                     unqualifiedAst =
                         { sourceReference = ""
                         , moduleDefinition = ModuleDefinition.Undefined
@@ -1074,7 +1084,7 @@ suite =
                                     emptyRange
                                     []
                                     [ ( "user-id", Type.Int )
-                                    , ( "value", Type.Union qualifiedUsMoneyUnion )
+                                    , ( "value", qualifiedUsMoneyUnionType )
                                     ]
                                 ]
                         , functions =
@@ -1096,7 +1106,7 @@ suite =
                                 , { name = "/stabel/test/some/module/>Wallet"
                                   , metadata =
                                         Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int, Type.Union qualifiedUsMoneyUnion ]
+                                            |> Metadata.withVerifiedType [ Type.Int, qualifiedUsMoneyUnionType ]
                                                 [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
@@ -1135,7 +1145,7 @@ suite =
                                   , metadata =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet", Type.Union qualifiedUsMoneyUnion ]
+                                                [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
                                                 [ Type.Custom "/stabel/test/some/module/Wallet" ]
                                   , implementation =
                                         SoloImpl
@@ -1170,7 +1180,7 @@ suite =
                                         Metadata.default
                                             |> Metadata.withVerifiedType
                                                 [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                                [ Type.Union qualifiedUsMoneyUnion ]
+                                                [ qualifiedUsMoneyUnionType ]
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Wallet" "value" ]
