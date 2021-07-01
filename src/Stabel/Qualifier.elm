@@ -126,10 +126,10 @@ run config =
         allQualifiedTypes =
             Dict.union qualifiedTypes config.inProgressAST.types
 
-        ( functionErrors, qualifiedFunctions ) =
+        ( functionErrors, qualifiedFunctions, inlineFunctionNames ) =
             Dict.foldl
                 (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc)
-                ( [], Dict.empty )
+                ( [], Dict.empty, Set.empty )
                 config.ast.functions
     in
     case ( typeErrors, functionErrors ) of
@@ -137,7 +137,7 @@ run config =
             Ok
                 { types = qualifiedTypes
                 , functions = qualifiedFunctions
-                , referenceableFunctions = Set.empty
+                , referenceableFunctions = inlineFunctionNames
                 }
 
         _ ->
@@ -503,9 +503,9 @@ qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
-    -> ( List Problem, Dict String FunctionDefinition )
-    -> ( List Problem, Dict String FunctionDefinition )
-qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc, inlineFuncs ) =
     let
         ( whens, impl ) =
             case unqualifiedFunction.implementation of
@@ -523,7 +523,7 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
             , imports = Dict.union unqualifiedFunction.imports modDef.imports
             }
 
-        ( newFunctionsAfterWhens, qualifiedWhensResult ) =
+        ( newFunctionsAfterWhens, inlineFunctionNamesAfterWhens, qualifiedWhensResult ) =
             whens
                 |> List.foldr
                     (qualifyWhen
@@ -532,10 +532,10 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
                         unqualifiedFunction.name
                         moduleReferences
                     )
-                    ( acc, [] )
-                |> Tuple.mapSecond Result.combine
+                    ( acc, Set.empty, [] )
+                |> (\( a, b, c ) -> ( a, b, Result.combine c ))
 
-        ( newFunctionsAfterImpl, qualifiedImplementationResult ) =
+        implQualifyResult =
             initQualifyNode config unqualifiedFunction.name moduleReferences newFunctionsAfterWhens impl
 
         qualifiedMetadataResult =
@@ -543,8 +543,13 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
 
         qualifiedName =
             qualifyName config unqualifiedFunction.name
+
+        newInlineFuncs =
+            inlineFuncs
+                |> Set.union inlineFunctionNamesAfterWhens
+                |> Set.union implQualifyResult.inlineFunctionNames
     in
-    case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
+    case ( qualifiedWhensResult, implQualifyResult.qualifiedNodes, qualifiedMetadataResult ) of
         ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok ( typeSignature, exposed ) ) ->
             ( errors
             , Dict.insert qualifiedName
@@ -559,22 +564,26 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
                     else
                         MultiImpl qualifiedWhens qualifiedImplementation
                 }
-                newFunctionsAfterImpl
+                implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( Err whenError, _, _ ) ->
             ( whenError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( _, Err implError, _ ) ->
             ( implError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( _, _, Err metaError ) ->
             ( metaError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
 
@@ -650,31 +659,28 @@ qualifyWhen :
     -> String
     -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, result ) =
+    -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, inlineFunctionNames, result ) =
     let
-        ( newFunctions, qualifiedImplementationResult ) =
+        qualifyNodeResult =
             initQualifyNode config functionName modRefs qualifiedFunctions impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes modRefs typeMatch
     in
-    case ( qualifiedImplementationResult, qualifiedMatchResult ) of
+    ( qualifyNodeResult.qualifiedFunctions
+    , Set.union inlineFunctionNames qualifyNodeResult.inlineFunctionNames
+    , case ( qualifyNodeResult.qualifiedNodes, qualifiedMatchResult ) of
         ( Err err, _ ) ->
-            ( newFunctions
-            , Err err :: result
-            )
+            Err err :: result
 
         ( _, Err err ) ->
-            ( newFunctions
-            , Err err :: result
-            )
+            Err err :: result
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
-            ( newFunctions
-            , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
-            )
+            Ok ( qualifiedMatch, qualifiedImplementation ) :: result
+    )
 
 
 qualifyMatch :
@@ -855,19 +861,31 @@ initQualifyNode :
     -> ModuleReferences
     -> Dict String FunctionDefinition
     -> List Parser.AstNode
-    -> ( Dict String FunctionDefinition, Result Problem (List Node) )
+    -> QualifyNodeResult
 initQualifyNode config currentDefName modRefs qualifiedFunctions impl =
     List.foldr
         (qualifyNode config currentDefName modRefs)
         (initQualifyNodeAccumulator qualifiedFunctions)
         impl
-        |> (\acc -> ( acc.qualifiedFunctions, Result.combine acc.qualifiedNodes ))
+        |> (\acc ->
+                { qualifiedFunctions = acc.qualifiedFunctions
+                , qualifiedNodes = Result.combine acc.qualifiedNodes
+                , inlineFunctionNames = acc.inlineFunctionNames
+                }
+           )
 
 
 type alias QualifyNodeAccumulator =
     { availableInlineFuncId : Int
     , qualifiedFunctions : Dict String FunctionDefinition
     , qualifiedNodes : List (Result Problem Node)
+    , inlineFunctionNames : Set String
+    }
+
+
+type alias QualifyNodeResult =
+    { qualifiedFunctions : Dict String FunctionDefinition
+    , qualifiedNodes : Result Problem (List Node)
     , inlineFunctionNames : Set String
     }
 
@@ -1025,10 +1043,25 @@ qualifyNode config currentDefName modRefs node acc =
                     else
                         "inlinefn:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
 
-                ( newFunctionsAfterInline, qualifiedQuotImplResult ) =
+                qualifyNodeResult =
                     initQualifyNode config inlineFuncName modRefs acc.qualifiedFunctions quotImpl
             in
-            case qualifiedQuotImplResult of
+            case qualifyNodeResult.qualifiedNodes of
+                Ok [ Function _ qualifiedName ] ->
+                    { acc
+                        | qualifiedNodes =
+                            Ok (FunctionRef sourceLocation qualifiedName)
+                                :: acc.qualifiedNodes
+                        , qualifiedFunctions =
+                            Dict.union
+                                acc.qualifiedFunctions
+                                qualifyNodeResult.qualifiedFunctions
+                        , inlineFunctionNames =
+                            acc.inlineFunctionNames
+                                |> Set.union qualifyNodeResult.inlineFunctionNames
+                                |> Set.insert inlineFuncName
+                    }
+
                 Ok qualifiedQuotImpl ->
                     { acc
                         | availableInlineFuncId =
@@ -1041,12 +1074,17 @@ qualifyNode config currentDefName modRefs node acc =
                                 , isExposed = False
                                 , implementation = SoloImpl qualifiedQuotImpl
                                 }
-                                newFunctionsAfterInline
+                                (Dict.union
+                                    acc.qualifiedFunctions
+                                    qualifyNodeResult.qualifiedFunctions
+                                )
                         , qualifiedNodes =
                             Ok (FunctionRef sourceLocation inlineFuncName)
                                 :: acc.qualifiedNodes
                         , inlineFunctionNames =
-                            Set.insert inlineFuncName acc.inlineFunctionNames
+                            acc.inlineFunctionNames
+                                |> Set.union qualifyNodeResult.inlineFunctionNames
+                                |> Set.insert inlineFuncName
                     }
 
                 Err err ->
