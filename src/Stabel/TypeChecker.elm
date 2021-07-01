@@ -61,6 +61,7 @@ type alias Context =
     { types : Dict String TypeDefinition
     , typedWords : Dict String WordDefinition
     , untypedWords : Dict String Qualifier.FunctionDefinition
+    , referenceableFunctions : Set String
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
@@ -78,6 +79,7 @@ type alias LoadedQualifierAST a =
     { a
         | types : Dict String Qualifier.TypeDefinition
         , functions : Dict String Qualifier.FunctionDefinition
+        , referenceableFunctions : Set String
     }
 
 
@@ -87,12 +89,12 @@ initContext ast =
         concreteTypes =
             Dict.map
                 (\_ t ->
-                    case t of
-                        Qualifier.CustomTypeDef name _ range generics members ->
-                            CustomTypeDef name range generics members
+                    case t.members of
+                        Qualifier.StructMembers members ->
+                            CustomTypeDef t.name t.sourceLocation t.generics members
 
-                        Qualifier.UnionTypeDef name _ range generics memberTypes ->
-                            UnionTypeDef name range generics memberTypes
+                        Qualifier.UnionMembers members ->
+                            UnionTypeDef t.name t.sourceLocation t.generics members
                 )
                 ast.types
 
@@ -131,6 +133,7 @@ initContext ast =
     { types = concreteTypes
     , typedWords = Dict.empty
     , untypedWords = ast.functions
+    , referenceableFunctions = ast.referenceableFunctions
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
@@ -196,10 +199,10 @@ typeCheckSoloImplementation context untypedDef impl =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
                         , type_ =
-                            untypedDef.metadata.type_
+                            untypedDef.typeSignature
                                 |> TypeSignature.toMaybe
                                 |> Maybe.withDefault inferredType
-                        , metadata = untypedDef.metadata
+                        , metadata = metadataFromUntypedDef context untypedDef
                         , implementation = SoloImpl (untypedToTypedImplementation newContext impl)
                         }
                         newContext.typedWords
@@ -254,7 +257,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
-                |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.metadata.type_) whenTypes)
+                |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.typeSignature) whenTypes)
 
         replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
             case typeSignature.input of
@@ -343,7 +346,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> joinOutputs (List.map .output inferredWhenTypes)
 
         exposedType =
-            TypeSignature.toMaybe untypedDef.metadata.type_
+            TypeSignature.toMaybe untypedDef.typeSignature
                 |> Maybe.withDefault inferredType
 
         maybeConsistencyError =
@@ -354,14 +357,14 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 let
                     error =
                         InconsistentWhens
-                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                             untypedDef.name
                 in
                 Just error
 
         maybeInexhaustiveError =
             inexhaustivenessCheck
-                (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                 whenPatterns
 
         finalContext =
@@ -370,18 +373,33 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
                         , type_ = exposedType
-                        , metadata = untypedDef.metadata
+                        , metadata = metadataFromUntypedDef context untypedDef
                         , implementation =
                             MultiImpl
                                 (List.map (Tuple.mapBoth mapTypeMatch (untypedToTypedImplementation newContext)) initialWhens)
                                 (untypedToTypedImplementation newContext defaultImpl)
                         }
                         newContext.typedWords
-                , errors = List.filterMap identity [ maybeConsistencyError, maybeInexhaustiveError ] ++ newContext.errors
+                , errors =
+                    List.filterMap identity
+                        [ maybeConsistencyError
+                        , maybeInexhaustiveError
+                        ]
+                        ++ newContext.errors
             }
     in
     verifyTypeSignature inferredType untypedDef finalContext
         |> cleanContext
+
+
+metadataFromUntypedDef : Context -> Qualifier.FunctionDefinition -> Metadata
+metadataFromUntypedDef context def =
+    { isEntryPoint = False
+    , type_ = def.typeSignature
+    , isInline = Set.member def.name context.referenceableFunctions
+    , sourceLocationRange = def.sourceLocation
+    , isExposed = def.isExposed
+    }
 
 
 inferWhenTypes :
@@ -392,7 +410,7 @@ inferWhenTypes :
 inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
     let
         alteredTypeSignature =
-            case untypedDef.metadata.type_ of
+            case untypedDef.typeSignature of
                 TypeSignature.UserProvided wt ->
                     TypeSignature.UserProvided <|
                         case wt.input of
@@ -405,11 +423,8 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 x ->
                     x
 
-        metadata =
-            untypedDef.metadata
-
         alteredDef =
-            { untypedDef | metadata = { metadata | type_ = alteredTypeSignature } }
+            { untypedDef | typeSignature = alteredTypeSignature }
 
         ( inf, newCtx ) =
             typeCheckImplementation alteredDef im (cleanContext ctx)
@@ -703,7 +718,7 @@ typeCheckImplementation : Qualifier.FunctionDefinition -> List Qualifier.Node ->
 typeCheckImplementation untypedDef impl context =
     let
         startingStackEffects =
-            untypedDef.metadata.type_
+            untypedDef.typeSignature
                 |> TypeSignature.toMaybe
                 |> Maybe.map reverseWordType
                 |> Maybe.withDefault Type.emptyFunctionType
@@ -730,7 +745,7 @@ typeCheckImplementation untypedDef impl context =
             { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
 
         annotatedInput =
-            untypedDef.metadata.type_
+            untypedDef.typeSignature
                 |> TypeSignature.toMaybe
                 |> Maybe.map .input
                 |> Maybe.withDefault []
@@ -850,7 +865,7 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
 
 verifyTypeSignature : FunctionType -> Qualifier.FunctionDefinition -> Context -> Context
 verifyTypeSignature inferredType untypedDef context =
-    case TypeSignature.toMaybe untypedDef.metadata.type_ of
+    case TypeSignature.toMaybe untypedDef.typeSignature of
         Just annotatedType ->
             let
                 ( _, simplifiedAnnotatedType ) =
@@ -859,7 +874,7 @@ verifyTypeSignature inferredType untypedDef context =
             if not <| Type.compatibleFunctions simplifiedAnnotatedType inferredType then
                 let
                     range =
-                        untypedDef.metadata.sourceLocationRange
+                        untypedDef.sourceLocation
                             |> Maybe.withDefault SourceLocation.emptyRange
 
                     problem =
@@ -897,7 +912,7 @@ typeCheckNode idx node context =
                         Just untypedDef ->
                             if Set.member name context.callStack then
                                 -- recursive definition!
-                                case TypeSignature.toMaybe untypedDef.metadata.type_ of
+                                case TypeSignature.toMaybe untypedDef.typeSignature of
                                     Just annotatedType ->
                                         addStackEffect context <| wordTypeToStackEffects annotatedType
 
@@ -905,7 +920,7 @@ typeCheckNode idx node context =
                                         let
                                             problem =
                                                 MissingTypeAnnotationInRecursiveCallStack
-                                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                                                     untypedDef.name
                                         in
                                         { context | errors = problem :: context.errors }
@@ -1085,7 +1100,7 @@ wordTypeFromStackEffectsHelper untypedDef effects ( context, wordType ) =
     let
         problem expected actual =
             UnexpectedType
-                (Maybe.withDefault SourceLocation.emptyRange untypedDef.metadata.sourceLocationRange)
+                (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                 untypedDef.name
                 expected
                 actual
@@ -1523,7 +1538,7 @@ untypedToTypedNode idx context untypedNode =
 
                 Nothing ->
                     Dict.get name context.untypedWords
-                        |> Maybe.andThen (.metadata >> .type_ >> TypeSignature.toMaybe)
+                        |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
                         |> Word range name
 

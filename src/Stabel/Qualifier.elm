@@ -3,12 +3,12 @@ module Stabel.Qualifier exposing
     , FunctionDefinition
     , FunctionImplementation(..)
     , Node(..)
-    , TypeDefinition(..)
+    , TypeDefinition
+    , TypeDefinitionMembers(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
     , requiredModules
     , run
-    , typeDefinitionName
     )
 
 import Dict exposing (Dict)
@@ -16,10 +16,9 @@ import List.Extra as List
 import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
-import Stabel.Data.Metadata as Metadata exposing (Metadata)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
-import Stabel.Data.TypeSignature as TypeSignature
+import Stabel.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Stabel.Parser as Parser
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
@@ -30,19 +29,29 @@ import Stabel.Qualifier.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
+    , referenceableFunctions : Set String
     }
 
 
-type
-    TypeDefinition
-    -- TODO: Each branch here should take a record. Too many arguments.
-    = CustomTypeDef String Bool SourceLocationRange (List String) (List ( String, Type ))
-    | UnionTypeDef String Bool SourceLocationRange (List String) (List Type)
+type alias TypeDefinition =
+    { name : String
+    , exposed : Bool
+    , sourceLocation : SourceLocationRange
+    , generics : List String
+    , members : TypeDefinitionMembers
+    }
+
+
+type TypeDefinitionMembers
+    = StructMembers (List ( String, Type ))
+    | UnionMembers (List Type)
 
 
 type alias FunctionDefinition =
     { name : String
-    , metadata : Metadata
+    , sourceLocation : Maybe SourceLocationRange
+    , typeSignature : TypeSignature
+    , isExposed : Bool
     , implementation : FunctionImplementation
     }
 
@@ -108,20 +117,27 @@ run : RunConfig -> Result (List Problem) AST
 run config =
     let
         ( typeErrors, qualifiedTypes ) =
-            Dict.foldl (\_ val acc -> qualifyType config val acc) ( [], Dict.empty ) config.ast.types
+            Dict.foldl
+                (\_ val acc -> qualifyType config val acc)
+                ( [], Dict.empty )
+                config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
         allQualifiedTypes =
             Dict.union qualifiedTypes config.inProgressAST.types
 
         ( functionErrors, qualifiedFunctions ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.functions
+            Dict.foldl
+                (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc)
+                ( [], Dict.empty )
+                config.ast.functions
     in
     case ( typeErrors, functionErrors ) of
         ( [], [] ) ->
             Ok
                 { types = qualifiedTypes
                 , functions = qualifiedFunctions
+                , referenceableFunctions = Set.empty
                 }
 
         _ ->
@@ -156,47 +172,57 @@ moduleDefinition config =
 
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
-    case td of
-        CustomTypeDef exposed name range generics members ->
-            CustomTypeDef exposed name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+    { td
+        | members =
+            case td.members of
+                StructMembers members ->
+                    StructMembers (List.map (Tuple.mapSecond (resolveUnion qt)) members)
 
-        UnionTypeDef exposed name range generics memberTypes ->
-            UnionTypeDef exposed name range generics (List.map (resolveUnion qt) memberTypes)
+                UnionMembers members ->
+                    UnionMembers (List.map (resolveUnion qt) members)
+    }
 
 
 resolveUnion : Dict String TypeDefinition -> Type -> Type
 resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
-            case Dict.get typeName typeDefs of
-                Just (UnionTypeDef name _ _ _ members) ->
-                    Type.Union (Just name) members
+            case Maybe.map .members (Dict.get typeName typeDefs) of
+                Just (UnionMembers members) ->
+                    Type.Union (Just typeName) members
 
                 _ ->
                     type_
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef name _ _ generics members) ->
-                    let
-                        genericsMap =
-                            List.map2 Tuple.pair generics types
-                                |> Dict.fromList
+                Just result ->
+                    case result.members of
+                        UnionMembers members ->
+                            let
+                                genericsMap =
+                                    List.map2 Tuple.pair result.generics types
+                                        |> Dict.fromList
 
-                        rebindGenerics t =
-                            case t of
-                                Type.Generic val ->
-                                    Dict.get val genericsMap
-                                        |> Maybe.withDefault t
+                                rebindGenerics t =
+                                    case t of
+                                        Type.Generic val ->
+                                            Dict.get val genericsMap
+                                                |> Maybe.withDefault t
 
-                                Type.CustomGeneric cgName cgMembers ->
-                                    Type.CustomGeneric cgName <|
-                                        List.map rebindGenerics cgMembers
+                                        Type.CustomGeneric cgName cgMembers ->
+                                            Type.CustomGeneric cgName <|
+                                                List.map rebindGenerics cgMembers
 
-                                _ ->
-                                    t
-                    in
-                    Type.Union (Just name) (List.map rebindGenerics members)
+                                        _ ->
+                                            t
+                            in
+                            Type.Union
+                                (Just typeName)
+                                (List.map rebindGenerics members)
+
+                        _ ->
+                            type_
 
                 _ ->
                     type_
@@ -253,13 +279,12 @@ qualifyType config typeDef ( errors, acc ) =
                 Ok qualifiedMembers ->
                     ( errors
                     , Dict.insert qualifiedName
-                        (CustomTypeDef
-                            qualifiedName
-                            exposed
-                            typeDef.sourceLocation
-                            typeDef.generics
-                            qualifiedMembers
-                        )
+                        { name = qualifiedName
+                        , exposed = exposed
+                        , sourceLocation = typeDef.sourceLocation
+                        , generics = typeDef.generics
+                        , members = StructMembers qualifiedMembers
+                        }
                         acc
                     )
 
@@ -278,13 +303,12 @@ qualifyType config typeDef ( errors, acc ) =
                 Ok qualifiedMemberTypes ->
                     ( errors
                     , Dict.insert qualifiedName
-                        (UnionTypeDef
-                            qualifiedName
-                            exposed
-                            typeDef.sourceLocation
-                            typeDef.generics
-                            qualifiedMemberTypes
-                        )
+                        { name = qualifiedName
+                        , exposed = exposed
+                        , sourceLocation = typeDef.sourceLocation
+                        , generics = typeDef.generics
+                        , members = UnionMembers qualifiedMemberTypes
+                        }
                         acc
                     )
 
@@ -304,30 +328,45 @@ qualifyMemberType config modRefs range type_ =
                         ++ [ name ]
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
+            in
+            refLookup qualifiedName binds
 
+        refLookup name binds =
+            let
                 bindResult =
                     binds
                         |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
+
+                maybeType =
+                    Dict.get name config.inProgressAST.types
+
+                maybeMembers =
+                    Maybe.map .members maybeType
+
+                exposed =
+                    maybeType
+                        |> Maybe.map .exposed
+                        |> Maybe.withDefault False
             in
-            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
+            case ( exposed, maybeMembers, bindResult ) of
+                ( _, Nothing, _ ) ->
+                    Err <| UnknownTypeRef range name
 
-                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
-                    Ok <| Type.Custom qualifiedName
+                ( False, _, _ ) ->
+                    Err <| TypeNotExposed range name
 
-                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
-                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+                ( _, _, Err err ) ->
+                    Err err
 
-                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union (Just qualifiedName) memberTypes
+                ( True, Just (StructMembers []), _ ) ->
+                    Ok <| Type.Custom name
 
-                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
+                ( True, Just (StructMembers _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric name qualifiedBinds
 
-                _ ->
-                    Err <| UnknownTypeRef range qualifiedName
+                ( True, Just (UnionMembers members), _ ) ->
+                    Ok <| Type.Union (Just name) members
 
         importsLookup name binds =
             case resolveImportedType config modRefs name of
@@ -412,30 +451,8 @@ qualifyMemberType config modRefs range type_ =
                     Dict.get pathString config.externalModules
                         |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
                         |> Maybe.withDefault ""
-
-                bindResult =
-                    binds
-                        |> List.map (qualifyMemberType config modRefs range)
-                        |> Result.combine
             in
-            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
-
-                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
-                    Ok <| Type.Custom qualifiedName
-
-                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
-                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
-
-                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union (Just qualifiedName) memberTypes
-
-                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
-
-                _ ->
-                    Err <| UnknownTypeRef range qualifiedName
+            refLookup qualifiedName binds
 
         Parser.Generic sym ->
             Ok (Type.Generic sym)
@@ -528,11 +545,13 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
             qualifyName config unqualifiedFunction.name
     in
     case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
-        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
+        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok ( typeSignature, exposed ) ) ->
             ( errors
             , Dict.insert qualifiedName
                 { name = qualifiedName
-                , metadata = qualifiedMetadata
+                , sourceLocation = unqualifiedFunction.sourceLocationRange
+                , typeSignature = typeSignature
+                , isExposed = exposed
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -563,7 +582,7 @@ qualifyMetadata :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
-    -> Result Problem Metadata
+    -> Result Problem ( TypeSignature, Bool )
 qualifyMetadata config qualifiedTypes function =
     let
         functionRange =
@@ -606,21 +625,15 @@ qualifyMetadata config qualifiedTypes function =
 
                             AssociatedFunctionSignature.Verified _ ->
                                 TypeSignature.CompilerProvided functionType
-
-                    baseMeta =
-                        Metadata.default
                 in
-                { baseMeta
-                    | type_ =
-                        TypeSignature.map (resolveUnions qualifiedTypes) ts
-                    , isExposed =
-                        case config.ast.moduleDefinition of
-                            ModuleDefinition.Undefined ->
-                                True
+                ( TypeSignature.map (resolveUnions qualifiedTypes) ts
+                , case config.ast.moduleDefinition of
+                    ModuleDefinition.Undefined ->
+                        True
 
-                            ModuleDefinition.Defined def ->
-                                Set.member function.name def.exposes
-                }
+                    ModuleDefinition.Defined def ->
+                        Set.member function.name def.exposes
+                )
             )
 
 
@@ -674,53 +687,55 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ False _ _ _) ->
-                    Err <| TypeNotExposed range name
-
-                Just (CustomTypeDef _ True _ gens members) ->
-                    let
-                        memberNames =
-                            members
-                                |> List.map Tuple.first
-                                |> Set.fromList
-
-                        qualifiedPatternsResult =
-                            patterns
-                                |> List.map
-                                    (qualifyMatchValue
-                                        config
-                                        qualifiedTypes
-                                        modRefs
-                                        range
-                                        name
-                                        memberNames
-                                    )
-                                |> Result.combine
-
-                        actualType =
-                            case gens of
-                                [] ->
-                                    Type.Custom name
-
-                                _ ->
-                                    Type.CustomGeneric name (List.map Type.Generic gens)
-                    in
-                    case qualifiedPatternsResult of
-                        Ok qualifiedPatterns ->
-                            Ok <| TypeMatch range actualType qualifiedPatterns
-
-                        Err err ->
-                            Err err
-
-                Just (UnionTypeDef _ False _ _ _) ->
-                    Err <| TypeNotExposed range name
-
-                Just (UnionTypeDef _ True _ _ types) ->
-                    if List.isEmpty patterns then
-                        Ok <| TypeMatch range (Type.Union (Just name) types) []
+                Just typeDef ->
+                    if not typeDef.exposed then
+                        Err <| TypeNotExposed range name
 
                     else
-                        Err <| UnionTypeMatchWithPatterns range
+                        case typeDef.members of
+                            StructMembers members ->
+                                let
+                                    memberNames =
+                                        members
+                                            |> List.map Tuple.first
+                                            |> Set.fromList
+
+                                    qualifiedPatternsResult =
+                                        patterns
+                                            |> List.map
+                                                (qualifyMatchValue
+                                                    config
+                                                    qualifiedTypes
+                                                    modRefs
+                                                    range
+                                                    name
+                                                    memberNames
+                                                )
+                                            |> Result.combine
+
+                                    actualType =
+                                        case typeDef.generics of
+                                            [] ->
+                                                Type.Custom name
+
+                                            _ ->
+                                                Type.CustomGeneric
+                                                    name
+                                                    (List.map Type.Generic typeDef.generics)
+                                in
+                                case qualifiedPatternsResult of
+                                    Ok qualifiedPatterns ->
+                                        Ok <| TypeMatch range actualType qualifiedPatterns
+
+                                    Err err ->
+                                        Err err
+
+                            UnionMembers types ->
+                                if List.isEmpty patterns then
+                                    Ok <| TypeMatch range (Type.Union (Just name) types) []
+
+                                else
+                                    Err <| UnionTypeMatchWithPatterns range
 
                 Nothing ->
                     Err <| UnknownTypeRef range name
@@ -853,6 +868,7 @@ type alias QualifyNodeAccumulator =
     { availableInlineFuncId : Int
     , qualifiedFunctions : Dict String FunctionDefinition
     , qualifiedNodes : List (Result Problem Node)
+    , inlineFunctionNames : Set String
     }
 
 
@@ -861,6 +877,7 @@ initQualifyNodeAccumulator qualifiedFunctions =
     { availableInlineFuncId = 1
     , qualifiedFunctions = qualifiedFunctions
     , qualifiedNodes = []
+    , inlineFunctionNames = Set.empty
     }
 
 
@@ -953,7 +970,7 @@ qualifyNode config currentDefName modRefs node acc =
                         { acc | qualifiedNodes = Err (UnknownFunctionRef loc qualifiedName) :: acc.qualifiedNodes }
 
                     Just function ->
-                        if function.metadata.isExposed then
+                        if function.isExposed then
                             { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
 
                         else
@@ -984,7 +1001,7 @@ qualifyNode config currentDefName modRefs node acc =
                             { acc | qualifiedNodes = Err (UnknownFunctionRef loc fullReference) :: acc.qualifiedNodes }
 
                         Just def ->
-                            if def.metadata.isExposed then
+                            if def.isExposed then
                                 { acc | qualifiedNodes = Ok (Function loc fullReference) :: acc.qualifiedNodes }
 
                             else
@@ -1014,31 +1031,26 @@ qualifyNode config currentDefName modRefs node acc =
             case qualifiedQuotImplResult of
                 Ok qualifiedQuotImpl ->
                     { acc
-                        | availableInlineFuncId = acc.availableInlineFuncId + 1
+                        | availableInlineFuncId =
+                            acc.availableInlineFuncId + 1
                         , qualifiedFunctions =
                             Dict.insert inlineFuncName
                                 { name = inlineFuncName
-                                , metadata =
-                                    Metadata.default
-                                        |> Metadata.isInline
+                                , sourceLocation = Nothing
+                                , typeSignature = TypeSignature.NotProvided
+                                , isExposed = False
                                 , implementation = SoloImpl qualifiedQuotImpl
                                 }
                                 newFunctionsAfterInline
-                        , qualifiedNodes = Ok (FunctionRef sourceLocation inlineFuncName) :: acc.qualifiedNodes
+                        , qualifiedNodes =
+                            Ok (FunctionRef sourceLocation inlineFuncName)
+                                :: acc.qualifiedNodes
+                        , inlineFunctionNames =
+                            Set.insert inlineFuncName acc.inlineFunctionNames
                     }
 
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
-
-
-typeDefinitionName : TypeDefinition -> String
-typeDefinitionName typeDef =
-    case typeDef of
-        CustomTypeDef name _ _ _ _ ->
-            name
-
-        UnionTypeDef name _ _ _ _ ->
-            name
 
 
 qualifyName : RunConfig -> String -> String
