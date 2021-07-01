@@ -19,9 +19,8 @@ type alias AST =
     }
 
 
-type TypeDefinition
-    = CustomTypeDef String SourceLocationRange (List String) (List ( String, Type ))
-    | UnionTypeDef String SourceLocationRange (List String) (List Type)
+type alias TypeDefinition =
+    Qualifier.TypeDefinition
 
 
 type alias WordDefinition =
@@ -86,18 +85,6 @@ type alias LoadedQualifierAST a =
 initContext : LoadedQualifierAST a -> Context
 initContext ast =
     let
-        concreteTypes =
-            Dict.map
-                (\_ t ->
-                    case t.members of
-                        Qualifier.StructMembers members ->
-                            CustomTypeDef t.name t.sourceLocation t.generics members
-
-                        Qualifier.UnionMembers members ->
-                            UnionTypeDef t.name t.sourceLocation t.generics members
-                )
-                ast.types
-
         genericErrors t =
             let
                 collectReferencedGenerics memberTypes =
@@ -110,27 +97,27 @@ initContext ast =
                         |> List.filter (\gen -> not (Set.member gen listedGenerics))
                         |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
             in
-            case t of
-                CustomTypeDef _ range generics members ->
+            case t.members of
+                Qualifier.StructMembers members ->
                     let
                         listedGenerics_ =
-                            Set.fromList generics
+                            Set.fromList t.generics
                     in
                     members
                         |> List.map Tuple.second
                         |> collectReferencedGenerics
-                        |> collectUndeclaredGenericProblems range listedGenerics_
+                        |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
 
-                UnionTypeDef _ range generics mts ->
+                Qualifier.UnionMembers mts ->
                     let
                         listedGenerics_ =
-                            Set.fromList generics
+                            Set.fromList t.generics
                     in
                     mts
                         |> collectReferencedGenerics
-                        |> collectUndeclaredGenericProblems range listedGenerics_
+                        |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
     in
-    { types = concreteTypes
+    { types = ast.types
     , typedWords = Dict.empty
     , untypedWords = ast.functions
     , referenceableFunctions = ast.referenceableFunctions
@@ -138,7 +125,7 @@ initContext ast =
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
     , callStack = Set.empty
-    , errors = List.concatMap genericErrors (Dict.values concreteTypes)
+    , errors = List.concatMap genericErrors (Dict.values ast.types)
     }
 
 
@@ -960,8 +947,8 @@ typeCheckNode idx node context =
                     Debug.todo "inconcievable!"
 
         Qualifier.ConstructType typeName ->
-            case Dict.get typeName context.types of
-                Just (CustomTypeDef _ _ _ members) ->
+            case getMembers typeName context.types of
+                Just (Qualifier.StructMembers members) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -988,11 +975,11 @@ typeCheckNode idx node context =
 
         Qualifier.SetMember typeName memberName ->
             case
-                ( Dict.get typeName context.types
+                ( getMembers typeName context.types
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ _ _ members), Just memberType ) ->
+                ( Just (Qualifier.StructMembers members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -1019,11 +1006,11 @@ typeCheckNode idx node context =
 
         Qualifier.GetMember typeName memberName ->
             case
-                ( Dict.get typeName context.types
+                ( getMembers typeName context.types
                 , getMemberType context.types typeName memberName
                 )
             of
-                ( Just (CustomTypeDef _ _ _ members), Just memberType ) ->
+                ( Just (Qualifier.StructMembers members), Just memberType ) ->
                     let
                         memberTypes =
                             List.map Tuple.second members
@@ -1050,6 +1037,12 @@ typeCheckNode idx node context =
 
         Qualifier.Builtin _ builtin ->
             addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
+
+
+getMembers : String -> Dict String TypeDefinition -> Maybe Qualifier.TypeDefinitionMembers
+getMembers typeName types =
+    Dict.get typeName types
+        |> Maybe.map .members
 
 
 tagGenericEffect : Int -> StackEffect -> StackEffect
@@ -1570,20 +1563,10 @@ untypedToTypedNode idx context untypedNode =
 
 getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
 getMemberType typeDict typeName memberName =
-    case Dict.get typeName typeDict of
-        Just (CustomTypeDef _ _ _ members) ->
+    case getMembers typeName typeDict of
+        Just (Qualifier.StructMembers members) ->
             List.find (\( name, _ ) -> name == memberName) members
                 |> Maybe.map Tuple.second
 
         _ ->
             Nothing
-
-
-typeDefName : TypeDefinition -> String
-typeDefName typeDef =
-    case typeDef of
-        CustomTypeDef name _ _ _ ->
-            name
-
-        UnionTypeDef name _ _ _ ->
-            name
