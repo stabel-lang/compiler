@@ -51,7 +51,7 @@ type alias FunctionDefinition =
     { name : String
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : TypeSignature
-    , isExposed : Bool
+    , exposed : Bool
     , implementation : FunctionImplementation
     }
 
@@ -556,7 +556,7 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc, inlin
                 { name = qualifiedName
                 , sourceLocation = unqualifiedFunction.sourceLocationRange
                 , typeSignature = typeSignature
-                , isExposed = exposed
+                , exposed = exposed
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -988,7 +988,7 @@ qualifyNode config currentDefName modRefs node acc =
                         { acc | qualifiedNodes = Err (UnknownFunctionRef loc qualifiedName) :: acc.qualifiedNodes }
 
                     Just function ->
-                        if function.isExposed then
+                        if function.exposed then
                             { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
 
                         else
@@ -1019,7 +1019,7 @@ qualifyNode config currentDefName modRefs node acc =
                             { acc | qualifiedNodes = Err (UnknownFunctionRef loc fullReference) :: acc.qualifiedNodes }
 
                         Just def ->
-                            if def.isExposed then
+                            if def.exposed then
                                 { acc | qualifiedNodes = Ok (Function loc fullReference) :: acc.qualifiedNodes }
 
                             else
@@ -1071,7 +1071,7 @@ qualifyNode config currentDefName modRefs node acc =
                                 { name = inlineFuncName
                                 , sourceLocation = Nothing
                                 , typeSignature = TypeSignature.NotProvided
-                                , isExposed = False
+                                , exposed = False
                                 , implementation = SoloImpl qualifiedQuotImpl
                                 }
                                 (Dict.union

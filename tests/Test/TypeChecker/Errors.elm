@@ -3,10 +3,11 @@ module Test.TypeChecker.Errors exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Set
 import Stabel.Data.Builtin as Builtin
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Qualifier exposing (..)
 import Stabel.TypeChecker as TypeChecker
 import Stabel.TypeChecker.Problem as Problem
@@ -21,25 +22,27 @@ suite =
                 let
                     ast =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ CustomTypeDef "Box"
-                                    False
-                                    emptyRange
-                                    [ "a" ]
-                                    [ ( "value", Type.Generic "b" ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Box"
+                                  , exposed = False
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members = StructMembers [ ( "value", Type.Generic "b" ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     undeclaredGenericError generic problem =
@@ -59,10 +62,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -70,6 +76,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     undeclaredGenericError problem =
@@ -87,20 +94,25 @@ suite =
                 let
                     ast =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ CustomTypeDef "IntBox"
-                                    False
-                                    emptyRange
-                                    []
-                                    [ ( "value", Type.Int ) ]
+                            Dict.fromListBy .name
+                                [ { name = "IntBox"
+                                  , exposed = False
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers [ ( "value", Type.Int ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -108,30 +120,43 @@ suite =
                                             ]
                                   }
                                 , { name = ">IntBox"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "IntBox" ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "IntBox" ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ ConstructType "IntBox" ]
                                   }
                                 , { name = ">value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "IntBox", Type.Int ] [ Type.Custom "IntBox" ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "IntBox", Type.Int ]
+                                            , output = [ Type.Custom "IntBox" ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "IntBox" "value" ]
                                   }
                                 , { name = "value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "IntBox" ] [ Type.Int ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "IntBox" ]
+                                            , output = [ Type.Int ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "IntBox" "value" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     undeclaredGenericError problem =
@@ -151,10 +176,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Generic "in" ] [ Type.Generic "out" ]
-                                            |> Metadata.asEntryPoint
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Generic "in" ]
+                                            , output = [ Type.Generic "out" ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -162,6 +190,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     typeError problem =
@@ -178,24 +207,40 @@ suite =
                 let
                     ast =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    False
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" False emptyRange [] []
-                                , CustomTypeDef "False" False emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = False
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = False
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = False
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Generic "out" ]
-                                            |> Metadata.asEntryPoint
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Generic "out" ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 0
@@ -203,15 +248,18 @@ suite =
                                             ]
                                   }
                                 , { name = "true-or-false"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Int ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Int ]
+                                            , output =
                                                 [ Type.Union Nothing
                                                     [ Type.Generic "a"
                                                     , Type.Generic "b"
                                                     ]
                                                 ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int [ ( "value", LiteralInt 0 ) ]
@@ -228,24 +276,36 @@ suite =
                                             []
                                   }
                                 , { name = ">True"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "True" ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = []
+                                            , output =
+                                                [ Type.Custom "True"
+                                                ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ ConstructType "True"
                                             ]
                                   }
                                 , { name = ">False"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Custom "False" ]
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = []
+                                            , output =
+                                                [ Type.Custom "False" ]
+                                            }
+                                  , exposed = False
                                   , implementation =
                                         SoloImpl
                                             [ ConstructType "False"
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 case TypeChecker.run ast of
@@ -288,9 +348,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
@@ -298,7 +358,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "mword"
-                                      , metadata = Metadata.default
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
@@ -310,6 +372,7 @@ suite =
                                                 []
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
 
                         inexhaustiveError problem =
@@ -329,9 +392,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
@@ -339,7 +402,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "mword"
-                                      , metadata = Metadata.default
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
@@ -353,6 +418,7 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                     in
                     case TypeChecker.run ast of
@@ -366,20 +432,26 @@ suite =
                     let
                         ast =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ CustomTypeDef "IntBox"
-                                        False
-                                        emptyRange
-                                        []
-                                        [ ( "value", Type.Int ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "IntBox"
+                                      , exposed = False
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            StructMembers
+                                                [ ( "value", Type.Int ) ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
-                                                |> Metadata.withType [] [ Type.Int ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input = []
+                                                , output = [ Type.Int ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -389,7 +461,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "mword"
-                                      , metadata = Metadata.default
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange
@@ -409,30 +483,43 @@ suite =
                                                 []
                                       }
                                     , { name = ">IntBox"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "IntBox" ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Int ]
+                                                , output = [ Type.Custom "IntBox" ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ ConstructType "IntBox" ]
                                       }
                                     , { name = ">value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox", Type.Int ] [ Type.Custom "IntBox" ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Custom "IntBox", Type.Int ]
+                                                , output = [ Type.Custom "IntBox" ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ SetMember "IntBox" "value" ]
                                       }
                                     , { name = "value>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox" ] [ Type.Int ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Custom "IntBox" ]
+                                                , output = [ Type.Int ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ GetMember "IntBox" "value" ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
 
                         inexhaustiveError problem =
@@ -452,9 +539,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
@@ -462,7 +549,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "mword"
-                                      , metadata = Metadata.default
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange Type.Int [ ( "value>", LiteralInt 1 ) ]
@@ -479,6 +568,7 @@ suite =
                                                 []
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                     in
                     case TypeChecker.run ast of
@@ -495,9 +585,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 2
@@ -505,7 +595,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "mword"
-                                      , metadata = Metadata.default
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange Type.Int []
@@ -522,6 +614,7 @@ suite =
                                                 []
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                     in
                     case TypeChecker.run ast of
@@ -541,62 +634,92 @@ suite =
 
                         input =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Maybe"
-                                        False
-                                        emptyRange
-                                        [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nil"
-                                        ]
-                                    , CustomTypeDef "IntBox"
-                                        False
-                                        emptyRange
-                                        []
-                                        [ ( "value", Type.Int ) ]
-                                    , CustomTypeDef "Nil" False emptyRange [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , exposed = False
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            UnionMembers
+                                                [ Type.Generic "a"
+                                                , Type.Custom "Nil"
+                                                ]
+                                      }
+                                    , { name = "IntBox"
+                                      , exposed = False
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            StructMembers
+                                                [ ( "value", Type.Int ) ]
+                                      }
+                                    , { name = "Nil"
+                                      , exposed = False
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = ">Nil"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [] [ Type.Custom "Nil" ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = []
+                                                , output = [ Type.Custom "Nil" ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ ConstructType "Nil"
                                                 ]
                                       }
                                     , { name = ">IntBox"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "IntBox" ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Int ]
+                                                , output = [ Type.Custom "IntBox" ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ ConstructType "IntBox" ]
                                       }
                                     , { name = ">value"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox", Type.Int ] [ Type.Custom "IntBox" ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Custom "IntBox", Type.Int ]
+                                                , output = [ Type.Custom "IntBox" ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ SetMember "IntBox" "value" ]
                                       }
                                     , { name = "value>"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withVerifiedType [ Type.Custom "IntBox" ] [ Type.Int ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ Type.Custom "IntBox" ]
+                                                , output = [ Type.Int ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ GetMember "IntBox" "value" ]
                                       }
                                     , { name = "with-default"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
-                                                    [ maybeUnion, Type.Int ]
-                                                    [ Type.Int ]
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.CompilerProvided
+                                                { input = [ maybeUnion, Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
+                                      , exposed = False
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange
@@ -619,9 +742,9 @@ suite =
                                                 []
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
+                                      , exposed = False
                                       , implementation =
                                             SoloImpl
                                                 [ Function emptyRange ">Nil"
@@ -630,6 +753,7 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
 
                         inexhaustiveError problem =

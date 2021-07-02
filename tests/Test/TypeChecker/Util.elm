@@ -22,7 +22,7 @@ expectTypeCheck input =
 expectTypeCheckFailure : QAST.AST -> Expectation
 expectTypeCheckFailure input =
     case run input of
-        Err err ->
+        Err _ ->
             Expect.pass
 
         Ok _ ->

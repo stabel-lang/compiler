@@ -385,7 +385,7 @@ metadataFromUntypedDef context def =
     , type_ = def.typeSignature
     , isInline = Set.member def.name context.referenceableFunctions
     , sourceLocationRange = def.sourceLocation
-    , isExposed = def.isExposed
+    , isExposed = def.exposed
     }
 
 
