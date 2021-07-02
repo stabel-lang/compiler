@@ -227,20 +227,17 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
         maybeBox ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
-                ( _, Type.Union members ) ->
-                    case List.find (\( t, _ ) -> t == leftType) (unionBoxMap members) of
-                        Just ( _, id ) ->
-                            Just (Box idx id)
-
-                        Nothing ->
-                            Nothing
+                ( _, Type.Union _ members ) ->
+                    List.find (\( t, _ ) -> t == leftType) (unionBoxMap members)
+                        |> Maybe.map Tuple.second
+                        |> Maybe.map (Box idx)
 
                 _ ->
                     Nothing
 
         maybeBoxLeadingElement =
             case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
-                ( Just _, True, Just (Type.Union _) ) ->
+                ( Just _, True, Just (Type.Union _ _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
 
@@ -341,7 +338,7 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
 
         createBoxMap t_ =
             case t_ of
-                Type.Union members ->
+                Type.Union _ members ->
                     unionBoxMap members
 
                 _ ->
