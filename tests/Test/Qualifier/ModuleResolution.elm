@@ -50,7 +50,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -58,6 +60,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -65,6 +68,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "internal/add" ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -105,7 +109,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int []
@@ -119,6 +125,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -126,6 +133,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "mod/add" ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -169,9 +177,11 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Custom "mod/Tipe"
                                                 , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
                                                 , Type.Union (Just "mod/TipeUnion")
@@ -179,7 +189,8 @@ suite =
                                                     , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
                                                 ]
-                                                []
+                                            , output = []
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Builtin emptyRange Builtin.StackDrop
@@ -188,6 +199,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -196,6 +208,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -245,15 +258,18 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Union (Just "mod/TipeUnion")
                                                     [ Type.Custom "mod/Tipe"
                                                     , Type.CustomGeneric "mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
                                                 ]
-                                                []
+                                            , output = []
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "mod/Tipe") []
@@ -272,6 +288,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -280,6 +297,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -307,16 +325,17 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "SomeType"
-                                  , CustomTypeDef "SomeType"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "tipe", Type.Custom "mod/Tipe" ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "SomeType"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers [ ( "tipe", Type.Custom "mod/Tipe" ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -325,6 +344,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -359,7 +379,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -367,6 +389,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -374,6 +397,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add" ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -414,7 +438,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange Type.Int []
@@ -428,6 +454,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -435,6 +462,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "/external/package/mod/add" ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -478,9 +506,11 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Custom "/external/package/mod/Tipe"
                                                 , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
                                                 , Type.Union (Just "/external/package/mod/TipeUnion")
@@ -488,7 +518,8 @@ suite =
                                                     , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
                                                 ]
-                                                []
+                                            , output = []
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Builtin emptyRange Builtin.StackDrop
@@ -497,6 +528,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -505,6 +537,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -554,15 +587,18 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Union (Just "/external/package/mod/TipeUnion")
                                                     [ Type.Custom "/external/package/mod/Tipe"
                                                     , Type.CustomGeneric "/external/package/mod/TipeGeneric" [ Type.Generic "a" ]
                                                     ]
                                                 ]
-                                                []
+                                            , output = []
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
@@ -581,6 +617,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -589,6 +626,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -616,16 +654,18 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "SomeType"
-                                  , CustomTypeDef "SomeType"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "SomeType"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "tipe", Type.Custom "/external/package/mod/Tipe" ) ]
+                                  }
                                 ]
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -634,6 +674,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -682,13 +723,15 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
-                                            |> Metadata.withType
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Custom "/external/package/mod/Tipe"
                                                 ]
-                                                [ Type.Custom "internal/mod/Tope" ]
+                                            , output = [ Type.Custom "internal/mod/Tope" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -697,6 +740,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -711,6 +755,7 @@ suite =
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -757,13 +802,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
-                                            |> Metadata.withType
-                                                [ Type.Custom "/external/package/mod/Tipe"
-                                                ]
-                                                [ Type.Custom "internal/mod/Tope" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "/external/package/mod/Tipe" ]
+                                            , output = [ Type.Custom "internal/mod/Tope" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -772,6 +817,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -786,6 +832,7 @@ suite =
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -832,9 +879,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
@@ -847,6 +894,7 @@ suite =
                                             [ Builtin emptyRange Builtin.StackDrop ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -857,6 +905,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -895,19 +944,20 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "Tepip"
-                                  , CustomTypeDef
-                                        "Tepip"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "first", Type.Custom "/external/package/mod/Tipe" )
-                                        , ( "second", Type.Custom "internal/mod/Tope" )
-                                        ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "Tepip"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "first", Type.Custom "/external/package/mod/Tipe" )
+                                            , ( "second", Type.Custom "internal/mod/Tope" )
+                                            ]
+                                  }
                                 ]
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -918,6 +968,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -966,12 +1017,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
-                                            |> Metadata.withType
-                                                [ Type.Custom "/external/package/mod/Tipe" ]
-                                                [ Type.Custom "internal/mod/Tope" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "/external/package/mod/Tipe" ]
+                                            , output = [ Type.Custom "internal/mod/Tope" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -980,6 +1032,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -994,6 +1047,7 @@ suite =
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1041,12 +1095,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
-                                            |> Metadata.withType
-                                                [ Type.Custom "/external/package/mod/Tipe" ]
-                                                [ Type.Custom "internal/mod/Tope" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "/external/package/mod/Tipe" ]
+                                            , output = [ Type.Custom "internal/mod/Tope" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -1055,6 +1110,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -1069,6 +1125,7 @@ suite =
                                 [ dummyWord "/external/package/mod/add"
                                 , dummyWord "internal/mod/value"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1107,19 +1164,20 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromList
-                                [ ( "Tepip"
-                                  , CustomTypeDef
-                                        "Tepip"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "first", Type.Custom "/external/package/mod/Tipe" )
-                                        , ( "second", Type.Custom "internal/mod/Tope" )
-                                        ]
-                                  )
+                            Dict.fromListBy .name
+                                [ { name = "Tepip"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "first", Type.Custom "/external/package/mod/Tipe" )
+                                            , ( "second", Type.Custom "internal/mod/Tope" )
+                                            ]
+                                  }
                                 ]
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -1130,6 +1188,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1178,9 +1237,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/external/package/mod/Tipe") []
@@ -1193,6 +1252,7 @@ suite =
                                             [ Builtin emptyRange Builtin.StackDrop ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     inProgressAst =
@@ -1203,6 +1263,7 @@ suite =
                                 |> List.concat
                                 |> Dict.fromList
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectExternalOutput
@@ -1250,7 +1311,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -1259,7 +1322,9 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
@@ -1268,6 +1333,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -1317,9 +1383,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isExposed False
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -1328,7 +1394,9 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
@@ -1337,6 +1405,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -1377,6 +1446,7 @@ suite =
                             Dict.fromList
                                 [ dummyWordUnexposed "internal/mod/value"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1436,6 +1506,7 @@ suite =
                             Dict.fromList
                                 [ dummyWordUnexposed "/external/package/mod/add"
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1489,6 +1560,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1535,6 +1607,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1589,6 +1662,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "/external/package/mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1642,6 +1716,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1686,6 +1761,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1738,6 +1814,7 @@ suite =
                             Dict.fromList <|
                                 dummyTypeUnexposed "mod/Tipe"
                         , functions = Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1785,6 +1862,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "/stabel/standard_library/core/over" ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1836,6 +1914,7 @@ suite =
                         , functions =
                             Dict.fromList
                                 [ dummyWord "/stabel/standard_library/core/over" ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     result =
@@ -1872,9 +1951,9 @@ dummyWordImpl : String -> Bool -> ( String, FunctionDefinition )
 dummyWordImpl name isExposed =
     ( name
     , { name = name
-      , metadata =
-            Metadata.default
-                |> Metadata.isExposed isExposed
+      , exposed = isExposed
+      , sourceLocation = Nothing
+      , typeSignature = TypeSignature.NotProvided
       , implementation =
             SoloImpl []
       }
@@ -1900,19 +1979,27 @@ dummyTypeImpl name isExposed =
         unionName =
             name ++ "Union"
     in
-    [ ( name
-      , CustomTypeDef name isExposed emptyRange [] []
-      )
-    , ( genericName
-      , CustomTypeDef genericName isExposed emptyRange [ "a" ] []
-      )
-    , ( unionName
-      , UnionTypeDef unionName
-            isExposed
-            emptyRange
-            []
-            [ Type.Custom name
-            , Type.CustomGeneric genericName [ Type.Generic "a" ]
-            ]
-      )
-    ]
+    List.map (\tipe -> ( tipe.name, tipe ))
+        [ { name = name
+          , exposed = isExposed
+          , sourceLocation = emptyRange
+          , generics = []
+          , members = StructMembers []
+          }
+        , { name = genericName
+          , exposed = isExposed
+          , sourceLocation = emptyRange
+          , generics = [ "a" ]
+          , members = StructMembers []
+          }
+        , { name = unionName
+          , exposed = isExposed
+          , sourceLocation = emptyRange
+          , generics = []
+          , members =
+                UnionMembers
+                    [ Type.Custom name
+                    , Type.CustomGeneric genericName [ Type.Generic "a" ]
+                    ]
+          }
+        ]
