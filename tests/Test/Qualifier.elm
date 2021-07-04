@@ -5,9 +5,9 @@ import Dict.Extra as Dict
 import Expect
 import Set
 import Stabel.Data.Builtin as Builtin
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
@@ -75,7 +75,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -83,7 +85,9 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -91,7 +95,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -103,6 +109,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -146,14 +153,17 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                                            , output =
                                                 [ Type.Generic "a"
                                                 , Type.Generic "b"
                                                 , Type.Generic "a"
                                                 ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Builtin emptyRange Builtin.StackSwap
@@ -162,6 +172,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -213,21 +224,36 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" True emptyRange [] []
-                                , CustomTypeDef "False" True emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
-                                  , metadata = Metadata.default
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "False") [], [ Integer emptyRange 0 ] )
@@ -236,6 +262,7 @@ suite =
                                             []
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -299,23 +326,28 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ Type.Int
                                                     , Type.FunctionSignature
                                                         { input = [ Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
                                                     ]
-                                                    [ Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
                                       , implementation =
                                             SoloImpl
                                                 [ Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -326,9 +358,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/2"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -336,15 +368,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inlinefn:main/2"
+                                    , "inlinefn:main/1"
                                     ]
                             }
                     in
@@ -391,7 +428,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -400,7 +439,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "inc"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -408,15 +449,18 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:a/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Function emptyRange "inc"
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inlinefn:a/1" ]
                             }
                     in
                     QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -457,7 +501,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -466,9 +512,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -478,15 +524,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inlinefn:main/1"
+                                    , "inlinefn:main/1/1"
                                     ]
                             }
                     in
@@ -549,26 +600,44 @@ suite =
 
                         expectedAst =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Bool"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ Type.Custom "True"
-                                        , Type.Custom "False"
-                                        ]
-                                    , CustomTypeDef "True" True emptyRange [] []
-                                    , CustomTypeDef "False" True emptyRange [] []
-                                    , CustomTypeDef "Box"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "value", Type.Int ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "Bool"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            UnionMembers
+                                                [ Type.Custom "True"
+                                                , Type.Custom "False"
+                                                ]
+                                      }
+                                    , { name = "True"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
+                                    , { name = "False"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
+                                    , { name = "Box"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            StructMembers
+                                                [ ( "value", Type.Int ) ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Function emptyRange "True" ] )
@@ -576,6 +645,7 @@ suite =
                                                 [ Function emptyRange "False" ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -626,20 +696,30 @@ suite =
 
                         expectedAst =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Maybe"
-                                        True
-                                        emptyRange
-                                        [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nothing"
-                                        ]
-                                    , CustomTypeDef "Nothing" True emptyRange [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            UnionMembers
+                                                [ Type.Generic "a"
+                                                , Type.Custom "Nothing"
+                                                ]
+                                      }
+                                    , { name = "Nothing"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
-                                      , metadata = Metadata.default
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (Type.Generic "a") []
@@ -651,6 +731,7 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -724,28 +805,48 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" True emptyRange [] []
-                                , CustomTypeDef "False" True emptyRange [] []
-                                , CustomTypeDef "Box"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "value", boolUnion ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "Box"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "value", boolUnion ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "true?"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Box" ] [ boolUnion ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "Box" ]
+                                            , output = [ boolUnion ]
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange
@@ -757,6 +858,7 @@ suite =
                                             [ Function emptyRange "False" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -871,34 +973,40 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef
-                                    "/stabel/test/some/module/USMoney"
-                                    True
-                                    emptyRange
-                                    []
-                                    qualifiedUsMoneyUnion
-                                , CustomTypeDef "/stabel/test/some/module/Dollar"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Cent"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "cent-value", Type.Int ) ]
+                            Dict.fromListBy .name
+                                [ { name = "/stabel/test/some/module/USMoney"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = UnionMembers qualifiedUsMoneyUnion
+                                  }
+                                , { name = "/stabel/test/some/module/Dollar"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "dollar-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Cent"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "cent-value", Type.Int ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/into-cents"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ qualifiedUsMoneyUnionType
-                                                ]
-                                                [ qualifiedUsMoneyUnionType
-                                                ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ qualifiedUsMoneyUnionType ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
@@ -915,11 +1023,13 @@ suite =
                                             []
                                   }
                                 , { name = "/stabel/test/some/module/add-money"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
-                                                [ qualifiedUsMoneyUnionType ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Function emptyRange "/stabel/test/some/module/into-cents"
@@ -929,11 +1039,13 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/quote-excuse"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Function emptyRange "/stabel/test/some/module/dollar-value>"
@@ -943,9 +1055,9 @@ suite =
                                             ]
                                   }
                                 , { name = "inlinefn:/stabel/test/some/module/quote-excuse/1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
@@ -953,56 +1065,77 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/>Dollar"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
@@ -1062,130 +1195,173 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef
-                                    "/stabel/test/some/module/USMoney"
-                                    True
-                                    emptyRange
-                                    []
-                                    qualifiedUsMoneyUnion
-                                , CustomTypeDef "/stabel/test/some/module/Dollar"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Cent"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "cent-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Wallet"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "user-id", Type.Int )
-                                    , ( "value", qualifiedUsMoneyUnionType )
-                                    ]
+                            Dict.fromListBy .name
+                                [ { name = "/stabel/test/some/module/USMoney"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = UnionMembers qualifiedUsMoneyUnion
+                                  }
+                                , { name = "/stabel/test/some/module/Dollar"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "dollar-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Cent"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "cent-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Wallet"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "user-id", Type.Int )
+                                            , ( "value", qualifiedUsMoneyUnionType )
+                                            ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/>Dollar"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Wallet"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int, qualifiedUsMoneyUnionType ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int, qualifiedUsMoneyUnionType ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>user-id"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/>value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/user-id>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Wallet" ] [ Type.Int ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                                [ qualifiedUsMoneyUnionType ]
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
