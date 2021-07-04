@@ -5,6 +5,7 @@ import List.Extra as List
 import Stabel.Codegen.BaseModule as BaseModule
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
+import Stabel.Qualifier exposing (TypeDefinitionMembers(..))
 import Stabel.TypeChecker as AST exposing (AST)
 import Wasm
 
@@ -50,10 +51,10 @@ typeMeta types =
     types
         |> List.filterMap
             (\typeDef ->
-                case typeDef of
-                    AST.CustomTypeDef name _ _ members ->
+                case typeDef.members of
+                    StructMembers members ->
                         Just
-                            ( name
+                            ( typeDef.name
                             , { id = 0
                               , members = members
                               }
@@ -153,7 +154,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     , output = [ Type.Int ]
                     }
 
-                AST.Word _ name type_ ->
+                AST.Word _ _ type_ ->
                     type_
 
                 AST.WordRef _ name ->
@@ -168,20 +169,25 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.ConstructType typeName ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ _ gens members) ->
-                            { input = List.map Tuple.second members
-                            , output = [ typeFromTypeDef typeName gens ]
-                            }
+                        Just struct ->
+                            case struct.members of
+                                StructMembers members ->
+                                    { input = List.map Tuple.second members
+                                    , output = [ typeFromTypeDef typeName struct.generics ]
+                                    }
+
+                                _ ->
+                                    Debug.todo "help"
 
                         _ ->
                             Debug.todo "help"
 
                 AST.SetMember typeName _ memberType ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ _ gens _) ->
+                        Just tipe ->
                             let
                                 type_ =
-                                    typeFromTypeDef typeName gens
+                                    typeFromTypeDef typeName tipe.generics
                             in
                             { input = [ type_, memberType ]
                             , output = [ type_ ]
@@ -192,10 +198,10 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.GetMember typeName _ memberType ->
                     case Dict.get typeName ast.types of
-                        Just (AST.CustomTypeDef _ _ gens _) ->
+                        Just tipe ->
                             let
                                 type_ =
-                                    typeFromTypeDef typeName gens
+                                    typeFromTypeDef typeName tipe.generics
                             in
                             { input = [ type_ ]
                             , output = [ memberType ]
@@ -227,20 +233,18 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
         maybeBox ( idx, leftType, rightType ) =
             case ( leftType, rightType ) of
-                ( _, Type.Union members ) ->
-                    case List.find (\( t, _ ) -> t == leftType) (unionBoxMap members) of
-                        Just ( _, id ) ->
-                            Just (Box idx id)
-
-                        Nothing ->
-                            Nothing
+                ( _, Type.Union _ members ) ->
+                    unionBoxMap members
+                        |> List.find (\( t, _ ) -> t == leftType)
+                        |> Maybe.map Tuple.second
+                        |> Maybe.map (Box idx)
 
                 _ ->
                     Nothing
 
         maybeBoxLeadingElement =
             case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
-                ( Just _, True, Just (Type.Union _) ) ->
+                ( Just _, True, Just (Type.Union _ _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
 
@@ -341,7 +345,7 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
 
         createBoxMap t_ =
             case t_ of
-                Type.Union members ->
+                Type.Union _ members ->
                     unionBoxMap members
 
                 _ ->
@@ -571,7 +575,7 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen."
 
-        SetMember typeName memberName memberType ->
+        SetMember typeName memberName _ ->
             case Dict.get typeName typeInfo of
                 Just type_ ->
                     let
@@ -603,7 +607,7 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen!"
 
-        GetMember typeName memberName memberType ->
+        GetMember typeName memberName _ ->
             case getMemberType typeInfo typeName memberName of
                 Just memberIndex ->
                     Wasm.Batch

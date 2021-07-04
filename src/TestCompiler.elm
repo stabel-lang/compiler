@@ -2,6 +2,7 @@ port module TestCompiler exposing (main)
 
 import Dict
 import Platform exposing (Program)
+import Set
 import Stabel.Codegen as Codegen
 import Stabel.Data.Metadata as Metadata
 import Stabel.Parser as Parser
@@ -70,9 +71,9 @@ compile entry sourceCode =
                         , inProgressAST =
                             { types = Dict.empty
                             , functions = Dict.empty
+                            , referenceableFunctions = Set.empty
                             }
                         }
-                        |> Result.map (\qast -> { qast | functions = Dict.update entry (Maybe.map setEntryPoint) qast.functions })
 
                 setEntryPoint word =
                     { word | metadata = Metadata.asEntryPoint word.metadata }
@@ -87,7 +88,11 @@ compile entry sourceCode =
                             formatErrors (TypeCheckerProblem.toString sourceCode) typeErrors
 
                         Ok typedAst ->
-                            Codegen.codegen typedAst
+                            { typedAst
+                                | words =
+                                    Dict.update entry (Maybe.map setEntryPoint) typedAst.words
+                            }
+                                |> Codegen.codegen
                                 |> Result.mapError (always "Codegen failed for unknown reason :(")
 
 
