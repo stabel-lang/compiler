@@ -4,9 +4,10 @@ module Test.TypeChecker.Util exposing
     , expectTypeCheckFailure
     )
 
+import Dict exposing (Dict)
 import Expect exposing (Expectation)
 import Stabel.Qualifier as QAST
-import Stabel.TypeChecker exposing (AST, run)
+import Stabel.TypeChecker exposing (WordDefinition, run)
 
 
 expectTypeCheck : QAST.AST -> Expectation
@@ -29,11 +30,11 @@ expectTypeCheckFailure input =
             Expect.fail "Did not expect type check to succeed."
 
 
-expectAst : QAST.AST -> AST -> Expectation
+expectAst : QAST.AST -> Dict String WordDefinition -> Expectation
 expectAst input expectedResult =
     case run input of
         Err err ->
             Expect.fail <| "Did not expect typecheck to fail: " ++ Debug.toString err
 
         Ok typedAst ->
-            Expect.equal expectedResult typedAst
+            Expect.equal expectedResult typedAst.words

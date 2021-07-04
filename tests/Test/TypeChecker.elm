@@ -2,10 +2,12 @@ module Test.TypeChecker exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
+import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Qualifier as QAST
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
@@ -29,7 +31,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -37,7 +41,9 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -45,9 +51,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -59,47 +65,43 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     expectedResult =
-                        { types = Dict.empty
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "inc"
-                                  , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                  , metadata = Metadata.default
-                                  , implementation =
-                                        SoloImpl
-                                            [ IntLiteral emptyRange 1
-                                            , Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "dec"
-                                  , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                                  , metadata = Metadata.default
-                                  , implementation =
-                                        SoloImpl
-                                            [ IntLiteral emptyRange 1
-                                            , Builtin emptyRange Builtin.Minus
-                                            ]
-                                  }
-                                , { name = "main"
-                                  , type_ = { input = [], output = [ Type.Int ] }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        SoloImpl
-                                            [ IntLiteral emptyRange 1
-                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , Word emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
-                                            , IntLiteral emptyRange 2
-                                            , Builtin emptyRange Builtin.Equal
-                                            ]
-                                  }
-                                ]
-                        }
+                        Dict.fromListBy .name
+                            [ { name = "inc"
+                              , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
+                              , metadata = Metadata.default
+                              , implementation =
+                                    SoloImpl
+                                        [ IntLiteral emptyRange 1
+                                        , Builtin emptyRange Builtin.Plus
+                                        ]
+                              }
+                            , { name = "dec"
+                              , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
+                              , metadata = Metadata.default
+                              , implementation =
+                                    SoloImpl
+                                        [ IntLiteral emptyRange 1
+                                        , Builtin emptyRange Builtin.Minus
+                                        ]
+                              }
+                            , { name = "main"
+                              , type_ = { input = [], output = [ Type.Int ] }
+                              , metadata = Metadata.default
+                              , implementation =
+                                    SoloImpl
+                                        [ IntLiteral emptyRange 1
+                                        , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , Word emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , IntLiteral emptyRange 2
+                                        , Builtin emptyRange Builtin.Equal
+                                        ]
+                              }
+                            ]
                 in
                 expectAst input expectedResult
         , test "Bad type annotation" <|
@@ -110,9 +112,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int ] []
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Int ]
+                                            , output = []
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -121,6 +127,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 expectTypeCheckFailure input
@@ -129,24 +136,33 @@ suite =
                 let
                     source =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "True" True emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "as-int"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "True"
@@ -154,6 +170,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -163,15 +180,26 @@ suite =
                 let
                     source =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Person" True emptyRange [] [ ( "age", Type.Int ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Person"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "age", Type.Int ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc-age"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Person" ] [ Type.Custom "Person" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "Person" ]
+                                            , output = [ Type.Custom "Person" ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "age>"
@@ -181,9 +209,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -193,6 +221,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -205,9 +234,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -220,14 +253,16 @@ suite =
                                             ]
                                   }
                                 , { name = "over"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                -- Most would start at a and increment, but we need to check that
-                                                -- the typechecker cares about the relationship between these generic
-                                                -- variables, not the names themselves
-                                                [ Type.Generic "b", Type.Generic "c" ]
-                                                [ Type.Generic "b", Type.Generic "c", Type.Generic "b" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        -- Most would start at a and increment, but we need to check that
+                                        -- the typechecker cares about the relationship between these generic
+                                        -- variables, not the names themselves
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Generic "b", Type.Generic "c" ]
+                                            , output = [ Type.Generic "b", Type.Generic "c", Type.Generic "b" ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackSwap
@@ -236,6 +271,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 expectTypeCheck input
@@ -247,9 +283,13 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 5
@@ -257,9 +297,13 @@ suite =
                                             ]
                                   }
                                 , { name = "square"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Int ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackDuplicate
@@ -267,6 +311,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 expectTypeCheck input
@@ -275,19 +320,26 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ ( "element", Type.Generic "a" ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Box"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "element", Type.Generic "a" ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 5
@@ -300,6 +352,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -309,21 +362,28 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Coordinate"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "x", Type.Int )
-                                    , ( "y", Type.Int )
-                                    ]
+                            Dict.fromListBy .name
+                                [ { name = "Coordinate"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "x", Type.Int )
+                                            , ( "y", Type.Int )
+                                            ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -335,7 +395,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main__quot1"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -343,13 +405,16 @@ suite =
                                             ]
                                   }
                                 , { name = "update-x"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Custom "Coordinate"
                                                 , Type.FunctionSignature { input = [ Type.Int ], output = [ Type.Int ] }
                                                 ]
-                                                [ Type.Custom "Coordinate" ]
+                                            , output = [ Type.Custom "Coordinate" ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackSwap
@@ -361,6 +426,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -375,34 +441,50 @@ suite =
 
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Pair"
-                                    True
-                                    emptyRange
-                                    [ "a", "b" ]
-                                    [ ( "first", Type.Generic "a" )
-                                    , ( "second", Type.Generic "b" )
-                                    ]
-                                , QAST.UnionTypeDef "List"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    listUnion
-                                , QAST.CustomTypeDef "NonEmpty"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ ( "head", Type.Generic "a" )
-                                    , ( "rest", Type.Union (Just "List") listUnion )
-                                    ]
-                                , QAST.CustomTypeDef "Empty" True emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "Pair"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a", "b" ]
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "first", Type.Generic "a" )
+                                            , ( "second", Type.Generic "b" )
+                                            ]
+                                  }
+                                , { name = "List"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members = QAST.UnionMembers listUnion
+                                  }
+                                , { name = "NonEmpty"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "head", Type.Generic "a" )
+                                            , ( "rest", Type.Union (Just "List") listUnion )
+                                            ]
+                                  }
+                                , { name = "Empty"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = []
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -418,16 +500,20 @@ suite =
                                             ]
                                   }
                                 , { name = "main__quot1"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.Plus
                                             ]
                                   }
                                 , { name = "fold"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Union (Just "List") listUnion
                                                 , Type.Generic "b"
                                                 , Type.FunctionSignature
@@ -440,7 +526,8 @@ suite =
                                                         ]
                                                     }
                                                 ]
-                                                [ Type.Generic "b" ]
+                                            , output = [ Type.Generic "b" ]
+                                            }
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "Empty") []
@@ -470,25 +557,27 @@ suite =
                                             []
                                   }
                                 , { name = "fold_quot1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "head>" ]
                                   }
                                 , { name = "fold_quot2"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "rest>" ]
                                   }
                                 , { name = "split"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.Generic "a"
                                                 , Type.FunctionSignature
                                                     { input = [ Type.Generic "a" ]
@@ -499,9 +588,11 @@ suite =
                                                     , output = [ Type.Generic "c" ]
                                                     }
                                                 ]
+                                            , output =
                                                 [ Type.Generic "b"
                                                 , Type.Generic "c"
                                                 ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackLeftRotate
@@ -515,17 +606,21 @@ suite =
                                             ]
                                   }
                                 , { name = "spill"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input =
                                                 [ Type.CustomGeneric "Pair"
                                                     [ Type.Generic "a"
                                                     , Type.Generic "b"
                                                     ]
                                                 ]
+                                            , output =
                                                 [ Type.Generic "a"
                                                 , Type.Generic "b"
                                                 ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.FunctionRef emptyRange "spill_quot1"
@@ -534,21 +629,28 @@ suite =
                                             ]
                                   }
                                 , { name = "spill_quot1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "first>" ]
                                   }
                                 , { name = "spill_quot2"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "second>" ]
                                   }
+                                ]
+                        , referenceableFunctions =
+                            Set.fromList
+                                [ "fold_quot1"
+                                , "fold_quot2"
+                                , "spill_quot1"
+                                , "spill_quot2"
                                 ]
                         }
                             |> QualifierUtil.addFunctionsForStructs
@@ -559,15 +661,19 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "element", Type.Generic "a" ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Box"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "element", Type.Generic "a" ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -577,15 +683,19 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.CustomTypeDef "Box"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ ( "element", Type.Generic "b" ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Box"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "element", Type.Generic "b" ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -599,16 +709,18 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -619,9 +731,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot2"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -629,15 +741,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
                                                 , QAST.Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "main__quot2"
+                                    , "main__quot1"
                                     ]
                             }
                     in
@@ -650,25 +767,28 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ Type.Int
                                                     , Type.FunctionSignature
                                                         { input = [ Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
                                                     ]
-                                                    [ Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -679,9 +799,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot2"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -689,15 +809,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
                                                 , QAST.Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "main__quot2"
+                                    , "main__quot1"
                                     ]
                             }
                     in
@@ -710,15 +835,18 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-nums"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ Type.FunctionSignature
                                                         { input = [ Type.Int, Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
                                                     ]
-                                                    [ Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -728,9 +856,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.FunctionRef emptyRange "main__quot1"
@@ -738,15 +866,18 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "main__quot1" ]
                             }
                     in
                     expectTypeCheck input
@@ -758,25 +889,28 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "map"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ Type.Generic "a"
                                                     , Type.FunctionSignature
                                                         { input = [ Type.Generic "a" ]
                                                         , output = [ Type.Generic "b" ]
                                                         }
                                                     ]
-                                                    [ Type.Generic "b" ]
+                                                , output = [ Type.Generic "b" ]
+                                                }
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -785,9 +919,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -795,6 +929,9 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "main__quot1" ]
                             }
                     in
                     expectTypeCheck input
@@ -809,33 +946,40 @@ suite =
 
                         input =
                             { types =
-                                Dict.fromListBy QAST.typeDefinitionName
-                                    [ QAST.UnionTypeDef "Maybe"
-                                        True
-                                        emptyRange
-                                        [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nil"
-                                        ]
-                                    , QAST.CustomTypeDef "Nil"
-                                        True
-                                        emptyRange
-                                        []
-                                        []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            QAST.UnionMembers
+                                                [ Type.Generic "a"
+                                                , Type.Custom "Nil"
+                                                ]
+                                      }
+                                    , { name = "Nil"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = QAST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "map"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ maybeUnion "a"
                                                     , Type.FunctionSignature
                                                         { input = [ Type.Generic "a" ]
                                                         , output = [ Type.Generic "b" ]
                                                         }
                                                     ]
-                                                    [ maybeUnion "b" ]
+                                                , output = [ maybeUnion "b" ]
+                                                }
                                       , implementation =
                                             QAST.MultiImpl
                                                 [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
@@ -850,9 +994,9 @@ suite =
                                                 []
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Function emptyRange "Nil"
@@ -861,9 +1005,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "main__quot1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -871,6 +1015,9 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "main__quot1" ]
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -888,31 +1035,40 @@ suite =
 
                         input =
                             { types =
-                                Dict.fromListBy QAST.typeDefinitionName
-                                    [ QAST.UnionTypeDef "List"
-                                        True
-                                        emptyRange
-                                        [ "a" ]
-                                        [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
-                                        , Type.Custom "EmptyList"
-                                        ]
-                                    , QAST.CustomTypeDef "NonEmptyList"
-                                        True
-                                        emptyRange
-                                        [ "a" ]
-                                        [ ( "first", Type.Generic "a" )
-                                        , ( "rest", listUnion )
-                                        ]
-                                    , QAST.CustomTypeDef "EmptyList"
-                                        True
-                                        emptyRange
-                                        []
-                                        []
+                                Dict.fromListBy .name
+                                    [ { name = "List"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            QAST.UnionMembers
+                                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                                , Type.Custom "EmptyList"
+                                                ]
+                                      }
+                                    , { name = "NonEmptyList"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            QAST.StructMembers
+                                                [ ( "first", Type.Generic "a" )
+                                                , ( "rest", listUnion )
+                                                ]
+                                      }
+                                    , { name = "EmptyList"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = QAST.StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "sum"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 0
@@ -920,9 +1076,13 @@ suite =
                                                 ]
                                       }
                                     , { name = "sum-helper"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType [ listUnion, Type.Int ] [ Type.Int ]
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input = [ listUnion, Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
                                       , implementation =
                                             QAST.MultiImpl
                                                 [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
@@ -945,9 +1105,9 @@ suite =
                                                 []
                                       }
                                     , { name = "main"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             QAST.SoloImpl
                                                 [ QAST.Integer emptyRange 1
@@ -961,6 +1121,7 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -974,9 +1135,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -985,11 +1146,13 @@ suite =
                                             ]
                                   }
                                 , { name = "drop-first"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
-                                                [ Type.Generic "b" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                                            , output = [ Type.Generic "b" ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackSwap
@@ -997,49 +1160,45 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
 
                     expectedResult =
-                        { types = Dict.empty
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , type_ =
-                                        { input = []
-                                        , output = [ Type.Int ]
-                                        }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        SoloImpl
-                                            [ IntLiteral emptyRange 1
-                                            , IntLiteral emptyRange 2
-                                            , Word emptyRange
-                                                "drop-first"
-                                                { input = [ Type.Int, Type.Int ]
-                                                , output = [ Type.Int ]
-                                                }
-                                            ]
-                                  }
-                                , { name = "drop-first"
-                                  , type_ =
-                                        { input = [ Type.Generic "a", Type.Generic "b" ]
-                                        , output = [ Type.Generic "b" ]
-                                        }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
-                                                [ Type.Generic "b" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ Builtin emptyRange Builtin.StackSwap
-                                            , Builtin emptyRange Builtin.StackDrop
-                                            ]
-                                  }
-                                ]
-                        }
+                        Dict.fromListBy .name
+                            [ { name = "main"
+                              , type_ =
+                                    { input = []
+                                    , output = [ Type.Int ]
+                                    }
+                              , metadata = Metadata.default
+                              , implementation =
+                                    SoloImpl
+                                        [ IntLiteral emptyRange 1
+                                        , IntLiteral emptyRange 2
+                                        , Word emptyRange
+                                            "drop-first"
+                                            { input = [ Type.Int, Type.Int ]
+                                            , output = [ Type.Int ]
+                                            }
+                                        ]
+                              }
+                            , { name = "drop-first"
+                              , type_ =
+                                    { input = [ Type.Generic "a", Type.Generic "b" ]
+                                    , output = [ Type.Generic "b" ]
+                                    }
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType
+                                            [ Type.Generic "a", Type.Generic "b" ]
+                                            [ Type.Generic "b" ]
+                              , implementation =
+                                    SoloImpl
+                                        [ Builtin emptyRange Builtin.StackSwap
+                                        , Builtin emptyRange Builtin.StackDrop
+                                        ]
+                              }
+                            ]
                 in
                 expectAst input expectedResult
         ]
