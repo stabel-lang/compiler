@@ -15,7 +15,6 @@ import List.Extra as List
 import Parser.Advanced exposing (DeadEnd)
 import Result.Extra as Result
 import Set exposing (Set)
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.ModuleName as ModuleName exposing (ModuleName)
 import Stabel.Data.PackageMetadata as PackageMetadata exposing (PackageMetadata)
 import Stabel.Data.PackageName as PackageName exposing (PackageName)
@@ -73,7 +72,6 @@ problemToString problem =
 type alias InitOptions =
     { projectDirPath : String
     , stdLibPath : String
-    , possibleEntryPoint : Maybe String
     }
 
 
@@ -87,8 +85,7 @@ type Model
 
 
 type alias State =
-    { possibleEntryPoint : Maybe String
-    , rootPackage : PackageInfo
+    { rootPackage : PackageInfo
     , dependencies : Dict String SemanticVersion
     , dependentPackages : Dict String PackageInfo
     , filePathToModule : Dict String ( PackageName, ModuleName )
@@ -117,8 +114,7 @@ type alias ParsedModuleInfo =
 
 emptyState : InitOptions -> PackageInfo -> State
 emptyState initOptions rootPackage =
-    { possibleEntryPoint = initOptions.possibleEntryPoint
-    , rootPackage = rootPackage
+    { rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
     , filePathToModule = Dict.empty
@@ -551,7 +547,13 @@ nextCompileStep remainingModules state =
 
                 ( qualifiedAst, errs ) =
                     sortedParsedModules
-                        |> List.foldl qualifyAst ( { types = Dict.empty, functions = Dict.empty }, [] )
+                        |> List.foldl qualifyAst
+                            ( { types = Dict.empty
+                              , functions = Dict.empty
+                              , referenceableFunctions = Set.empty
+                              }
+                            , []
+                            )
 
                 qualifyAst parsedModInfo ( qast, es ) =
                     let
@@ -575,30 +577,17 @@ nextCompileStep remainingModules state =
                                 mergedQualifiedAst =
                                     { types = Dict.union qast.types qualifiedAST.types
                                     , functions = Dict.union qast.functions qualifiedAST.functions
+                                    , referenceableFunctions = Set.union qast.referenceableFunctions qualifiedAST.referenceableFunctions
                                     }
                             in
                             ( mergedQualifiedAst, es )
-
-                wordsWithEntryPoint =
-                    state.possibleEntryPoint
-                        |> Maybe.map (setEntryPoint qualifiedAst.functions)
-                        |> Maybe.withDefault qualifiedAst.functions
-
-                setEntryPoint words entryPointName =
-                    Dict.update
-                        entryPointName
-                        (Maybe.map (\w -> { w | metadata = Metadata.asEntryPoint w.metadata }))
-                        words
             in
             case errs of
                 [] ->
-                    Done
-                        { types = qualifiedAst.types
-                        , functions = wordsWithEntryPoint
-                        }
+                    Done qualifiedAst
 
                 err :: _ ->
-                    Failed <| err
+                    Failed err
 
         ( packageInfo, moduleName ) :: otherModules ->
             let

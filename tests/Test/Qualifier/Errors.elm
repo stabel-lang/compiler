@@ -3,6 +3,7 @@ module Test.Qualifier.Errors exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
@@ -206,6 +207,7 @@ checkForError fn source =
                 , inProgressAST =
                     { types = Dict.empty
                     , functions = Dict.empty
+                    , referenceableFunctions = Set.empty
                     }
                 }
     in
