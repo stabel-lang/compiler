@@ -11,6 +11,7 @@ import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.SourceLocation as PSourceLoc
 import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Test exposing (Test, describe, test)
@@ -37,8 +38,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "+"
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "+"
                                             ]
                                   }
                                 , { name = "dec"
@@ -48,8 +49,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "-"
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "-"
                                             ]
                                   }
                                 , { name = "main"
@@ -59,12 +60,12 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "inc"
-                                            , AST.Function emptyRange "inc"
-                                            , AST.Function emptyRange "dec"
-                                            , AST.Integer emptyRange 2
-                                            , AST.Function emptyRange "="
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "inc"
+                                            , AST.Function PSourceLoc.emptyRange "inc"
+                                            , AST.Function PSourceLoc.emptyRange "dec"
+                                            , AST.Integer PSourceLoc.emptyRange 2
+                                            , AST.Function PSourceLoc.emptyRange "="
                                             ]
                                   }
                                 ]
@@ -140,9 +141,9 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "swap"
-                                            , AST.Function emptyRange "dup"
-                                            , AST.Function emptyRange "rotate"
+                                            [ AST.Function PSourceLoc.emptyRange "swap"
+                                            , AST.Function PSourceLoc.emptyRange "dup"
+                                            , AST.Function PSourceLoc.emptyRange "rotate"
                                             ]
                                   }
                                 ]
@@ -185,7 +186,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Bool"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -194,12 +195,12 @@ suite =
                                             ]
                                   }
                                 , { name = "True"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "False"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
@@ -213,8 +214,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "False" []) [], [ AST.Integer emptyRange 0 ] )
-                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "True" []) [], [ AST.Integer emptyRange 1 ] )
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "False" []) [], [ AST.Integer PSourceLoc.emptyRange 0 ] )
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "True" []) [], [ AST.Integer PSourceLoc.emptyRange 1 ] )
                                             ]
                                             []
                                   }
@@ -295,7 +296,7 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Function emptyRange "!"
+                                                [ AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     , { name = "main"
@@ -305,17 +306,17 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.Function PSourceLoc.emptyRange "+"
                                                     ]
-                                                , AST.Function emptyRange "apply-to-num"
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.Function emptyRange "-"
+                                                , AST.Function PSourceLoc.emptyRange "apply-to-num"
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.Function PSourceLoc.emptyRange "-"
                                                     ]
-                                                , AST.Function emptyRange "apply-to-num"
+                                                , AST.Function PSourceLoc.emptyRange "apply-to-num"
                                                 ]
                                       }
                                     ]
@@ -402,11 +403,11 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Function emptyRange "inc"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Function PSourceLoc.emptyRange "inc"
                                                     ]
-                                                , AST.Function emptyRange "!"
+                                                , AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     , { name = "inc"
@@ -416,8 +417,8 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "+"
                                                 ]
                                       }
                                     ]
@@ -471,17 +472,17 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.InlineFunction emptyRange
-                                                        [ AST.Integer emptyRange 1
-                                                        , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.InlineFunction PSourceLoc.emptyRange
+                                                        [ AST.Integer PSourceLoc.emptyRange 1
+                                                        , AST.Function PSourceLoc.emptyRange "+"
                                                         ]
-                                                    , AST.Function emptyRange "!"
-                                                    , AST.Function emptyRange "+"
+                                                    , AST.Function PSourceLoc.emptyRange "!"
+                                                    , AST.Function PSourceLoc.emptyRange "+"
                                                     ]
-                                                , AST.Function emptyRange "!"
+                                                , AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     ]
@@ -544,7 +545,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Bool"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.UnionMembers
@@ -553,17 +554,17 @@ suite =
                                                 ]
                                       }
                                     , { name = "True"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
                                     , { name = "False"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
                                     , { name = "Box"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.StructMembers
@@ -579,11 +580,11 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
-                                                  , [ AST.Function emptyRange "True" ]
+                                                [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
+                                                  , [ AST.Function PSourceLoc.emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Function emptyRange "False" ]
+                                                [ AST.Function PSourceLoc.emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -650,7 +651,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Maybe"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = [ "a" ]
                                       , members =
                                             AST.UnionMembers
@@ -659,7 +660,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "Nothing"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -673,12 +674,12 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (AST.Generic "a") []
-                                                  , [ AST.Function emptyRange "drop" ]
+                                                [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.Generic "a") []
+                                                  , [ AST.Function PSourceLoc.emptyRange "drop" ]
                                                   )
                                                 ]
-                                                [ AST.Function emptyRange "swap"
-                                                , AST.Function emptyRange "drop"
+                                                [ AST.Function PSourceLoc.emptyRange "swap"
+                                                , AST.Function PSourceLoc.emptyRange "drop"
                                                 ]
                                       }
                                     ]
@@ -743,7 +744,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Bool"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -752,17 +753,17 @@ suite =
                                             ]
                                   }
                                 , { name = "True"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "False"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "Box"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -782,13 +783,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange
                                                     (AST.LocalRef "Box" [])
                                                     [ ( "value", AST.LiteralType (AST.LocalRef "True" []) ) ]
-                                              , [ AST.Function emptyRange "True" ]
+                                              , [ AST.Function PSourceLoc.emptyRange "True" ]
                                               )
                                             ]
-                                            [ AST.Function emptyRange "False" ]
+                                            [ AST.Function PSourceLoc.emptyRange "False" ]
                                   }
                                 ]
                         }
@@ -872,7 +873,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "USMoney"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -881,14 +882,14 @@ suite =
                                             ]
                                   }
                                 , { name = "Dollar"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
                                             [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                   }
                                 , { name = "Cent"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -908,14 +909,14 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Dollar" []) []
-                                              , [ AST.Function emptyRange "dollar-value>"
-                                                , AST.Integer emptyRange 100
-                                                , AST.Function emptyRange "*"
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Dollar" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "dollar-value>"
+                                                , AST.Integer PSourceLoc.emptyRange 100
+                                                , AST.Function PSourceLoc.emptyRange "*"
                                                 ]
                                               )
-                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "Cent" []) []
-                                              , [ AST.Function emptyRange "cent-value>"
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Cent" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "cent-value>"
                                                 ]
                                               )
                                             ]
@@ -932,10 +933,10 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "into-cents"
-                                            , AST.Function emptyRange "swap"
-                                            , AST.Function emptyRange "into-cents"
-                                            , AST.Function emptyRange "+"
+                                            [ AST.Function PSourceLoc.emptyRange "into-cents"
+                                            , AST.Function PSourceLoc.emptyRange "swap"
+                                            , AST.Function PSourceLoc.emptyRange "into-cents"
+                                            , AST.Function PSourceLoc.emptyRange "+"
                                             ]
                                   }
                                 , { name = "quote-excuse"
@@ -949,13 +950,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "dollar-value>"
-                                            , AST.InlineFunction emptyRange
-                                                [ AST.Integer emptyRange 2
-                                                , AST.Function emptyRange "*"
+                                            [ AST.Function PSourceLoc.emptyRange "dollar-value>"
+                                            , AST.InlineFunction PSourceLoc.emptyRange
+                                                [ AST.Integer PSourceLoc.emptyRange 2
+                                                , AST.Function PSourceLoc.emptyRange "*"
                                                 ]
-                                            , AST.Function emptyRange "!"
-                                            , AST.Function emptyRange ">Dollar"
+                                            , AST.Function PSourceLoc.emptyRange "!"
+                                            , AST.Function PSourceLoc.emptyRange ">Dollar"
                                             ]
                                   }
                                 ]
@@ -1150,7 +1151,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "USMoney"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -1159,7 +1160,7 @@ suite =
                                             ]
                                   }
                                 , { name = "Wallet"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1168,14 +1169,14 @@ suite =
                                             ]
                                   }
                                 , { name = "Dollar"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
                                             [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                   }
                                 , { name = "Cent"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1376,7 +1377,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Tipe"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1396,15 +1397,15 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
-                                              , [ AST.PackageFunction emptyRange [ "package", "module" ] "when-one"
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
+                                              , [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-one"
                                                 ]
                                               )
-                                            , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
-                                              , [ AST.Function emptyRange "drop" ]
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "drop" ]
                                               )
                                             ]
-                                            [ AST.PackageFunction emptyRange [ "package", "module" ] "when-other-one" ]
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-other-one" ]
                                   }
                                 , { name = "main"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
@@ -1413,10 +1414,10 @@ suite =
                                   , imports = Dict.fromList [ ( "/list/of/names", [ "one" ] ) ]
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageFunction emptyRange [ "html" ] "div"
-                                            , AST.Function emptyRange "call-external"
-                                            , AST.ExternalFunction emptyRange [ "some", "ext" ] "word"
-                                            , AST.PackageFunction emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "html" ] "div"
+                                            , AST.Function PSourceLoc.emptyRange "call-external"
+                                            , AST.ExternalFunction PSourceLoc.emptyRange [ "some", "ext" ] "word"
+                                            , AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]
@@ -1470,7 +1471,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageFunction emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]

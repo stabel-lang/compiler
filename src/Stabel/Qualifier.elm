@@ -251,6 +251,12 @@ qualifyType config typeDef ( errors, acc ) =
         qualifiedName =
             qualifyName config typeDef.name
 
+        qualifiedRange =
+            SourceLocationRange
+                config.ast.sourceReference
+                typeDef.sourceLocation.start
+                typeDef.sourceLocation.end
+
         exposed =
             Set.isEmpty exposes || Set.member typeDef.name exposes
     in
@@ -258,7 +264,7 @@ qualifyType config typeDef ( errors, acc ) =
         Parser.StructMembers members ->
             let
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs typeDef.sourceLocation)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs qualifiedRange)) members
                         |> List.map raiseTupleError
                         |> Result.combine
 
@@ -281,7 +287,7 @@ qualifyType config typeDef ( errors, acc ) =
                     , Dict.insert qualifiedName
                         { name = qualifiedName
                         , exposed = exposed
-                        , sourceLocation = typeDef.sourceLocation
+                        , sourceLocation = qualifiedRange
                         , generics = typeDef.generics
                         , members = StructMembers qualifiedMembers
                         }
@@ -291,7 +297,7 @@ qualifyType config typeDef ( errors, acc ) =
         Parser.UnionMembers memberTypes ->
             let
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config modRefs typeDef.sourceLocation) memberTypes
+                    List.map (qualifyMemberType config modRefs qualifiedRange) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -305,7 +311,7 @@ qualifyType config typeDef ( errors, acc ) =
                     , Dict.insert qualifiedName
                         { name = qualifiedName
                         , exposed = exposed
-                        , sourceLocation = typeDef.sourceLocation
+                        , sourceLocation = qualifiedRange
                         , generics = typeDef.generics
                         , members = UnionMembers qualifiedMemberTypes
                         }
@@ -544,6 +550,12 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc, inlin
         qualifiedName =
             qualifyName config unqualifiedFunction.name
 
+        mapLoc loc =
+            SourceLocationRange
+                config.ast.sourceReference
+                loc.start
+                loc.end
+
         newInlineFuncs =
             inlineFuncs
                 |> Set.union inlineFunctionNamesAfterWhens
@@ -554,7 +566,7 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc, inlin
             ( errors
             , Dict.insert qualifiedName
                 { name = qualifiedName
-                , sourceLocation = unqualifiedFunction.sourceLocationRange
+                , sourceLocation = Maybe.map mapLoc unqualifiedFunction.sourceLocationRange
                 , typeSignature = typeSignature
                 , exposed = exposed
                 , implementation =
@@ -595,7 +607,15 @@ qualifyMetadata :
 qualifyMetadata config qualifiedTypes function =
     let
         functionRange =
-            Maybe.withDefault SourceLocation.emptyRange function.sourceLocationRange
+            function.sourceLocationRange
+                |> Maybe.map
+                    (\r ->
+                        SourceLocationRange
+                            config.ast.sourceReference
+                            r.start
+                            r.end
+                    )
+                |> Maybe.withDefault SourceLocation.emptyRange
 
         inputLength =
             function.typeSignature
@@ -691,6 +711,12 @@ qualifyMatch :
     -> Result Problem TypeMatch
 qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
+        qualifiedRange range =
+            SourceLocationRange
+                config.ast.sourceReference
+                range.start
+                range.end
+
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
                 Just typeDef ->
@@ -748,20 +774,23 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
     in
     case typeMatch of
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
-            Ok <| TypeMatch range Type.Int []
+            Ok <| TypeMatch (qualifiedRange range) Type.Int []
 
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
+            Ok <| TypeMatch (qualifiedRange range) Type.Int [ ( "value", LiteralInt val ) ]
 
         Parser.TypeMatch range (Parser.Generic sym) [] ->
-            Ok <| TypeMatch range (Type.Generic sym) []
+            Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
 
         Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
-            case qualifiedNameToMatch range (qualifyName config name) patterns of
+            case qualifiedNameToMatch (qualifiedRange range) (qualifyName config name) patterns of
                 (Err (UnknownTypeRef _ _)) as errMsg ->
                     case resolveImportedType config modRefs name of
                         Just importedModule ->
-                            qualifiedNameToMatch range (importedModule ++ "/" ++ name) patterns
+                            qualifiedNameToMatch
+                                (qualifiedRange range)
+                                (importedModule ++ "/" ++ name)
+                                patterns
 
                         Nothing ->
                             errMsg
@@ -788,7 +817,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                     ++ name
                                     |> qualifyPackageModule config.packageName
                         in
-                        qualifiedNameToMatch range qualifiedName patterns
+                        qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
                 Nothing ->
                     let
@@ -798,7 +827,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                 ++ name
                                 |> qualifyPackageModule config.packageName
                     in
-                    qualifiedNameToMatch range qualifiedName patterns
+                    qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
             let
@@ -808,7 +837,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
             in
-            qualifiedNameToMatch range qualifiedName patterns
+            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range (Parser.ExternalRef path name _) patterns ->
             let
@@ -820,10 +849,10 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
                         |> Maybe.withDefault ""
             in
-            qualifiedNameToMatch range qualifiedName patterns
+            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range _ _ ->
-            Err <| InvalidTypeMatch range
+            Err <| InvalidTypeMatch (qualifiedRange range)
 
 
 qualifyMatchValue :
@@ -907,27 +936,41 @@ qualifyNode :
     -> QualifyNodeAccumulator
     -> QualifyNodeAccumulator
 qualifyNode config currentDefName modRefs node acc =
+    let
+        mapLoc loc =
+            SourceLocationRange
+                config.ast.sourceReference
+                loc.start
+                loc.end
+    in
     case node of
         Parser.Integer loc value ->
-            { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
+            { acc
+                | qualifiedNodes =
+                    Ok (Integer (mapLoc loc) value)
+                        :: acc.qualifiedNodes
+            }
 
         Parser.Function loc value ->
             let
                 qualifiedName =
                     qualifyName config value
+
+                qLoc =
+                    mapLoc loc
             in
             if Dict.member value config.ast.functions then
-                { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
+                { acc | qualifiedNodes = Ok (Function qLoc qualifiedName) :: acc.qualifiedNodes }
 
             else
                 case Dict.get value builtinDict of
                     Just builtin ->
-                        { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
+                        { acc | qualifiedNodes = Ok (Builtin qLoc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
                         case resolveImportedFunction config modRefs value of
                             Nothing ->
-                                { acc | qualifiedNodes = Err (UnknownFunctionRef loc value) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
 
                             Just mod ->
                                 if representsExternalModule mod then
@@ -958,6 +1001,9 @@ qualifyNode config currentDefName modRefs node acc =
 
         Parser.PackageFunction loc path value ->
             let
+                qLoc =
+                    mapLoc loc
+
                 normalizedPathPreAliasCheck =
                     String.join "/" path
 
@@ -985,23 +1031,26 @@ qualifyNode config currentDefName modRefs node acc =
                 in
                 case Dict.get qualifiedName config.inProgressAST.functions of
                     Nothing ->
-                        { acc | qualifiedNodes = Err (UnknownFunctionRef loc qualifiedName) :: acc.qualifiedNodes }
+                        { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc qualifiedName) :: acc.qualifiedNodes }
 
                     Just function ->
                         if function.exposed then
-                            { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Ok (Function qLoc qualifiedName) :: acc.qualifiedNodes }
 
                         else
-                            { acc | qualifiedNodes = Err (FunctionNotExposed loc qualifiedName) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (FunctionNotExposed qLoc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalFunction loc path value ->
             let
+                qLoc =
+                    mapLoc loc
+
                 normalizedPath =
                     "/" ++ String.join "/" path
             in
             case Dict.get normalizedPath config.externalModules of
                 Nothing ->
-                    { acc | qualifiedNodes = Err (UnknownFunctionRef loc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
+                    { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
 
                 Just package ->
                     let
@@ -1016,14 +1065,14 @@ qualifyNode config currentDefName modRefs node acc =
                     in
                     case Dict.get fullReference config.inProgressAST.functions of
                         Nothing ->
-                            { acc | qualifiedNodes = Err (UnknownFunctionRef loc fullReference) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc fullReference) :: acc.qualifiedNodes }
 
                         Just def ->
                             if def.exposed then
-                                { acc | qualifiedNodes = Ok (Function loc fullReference) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Ok (Function qLoc fullReference) :: acc.qualifiedNodes }
 
                             else
-                                { acc | qualifiedNodes = Err (FunctionNotExposed loc fullReference) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (FunctionNotExposed qLoc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -1050,7 +1099,7 @@ qualifyNode config currentDefName modRefs node acc =
                 Ok [ Function _ qualifiedName ] ->
                     { acc
                         | qualifiedNodes =
-                            Ok (FunctionRef sourceLocation qualifiedName)
+                            Ok (FunctionRef (mapLoc sourceLocation) qualifiedName)
                                 :: acc.qualifiedNodes
                         , qualifiedFunctions =
                             Dict.union
@@ -1079,7 +1128,7 @@ qualifyNode config currentDefName modRefs node acc =
                                     qualifyNodeResult.qualifiedFunctions
                                 )
                         , qualifiedNodes =
-                            Ok (FunctionRef sourceLocation inlineFuncName)
+                            Ok (FunctionRef (mapLoc sourceLocation) inlineFuncName)
                                 :: acc.qualifiedNodes
                         , inlineFunctionNames =
                             acc.inlineFunctionNames

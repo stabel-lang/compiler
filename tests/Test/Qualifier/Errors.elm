@@ -8,6 +8,7 @@ import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.SourceLocation as PSourceLoc
 import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem exposing (Problem(..))
@@ -34,8 +35,8 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "+"
                                                 ]
                                       }
                                     , { name = "main"
@@ -45,12 +46,12 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "inc"
-                                                , AST.Function emptyRange "inc"
-                                                , AST.Function emptyRange "dec"
-                                                , AST.Integer emptyRange 2
-                                                , AST.Function emptyRange "="
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "inc"
+                                                , AST.Function PSourceLoc.emptyRange "inc"
+                                                , AST.Function PSourceLoc.emptyRange "dec"
+                                                , AST.Integer PSourceLoc.emptyRange 2
+                                                , AST.Function PSourceLoc.emptyRange "="
                                                 ]
                                       }
                                     ]
@@ -73,8 +74,8 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "/external/module/inc"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "/external/module/inc"
                                                 ]
                                       }
                                     ]
@@ -101,8 +102,8 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "+"
                                                 ]
                                       }
                                     , { name = "main"
@@ -112,10 +113,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "inc"
-                                                , AST.Integer emptyRange 2
-                                                , AST.Function emptyRange "="
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "inc"
+                                                , AST.Integer PSourceLoc.emptyRange 2
+                                                , AST.Function PSourceLoc.emptyRange "="
                                                 ]
                                       }
                                     ]
@@ -131,7 +132,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "USMoney"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.UnionMembers
@@ -140,7 +141,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "Dollar"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.StructMembers
@@ -160,7 +161,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "BoxWrapper"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.StructMembers
