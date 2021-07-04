@@ -50,7 +50,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -109,7 +109,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -177,7 +177,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -258,7 +258,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -379,7 +379,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -438,7 +438,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -506,7 +506,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -587,7 +587,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "external-call"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -1311,7 +1311,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "fn1"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -1322,7 +1322,7 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -1394,7 +1394,7 @@ suite =
                                             ]
                                   }
                                 , { name = "fn2"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =

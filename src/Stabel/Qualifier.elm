@@ -359,7 +359,7 @@ qualifyMemberType config modRefs range type_ =
                 ( _, _, Err err ) ->
                     Err err
 
-                ( True, Just (StructMembers []), _ ) ->
+                ( True, Just (StructMembers _), Ok [] ) ->
                     Ok <| Type.Custom name
 
                 ( True, Just (StructMembers _), Ok qualifiedBinds ) ->
@@ -1059,7 +1059,7 @@ qualifyNode config currentDefName modRefs node acc =
                         , inlineFunctionNames =
                             acc.inlineFunctionNames
                                 |> Set.union qualifyNodeResult.inlineFunctionNames
-                                |> Set.insert inlineFuncName
+                                |> Set.insert qualifiedName
                     }
 
                 Ok qualifiedQuotImpl ->

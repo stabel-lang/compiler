@@ -75,7 +75,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -85,7 +85,7 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -95,7 +95,7 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -153,7 +153,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -251,7 +251,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature = TypeSignature.NotProvided
                                   , implementation =
@@ -326,7 +326,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature =
                                             TypeSignature.UserProvided
@@ -345,7 +345,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "main"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
@@ -428,18 +428,18 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , FunctionRef emptyRange "inlinefn:a/1"
+                                                , FunctionRef emptyRange "inc"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "inc"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
@@ -448,19 +448,10 @@ suite =
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "inlinefn:a/1"
-                                      , exposed = False
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            SoloImpl
-                                                [ Function emptyRange "inc"
-                                                ]
-                                      }
                                     ]
                             , referenceableFunctions =
                                 Set.fromList
-                                    [ "inlinefn:a/1" ]
+                                    [ "inc" ]
                             }
                     in
                     QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -501,7 +492,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
@@ -635,7 +626,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
@@ -717,7 +708,7 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
-                                      , exposed = False
+                                      , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
@@ -840,7 +831,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "true?"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -1000,7 +991,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/into-cents"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -1023,7 +1014,7 @@ suite =
                                             []
                                   }
                                 , { name = "/stabel/test/some/module/add-money"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -1039,7 +1030,7 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/quote-excuse"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.UserProvided
@@ -1065,7 +1056,7 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/>Dollar"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1076,7 +1067,7 @@ suite =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1087,7 +1078,7 @@ suite =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1099,7 +1090,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1111,7 +1102,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1123,7 +1114,7 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1135,7 +1126,9 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 ]
-                        , referenceableFunctions = Set.empty
+                        , referenceableFunctions =
+                            Set.fromList
+                                [ "inlinefn:/stabel/test/some/module/quote-excuse/1" ]
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
@@ -1232,7 +1225,7 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/>Dollar"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1243,7 +1236,7 @@ suite =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1254,7 +1247,7 @@ suite =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Wallet"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1265,7 +1258,7 @@ suite =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1277,7 +1270,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1289,7 +1282,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>user-id"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1301,7 +1294,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/>value"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1313,7 +1306,7 @@ suite =
                                             [ SetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1325,7 +1318,7 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1337,7 +1330,7 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/user-id>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided
@@ -1349,7 +1342,7 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/value>"
-                                  , exposed = False
+                                  , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
                                         TypeSignature.CompilerProvided

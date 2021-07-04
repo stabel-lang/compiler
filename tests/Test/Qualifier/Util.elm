@@ -149,7 +149,7 @@ addFunctionsForStructsHelper name generics members ast =
                     { input = List.map Tuple.second members
                     , output = [ selfType ]
                     }
-            , exposed = False
+            , exposed = True
             , implementation = AST.SoloImpl [ AST.ConstructType name ]
             }
 
@@ -164,7 +164,7 @@ addFunctionsForStructsHelper name generics members ast =
                     { input = [ selfType, type_ ]
                     , output = [ selfType ]
                     }
-            , exposed = False
+            , exposed = True
             , implementation =
                 AST.SoloImpl [ AST.SetMember name memberName ]
             }
@@ -180,7 +180,7 @@ addFunctionsForStructsHelper name generics members ast =
                     { input = [ selfType ]
                     , output = [ type_ ]
                     }
-            , exposed = False
+            , exposed = True
             , implementation =
                 AST.SoloImpl [ AST.GetMember name memberName ]
             }

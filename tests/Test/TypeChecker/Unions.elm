@@ -498,9 +498,7 @@ suite =
                               }
                             , { name = "main"
                               , type_ = { input = [], output = [ Type.Int ] }
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.asEntryPoint
+                              , metadata = Metadata.default
                               , implementation =
                                     SoloImpl
                                         [ Word emptyRange
