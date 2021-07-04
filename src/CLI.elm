@@ -1,9 +1,11 @@
 port module CLI exposing (main)
 
+import Dict
 import Json.Decode as Json
 import Json.Encode as Encode
 import Platform exposing (Program)
 import Stabel.Codegen as Codegen
+import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
 import Stabel.PackageLoader as PackageLoader
 import Stabel.TypeChecker as TypeChecker
@@ -19,7 +21,7 @@ type alias Flags =
 
 
 type alias Model =
-    PackageLoader.Model
+    ( Maybe String, PackageLoader.Model )
 
 
 type Msg
@@ -41,11 +43,10 @@ init { projectDir, entryPoint, stdLibPath } =
         initialModel =
             PackageLoader.init
                 { projectDirPath = projectDir
-                , possibleEntryPoint = entryPoint
                 , stdLibPath = stdLibPath
                 }
     in
-    ( initialModel
+    ( ( entryPoint, initialModel )
     , sendSideEffectFromModel initialModel
     )
 
@@ -59,25 +60,38 @@ sendSideEffectFromModel model =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg (( entryPoint, packageLoaderModel ) as model) =
     case msg of
         Incomming packageLoaderMsgJson ->
             case Json.decodeValue decodePackageLoaderMsg packageLoaderMsgJson of
                 Ok packageLoaderMsg ->
                     let
                         updatedModel =
-                            PackageLoader.update packageLoaderMsg model
+                            PackageLoader.update packageLoaderMsg packageLoaderModel
                     in
                     case updatedModel of
                         PackageLoader.Done qualifiedAst ->
                             let
+                                setEntryPoint word =
+                                    { word | metadata = Metadata.asEntryPoint word.metadata }
+
                                 compilationResult =
                                     case TypeChecker.run qualifiedAst of
                                         Err typeErrors ->
                                             formatErrors (TypeCheckerProblem.toString "") typeErrors
 
                                         Ok typedAst ->
-                                            Codegen.codegen typedAst
+                                            (case entryPoint of
+                                                Nothing ->
+                                                    typedAst
+
+                                                Just fnName ->
+                                                    { typedAst
+                                                        | words =
+                                                            Dict.update fnName (Maybe.map setEntryPoint) typedAst.words
+                                                    }
+                                            )
+                                                |> Codegen.codegen
                                                 |> Result.mapError (always "compfail")
                                                 |> Result.map Wasm.toString
                             in
@@ -100,7 +114,7 @@ update msg model =
                             )
 
                         _ ->
-                            ( updatedModel
+                            ( ( entryPoint, updatedModel )
                             , sendSideEffectFromModel updatedModel
                             )
 
