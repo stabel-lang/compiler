@@ -2,10 +2,12 @@ module Test.TypeChecker.Unions exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
+import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type exposing (Type)
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Qualifier as QAST
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
@@ -27,7 +29,9 @@ suite =
                     input =
                         template
                             { name = "to-int"
-                            , metadata = Metadata.default
+                            , exposed = True
+                            , sourceLocation = Nothing
+                            , typeSignature = TypeSignature.NotProvided
                             , implementation =
                                 QAST.MultiImpl
                                     [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
@@ -51,9 +55,13 @@ suite =
                     input =
                         template
                             { name = "to-int"
-                            , metadata =
-                                Metadata.default
-                                    |> Metadata.withType [ boolUnion ] [ Type.Int ]
+                            , exposed = True
+                            , sourceLocation = Nothing
+                            , typeSignature =
+                                TypeSignature.UserProvided
+                                    { input = [ boolUnion ]
+                                    , output = [ Type.Int ]
+                                    }
                             , implementation =
                                 QAST.MultiImpl
                                     [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
@@ -77,9 +85,13 @@ suite =
                     input =
                         template
                             { name = "to-int"
-                            , metadata =
-                                Metadata.default
-                                    |> Metadata.withType [ boolUnion ] [ Type.Int ]
+                            , exposed = True
+                            , sourceLocation = Nothing
+                            , typeSignature =
+                                TypeSignature.UserProvided
+                                    { input = [ boolUnion ]
+                                    , output = [ Type.Int ]
+                                    }
                             , implementation =
                                 QAST.MultiImpl
                                     [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
@@ -100,7 +112,9 @@ suite =
                     input =
                         template
                             { name = "to-int"
-                            , metadata = Metadata.default
+                            , exposed = True
+                            , sourceLocation = Nothing
+                            , typeSignature = TypeSignature.NotProvided
                             , implementation =
                                 QAST.MultiImpl
                                     [ ( QAST.TypeMatch emptyRange (Type.Custom "False") []
@@ -120,29 +134,40 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "Beings"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "Person"
-                                    , Type.Custom "Dog"
-                                    ]
-                                , QAST.CustomTypeDef "Person"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "age", Type.Int ) ]
-                                , QAST.CustomTypeDef "Dog"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "man-years", Type.Int ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Beings"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.UnionMembers
+                                            [ Type.Custom "Person"
+                                            , Type.Custom "Dog"
+                                            ]
+                                  }
+                                , { name = "Person"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "age", Type.Int ) ]
+                                  }
+                                , { name = "Dog"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "man-years", Type.Int ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "add-to-age"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
@@ -159,7 +184,9 @@ suite =
                                             []
                                   }
                                 , { name = "get-man-age"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "Person") []
@@ -172,9 +199,9 @@ suite =
                                             []
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 18
@@ -193,6 +220,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -202,21 +230,36 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "Bool"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , QAST.CustomTypeDef "True" True emptyRange [] []
-                                , QAST.CustomTypeDef "False" True emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        QAST.UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "not"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Custom "True") []
@@ -233,9 +276,13 @@ suite =
                                             []
                                   }
                                 , { name = "true-to-int"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "True" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "True" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Builtin emptyRange Builtin.StackDrop
@@ -243,9 +290,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "True"
@@ -254,6 +301,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -269,35 +317,44 @@ suite =
 
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "List"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
-                                    , Type.Custom "EmptyList"
-                                    ]
-                                , QAST.CustomTypeDef "NonEmptyList"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ ( "first", Type.Generic "a" )
-                                    , ( "rest", listUnion )
-                                    ]
-                                , QAST.CustomTypeDef "EmptyList"
-                                    True
-                                    emptyRange
-                                    []
-                                    []
+                            Dict.fromListBy .name
+                                [ { name = "List"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.UnionMembers
+                                            [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
+                                            , Type.Custom "EmptyList"
+                                            ]
+                                  }
+                                , { name = "NonEmptyList"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.StructMembers
+                                            [ ( "first", Type.Generic "a" )
+                                            , ( "rest", listUnion )
+                                            ]
+                                  }
+                                , { name = "EmptyList"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "first-or-default"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ listUnion, Type.Generic "a" ]
-                                                [ Type.Generic "a" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ listUnion, Type.Generic "a" ]
+                                            , output = [ Type.Generic "a" ]
+                                            }
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]) []
@@ -314,9 +371,9 @@ suite =
                                             []
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Integer emptyRange 1
@@ -329,6 +386,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -344,28 +402,34 @@ suite =
 
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "Maybe"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ Type.Generic "a"
-                                    , Type.Custom "Nil"
-                                    ]
-                                , QAST.CustomTypeDef "Nil"
-                                    True
-                                    emptyRange
-                                    []
-                                    []
+                            Dict.fromListBy .name
+                                [ { name = "Maybe"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.UnionMembers
+                                            [ Type.Generic "a"
+                                            , Type.Custom "Nil"
+                                            ]
+                                  }
+                                , { name = "Nil"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "with-default"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ maybeUnion, Type.Generic "a" ]
-                                                [ Type.Generic "a" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ maybeUnion, Type.Generic "a" ]
+                                            , output = [ Type.Generic "a" ]
+                                            }
                                   , implementation =
                                         QAST.MultiImpl
                                             [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
@@ -381,9 +445,9 @@ suite =
                                             []
                                   }
                                 , { name = "main"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         QAST.SoloImpl
                                             [ QAST.Function emptyRange "Nil"
@@ -392,84 +456,71 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
 
                     expectedResult =
-                        { types =
-                            Dict.fromListBy typeDefName
-                                [ UnionTypeDef "Maybe"
-                                    emptyRange
-                                    [ "a" ]
-                                    [ Type.Generic "a"
-                                    , Type.Custom "Nil"
-                                    ]
-                                , CustomTypeDef "Nil" emptyRange [] []
-                                ]
-                        , words =
-                            Dict.fromListBy .name
-                                [ { name = "Nil"
-                                  , type_ = { input = [], output = [ Type.Custom "Nil" ] }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
-                                  , implementation =
-                                        SoloImpl
-                                            [ ConstructType "Nil"
+                        Dict.fromListBy .name
+                            [ { name = "Nil"
+                              , type_ = { input = [], output = [ Type.Custom "Nil" ] }
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
+                              , implementation =
+                                    SoloImpl
+                                        [ ConstructType "Nil"
+                                        ]
+                              }
+                            , { name = "with-default"
+                              , type_ =
+                                    { input = [ maybeUnion, Type.Generic "a" ]
+                                    , output = [ Type.Generic "a" ]
+                                    }
+                              , metadata =
+                                    Metadata.default
+                                        |> Metadata.withType
+                                            [ maybeUnion, Type.Generic "a" ]
+                                            [ Type.Generic "a" ]
+                              , implementation =
+                                    MultiImpl
+                                        [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                          , [ Builtin emptyRange Builtin.StackDrop
                                             ]
-                                  }
-                                , { name = "with-default"
-                                  , type_ =
-                                        { input = [ maybeUnion, Type.Generic "a" ]
-                                        , output = [ Type.Generic "a" ]
-                                        }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ maybeUnion, Type.Generic "a" ]
-                                                [ Type.Generic "a" ]
-                                  , implementation =
-                                        MultiImpl
-                                            [ ( TypeMatch emptyRange (Type.Generic "a") []
-                                              , [ Builtin emptyRange Builtin.StackDrop
-                                                ]
-                                              )
-                                            , ( TypeMatch emptyRange (Type.Custom "Nil") []
-                                              , [ Builtin emptyRange Builtin.StackSwap
-                                                , Builtin emptyRange Builtin.StackDrop
-                                                ]
-                                              )
+                                          )
+                                        , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                          , [ Builtin emptyRange Builtin.StackSwap
+                                            , Builtin emptyRange Builtin.StackDrop
                                             ]
-                                            []
-                                  }
-                                , { name = "main"
-                                  , type_ = { input = [], output = [ Type.Int ] }
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.asEntryPoint
-                                  , implementation =
-                                        SoloImpl
-                                            [ Word emptyRange
-                                                "Nil"
-                                                { input = []
-                                                , output = [ Type.Custom "Nil" ]
-                                                }
-                                            , IntLiteral emptyRange 1
-                                            , Word emptyRange
-                                                "with-default"
-                                                { input =
-                                                    [ Type.Union (Just "Maybe")
-                                                        [ Type.Int
-                                                        , Type.Custom "Nil"
-                                                        ]
-                                                    , Type.Int
+                                          )
+                                        ]
+                                        []
+                              }
+                            , { name = "main"
+                              , type_ = { input = [], output = [ Type.Int ] }
+                              , metadata = Metadata.default
+                              , implementation =
+                                    SoloImpl
+                                        [ Word emptyRange
+                                            "Nil"
+                                            { input = []
+                                            , output = [ Type.Custom "Nil" ]
+                                            }
+                                        , IntLiteral emptyRange 1
+                                        , Word emptyRange
+                                            "with-default"
+                                            { input =
+                                                [ Type.Union (Just "Maybe")
+                                                    [ Type.Int
+                                                    , Type.Custom "Nil"
                                                     ]
-                                                , output = [ Type.Int ]
-                                                }
-                                            ]
-                                  }
-                                ]
-                        }
+                                                , Type.Int
+                                                ]
+                                            , output = [ Type.Int ]
+                                            }
+                                        ]
+                              }
+                            ]
                 in
                 expectAst input expectedResult
         , test "Generic union fails if not generic is listed" <|
@@ -477,22 +528,27 @@ suite =
                 let
                     input =
                         { types =
-                            Dict.fromListBy QAST.typeDefinitionName
-                                [ QAST.UnionTypeDef "Maybe"
-                                    True
-                                    emptyRange
-                                    [ "a" ]
-                                    [ Type.Generic "b"
-                                    , Type.Custom "Nothing"
-                                    ]
-                                , QAST.CustomTypeDef "Nothing"
-                                    True
-                                    emptyRange
-                                    []
-                                    []
+                            Dict.fromListBy .name
+                                [ { name = "Maybe"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = [ "a" ]
+                                  , members =
+                                        QAST.UnionMembers
+                                            [ Type.Generic "b"
+                                            , Type.Custom "Nothing"
+                                            ]
+                                  }
+                                , { name = "Nothing"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = QAST.StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.empty
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -511,24 +567,37 @@ boolUnion =
 template : QAST.FunctionDefinition -> QAST.AST
 template multiFn =
     { types =
-        Dict.fromListBy QAST.typeDefinitionName
-            [ QAST.UnionTypeDef "Bool"
-                True
-                emptyRange
-                []
-                [ Type.Custom "True"
-                , Type.Custom "False"
-                ]
-            , QAST.CustomTypeDef "True" True emptyRange [] []
-            , QAST.CustomTypeDef "False" True emptyRange [] []
+        Dict.fromListBy .name
+            [ { name = "Bool"
+              , exposed = True
+              , sourceLocation = emptyRange
+              , generics = []
+              , members =
+                    QAST.UnionMembers
+                        [ Type.Custom "True"
+                        , Type.Custom "False"
+                        ]
+              }
+            , { name = "True"
+              , exposed = True
+              , sourceLocation = emptyRange
+              , generics = []
+              , members = QAST.StructMembers []
+              }
+            , { name = "False"
+              , exposed = True
+              , sourceLocation = emptyRange
+              , generics = []
+              , members = QAST.StructMembers []
+              }
             ]
     , functions =
         Dict.fromListBy .name
             [ multiFn
             , { name = "main"
-              , metadata =
-                    Metadata.default
-                        |> Metadata.asEntryPoint
+              , exposed = True
+              , sourceLocation = Nothing
+              , typeSignature = TypeSignature.NotProvided
               , implementation =
                     QAST.SoloImpl
                         [ QAST.Function emptyRange "True"
@@ -539,5 +608,6 @@ template multiFn =
                         ]
               }
             ]
+    , referenceableFunctions = Set.empty
     }
         |> QualifierUtil.addFunctionsForStructs

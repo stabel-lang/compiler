@@ -5,12 +5,13 @@ import Dict.Extra as Dict
 import Expect
 import Set
 import Stabel.Data.Builtin as Builtin
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as AST
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.SourceLocation as PSourceLoc
 import Stabel.Parser.Type as AST
 import Stabel.Qualifier exposing (..)
 import Test exposing (Test, describe, test)
@@ -37,8 +38,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "+"
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "+"
                                             ]
                                   }
                                 , { name = "dec"
@@ -48,8 +49,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "-"
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "-"
                                             ]
                                   }
                                 , { name = "main"
@@ -59,12 +60,12 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Integer emptyRange 1
-                                            , AST.Function emptyRange "inc"
-                                            , AST.Function emptyRange "inc"
-                                            , AST.Function emptyRange "dec"
-                                            , AST.Integer emptyRange 2
-                                            , AST.Function emptyRange "="
+                                            [ AST.Integer PSourceLoc.emptyRange 1
+                                            , AST.Function PSourceLoc.emptyRange "inc"
+                                            , AST.Function PSourceLoc.emptyRange "inc"
+                                            , AST.Function PSourceLoc.emptyRange "dec"
+                                            , AST.Integer PSourceLoc.emptyRange 2
+                                            , AST.Function PSourceLoc.emptyRange "="
                                             ]
                                   }
                                 ]
@@ -75,7 +76,9 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "inc"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -83,7 +86,9 @@ suite =
                                             ]
                                   }
                                 , { name = "dec"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -91,7 +96,9 @@ suite =
                                             ]
                                   }
                                 , { name = "main"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 1
@@ -103,6 +110,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -133,9 +141,9 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "swap"
-                                            , AST.Function emptyRange "dup"
-                                            , AST.Function emptyRange "rotate"
+                                            [ AST.Function PSourceLoc.emptyRange "swap"
+                                            , AST.Function PSourceLoc.emptyRange "dup"
+                                            , AST.Function PSourceLoc.emptyRange "rotate"
                                             ]
                                   }
                                 ]
@@ -146,14 +154,17 @@ suite =
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "over"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Generic "a", Type.Generic "b" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                                            , output =
                                                 [ Type.Generic "a"
                                                 , Type.Generic "b"
                                                 , Type.Generic "a"
                                                 ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Builtin emptyRange Builtin.StackSwap
@@ -162,6 +173,7 @@ suite =
                                             ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -174,7 +186,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Bool"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -183,12 +195,12 @@ suite =
                                             ]
                                   }
                                 , { name = "True"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "False"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
@@ -202,8 +214,8 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "False" []) [], [ AST.Integer emptyRange 0 ] )
-                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "True" []) [], [ AST.Integer emptyRange 1 ] )
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "False" []) [], [ AST.Integer PSourceLoc.emptyRange 0 ] )
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "True" []) [], [ AST.Integer PSourceLoc.emptyRange 1 ] )
                                             ]
                                             []
                                   }
@@ -213,21 +225,36 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" True emptyRange [] []
-                                , CustomTypeDef "False" True emptyRange [] []
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "to-int"
-                                  , metadata = Metadata.default
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "False") [], [ Integer emptyRange 0 ] )
@@ -236,6 +263,7 @@ suite =
                                             []
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -268,7 +296,7 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Function emptyRange "!"
+                                                [ AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     , { name = "main"
@@ -278,17 +306,17 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.Function PSourceLoc.emptyRange "+"
                                                     ]
-                                                , AST.Function emptyRange "apply-to-num"
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.Function emptyRange "-"
+                                                , AST.Function PSourceLoc.emptyRange "apply-to-num"
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.Function PSourceLoc.emptyRange "-"
                                                     ]
-                                                , AST.Function emptyRange "apply-to-num"
+                                                , AST.Function PSourceLoc.emptyRange "apply-to-num"
                                                 ]
                                       }
                                     ]
@@ -299,23 +327,28 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "apply-to-num"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.withType
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature =
+                                            TypeSignature.UserProvided
+                                                { input =
                                                     [ Type.Int
                                                     , Type.FunctionSignature
                                                         { input = [ Type.Int ]
                                                         , output = [ Type.Int ]
                                                         }
                                                     ]
-                                                    [ Type.Int ]
+                                                , output = [ Type.Int ]
+                                                }
                                       , implementation =
                                             SoloImpl
                                                 [ Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "main"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -326,9 +359,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/2"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -336,15 +369,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Minus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inlinefn:main/2"
+                                    , "inlinefn:main/1"
                                     ]
                             }
                     in
@@ -365,11 +403,11 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Function emptyRange "inc"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Function PSourceLoc.emptyRange "inc"
                                                     ]
-                                                , AST.Function emptyRange "!"
+                                                , AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     , { name = "inc"
@@ -379,8 +417,8 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.Function PSourceLoc.emptyRange "+"
                                                 ]
                                       }
                                     ]
@@ -391,32 +429,30 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "a"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
-                                                , FunctionRef emptyRange "inlinefn:a/1"
+                                                , FunctionRef emptyRange "inc"
                                                 , Builtin emptyRange Builtin.Apply
                                                 ]
                                       }
                                     , { name = "inc"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "inlinefn:a/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
-                                      , implementation =
-                                            SoloImpl
-                                                [ Function emptyRange "inc"
-                                                ]
-                                      }
                                     ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inc" ]
                             }
                     in
                     QualifierUtil.expectOutput unqualifiedAst expectedAst
@@ -436,17 +472,17 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.SoloImpl
-                                                [ AST.Integer emptyRange 1
-                                                , AST.InlineFunction emptyRange
-                                                    [ AST.Integer emptyRange 1
-                                                    , AST.InlineFunction emptyRange
-                                                        [ AST.Integer emptyRange 1
-                                                        , AST.Function emptyRange "+"
+                                                [ AST.Integer PSourceLoc.emptyRange 1
+                                                , AST.InlineFunction PSourceLoc.emptyRange
+                                                    [ AST.Integer PSourceLoc.emptyRange 1
+                                                    , AST.InlineFunction PSourceLoc.emptyRange
+                                                        [ AST.Integer PSourceLoc.emptyRange 1
+                                                        , AST.Function PSourceLoc.emptyRange "+"
                                                         ]
-                                                    , AST.Function emptyRange "!"
-                                                    , AST.Function emptyRange "+"
+                                                    , AST.Function PSourceLoc.emptyRange "!"
+                                                    , AST.Function PSourceLoc.emptyRange "+"
                                                     ]
-                                                , AST.Function emptyRange "!"
+                                                , AST.Function PSourceLoc.emptyRange "!"
                                                 ]
                                       }
                                     ]
@@ -457,7 +493,9 @@ suite =
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "main"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -466,9 +504,9 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
@@ -478,15 +516,20 @@ suite =
                                                 ]
                                       }
                                     , { name = "inlinefn:main/1/1"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.isInline
+                                      , exposed = False
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             SoloImpl
                                                 [ Integer emptyRange 1
                                                 , Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
+                                    ]
+                            , referenceableFunctions =
+                                Set.fromList
+                                    [ "inlinefn:main/1"
+                                    , "inlinefn:main/1/1"
                                     ]
                             }
                     in
@@ -502,7 +545,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Bool"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.UnionMembers
@@ -511,17 +554,17 @@ suite =
                                                 ]
                                       }
                                     , { name = "True"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
                                     , { name = "False"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
                                     , { name = "Box"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members =
                                             AST.StructMembers
@@ -537,11 +580,11 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
-                                                  , [ AST.Function emptyRange "True" ]
+                                                [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Box" []) [ ( "value", AST.LiteralInt 0 ) ]
+                                                  , [ AST.Function PSourceLoc.emptyRange "True" ]
                                                   )
                                                 ]
-                                                [ AST.Function emptyRange "False" ]
+                                                [ AST.Function PSourceLoc.emptyRange "False" ]
                                       }
                                     ]
                             }
@@ -549,26 +592,44 @@ suite =
 
                         expectedAst =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Bool"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ Type.Custom "True"
-                                        , Type.Custom "False"
-                                        ]
-                                    , CustomTypeDef "True" True emptyRange [] []
-                                    , CustomTypeDef "False" True emptyRange [] []
-                                    , CustomTypeDef "Box"
-                                        True
-                                        emptyRange
-                                        []
-                                        [ ( "value", Type.Int ) ]
+                                Dict.fromListBy .name
+                                    [ { name = "Bool"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            UnionMembers
+                                                [ Type.Custom "True"
+                                                , Type.Custom "False"
+                                                ]
+                                      }
+                                    , { name = "True"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
+                                    , { name = "False"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
+                                    , { name = "Box"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members =
+                                            StructMembers
+                                                [ ( "value", Type.Int ) ]
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "zero?"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (Type.Custom "Box") [ ( "value", LiteralInt 0 ) ], [ Function emptyRange "True" ] )
@@ -576,6 +637,7 @@ suite =
                                                 [ Function emptyRange "False" ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -589,7 +651,7 @@ suite =
                             , types =
                                 Dict.fromListBy .name
                                     [ { name = "Maybe"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = [ "a" ]
                                       , members =
                                             AST.UnionMembers
@@ -598,7 +660,7 @@ suite =
                                                 ]
                                       }
                                     , { name = "Nothing"
-                                      , sourceLocation = emptyRange
+                                      , sourceLocation = PSourceLoc.emptyRange
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -612,12 +674,12 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             AST.MultiImpl
-                                                [ ( AST.TypeMatch emptyRange (AST.Generic "a") []
-                                                  , [ AST.Function emptyRange "drop" ]
+                                                [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.Generic "a") []
+                                                  , [ AST.Function PSourceLoc.emptyRange "drop" ]
                                                   )
                                                 ]
-                                                [ AST.Function emptyRange "swap"
-                                                , AST.Function emptyRange "drop"
+                                                [ AST.Function PSourceLoc.emptyRange "swap"
+                                                , AST.Function PSourceLoc.emptyRange "drop"
                                                 ]
                                       }
                                     ]
@@ -626,20 +688,30 @@ suite =
 
                         expectedAst =
                             { types =
-                                Dict.fromListBy typeDefinitionName
-                                    [ UnionTypeDef "Maybe"
-                                        True
-                                        emptyRange
-                                        [ "a" ]
-                                        [ Type.Generic "a"
-                                        , Type.Custom "Nothing"
-                                        ]
-                                    , CustomTypeDef "Nothing" True emptyRange [] []
+                                Dict.fromListBy .name
+                                    [ { name = "Maybe"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = [ "a" ]
+                                      , members =
+                                            UnionMembers
+                                                [ Type.Generic "a"
+                                                , Type.Custom "Nothing"
+                                                ]
+                                      }
+                                    , { name = "Nothing"
+                                      , exposed = True
+                                      , sourceLocation = emptyRange
+                                      , generics = []
+                                      , members = StructMembers []
+                                      }
                                     ]
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "with-default"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             MultiImpl
                                                 [ ( TypeMatch emptyRange (Type.Generic "a") []
@@ -651,6 +723,7 @@ suite =
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                                 |> QualifierUtil.addFunctionsForStructs
                     in
@@ -671,7 +744,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Bool"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -680,17 +753,17 @@ suite =
                                             ]
                                   }
                                 , { name = "True"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "False"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
                                 , { name = "Box"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -710,13 +783,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange
                                                     (AST.LocalRef "Box" [])
                                                     [ ( "value", AST.LiteralType (AST.LocalRef "True" []) ) ]
-                                              , [ AST.Function emptyRange "True" ]
+                                              , [ AST.Function PSourceLoc.emptyRange "True" ]
                                               )
                                             ]
-                                            [ AST.Function emptyRange "False" ]
+                                            [ AST.Function PSourceLoc.emptyRange "False" ]
                                   }
                                 ]
                         }
@@ -724,28 +797,48 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef "Bool"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ Type.Custom "True"
-                                    , Type.Custom "False"
-                                    ]
-                                , CustomTypeDef "True" True emptyRange [] []
-                                , CustomTypeDef "False" True emptyRange [] []
-                                , CustomTypeDef "Box"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "value", boolUnion ) ]
+                            Dict.fromListBy .name
+                                [ { name = "Bool"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        UnionMembers
+                                            [ Type.Custom "True"
+                                            , Type.Custom "False"
+                                            ]
+                                  }
+                                , { name = "True"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "False"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = StructMembers []
+                                  }
+                                , { name = "Box"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "value", boolUnion ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "true?"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType [ Type.Custom "Box" ] [ boolUnion ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "Box" ]
+                                            , output = [ boolUnion ]
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange
@@ -757,6 +850,7 @@ suite =
                                             [ Function emptyRange "False" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                             |> QualifierUtil.addFunctionsForStructs
                 in
@@ -779,7 +873,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "USMoney"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -788,14 +882,14 @@ suite =
                                             ]
                                   }
                                 , { name = "Dollar"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
                                             [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                   }
                                 , { name = "Cent"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -815,14 +909,14 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Dollar" []) []
-                                              , [ AST.Function emptyRange "dollar-value>"
-                                                , AST.Integer emptyRange 100
-                                                , AST.Function emptyRange "*"
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Dollar" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "dollar-value>"
+                                                , AST.Integer PSourceLoc.emptyRange 100
+                                                , AST.Function PSourceLoc.emptyRange "*"
                                                 ]
                                               )
-                                            , ( AST.TypeMatch emptyRange (AST.LocalRef "Cent" []) []
-                                              , [ AST.Function emptyRange "cent-value>"
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Cent" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "cent-value>"
                                                 ]
                                               )
                                             ]
@@ -839,10 +933,10 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "into-cents"
-                                            , AST.Function emptyRange "swap"
-                                            , AST.Function emptyRange "into-cents"
-                                            , AST.Function emptyRange "+"
+                                            [ AST.Function PSourceLoc.emptyRange "into-cents"
+                                            , AST.Function PSourceLoc.emptyRange "swap"
+                                            , AST.Function PSourceLoc.emptyRange "into-cents"
+                                            , AST.Function PSourceLoc.emptyRange "+"
                                             ]
                                   }
                                 , { name = "quote-excuse"
@@ -856,13 +950,13 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.Function emptyRange "dollar-value>"
-                                            , AST.InlineFunction emptyRange
-                                                [ AST.Integer emptyRange 2
-                                                , AST.Function emptyRange "*"
+                                            [ AST.Function PSourceLoc.emptyRange "dollar-value>"
+                                            , AST.InlineFunction PSourceLoc.emptyRange
+                                                [ AST.Integer PSourceLoc.emptyRange 2
+                                                , AST.Function PSourceLoc.emptyRange "*"
                                                 ]
-                                            , AST.Function emptyRange "!"
-                                            , AST.Function emptyRange ">Dollar"
+                                            , AST.Function PSourceLoc.emptyRange "!"
+                                            , AST.Function PSourceLoc.emptyRange ">Dollar"
                                             ]
                                   }
                                 ]
@@ -871,34 +965,40 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef
-                                    "/stabel/test/some/module/USMoney"
-                                    True
-                                    emptyRange
-                                    []
-                                    qualifiedUsMoneyUnion
-                                , CustomTypeDef "/stabel/test/some/module/Dollar"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Cent"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "cent-value", Type.Int ) ]
+                            Dict.fromListBy .name
+                                [ { name = "/stabel/test/some/module/USMoney"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = UnionMembers qualifiedUsMoneyUnion
+                                  }
+                                , { name = "/stabel/test/some/module/Dollar"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "dollar-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Cent"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "cent-value", Type.Int ) ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/into-cents"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ qualifiedUsMoneyUnionType
-                                                ]
-                                                [ qualifiedUsMoneyUnionType
-                                                ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ qualifiedUsMoneyUnionType ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
@@ -915,11 +1015,13 @@ suite =
                                             []
                                   }
                                 , { name = "/stabel/test/some/module/add-money"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
-                                                [ qualifiedUsMoneyUnionType ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Function emptyRange "/stabel/test/some/module/into-cents"
@@ -929,11 +1031,13 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/quote-excuse"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.UserProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ Function emptyRange "/stabel/test/some/module/dollar-value>"
@@ -943,9 +1047,9 @@ suite =
                                             ]
                                   }
                                 , { name = "inlinefn:/stabel/test/some/module/quote-excuse/1"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.isInline
+                                  , exposed = False
+                                  , sourceLocation = Nothing
+                                  , typeSignature = TypeSignature.NotProvided
                                   , implementation =
                                         SoloImpl
                                             [ Integer emptyRange 2
@@ -953,56 +1057,79 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/>Dollar"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 ]
+                        , referenceableFunctions =
+                            Set.fromList
+                                [ "inlinefn:/stabel/test/some/module/quote-excuse/1" ]
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
@@ -1024,7 +1151,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "USMoney"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -1033,7 +1160,7 @@ suite =
                                             ]
                                   }
                                 , { name = "Wallet"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1042,14 +1169,14 @@ suite =
                                             ]
                                   }
                                 , { name = "Dollar"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
                                             [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
                                   }
                                 , { name = "Cent"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1062,130 +1189,173 @@ suite =
 
                     expectedAst =
                         { types =
-                            Dict.fromListBy typeDefinitionName
-                                [ UnionTypeDef
-                                    "/stabel/test/some/module/USMoney"
-                                    True
-                                    emptyRange
-                                    []
-                                    qualifiedUsMoneyUnion
-                                , CustomTypeDef "/stabel/test/some/module/Dollar"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "dollar-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Cent"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "cent-value", Type.Int ) ]
-                                , CustomTypeDef "/stabel/test/some/module/Wallet"
-                                    True
-                                    emptyRange
-                                    []
-                                    [ ( "user-id", Type.Int )
-                                    , ( "value", qualifiedUsMoneyUnionType )
-                                    ]
+                            Dict.fromListBy .name
+                                [ { name = "/stabel/test/some/module/USMoney"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members = UnionMembers qualifiedUsMoneyUnion
+                                  }
+                                , { name = "/stabel/test/some/module/Dollar"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "dollar-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Cent"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "cent-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Wallet"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "user-id", Type.Int )
+                                            , ( "value", qualifiedUsMoneyUnionType )
+                                            ]
+                                  }
                                 ]
                         , functions =
                             Dict.fromListBy .name
                                 [ { name = "/stabel/test/some/module/>Dollar"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Cent"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int ] [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
                                   }
                                 , { name = "/stabel/test/some/module/>Wallet"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Int, qualifiedUsMoneyUnionType ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Int, qualifiedUsMoneyUnionType ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
                                   }
                                 , { name = "/stabel/test/some/module/>dollar-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>cent-value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/>user-id"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/>value"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
+                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ SetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 , { name = "/stabel/test/some/module/dollar-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Dollar" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/cent-value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Cent" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
                                   }
                                 , { name = "/stabel/test/some/module/user-id>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType [ Type.Custom "/stabel/test/some/module/Wallet" ] [ Type.Int ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            , output = [ Type.Int ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Wallet" "user-id" ]
                                   }
                                 , { name = "/stabel/test/some/module/value>"
-                                  , metadata =
-                                        Metadata.default
-                                            |> Metadata.withVerifiedType
-                                                [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                                [ qualifiedUsMoneyUnionType ]
+                                  , exposed = True
+                                  , sourceLocation = Nothing
+                                  , typeSignature =
+                                        TypeSignature.CompilerProvided
+                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                            , output = [ qualifiedUsMoneyUnionType ]
+                                            }
                                   , implementation =
                                         SoloImpl
                                             [ GetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 ]
+                        , referenceableFunctions = Set.empty
                         }
                 in
                 QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
@@ -1207,7 +1377,7 @@ suite =
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Tipe"
-                                  , sourceLocation = emptyRange
+                                  , sourceLocation = PSourceLoc.emptyRange
                                   , generics = []
                                   , members =
                                         AST.StructMembers
@@ -1227,15 +1397,15 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
-                                              , [ AST.PackageFunction emptyRange [ "package", "module" ] "when-one"
+                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
+                                              , [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-one"
                                                 ]
                                               )
-                                            , ( AST.TypeMatch emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
-                                              , [ AST.Function emptyRange "drop" ]
+                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
+                                              , [ AST.Function PSourceLoc.emptyRange "drop" ]
                                               )
                                             ]
-                                            [ AST.PackageFunction emptyRange [ "package", "module" ] "when-other-one" ]
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-other-one" ]
                                   }
                                 , { name = "main"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
@@ -1244,10 +1414,10 @@ suite =
                                   , imports = Dict.fromList [ ( "/list/of/names", [ "one" ] ) ]
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageFunction emptyRange [ "html" ] "div"
-                                            , AST.Function emptyRange "call-external"
-                                            , AST.ExternalFunction emptyRange [ "some", "ext" ] "word"
-                                            , AST.PackageFunction emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "html" ] "div"
+                                            , AST.Function PSourceLoc.emptyRange "call-external"
+                                            , AST.ExternalFunction PSourceLoc.emptyRange [ "some", "ext" ] "word"
+                                            , AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]
@@ -1301,7 +1471,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         AST.SoloImpl
-                                            [ AST.PackageFunction emptyRange [ "ali" ] "word1"
+                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
                                             ]
                                   }
                                 ]

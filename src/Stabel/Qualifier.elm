@@ -3,12 +3,12 @@ module Stabel.Qualifier exposing
     , FunctionDefinition
     , FunctionImplementation(..)
     , Node(..)
-    , TypeDefinition(..)
+    , TypeDefinition
+    , TypeDefinitionMembers(..)
     , TypeMatch(..)
     , TypeMatchValue(..)
     , requiredModules
     , run
-    , typeDefinitionName
     )
 
 import Dict exposing (Dict)
@@ -16,10 +16,9 @@ import List.Extra as List
 import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
-import Stabel.Data.Metadata as Metadata exposing (Metadata)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
-import Stabel.Data.TypeSignature as TypeSignature
+import Stabel.Data.TypeSignature as TypeSignature exposing (TypeSignature)
 import Stabel.Parser as Parser
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
@@ -30,19 +29,29 @@ import Stabel.Qualifier.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
+    , referenceableFunctions : Set String
     }
 
 
-type
-    TypeDefinition
-    -- TODO: Each branch here should take a record. Too many arguments.
-    = CustomTypeDef String Bool SourceLocationRange (List String) (List ( String, Type ))
-    | UnionTypeDef String Bool SourceLocationRange (List String) (List Type)
+type alias TypeDefinition =
+    { name : String
+    , exposed : Bool
+    , sourceLocation : SourceLocationRange
+    , generics : List String
+    , members : TypeDefinitionMembers
+    }
+
+
+type TypeDefinitionMembers
+    = StructMembers (List ( String, Type ))
+    | UnionMembers (List Type)
 
 
 type alias FunctionDefinition =
     { name : String
-    , metadata : Metadata
+    , sourceLocation : Maybe SourceLocationRange
+    , typeSignature : TypeSignature
+    , exposed : Bool
     , implementation : FunctionImplementation
     }
 
@@ -108,20 +117,27 @@ run : RunConfig -> Result (List Problem) AST
 run config =
     let
         ( typeErrors, qualifiedTypes ) =
-            Dict.foldl (\_ val acc -> qualifyType config val acc) ( [], Dict.empty ) config.ast.types
+            Dict.foldl
+                (\_ val acc -> qualifyType config val acc)
+                ( [], Dict.empty )
+                config.ast.types
                 |> Tuple.mapSecond (\qt -> Dict.map (\_ v -> resolveUnionInTypeDefs qt v) qt)
 
         allQualifiedTypes =
             Dict.union qualifiedTypes config.inProgressAST.types
 
-        ( functionErrors, qualifiedFunctions ) =
-            Dict.foldl (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc) ( [], Dict.empty ) config.ast.functions
+        ( functionErrors, qualifiedFunctions, inlineFunctionNames ) =
+            Dict.foldl
+                (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc)
+                ( [], Dict.empty, Set.empty )
+                config.ast.functions
     in
     case ( typeErrors, functionErrors ) of
         ( [], [] ) ->
             Ok
                 { types = qualifiedTypes
                 , functions = qualifiedFunctions
+                , referenceableFunctions = inlineFunctionNames
                 }
 
         _ ->
@@ -156,47 +172,57 @@ moduleDefinition config =
 
 resolveUnionInTypeDefs : Dict String TypeDefinition -> TypeDefinition -> TypeDefinition
 resolveUnionInTypeDefs qt td =
-    case td of
-        CustomTypeDef exposed name range generics members ->
-            CustomTypeDef exposed name range generics (List.map (Tuple.mapSecond (resolveUnion qt)) members)
+    { td
+        | members =
+            case td.members of
+                StructMembers members ->
+                    StructMembers (List.map (Tuple.mapSecond (resolveUnion qt)) members)
 
-        UnionTypeDef exposed name range generics memberTypes ->
-            UnionTypeDef exposed name range generics (List.map (resolveUnion qt) memberTypes)
+                UnionMembers members ->
+                    UnionMembers (List.map (resolveUnion qt) members)
+    }
 
 
 resolveUnion : Dict String TypeDefinition -> Type -> Type
 resolveUnion typeDefs type_ =
     case type_ of
         Type.Custom typeName ->
-            case Dict.get typeName typeDefs of
-                Just (UnionTypeDef name _ _ _ members) ->
-                    Type.Union (Just name) members
+            case Maybe.map .members (Dict.get typeName typeDefs) of
+                Just (UnionMembers members) ->
+                    Type.Union (Just typeName) members
 
                 _ ->
                     type_
 
         Type.CustomGeneric typeName types ->
             case Dict.get typeName typeDefs of
-                Just (UnionTypeDef name _ _ generics members) ->
-                    let
-                        genericsMap =
-                            List.map2 Tuple.pair generics types
-                                |> Dict.fromList
+                Just result ->
+                    case result.members of
+                        UnionMembers members ->
+                            let
+                                genericsMap =
+                                    List.map2 Tuple.pair result.generics types
+                                        |> Dict.fromList
 
-                        rebindGenerics t =
-                            case t of
-                                Type.Generic val ->
-                                    Dict.get val genericsMap
-                                        |> Maybe.withDefault t
+                                rebindGenerics t =
+                                    case t of
+                                        Type.Generic val ->
+                                            Dict.get val genericsMap
+                                                |> Maybe.withDefault t
 
-                                Type.CustomGeneric cgName cgMembers ->
-                                    Type.CustomGeneric cgName <|
-                                        List.map rebindGenerics cgMembers
+                                        Type.CustomGeneric cgName cgMembers ->
+                                            Type.CustomGeneric cgName <|
+                                                List.map rebindGenerics cgMembers
 
-                                _ ->
-                                    t
-                    in
-                    Type.Union (Just name) (List.map rebindGenerics members)
+                                        _ ->
+                                            t
+                            in
+                            Type.Union
+                                (Just typeName)
+                                (List.map rebindGenerics members)
+
+                        _ ->
+                            type_
 
                 _ ->
                     type_
@@ -225,6 +251,12 @@ qualifyType config typeDef ( errors, acc ) =
         qualifiedName =
             qualifyName config typeDef.name
 
+        qualifiedRange =
+            SourceLocationRange
+                config.ast.sourceReference
+                typeDef.sourceLocation.start
+                typeDef.sourceLocation.end
+
         exposed =
             Set.isEmpty exposes || Set.member typeDef.name exposes
     in
@@ -232,7 +264,7 @@ qualifyType config typeDef ( errors, acc ) =
         Parser.StructMembers members ->
             let
                 qualifiedMemberResult =
-                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs typeDef.sourceLocation)) members
+                    List.map (Tuple.mapSecond (qualifyMemberType config modRefs qualifiedRange)) members
                         |> List.map raiseTupleError
                         |> Result.combine
 
@@ -253,20 +285,19 @@ qualifyType config typeDef ( errors, acc ) =
                 Ok qualifiedMembers ->
                     ( errors
                     , Dict.insert qualifiedName
-                        (CustomTypeDef
-                            qualifiedName
-                            exposed
-                            typeDef.sourceLocation
-                            typeDef.generics
-                            qualifiedMembers
-                        )
+                        { name = qualifiedName
+                        , exposed = exposed
+                        , sourceLocation = qualifiedRange
+                        , generics = typeDef.generics
+                        , members = StructMembers qualifiedMembers
+                        }
                         acc
                     )
 
         Parser.UnionMembers memberTypes ->
             let
                 qualifiedMemberTypesResult =
-                    List.map (qualifyMemberType config modRefs typeDef.sourceLocation) memberTypes
+                    List.map (qualifyMemberType config modRefs qualifiedRange) memberTypes
                         |> Result.combine
             in
             case qualifiedMemberTypesResult of
@@ -278,13 +309,12 @@ qualifyType config typeDef ( errors, acc ) =
                 Ok qualifiedMemberTypes ->
                     ( errors
                     , Dict.insert qualifiedName
-                        (UnionTypeDef
-                            qualifiedName
-                            exposed
-                            typeDef.sourceLocation
-                            typeDef.generics
-                            qualifiedMemberTypes
-                        )
+                        { name = qualifiedName
+                        , exposed = exposed
+                        , sourceLocation = qualifiedRange
+                        , generics = typeDef.generics
+                        , members = UnionMembers qualifiedMemberTypes
+                        }
                         acc
                     )
 
@@ -304,30 +334,45 @@ qualifyMemberType config modRefs range type_ =
                         ++ [ name ]
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
+            in
+            refLookup qualifiedName binds
 
+        refLookup name binds =
+            let
                 bindResult =
                     binds
                         |> List.map (qualifyMemberType config modRefs range)
                         |> Result.combine
+
+                maybeType =
+                    Dict.get name config.inProgressAST.types
+
+                maybeMembers =
+                    Maybe.map .members maybeType
+
+                exposed =
+                    maybeType
+                        |> Maybe.map .exposed
+                        |> Maybe.withDefault False
             in
-            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
+            case ( exposed, maybeMembers, bindResult ) of
+                ( _, Nothing, _ ) ->
+                    Err <| UnknownTypeRef range name
 
-                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
-                    Ok <| Type.Custom qualifiedName
+                ( False, _, _ ) ->
+                    Err <| TypeNotExposed range name
 
-                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
-                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
+                ( _, _, Err err ) ->
+                    Err err
 
-                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union (Just qualifiedName) memberTypes
+                ( True, Just (StructMembers _), Ok [] ) ->
+                    Ok <| Type.Custom name
 
-                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
+                ( True, Just (StructMembers _), Ok qualifiedBinds ) ->
+                    Ok <| Type.CustomGeneric name qualifiedBinds
 
-                _ ->
-                    Err <| UnknownTypeRef range qualifiedName
+                ( True, Just (UnionMembers members), _ ) ->
+                    Ok <| Type.Union (Just name) members
 
         importsLookup name binds =
             case resolveImportedType config modRefs name of
@@ -412,30 +457,8 @@ qualifyMemberType config modRefs range type_ =
                     Dict.get pathString config.externalModules
                         |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
                         |> Maybe.withDefault ""
-
-                bindResult =
-                    binds
-                        |> List.map (qualifyMemberType config modRefs range)
-                        |> Result.combine
             in
-            case ( Dict.get qualifiedName config.inProgressAST.types, bindResult ) of
-                ( Just (CustomTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
-
-                ( Just (CustomTypeDef _ True _ [] _), _ ) ->
-                    Ok <| Type.Custom qualifiedName
-
-                ( Just (CustomTypeDef _ True _ _ _), Ok qualifiedBinds ) ->
-                    Ok <| Type.CustomGeneric qualifiedName qualifiedBinds
-
-                ( Just (UnionTypeDef _ True _ _ memberTypes), _ ) ->
-                    Ok <| Type.Union (Just qualifiedName) memberTypes
-
-                ( Just (UnionTypeDef _ False _ _ _), _ ) ->
-                    Err <| TypeNotExposed range qualifiedName
-
-                _ ->
-                    Err <| UnknownTypeRef range qualifiedName
+            refLookup qualifiedName binds
 
         Parser.Generic sym ->
             Ok (Type.Generic sym)
@@ -486,9 +509,9 @@ qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
-    -> ( List Problem, Dict String FunctionDefinition )
-    -> ( List Problem, Dict String FunctionDefinition )
-qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc, inlineFuncs ) =
     let
         ( whens, impl ) =
             case unqualifiedFunction.implementation of
@@ -506,7 +529,7 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
             , imports = Dict.union unqualifiedFunction.imports modDef.imports
             }
 
-        ( newFunctionsAfterWhens, qualifiedWhensResult ) =
+        ( newFunctionsAfterWhens, inlineFunctionNamesAfterWhens, qualifiedWhensResult ) =
             whens
                 |> List.foldr
                     (qualifyWhen
@@ -515,10 +538,10 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
                         unqualifiedFunction.name
                         moduleReferences
                     )
-                    ( acc, [] )
-                |> Tuple.mapSecond Result.combine
+                    ( acc, Set.empty, [] )
+                |> (\( a, b, c ) -> ( a, b, Result.combine c ))
 
-        ( newFunctionsAfterImpl, qualifiedImplementationResult ) =
+        implQualifyResult =
             initQualifyNode config unqualifiedFunction.name moduleReferences newFunctionsAfterWhens impl
 
         qualifiedMetadataResult =
@@ -526,13 +549,26 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
 
         qualifiedName =
             qualifyName config unqualifiedFunction.name
+
+        mapLoc loc =
+            SourceLocationRange
+                config.ast.sourceReference
+                loc.start
+                loc.end
+
+        newInlineFuncs =
+            inlineFuncs
+                |> Set.union inlineFunctionNamesAfterWhens
+                |> Set.union implQualifyResult.inlineFunctionNames
     in
-    case ( qualifiedWhensResult, qualifiedImplementationResult, qualifiedMetadataResult ) of
-        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok qualifiedMetadata ) ->
+    case ( qualifiedWhensResult, implQualifyResult.qualifiedNodes, qualifiedMetadataResult ) of
+        ( Ok qualifiedWhens, Ok qualifiedImplementation, Ok ( typeSignature, exposed ) ) ->
             ( errors
             , Dict.insert qualifiedName
                 { name = qualifiedName
-                , metadata = qualifiedMetadata
+                , sourceLocation = Maybe.map mapLoc unqualifiedFunction.sourceLocationRange
+                , typeSignature = typeSignature
+                , exposed = exposed
                 , implementation =
                     if List.isEmpty qualifiedWhens then
                         SoloImpl qualifiedImplementation
@@ -540,22 +576,26 @@ qualifyDefinition config qualifiedTypes unqualifiedFunction ( errors, acc ) =
                     else
                         MultiImpl qualifiedWhens qualifiedImplementation
                 }
-                newFunctionsAfterImpl
+                implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( Err whenError, _, _ ) ->
             ( whenError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( _, Err implError, _ ) ->
             ( implError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
         ( _, _, Err metaError ) ->
             ( metaError :: errors
-            , newFunctionsAfterImpl
+            , implQualifyResult.qualifiedFunctions
+            , newInlineFuncs
             )
 
 
@@ -563,11 +603,19 @@ qualifyMetadata :
     RunConfig
     -> Dict String TypeDefinition
     -> Parser.FunctionDefinition
-    -> Result Problem Metadata
+    -> Result Problem ( TypeSignature, Bool )
 qualifyMetadata config qualifiedTypes function =
     let
         functionRange =
-            Maybe.withDefault SourceLocation.emptyRange function.sourceLocationRange
+            function.sourceLocationRange
+                |> Maybe.map
+                    (\r ->
+                        SourceLocationRange
+                            config.ast.sourceReference
+                            r.start
+                            r.end
+                    )
+                |> Maybe.withDefault SourceLocation.emptyRange
 
         inputLength =
             function.typeSignature
@@ -606,21 +654,15 @@ qualifyMetadata config qualifiedTypes function =
 
                             AssociatedFunctionSignature.Verified _ ->
                                 TypeSignature.CompilerProvided functionType
-
-                    baseMeta =
-                        Metadata.default
                 in
-                { baseMeta
-                    | type_ =
-                        TypeSignature.map (resolveUnions qualifiedTypes) ts
-                    , isExposed =
-                        case config.ast.moduleDefinition of
-                            ModuleDefinition.Undefined ->
-                                True
+                ( TypeSignature.map (resolveUnions qualifiedTypes) ts
+                , case config.ast.moduleDefinition of
+                    ModuleDefinition.Undefined ->
+                        True
 
-                            ModuleDefinition.Defined def ->
-                                Set.member function.name def.exposes
-                }
+                    ModuleDefinition.Defined def ->
+                        Set.member function.name def.exposes
+                )
             )
 
 
@@ -637,31 +679,28 @@ qualifyWhen :
     -> String
     -> ModuleReferences
     -> ( Parser.TypeMatch, List Parser.AstNode )
-    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
-    -> ( Dict String FunctionDefinition, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, result ) =
+    -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
+    -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
+qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, inlineFunctionNames, result ) =
     let
-        ( newFunctions, qualifiedImplementationResult ) =
+        qualifyNodeResult =
             initQualifyNode config functionName modRefs qualifiedFunctions impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes modRefs typeMatch
     in
-    case ( qualifiedImplementationResult, qualifiedMatchResult ) of
+    ( qualifyNodeResult.qualifiedFunctions
+    , Set.union inlineFunctionNames qualifyNodeResult.inlineFunctionNames
+    , case ( qualifyNodeResult.qualifiedNodes, qualifiedMatchResult ) of
         ( Err err, _ ) ->
-            ( newFunctions
-            , Err err :: result
-            )
+            Err err :: result
 
         ( _, Err err ) ->
-            ( newFunctions
-            , Err err :: result
-            )
+            Err err :: result
 
         ( Ok qualifiedImplementation, Ok qualifiedMatch ) ->
-            ( newFunctions
-            , Ok ( qualifiedMatch, qualifiedImplementation ) :: result
-            )
+            Ok ( qualifiedMatch, qualifiedImplementation ) :: result
+    )
 
 
 qualifyMatch :
@@ -672,75 +711,86 @@ qualifyMatch :
     -> Result Problem TypeMatch
 qualifyMatch config qualifiedTypes modRefs typeMatch =
     let
+        qualifiedRange range =
+            SourceLocationRange
+                config.ast.sourceReference
+                range.start
+                range.end
+
         qualifiedNameToMatch range name patterns =
             case Dict.get name qualifiedTypes of
-                Just (CustomTypeDef _ False _ _ _) ->
-                    Err <| TypeNotExposed range name
-
-                Just (CustomTypeDef _ True _ gens members) ->
-                    let
-                        memberNames =
-                            members
-                                |> List.map Tuple.first
-                                |> Set.fromList
-
-                        qualifiedPatternsResult =
-                            patterns
-                                |> List.map
-                                    (qualifyMatchValue
-                                        config
-                                        qualifiedTypes
-                                        modRefs
-                                        range
-                                        name
-                                        memberNames
-                                    )
-                                |> Result.combine
-
-                        actualType =
-                            case gens of
-                                [] ->
-                                    Type.Custom name
-
-                                _ ->
-                                    Type.CustomGeneric name (List.map Type.Generic gens)
-                    in
-                    case qualifiedPatternsResult of
-                        Ok qualifiedPatterns ->
-                            Ok <| TypeMatch range actualType qualifiedPatterns
-
-                        Err err ->
-                            Err err
-
-                Just (UnionTypeDef _ False _ _ _) ->
-                    Err <| TypeNotExposed range name
-
-                Just (UnionTypeDef _ True _ _ types) ->
-                    if List.isEmpty patterns then
-                        Ok <| TypeMatch range (Type.Union (Just name) types) []
+                Just typeDef ->
+                    if not typeDef.exposed then
+                        Err <| TypeNotExposed range name
 
                     else
-                        Err <| UnionTypeMatchWithPatterns range
+                        case typeDef.members of
+                            StructMembers members ->
+                                let
+                                    memberNames =
+                                        members
+                                            |> List.map Tuple.first
+                                            |> Set.fromList
+
+                                    qualifiedPatternsResult =
+                                        patterns
+                                            |> List.map
+                                                (qualifyMatchValue
+                                                    config
+                                                    qualifiedTypes
+                                                    modRefs
+                                                    range
+                                                    name
+                                                    memberNames
+                                                )
+                                            |> Result.combine
+
+                                    actualType =
+                                        case typeDef.generics of
+                                            [] ->
+                                                Type.Custom name
+
+                                            _ ->
+                                                Type.CustomGeneric
+                                                    name
+                                                    (List.map Type.Generic typeDef.generics)
+                                in
+                                case qualifiedPatternsResult of
+                                    Ok qualifiedPatterns ->
+                                        Ok <| TypeMatch range actualType qualifiedPatterns
+
+                                    Err err ->
+                                        Err err
+
+                            UnionMembers types ->
+                                if List.isEmpty patterns then
+                                    Ok <| TypeMatch range (Type.Union (Just name) types) []
+
+                                else
+                                    Err <| UnionTypeMatchWithPatterns range
 
                 Nothing ->
                     Err <| UnknownTypeRef range name
     in
     case typeMatch of
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
-            Ok <| TypeMatch range Type.Int []
+            Ok <| TypeMatch (qualifiedRange range) Type.Int []
 
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch range Type.Int [ ( "value", LiteralInt val ) ]
+            Ok <| TypeMatch (qualifiedRange range) Type.Int [ ( "value", LiteralInt val ) ]
 
         Parser.TypeMatch range (Parser.Generic sym) [] ->
-            Ok <| TypeMatch range (Type.Generic sym) []
+            Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
 
         Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
-            case qualifiedNameToMatch range (qualifyName config name) patterns of
+            case qualifiedNameToMatch (qualifiedRange range) (qualifyName config name) patterns of
                 (Err (UnknownTypeRef _ _)) as errMsg ->
                     case resolveImportedType config modRefs name of
                         Just importedModule ->
-                            qualifiedNameToMatch range (importedModule ++ "/" ++ name) patterns
+                            qualifiedNameToMatch
+                                (qualifiedRange range)
+                                (importedModule ++ "/" ++ name)
+                                patterns
 
                         Nothing ->
                             errMsg
@@ -767,7 +817,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                     ++ name
                                     |> qualifyPackageModule config.packageName
                         in
-                        qualifiedNameToMatch range qualifiedName patterns
+                        qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
                 Nothing ->
                     let
@@ -777,7 +827,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                 ++ name
                                 |> qualifyPackageModule config.packageName
                     in
-                    qualifiedNameToMatch range qualifiedName patterns
+                    qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
             let
@@ -787,7 +837,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
             in
-            qualifiedNameToMatch range qualifiedName patterns
+            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range (Parser.ExternalRef path name _) patterns ->
             let
@@ -799,10 +849,10 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
                         |> Maybe.withDefault ""
             in
-            qualifiedNameToMatch range qualifiedName patterns
+            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
         Parser.TypeMatch range _ _ ->
-            Err <| InvalidTypeMatch range
+            Err <| InvalidTypeMatch (qualifiedRange range)
 
 
 qualifyMatchValue :
@@ -840,19 +890,32 @@ initQualifyNode :
     -> ModuleReferences
     -> Dict String FunctionDefinition
     -> List Parser.AstNode
-    -> ( Dict String FunctionDefinition, Result Problem (List Node) )
+    -> QualifyNodeResult
 initQualifyNode config currentDefName modRefs qualifiedFunctions impl =
     List.foldr
         (qualifyNode config currentDefName modRefs)
         (initQualifyNodeAccumulator qualifiedFunctions)
         impl
-        |> (\acc -> ( acc.qualifiedFunctions, Result.combine acc.qualifiedNodes ))
+        |> (\acc ->
+                { qualifiedFunctions = acc.qualifiedFunctions
+                , qualifiedNodes = Result.combine acc.qualifiedNodes
+                , inlineFunctionNames = acc.inlineFunctionNames
+                }
+           )
 
 
 type alias QualifyNodeAccumulator =
     { availableInlineFuncId : Int
     , qualifiedFunctions : Dict String FunctionDefinition
     , qualifiedNodes : List (Result Problem Node)
+    , inlineFunctionNames : Set String
+    }
+
+
+type alias QualifyNodeResult =
+    { qualifiedFunctions : Dict String FunctionDefinition
+    , qualifiedNodes : Result Problem (List Node)
+    , inlineFunctionNames : Set String
     }
 
 
@@ -861,6 +924,7 @@ initQualifyNodeAccumulator qualifiedFunctions =
     { availableInlineFuncId = 1
     , qualifiedFunctions = qualifiedFunctions
     , qualifiedNodes = []
+    , inlineFunctionNames = Set.empty
     }
 
 
@@ -872,27 +936,41 @@ qualifyNode :
     -> QualifyNodeAccumulator
     -> QualifyNodeAccumulator
 qualifyNode config currentDefName modRefs node acc =
+    let
+        mapLoc loc =
+            SourceLocationRange
+                config.ast.sourceReference
+                loc.start
+                loc.end
+    in
     case node of
         Parser.Integer loc value ->
-            { acc | qualifiedNodes = Ok (Integer loc value) :: acc.qualifiedNodes }
+            { acc
+                | qualifiedNodes =
+                    Ok (Integer (mapLoc loc) value)
+                        :: acc.qualifiedNodes
+            }
 
         Parser.Function loc value ->
             let
                 qualifiedName =
                     qualifyName config value
+
+                qLoc =
+                    mapLoc loc
             in
             if Dict.member value config.ast.functions then
-                { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
+                { acc | qualifiedNodes = Ok (Function qLoc qualifiedName) :: acc.qualifiedNodes }
 
             else
                 case Dict.get value builtinDict of
                     Just builtin ->
-                        { acc | qualifiedNodes = Ok (Builtin loc builtin) :: acc.qualifiedNodes }
+                        { acc | qualifiedNodes = Ok (Builtin qLoc builtin) :: acc.qualifiedNodes }
 
                     Nothing ->
                         case resolveImportedFunction config modRefs value of
                             Nothing ->
-                                { acc | qualifiedNodes = Err (UnknownFunctionRef loc value) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
 
                             Just mod ->
                                 if representsExternalModule mod then
@@ -923,6 +1001,9 @@ qualifyNode config currentDefName modRefs node acc =
 
         Parser.PackageFunction loc path value ->
             let
+                qLoc =
+                    mapLoc loc
+
                 normalizedPathPreAliasCheck =
                     String.join "/" path
 
@@ -950,23 +1031,26 @@ qualifyNode config currentDefName modRefs node acc =
                 in
                 case Dict.get qualifiedName config.inProgressAST.functions of
                     Nothing ->
-                        { acc | qualifiedNodes = Err (UnknownFunctionRef loc qualifiedName) :: acc.qualifiedNodes }
+                        { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc qualifiedName) :: acc.qualifiedNodes }
 
                     Just function ->
-                        if function.metadata.isExposed then
-                            { acc | qualifiedNodes = Ok (Function loc qualifiedName) :: acc.qualifiedNodes }
+                        if function.exposed then
+                            { acc | qualifiedNodes = Ok (Function qLoc qualifiedName) :: acc.qualifiedNodes }
 
                         else
-                            { acc | qualifiedNodes = Err (FunctionNotExposed loc qualifiedName) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (FunctionNotExposed qLoc qualifiedName) :: acc.qualifiedNodes }
 
         Parser.ExternalFunction loc path value ->
             let
+                qLoc =
+                    mapLoc loc
+
                 normalizedPath =
                     "/" ++ String.join "/" path
             in
             case Dict.get normalizedPath config.externalModules of
                 Nothing ->
-                    { acc | qualifiedNodes = Err (UnknownFunctionRef loc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
+                    { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc (normalizedPath ++ "/" ++ value)) :: acc.qualifiedNodes }
 
                 Just package ->
                     let
@@ -981,14 +1065,14 @@ qualifyNode config currentDefName modRefs node acc =
                     in
                     case Dict.get fullReference config.inProgressAST.functions of
                         Nothing ->
-                            { acc | qualifiedNodes = Err (UnknownFunctionRef loc fullReference) :: acc.qualifiedNodes }
+                            { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc fullReference) :: acc.qualifiedNodes }
 
                         Just def ->
-                            if def.metadata.isExposed then
-                                { acc | qualifiedNodes = Ok (Function loc fullReference) :: acc.qualifiedNodes }
+                            if def.exposed then
+                                { acc | qualifiedNodes = Ok (Function qLoc fullReference) :: acc.qualifiedNodes }
 
                             else
-                                { acc | qualifiedNodes = Err (FunctionNotExposed loc fullReference) :: acc.qualifiedNodes }
+                                { acc | qualifiedNodes = Err (FunctionNotExposed qLoc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
@@ -1008,37 +1092,52 @@ qualifyNode config currentDefName modRefs node acc =
                     else
                         "inlinefn:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
 
-                ( newFunctionsAfterInline, qualifiedQuotImplResult ) =
+                qualifyNodeResult =
                     initQualifyNode config inlineFuncName modRefs acc.qualifiedFunctions quotImpl
             in
-            case qualifiedQuotImplResult of
+            case qualifyNodeResult.qualifiedNodes of
+                Ok [ Function _ qualifiedName ] ->
+                    { acc
+                        | qualifiedNodes =
+                            Ok (FunctionRef (mapLoc sourceLocation) qualifiedName)
+                                :: acc.qualifiedNodes
+                        , qualifiedFunctions =
+                            Dict.union
+                                acc.qualifiedFunctions
+                                qualifyNodeResult.qualifiedFunctions
+                        , inlineFunctionNames =
+                            acc.inlineFunctionNames
+                                |> Set.union qualifyNodeResult.inlineFunctionNames
+                                |> Set.insert qualifiedName
+                    }
+
                 Ok qualifiedQuotImpl ->
                     { acc
-                        | availableInlineFuncId = acc.availableInlineFuncId + 1
+                        | availableInlineFuncId =
+                            acc.availableInlineFuncId + 1
                         , qualifiedFunctions =
                             Dict.insert inlineFuncName
                                 { name = inlineFuncName
-                                , metadata =
-                                    Metadata.default
-                                        |> Metadata.isInline
+                                , sourceLocation = Nothing
+                                , typeSignature = TypeSignature.NotProvided
+                                , exposed = False
                                 , implementation = SoloImpl qualifiedQuotImpl
                                 }
-                                newFunctionsAfterInline
-                        , qualifiedNodes = Ok (FunctionRef sourceLocation inlineFuncName) :: acc.qualifiedNodes
+                                (Dict.union
+                                    acc.qualifiedFunctions
+                                    qualifyNodeResult.qualifiedFunctions
+                                )
+                        , qualifiedNodes =
+                            Ok (FunctionRef (mapLoc sourceLocation) inlineFuncName)
+                                :: acc.qualifiedNodes
+                        , inlineFunctionNames =
+                            acc.inlineFunctionNames
+                                |> Set.union qualifyNodeResult.inlineFunctionNames
+                                |> Set.insert inlineFuncName
                     }
 
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
-
-
-typeDefinitionName : TypeDefinition -> String
-typeDefinitionName typeDef =
-    case typeDef of
-        CustomTypeDef name _ _ _ _ ->
-            name
-
-        UnionTypeDef name _ _ _ _ ->
-            name
 
 
 qualifyName : RunConfig -> String -> String

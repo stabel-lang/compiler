@@ -8,7 +8,8 @@ module Stabel.Data.SourceLocation exposing
 
 
 type alias SourceLocationRange =
-    { start : SourceLocation
+    { source : String
+    , start : SourceLocation
     , end : SourceLocation
     }
 
@@ -21,7 +22,7 @@ type alias SourceLocation =
 
 emptyRange : SourceLocationRange
 emptyRange =
-    SourceLocationRange
+    SourceLocationRange ""
         (SourceLocation 0 0)
         (SourceLocation 0 0)
 

@@ -4,10 +4,12 @@ import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import List.Extra as List
+import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
 import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.PackageLoader as PackageLoader
 import Stabel.Qualifier as Qualifier
 import Test exposing (Test, describe, test)
@@ -19,7 +21,6 @@ suite =
     let
         initOpts =
             { projectDirPath = "/project"
-            , possibleEntryPoint = Nothing
             , stdLibPath = "/project/lib/unused"
             }
     in
@@ -58,12 +59,13 @@ suite =
 
                     Ok ast ->
                         Expect.equal
-                            { types =
-                                Dict.fromListBy Qualifier.typeDefinitionName []
+                            { types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "/robheghan/fnv/mod1/next-version"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Function emptyRange "/stabel/version/version/data/number"
@@ -72,13 +74,16 @@ suite =
                                                 ]
                                       }
                                     , { name = "/stabel/version/version/data/number"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Integer emptyRange 2
                                                 ]
                                       }
                                     ]
+                            , referenceableFunctions = Set.empty
                             }
                             (Util.stripLocations ast)
         , test "Compiles project with multiple dependant modules to qualified AST" <|
@@ -95,12 +100,13 @@ suite =
 
                     Ok ast ->
                         Expect.equal
-                            { types =
-                                Dict.fromListBy Qualifier.typeDefinitionName []
+                            { types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
                                     [ { name = "/robheghan/dummy/mod1/bump-version"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Integer emptyRange 1
@@ -108,14 +114,18 @@ suite =
                                                 ]
                                       }
                                     , { name = "/robheghan/dummy/mod2/version"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Integer emptyRange 5
                                                 ]
                                       }
                                     , { name = "/robheghan/dummy/mod3/next-version"
-                                      , metadata = Metadata.default
+                                      , exposed = True
+                                      , sourceLocation = Nothing
+                                      , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
                                                 [ Qualifier.Function emptyRange "/robheghan/dummy/mod2/version"
@@ -123,49 +133,7 @@ suite =
                                                 ]
                                       }
                                     ]
-                            }
-                            (Util.stripLocations ast)
-        , test "Specified entry point is marked as such" <|
-            \_ ->
-                let
-                    loaderResult =
-                        PackageLoader.init
-                            { projectDirPath = "/project"
-                            , possibleEntryPoint = Just "/stabel/version/version/data/number"
-                            , stdLibPath = initOpts.stdLibPath
-                            }
-                            |> resolveSideEffects testFiles []
-                            |> Result.map Tuple.second
-                in
-                case loaderResult of
-                    Err msg ->
-                        Expect.fail msg
-
-                    Ok ast ->
-                        Expect.equal
-                            { types =
-                                Dict.fromListBy Qualifier.typeDefinitionName []
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "/robheghan/fnv/mod1/next-version"
-                                      , metadata = Metadata.default
-                                      , implementation =
-                                            Qualifier.SoloImpl
-                                                [ Qualifier.Function emptyRange "/stabel/version/version/data/number"
-                                                , Qualifier.Integer emptyRange 1
-                                                , Qualifier.Builtin emptyRange Builtin.Plus
-                                                ]
-                                      }
-                                    , { name = "/stabel/version/version/data/number"
-                                      , metadata =
-                                            Metadata.default
-                                                |> Metadata.asEntryPoint
-                                      , implementation =
-                                            Qualifier.SoloImpl
-                                                [ Qualifier.Integer emptyRange 2
-                                                ]
-                                      }
-                                    ]
+                            , referenceableFunctions = Set.empty
                             }
                             (Util.stripLocations ast)
         ]

@@ -9,9 +9,11 @@ module Test.Qualifier.Util exposing
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
+import Set
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type exposing (Type)
+import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
@@ -29,6 +31,7 @@ emptyAst : AST
 emptyAst =
     { types = Dict.empty
     , functions = Dict.empty
+    , referenceableFunctions = Set.empty
     }
 
 
@@ -52,6 +55,7 @@ expectOutput parserAst expectedAst =
             Expect.equal expectedAst
                 { types = actualAst.types
                 , functions = actualAst.functions
+                , referenceableFunctions = actualAst.referenceableFunctions
                 }
 
 
@@ -75,6 +79,7 @@ expectModuleOutput parserAst expectedAst =
             Expect.equal expectedAst
                 { types = actualAst.types
                 , functions = actualAst.functions
+                , referenceableFunctions = actualAst.referenceableFunctions
                 }
 
 
@@ -111,9 +116,9 @@ addFunctionsForStructs : AST -> AST
 addFunctionsForStructs ast =
     let
         helper _ t wipAst =
-            case t of
-                AST.CustomTypeDef name _ _ generics members ->
-                    addFunctionsForStructsHelper name generics members wipAst
+            case t.members of
+                AST.StructMembers members ->
+                    addFunctionsForStructsHelper t.name t.generics members wipAst
 
                 _ ->
                     wipAst
@@ -138,9 +143,13 @@ addFunctionsForStructsHelper name generics members ast =
 
                 else
                     ">" ++ name
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType (List.map Tuple.second members) [ selfType ]
+            , sourceLocation = Nothing
+            , typeSignature =
+                TypeSignature.CompilerProvided
+                    { input = List.map Tuple.second members
+                    , output = [ selfType ]
+                    }
+            , exposed = True
             , implementation = AST.SoloImpl [ AST.ConstructType name ]
             }
 
@@ -149,11 +158,13 @@ addFunctionsForStructsHelper name generics members ast =
 
         settersHelper ( memberName, type_ ) =
             { name = ">" ++ memberName
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType
-                        [ selfType, type_ ]
-                        [ selfType ]
+            , sourceLocation = Nothing
+            , typeSignature =
+                TypeSignature.CompilerProvided
+                    { input = [ selfType, type_ ]
+                    , output = [ selfType ]
+                    }
+            , exposed = True
             , implementation =
                 AST.SoloImpl [ AST.SetMember name memberName ]
             }
@@ -163,11 +174,13 @@ addFunctionsForStructsHelper name generics members ast =
 
         gettersHelper ( memberName, type_ ) =
             { name = memberName ++ ">"
-            , metadata =
-                Metadata.default
-                    |> Metadata.withVerifiedType
-                        [ selfType ]
-                        [ type_ ]
+            , sourceLocation = Nothing
+            , typeSignature =
+                TypeSignature.CompilerProvided
+                    { input = [ selfType ]
+                    , output = [ type_ ]
+                    }
+            , exposed = True
             , implementation =
                 AST.SoloImpl [ AST.GetMember name memberName ]
             }
@@ -184,24 +197,20 @@ stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
     , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
+    , referenceableFunctions = ast.referenceableFunctions
     }
 
 
 stripTypeLocation : TypeDefinition -> TypeDefinition
 stripTypeLocation typeDef =
-    case typeDef of
-        AST.CustomTypeDef exposed name _ generics members ->
-            AST.CustomTypeDef exposed name emptyRange generics members
-
-        AST.UnionTypeDef exposed name _ generics members ->
-            AST.UnionTypeDef exposed name emptyRange generics members
+    { typeDef | sourceLocation = emptyRange }
 
 
 stripWordLocation : FunctionDefinition -> FunctionDefinition
 stripWordLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
-        , metadata = Metadata.clearSourceLocationRange word.metadata
+        , sourceLocation = Nothing
     }
 
 
