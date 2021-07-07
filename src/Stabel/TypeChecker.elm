@@ -1,7 +1,6 @@
 module Stabel.TypeChecker exposing
     ( AST
     , AstNode(..)
-    , LoadedQualifierAST
     , TypeDefinition
     , TypeMatch(..)
     , TypeMatchValue(..)
@@ -71,15 +70,7 @@ type StackEffect
     | Pop Type
 
 
-type alias LoadedQualifierAST a =
-    { a
-        | types : Dict String Qualifier.TypeDefinition
-        , functions : Dict String Qualifier.FunctionDefinition
-        , referenceableFunctions : Set String
-    }
-
-
-run : LoadedQualifierAST a -> Result (List Problem) AST
+run : Qualifier.AST -> Result (List Problem) AST
 run ast =
     typeCheck (initContext ast) ast
 
@@ -101,7 +92,7 @@ type alias Context =
     }
 
 
-initContext : LoadedQualifierAST a -> Context
+initContext : Qualifier.AST -> Context
 initContext ast =
     { types = ast.types
     , typedWords = Dict.empty
@@ -168,7 +159,7 @@ cleanContext ctx =
 -- Type Checking --
 
 
-typeCheck : Context -> LoadedQualifierAST a -> Result (List Problem) AST
+typeCheck : Context -> Qualifier.AST -> Result (List Problem) AST
 typeCheck context ast =
     let
         updatedContext =
