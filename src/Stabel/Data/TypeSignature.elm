@@ -1,4 +1,9 @@
-module Stabel.Data.TypeSignature exposing (..)
+module Stabel.Data.TypeSignature exposing
+    ( TypeSignature(..)
+    , map
+    , toMaybe
+    , withDefault
+    )
 
 import Stabel.Data.Type exposing (FunctionType)
 
@@ -20,6 +25,19 @@ map fn ts =
 
         CompilerProvided wt ->
             CompilerProvided (fn wt)
+
+
+withDefault : FunctionType -> TypeSignature -> FunctionType
+withDefault default ts =
+    case ts of
+        NotProvided ->
+            default
+
+        UserProvided wt ->
+            wt
+
+        CompilerProvided wt ->
+            wt
 
 
 toMaybe : TypeSignature -> Maybe FunctionType

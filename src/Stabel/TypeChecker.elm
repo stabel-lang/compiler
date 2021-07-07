@@ -66,19 +66,6 @@ type AstNode
     | Builtin SourceLocationRange Builtin
 
 
-type alias Context =
-    { types : Dict String TypeDefinition
-    , typedWords : Dict String WordDefinition
-    , untypedWords : Dict String Qualifier.FunctionDefinition
-    , referenceableFunctions : Set String
-    , stackEffects : List StackEffect
-    , boundGenerics : Dict String Type
-    , boundStackRanges : Dict String (List Type)
-    , callStack : Set String
-    , errors : List Problem
-    }
-
-
 type StackEffect
     = Push Type
     | Pop Type
@@ -92,41 +79,30 @@ type alias LoadedQualifierAST a =
     }
 
 
+run : LoadedQualifierAST a -> Result (List Problem) AST
+run ast =
+    typeCheck (initContext ast) ast
+
+
+
+-- CONTEXT --
+
+
+type alias Context =
+    { types : Dict String TypeDefinition
+    , typedWords : Dict String WordDefinition
+    , untypedWords : Dict String Qualifier.FunctionDefinition
+    , referenceableFunctions : Set String
+    , stackEffects : List StackEffect
+    , boundGenerics : Dict String Type
+    , boundStackRanges : Dict String (List Type)
+    , callStack : Set String
+    , errors : List Problem
+    }
+
+
 initContext : LoadedQualifierAST a -> Context
 initContext ast =
-    let
-        genericErrors t =
-            let
-                collectReferencedGenerics memberTypes =
-                    List.map Type.referencedGenerics memberTypes
-                        |> List.foldl Set.union Set.empty
-                        |> Set.toList
-
-                collectUndeclaredGenericProblems range listedGenerics memberTypes =
-                    memberTypes
-                        |> List.filter (\gen -> not (Set.member gen listedGenerics))
-                        |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
-            in
-            case t.members of
-                Qualifier.StructMembers members ->
-                    let
-                        listedGenerics_ =
-                            Set.fromList t.generics
-                    in
-                    members
-                        |> List.map Tuple.second
-                        |> collectReferencedGenerics
-                        |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
-
-                Qualifier.UnionMembers mts ->
-                    let
-                        listedGenerics_ =
-                            Set.fromList t.generics
-                    in
-                    mts
-                        |> collectReferencedGenerics
-                        |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
-    in
     { types = ast.types
     , typedWords = Dict.empty
     , untypedWords = ast.functions
@@ -135,17 +111,65 @@ initContext ast =
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
     , callStack = Set.empty
-    , errors = List.concatMap genericErrors (Dict.values ast.types)
+    , errors =
+        ast.types
+            |> Dict.values
+            |> List.concatMap verifyGenericVariableConsistency
     }
 
 
-run : LoadedQualifierAST a -> Result (List Problem) AST
-run ast =
-    typeCheckHelper (initContext ast) ast
+verifyGenericVariableConsistency : Qualifier.TypeDefinition -> List Problem
+verifyGenericVariableConsistency t =
+    case t.members of
+        Qualifier.StructMembers members ->
+            let
+                listedGenerics_ =
+                    Set.fromList t.generics
+            in
+            members
+                |> List.map Tuple.second
+                |> collectReferencedGenerics
+                |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
+
+        Qualifier.UnionMembers mts ->
+            let
+                listedGenerics_ =
+                    Set.fromList t.generics
+            in
+            mts
+                |> collectReferencedGenerics
+                |> collectUndeclaredGenericProblems t.sourceLocation listedGenerics_
 
 
-typeCheckHelper : Context -> LoadedQualifierAST a -> Result (List Problem) AST
-typeCheckHelper context ast =
+collectReferencedGenerics : List Type -> List String
+collectReferencedGenerics memberTypes =
+    List.map Type.referencedGenerics memberTypes
+        |> List.foldl Set.union Set.empty
+        |> Set.toList
+
+
+collectUndeclaredGenericProblems : SourceLocationRange -> Set String -> List String -> List Problem
+collectUndeclaredGenericProblems range listedGenerics memberTypes =
+    memberTypes
+        |> List.filter (\gen -> not (Set.member gen listedGenerics))
+        |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
+
+
+cleanContext : Context -> Context
+cleanContext ctx =
+    { ctx
+        | stackEffects = []
+        , boundGenerics = Dict.empty
+        , boundStackRanges = Dict.empty
+    }
+
+
+
+-- Type Checking --
+
+
+typeCheck : Context -> LoadedQualifierAST a -> Result (List Problem) AST
+typeCheck context ast =
     let
         updatedContext =
             Dict.foldl (\_ v acc -> typeCheckDefinition v acc) context ast.functions
@@ -164,7 +188,7 @@ typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
     case Dict.get untypedDef.name context.typedWords of
         Just _ ->
-            cleanContext context
+            context
 
         Nothing ->
             case untypedDef.implementation of
@@ -175,13 +199,8 @@ typeCheckDefinition untypedDef context =
                     typeCheckMultiImplementation context untypedDef initialWhens defaultImpl
 
 
-cleanContext : Context -> Context
-cleanContext ctx =
-    { ctx
-        | stackEffects = []
-        , boundGenerics = Dict.empty
-        , boundStackRanges = Dict.empty
-    }
+
+-- Type Check Solo Impl --
 
 
 typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qualifier.Node -> Context
@@ -190,6 +209,9 @@ typeCheckSoloImplementation context untypedDef impl =
         ( inferredType, newContext ) =
             typeCheckImplementation untypedDef impl (cleanContext context)
 
+        typedImplementation =
+            SoloImpl (untypedToTypedImplementation newContext impl)
+
         finalContext =
             { newContext
                 | typedWords =
@@ -197,10 +219,9 @@ typeCheckSoloImplementation context untypedDef impl =
                         { name = untypedDef.name
                         , type_ =
                             untypedDef.typeSignature
-                                |> TypeSignature.toMaybe
-                                |> Maybe.withDefault inferredType
+                                |> TypeSignature.withDefault inferredType
                         , metadata = metadataFromUntypedDef context untypedDef
-                        , implementation = SoloImpl (untypedToTypedImplementation newContext impl)
+                        , implementation = typedImplementation
                         }
                         newContext.typedWords
             }
@@ -220,6 +241,94 @@ untypedToTypedImplementation context impl =
     List.foldl helper ( 0, [] ) impl
         |> Tuple.second
         |> List.reverse
+
+
+untypedToTypedNode : Int -> Context -> Qualifier.Node -> AstNode
+untypedToTypedNode idx context untypedNode =
+    case untypedNode of
+        Qualifier.Integer range num ->
+            IntLiteral range num
+
+        Qualifier.Function range name ->
+            case Dict.get name context.typedWords of
+                Just def ->
+                    let
+                        resolvedWordType =
+                            { input =
+                                def.type_.input
+                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
+                            , output =
+                                def.type_.output
+                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
+                            }
+
+                        replaceGenericWithBoundValue t =
+                            let
+                                boundType =
+                                    case getGenericBinding context t of
+                                        Just boundValue ->
+                                            boundValue
+
+                                        Nothing ->
+                                            t
+                            in
+                            case boundType of
+                                -- TODO: not structs?
+                                Type.Union unionName members ->
+                                    Type.Union unionName <|
+                                        List.map replaceGenericWithBoundValue members
+
+                                _ ->
+                                    boundType
+                    in
+                    Word range name resolvedWordType
+
+                Nothing ->
+                    -- TODO: this can't be right?
+                    Dict.get name context.untypedWords
+                        |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
+                        |> Maybe.withDefault { input = [], output = [] }
+                        |> Word range name
+
+        Qualifier.FunctionRef range ref ->
+            WordRef range ref
+
+        Qualifier.ConstructType typeName ->
+            ConstructType typeName
+
+        Qualifier.SetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    SetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.GetMember typeName memberName ->
+            case getMemberType context.types typeName memberName of
+                Just memberType ->
+                    GetMember typeName memberName memberType
+
+                Nothing ->
+                    Debug.todo "Inconcievable!"
+
+        Qualifier.Builtin range builtin ->
+            Builtin range builtin
+
+
+getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
+getMemberType typeDict typeName memberName =
+    case getMembers typeName typeDict of
+        Just (Qualifier.StructMembers members) ->
+            List.find (\( name, _ ) -> name == memberName) members
+                |> Maybe.map Tuple.second
+
+        _ ->
+            Nothing
+
+
+
+-- Type Check Multi functions --
 
 
 typeCheckMultiImplementation :
@@ -242,6 +351,8 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                     in
                     case inferredDefaultType.input of
                         [] ->
+                            -- TODO: Generic arg?
+                            -- TODO: Add test to see if we can make this fail
                             Debug.todo "Default impl doesn't have an input argument"
 
                         firstType :: _ ->
@@ -254,43 +365,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
-                |> Tuple.mapFirst (\whenTypes -> List.map (constrainGenerics untypedDef.typeSignature) whenTypes)
-
-        replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
-            case typeSignature.input of
-                ((Type.Generic _) as toReplace) :: _ ->
-                    { input = List.map (replaceType toReplace matchType) typeSignature.input
-                    , output = List.map (replaceType toReplace matchType) typeSignature.output
-                    }
-
-                ((Type.StackRange _) as toReplace) :: _ ->
-                    { input = List.map (replaceType toReplace matchType) typeSignature.input
-                    , output = List.map (replaceType toReplace matchType) typeSignature.output
-                    }
-
-                _ ->
-                    typeSignature
-
-        replaceType type_ with el =
-            case el of
-                Type.CustomGeneric name members ->
-                    Type.CustomGeneric name (List.map (replaceType type_ with) members)
-
-                Type.Union name members ->
-                    Type.Union name (List.map (replaceType type_ with) members)
-
-                Type.FunctionSignature quotType ->
-                    Type.FunctionSignature
-                        { input = List.map (replaceType type_ with) quotType.input
-                        , output = List.map (replaceType type_ with) quotType.output
-                        }
-
-                _ ->
-                    if type_ == el then
-                        with
-
-                    else
-                        el
+                |> Tuple.mapFirst (List.map (constrainGenerics untypedDef.typeSignature))
 
         whenPatterns =
             List.map Tuple.first whens
@@ -298,71 +373,34 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         whensAreConsistent =
             inferredWhenTypes
                 |> List.map2 Tuple.pair whenPatterns
-                |> List.all typeCheckWhen
-
-        typeCheckWhen ( Qualifier.TypeMatch _ forType _, inf ) =
-            case inf.input of
-                firstInput :: _ ->
-                    Type.genericlyCompatible firstInput forType
-
-                [] ->
-                    False
+                |> List.all patternMatchIsCompatibleWithInferredType
 
         whensAreCompatible =
             inferredWhenTypes
-                |> List.map (stripFirstInput >> countOutput)
+                |> List.map (dropFirstInputType >> countOutput)
                 |> areAllEqual
-
-        stripFirstInput inf =
-            { inf | input = List.drop 1 inf.input }
-
-        countOutput wordType =
-            ( wordType.input, List.length wordType.output )
-
-        areAllEqual ls =
-            case ls of
-                [] ->
-                    True
-
-                ( fTypes, fCnt ) :: rest ->
-                    List.all
-                        (\( nTypes, nCnt ) ->
-                            (fCnt == nCnt)
-                                && compatibleTypeList fTypes nTypes
-                        )
-                        rest
-
-        compatibleTypeList aLs bLs =
-            List.map2 Type.genericlyCompatible aLs bLs
-                |> List.all identity
 
         inferredType =
             List.head inferredWhenTypes
                 |> Maybe.withDefault { input = [], output = [] }
-                |> replaceFirstType (unionOfTypeMatches whens)
+                |> replaceFirstInputType (unionOfTypeMatches whens)
                 |> joinOutputs (List.map .output inferredWhenTypes)
 
         exposedType =
-            TypeSignature.toMaybe untypedDef.typeSignature
-                |> Maybe.withDefault inferredType
+            TypeSignature.withDefault inferredType untypedDef.typeSignature
 
         maybeConsistencyError =
             if whensAreConsistent && whensAreCompatible then
                 Nothing
 
             else
-                let
-                    error =
-                        InconsistentWhens
-                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
-                            untypedDef.name
-                in
-                Just error
+                Just <| InconsistentWhens sourceLocation untypedDef.name
 
         maybeInexhaustiveError =
-            inexhaustivenessCheck
-                (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
-                whenPatterns
+            inexhaustivenessCheck sourceLocation whenPatterns
+
+        sourceLocation =
+            Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation
 
         finalContext =
             { newContext
@@ -373,8 +411,11 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         , metadata = metadataFromUntypedDef context untypedDef
                         , implementation =
                             MultiImpl
-                                (List.map (Tuple.mapBoth mapTypeMatch (untypedToTypedImplementation newContext)) initialWhens)
-                                (untypedToTypedImplementation newContext defaultImpl)
+                                (List.map
+                                    (Tuple.mapBoth mapTypeMatch typeImplementation)
+                                    initialWhens
+                                )
+                                (typeImplementation defaultImpl)
                         }
                         newContext.typedWords
                 , errors =
@@ -384,6 +425,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         ]
                         ++ newContext.errors
             }
+
+        typeImplementation =
+            untypedToTypedImplementation newContext
     in
     verifyTypeSignature inferredType untypedDef finalContext
         |> cleanContext
@@ -474,9 +518,49 @@ normalizeWhenTypes whenTypes =
 
 simplifyWhenWordTypes : List FunctionType -> Context -> ( List FunctionType, Context )
 simplifyWhenWordTypes wordTypes context =
-    ( List.map (\wt -> Tuple.second (simplifyWordType ( context, wt ))) wordTypes
+    ( List.map (\wt -> Tuple.first (simplifyWordType ( wt, context ))) wordTypes
     , context
     )
+
+
+replaceFirstTypeWithPatternMatch : ( Qualifier.TypeMatch, FunctionType ) -> FunctionType
+replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
+    case typeSignature.input of
+        ((Type.Generic _) as toReplace) :: _ ->
+            { input = List.map (replaceType toReplace matchType) typeSignature.input
+            , output = List.map (replaceType toReplace matchType) typeSignature.output
+            }
+
+        ((Type.StackRange _) as toReplace) :: _ ->
+            { input = List.map (replaceType toReplace matchType) typeSignature.input
+            , output = List.map (replaceType toReplace matchType) typeSignature.output
+            }
+
+        _ ->
+            typeSignature
+
+
+replaceType : Type -> Type -> Type -> Type
+replaceType type_ with el =
+    case el of
+        Type.CustomGeneric name members ->
+            Type.CustomGeneric name (List.map (replaceType type_ with) members)
+
+        Type.Union name members ->
+            Type.Union name (List.map (replaceType type_ with) members)
+
+        Type.FunctionSignature quotType ->
+            Type.FunctionSignature
+                { input = List.map (replaceType type_ with) quotType.input
+                , output = List.map (replaceType type_ with) quotType.output
+                }
+
+        _ ->
+            if type_ == el then
+                with
+
+            else
+                el
 
 
 equalizeWhenTypes : List FunctionType -> List FunctionType
@@ -579,8 +663,8 @@ unionOfTypeMatches whenBranches =
             Type.Union Nothing uniqueTypes
 
 
-replaceFirstType : Type -> FunctionType -> FunctionType
-replaceFirstType with inf =
+replaceFirstInputType : Type -> FunctionType -> FunctionType
+replaceFirstInputType with inf =
     case inf.input of
         _ :: rem ->
             { inf | input = with :: rem }
@@ -711,14 +795,54 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
             constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
 
 
+patternMatchIsCompatibleWithInferredType : ( Qualifier.TypeMatch, FunctionType ) -> Bool
+patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ forType _, inf ) =
+    case inf.input of
+        firstInput :: _ ->
+            Type.genericlyCompatible firstInput forType
+
+        [] ->
+            False
+
+
+dropFirstInputType : FunctionType -> FunctionType
+dropFirstInputType inf =
+    { inf | input = List.drop 1 inf.input }
+
+
+countOutput : FunctionType -> ( List Type, Int )
+countOutput wordType =
+    ( wordType.input, List.length wordType.output )
+
+
+areAllEqual : List ( List Type, Int ) -> Bool
+areAllEqual ls =
+    case ls of
+        [] ->
+            True
+
+        ( inputTypes, outputLength ) :: rest ->
+            List.all
+                (\( nextInputTypes, nextOutputLength ) ->
+                    (outputLength == nextOutputLength)
+                        && compatibleTypeList inputTypes nextInputTypes
+                )
+                rest
+
+
+compatibleTypeList : List Type -> List Type -> Bool
+compatibleTypeList aLs bLs =
+    List.map2 Type.genericlyCompatible aLs bLs
+        |> List.all identity
+
+
 typeCheckImplementation : Qualifier.FunctionDefinition -> List Qualifier.Node -> Context -> ( FunctionType, Context )
 typeCheckImplementation untypedDef impl context =
     let
         startingStackEffects =
             untypedDef.typeSignature
-                |> TypeSignature.toMaybe
-                |> Maybe.map reverseWordType
-                |> Maybe.withDefault Type.emptyFunctionType
+                |> TypeSignature.map reverseWordType
+                |> TypeSignature.withDefault Type.emptyFunctionType
                 |> wordTypeToStackEffects
 
         reverseWordType wt =
@@ -748,9 +872,8 @@ typeCheckImplementation untypedDef impl context =
                 |> Maybe.withDefault []
     in
     wordTypeFromStackEffects untypedDef contextWithoutCall
-        |> (\( ctx, wt ) -> ( ctx, { wt | input = wt.input ++ annotatedInput } ))
+        |> (\( ctx, wt ) -> ( { wt | input = wt.input ++ annotatedInput }, ctx ))
         |> simplifyWordType
-        |> (\( a, b ) -> ( b, a ))
 
 
 extractTypeFromTypeMatch : Qualifier.TypeMatch -> Type
@@ -795,7 +918,6 @@ inexhaustivenessCheck range patterns =
 type InexhaustiveState
     = Total
     | SeenInt
-    | SeenType Type
 
 
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
@@ -849,7 +971,7 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
                         )
                         acc
         in
-        if List.find (\( toMatch, _ ) -> toMatch == typeList) modifiedAcc == Nothing then
+        if List.any (\( toMatch, _ ) -> toMatch == typeList) modifiedAcc then
             toAdd ++ modifiedAcc
 
         else
@@ -865,8 +987,8 @@ verifyTypeSignature inferredType untypedDef context =
     case TypeSignature.toMaybe untypedDef.typeSignature of
         Just annotatedType ->
             let
-                ( _, simplifiedAnnotatedType ) =
-                    simplifyWordType ( context, annotatedType )
+                simplifiedAnnotatedType =
+                    Tuple.first <| simplifyWordType ( annotatedType, context )
             in
             if not <| Type.compatibleFunctions simplifiedAnnotatedType inferredType then
                 let
@@ -1095,7 +1217,10 @@ wordTypeToStackEffects wordType =
 
 wordTypeFromStackEffects : Qualifier.FunctionDefinition -> Context -> ( Context, FunctionType )
 wordTypeFromStackEffects untypedDef context =
-    wordTypeFromStackEffectsHelper untypedDef context.stackEffects ( context, { input = [], output = [] } )
+    wordTypeFromStackEffectsHelper
+        untypedDef
+        context.stackEffects
+        ( context, { input = [], output = [] } )
 
 
 wordTypeFromStackEffectsHelper : Qualifier.FunctionDefinition -> List StackEffect -> ( Context, FunctionType ) -> ( Context, FunctionType )
@@ -1370,8 +1495,8 @@ replaceStackRange boundRanges types =
         types
 
 
-simplifyWordType : ( Context, FunctionType ) -> ( Context, FunctionType )
-simplifyWordType ( context, wordType ) =
+simplifyWordType : ( FunctionType, Context ) -> ( FunctionType, Context )
+simplifyWordType ( wordType, context ) =
     let
         oldSignature =
             wordType.input ++ wordType.output
@@ -1454,10 +1579,10 @@ simplifyWordType ( context, wordType ) =
                 _ ->
                     ( nextId, seenGenerics, type_ :: acc )
     in
-    ( context
-    , { input = List.take inputLength newSignature
+    ( { input = List.take inputLength newSignature
       , output = List.drop inputLength newSignature
       }
+    , context
     )
 
 
@@ -1498,85 +1623,3 @@ reverseLookup ( name, aliases ) acc =
         |> List.filter (\a -> not <| Dict.member a acc)
         |> List.filter (\a -> a /= targetName)
         |> List.foldl (\alias newAcc -> Dict.insert alias targetName newAcc) acc
-
-
-untypedToTypedNode : Int -> Context -> Qualifier.Node -> AstNode
-untypedToTypedNode idx context untypedNode =
-    case untypedNode of
-        Qualifier.Integer range num ->
-            IntLiteral range num
-
-        Qualifier.Function range name ->
-            case Dict.get name context.typedWords of
-                Just def ->
-                    let
-                        resolvedWordType =
-                            { input =
-                                def.type_.input
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            , output =
-                                def.type_.output
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            }
-
-                        replaceGenericWithBoundValue t =
-                            let
-                                boundType =
-                                    case getGenericBinding context t of
-                                        Just boundValue ->
-                                            boundValue
-
-                                        Nothing ->
-                                            t
-                            in
-                            case boundType of
-                                Type.Union unionName members ->
-                                    Type.Union unionName <|
-                                        List.map replaceGenericWithBoundValue members
-
-                                _ ->
-                                    boundType
-                    in
-                    Word range name resolvedWordType
-
-                Nothing ->
-                    Dict.get name context.untypedWords
-                        |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
-                        |> Maybe.withDefault { input = [], output = [] }
-                        |> Word range name
-
-        Qualifier.FunctionRef range ref ->
-            WordRef range ref
-
-        Qualifier.ConstructType typeName ->
-            ConstructType typeName
-
-        Qualifier.SetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    SetMember typeName memberName memberType
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
-
-        Qualifier.GetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    GetMember typeName memberName memberType
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
-
-        Qualifier.Builtin range builtin ->
-            Builtin range builtin
-
-
-getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
-getMemberType typeDict typeName memberName =
-    case getMembers typeName typeDict of
-        Just (Qualifier.StructMembers members) ->
-            List.find (\( name, _ ) -> name == memberName) members
-                |> Maybe.map Tuple.second
-
-        _ ->
-            Nothing
