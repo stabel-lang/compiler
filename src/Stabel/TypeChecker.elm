@@ -1,4 +1,14 @@
-module Stabel.TypeChecker exposing (..)
+module Stabel.TypeChecker exposing
+    ( AST
+    , AstNode(..)
+    , LoadedQualifierAST
+    , TypeDefinition
+    , TypeMatch(..)
+    , TypeMatchValue(..)
+    , WordDefinition
+    , WordImplementation(..)
+    , run
+    )
 
 import Dict exposing (Dict)
 import Dict.Extra as Dict
