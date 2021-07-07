@@ -94,9 +94,9 @@ suite =
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
-                                        , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                        , Word emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
-                                        , Word emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , Function emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , Function emptyRange "inc" { input = [ Type.Int ], output = [ Type.Int ] }
+                                        , Function emptyRange "dec" { input = [ Type.Int ], output = [ Type.Int ] }
                                         , IntLiteral emptyRange 2
                                         , Builtin emptyRange Builtin.Equal
                                         ]
@@ -1175,7 +1175,7 @@ suite =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
                                         , IntLiteral emptyRange 2
-                                        , Word emptyRange
+                                        , Function emptyRange
                                             "drop-first"
                                             { input = [ Type.Int, Type.Int ]
                                             , output = [ Type.Int ]

@@ -87,8 +87,8 @@ update msg (( entryPoint, packageLoaderModel ) as model) =
 
                                                 Just fnName ->
                                                     { typedAst
-                                                        | words =
-                                                            Dict.update fnName (Maybe.map setEntryPoint) typedAst.words
+                                                        | functions =
+                                                            Dict.update fnName (Maybe.map setEntryPoint) typedAst.functions
                                                     }
                                             )
                                                 |> Codegen.codegen

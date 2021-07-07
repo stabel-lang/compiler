@@ -39,7 +39,7 @@ codegen ast =
                 |> Dict.values
                 |> typeMeta
     in
-    ast.words
+    ast.functions
         |> Dict.values
         |> List.map (toWasmFuncDef typeMetaDict ast)
         |> List.foldl Wasm.withFunction BaseModule.baseModule
@@ -75,7 +75,7 @@ typeMeta types =
 toWasmFuncDef :
     Dict String TypeInformation
     -> AST
-    -> AST.WordDefinition
+    -> AST.FunctionDefinition
     -> Wasm.FunctionDef
 toWasmFuncDef typeInfo ast def =
     let
@@ -106,7 +106,7 @@ toWasmFuncDef typeInfo ast def =
 astNodesToInstructions :
     Dict String TypeInformation
     -> AST
-    -> AST.WordDefinition
+    -> AST.FunctionDefinition
     -> List AST.AstNode
     -> List Wasm.Instruction
 astNodesToInstructions typeInfo ast def astNodes =
@@ -129,10 +129,10 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 AST.IntLiteral _ val ->
                     IntLiteral val
 
-                AST.Word _ name type_ ->
+                AST.Function _ name type_ ->
                     Word name type_
 
-                AST.WordRef _ name ->
+                AST.FunctionRef _ name ->
                     WordRef name
 
                 AST.ConstructType typeName ->
@@ -154,11 +154,11 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     , output = [ Type.Int ]
                     }
 
-                AST.Word _ _ type_ ->
+                AST.Function _ _ type_ ->
                     type_
 
-                AST.WordRef _ name ->
-                    case Dict.get name ast.words of
+                AST.FunctionRef _ name ->
+                    case Dict.get name ast.functions of
                         Just def ->
                             { input = []
                             , output = [ Type.FunctionSignature def.type_ ]
@@ -211,7 +211,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                             Debug.todo "help"
 
                 AST.Builtin _ builtin ->
-                    Builtin.wordType builtin
+                    Builtin.functionType builtin
 
         typeFromTypeDef typeName gens =
             if List.isEmpty gens then
@@ -265,7 +265,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
         isMultiWord possibleMultiWordNode =
             case possibleMultiWordNode of
                 Word name _ ->
-                    case Dict.get name ast.words of
+                    case Dict.get name ast.functions of
                         Just def ->
                             case def.implementation of
                                 AST.SoloImpl _ ->
@@ -331,7 +331,7 @@ requiresBoxingInPatternMatch type_ =
 multiFnToInstructions :
     Dict String TypeInformation
     -> AST
-    -> AST.WordDefinition
+    -> AST.FunctionDefinition
     -> List ( AST.TypeMatch, List AST.AstNode )
     -> List AST.AstNode
     -> Wasm.Instruction

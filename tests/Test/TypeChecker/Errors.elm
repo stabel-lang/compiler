@@ -377,7 +377,7 @@ suite =
 
                         inexhaustiveError problem =
                             case problem of
-                                Problem.InexhaustiveMultiWord _ [ [ Type.Int ] ] ->
+                                Problem.InexhaustiveMultiFunction _ [ [ Type.Int ] ] ->
                                     True
 
                                 _ ->
@@ -524,7 +524,7 @@ suite =
 
                         inexhaustiveError problem =
                             case problem of
-                                Problem.InexhaustiveMultiWord _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
+                                Problem.InexhaustiveMultiFunction _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
                                     True
 
                                 _ ->
@@ -758,7 +758,7 @@ suite =
 
                         inexhaustiveError problem =
                             case problem of
-                                Problem.InexhaustiveMultiWord _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
+                                Problem.InexhaustiveMultiFunction _ [ [ Type.Custom "IntBox", Type.Int ] ] ->
                                     True
 
                                 _ ->

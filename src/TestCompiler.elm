@@ -89,8 +89,8 @@ compile entry sourceCode =
 
                         Ok typedAst ->
                             { typedAst
-                                | words =
-                                    Dict.update entry (Maybe.map setEntryPoint) typedAst.words
+                                | functions =
+                                    Dict.update entry (Maybe.map setEntryPoint) typedAst.functions
                             }
                                 |> Codegen.codegen
                                 |> Result.mapError (always "Codegen failed for unknown reason :(")

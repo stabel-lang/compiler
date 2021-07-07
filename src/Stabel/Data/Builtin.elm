@@ -1,4 +1,7 @@
-module Stabel.Data.Builtin exposing (..)
+module Stabel.Data.Builtin exposing
+    ( Builtin(..)
+    , functionType
+    )
 
 import Stabel.Data.Type as Type exposing (FunctionType)
 
@@ -17,8 +20,8 @@ type Builtin
     | Apply
 
 
-wordType : Builtin -> FunctionType
-wordType builtin =
+functionType : Builtin -> FunctionType
+functionType builtin =
     case builtin of
         Plus ->
             { input = [ Type.Int, Type.Int ]

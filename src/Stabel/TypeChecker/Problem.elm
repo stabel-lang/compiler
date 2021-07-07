@@ -14,7 +14,7 @@ type Problem
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
-    | InexhaustiveMultiWord SourceLocationRange (List (List Type))
+    | InexhaustiveMultiFunction SourceLocationRange (List (List Type))
 
 
 toString : String -> Problem -> String
@@ -61,12 +61,12 @@ toString source problem =
                 ++ name
                 ++ "' as we're unable to infer the type of a recursive call."
 
-        InexhaustiveMultiWord range missingTypes ->
+        InexhaustiveMultiFunction range missingTypes ->
             let
                 formatTypePattern tp =
                     String.join " -> " (List.map Type.toDisplayString tp)
             in
             SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
-                ++ "This multiword doesn't handle all potential patterns. Missing patterns for:\n\n"
+                ++ "This multi-function doesn't handle all potential patterns. Missing patterns for:\n\n"
                 ++ String.join "\n" (List.map formatTypePattern missingTypes)

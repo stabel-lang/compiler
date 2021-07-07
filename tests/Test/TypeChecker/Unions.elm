@@ -501,13 +501,13 @@ suite =
                               , metadata = Metadata.default
                               , implementation =
                                     SoloImpl
-                                        [ Word emptyRange
+                                        [ Function emptyRange
                                             "Nil"
                                             { input = []
                                             , output = [ Type.Custom "Nil" ]
                                             }
                                         , IntLiteral emptyRange 1
-                                        , Word emptyRange
+                                        , Function emptyRange
                                             "with-default"
                                             { input =
                                                 [ Type.Union (Just "Maybe")

@@ -1,11 +1,11 @@
 module Stabel.TypeChecker exposing
     ( AST
     , AstNode(..)
+    , FunctionDefinition
+    , FunctionImplementation(..)
     , TypeDefinition
     , TypeMatch(..)
     , TypeMatchValue(..)
-    , WordDefinition
-    , WordImplementation(..)
     , run
     )
 
@@ -24,7 +24,7 @@ import Stabel.TypeChecker.Problem exposing (Problem(..))
 
 type alias AST =
     { types : Dict String TypeDefinition
-    , words : Dict String WordDefinition
+    , functions : Dict String FunctionDefinition
     }
 
 
@@ -32,15 +32,15 @@ type alias TypeDefinition =
     Qualifier.TypeDefinition
 
 
-type alias WordDefinition =
+type alias FunctionDefinition =
     { name : String
     , type_ : FunctionType
     , metadata : Metadata
-    , implementation : WordImplementation
+    , implementation : FunctionImplementation
     }
 
 
-type WordImplementation
+type FunctionImplementation
     = SoloImpl (List AstNode)
     | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
 
@@ -57,8 +57,8 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
-    | Word SourceLocationRange String FunctionType
-    | WordRef SourceLocationRange String
+    | Function SourceLocationRange String FunctionType
+    | FunctionRef SourceLocationRange String
     | ConstructType String
     | SetMember String String Type
     | GetMember String String Type
@@ -81,8 +81,8 @@ run ast =
 
 type alias Context =
     { types : Dict String TypeDefinition
-    , typedWords : Dict String WordDefinition
-    , untypedWords : Dict String Qualifier.FunctionDefinition
+    , typedFunctions : Dict String FunctionDefinition
+    , untypedFunctions : Dict String Qualifier.FunctionDefinition
     , referenceableFunctions : Set String
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
@@ -95,8 +95,8 @@ type alias Context =
 initContext : Qualifier.AST -> Context
 initContext ast =
     { types = ast.types
-    , typedWords = Dict.empty
-    , untypedWords = ast.functions
+    , typedFunctions = Dict.empty
+    , untypedFunctions = ast.functions
     , referenceableFunctions = ast.referenceableFunctions
     , stackEffects = []
     , boundGenerics = Dict.empty
@@ -168,7 +168,7 @@ typeCheck context ast =
     if List.isEmpty updatedContext.errors then
         Ok <|
             { types = updatedContext.types
-            , words = updatedContext.typedWords
+            , functions = updatedContext.typedFunctions
             }
 
     else
@@ -177,7 +177,7 @@ typeCheck context ast =
 
 typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> Context
 typeCheckDefinition untypedDef context =
-    case Dict.get untypedDef.name context.typedWords of
+    case Dict.get untypedDef.name context.typedFunctions of
         Just _ ->
             context
 
@@ -205,7 +205,7 @@ typeCheckSoloImplementation context untypedDef impl =
 
         finalContext =
             { newContext
-                | typedWords =
+                | typedFunctions =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
                         , type_ =
@@ -214,7 +214,7 @@ typeCheckSoloImplementation context untypedDef impl =
                         , metadata = metadataFromUntypedDef context untypedDef
                         , implementation = typedImplementation
                         }
-                        newContext.typedWords
+                        newContext.typedFunctions
             }
     in
     verifyTypeSignature inferredType untypedDef finalContext
@@ -241,10 +241,10 @@ untypedToTypedNode idx context untypedNode =
             IntLiteral range num
 
         Qualifier.Function range name ->
-            case Dict.get name context.typedWords of
+            case Dict.get name context.typedFunctions of
                 Just def ->
                     let
-                        resolvedWordType =
+                        resolvedFunctionType =
                             { input =
                                 def.type_.input
                                     |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
@@ -272,17 +272,17 @@ untypedToTypedNode idx context untypedNode =
                                 _ ->
                                     boundType
                     in
-                    Word range name resolvedWordType
+                    Function range name resolvedFunctionType
 
                 Nothing ->
                     -- TODO: this can't be right?
-                    Dict.get name context.untypedWords
+                    Dict.get name context.untypedFunctions
                         |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
-                        |> Word range name
+                        |> Function range name
 
         Qualifier.FunctionRef range ref ->
-            WordRef range ref
+            FunctionRef range ref
 
         Qualifier.ConstructType typeName ->
             ConstructType typeName
@@ -353,7 +353,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
             whens
                 |> List.foldr (inferWhenTypes untypedDef) ( [], context )
                 |> Tuple.mapFirst normalizeWhenTypes
-                |> (\( wts, ctx ) -> simplifyWhenWordTypes wts ctx)
+                |> (\( wts, ctx ) -> simplifyWhenFunctionTypes wts ctx)
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (List.map (constrainGenerics untypedDef.typeSignature))
@@ -395,7 +395,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
         finalContext =
             { newContext
-                | typedWords =
+                | typedFunctions =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
                         , type_ = exposedType
@@ -408,7 +408,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                                 )
                                 (typeImplementation defaultImpl)
                         }
-                        newContext.typedWords
+                        newContext.typedFunctions
                 , errors =
                     List.filterMap identity
                         [ maybeConsistencyError
@@ -472,10 +472,10 @@ normalizeWhenTypes whenTypes =
                 |> List.reverse
                 |> List.head
 
-        matchInputLength toMatch wordType =
+        matchInputLength toMatch functionType =
             let
                 diff =
-                    List.length toMatch.input - List.length wordType.input
+                    List.length toMatch.input - List.length functionType.input
 
                 padding =
                     List.take diff toMatch.input
@@ -483,12 +483,11 @@ normalizeWhenTypes whenTypes =
             in
             case padding of
                 [] ->
-                    wordType
+                    functionType
 
                 elements ->
-                    { wordType
-                        | input = elements ++ wordType.input
-                        , output = elements ++ wordType.output
+                    { input = elements ++ functionType.input
+                    , output = elements ++ functionType.output
                     }
 
         padGeneric t =
@@ -507,9 +506,9 @@ normalizeWhenTypes whenTypes =
             whenTypes
 
 
-simplifyWhenWordTypes : List FunctionType -> Context -> ( List FunctionType, Context )
-simplifyWhenWordTypes wordTypes context =
-    ( List.map (\wt -> Tuple.first (simplifyWordType ( wt, context ))) wordTypes
+simplifyWhenFunctionTypes : List FunctionType -> Context -> ( List FunctionType, Context )
+simplifyWhenFunctionTypes functionTypes context =
+    ( List.map (\wt -> Tuple.first (simplifyFunctionType ( wt, context ))) functionTypes
     , context
     )
 
@@ -540,10 +539,10 @@ replaceType type_ with el =
         Type.Union name members ->
             Type.Union name (List.map (replaceType type_ with) members)
 
-        Type.FunctionSignature quotType ->
+        Type.FunctionSignature functionType ->
             Type.FunctionSignature
-                { input = List.map (replaceType type_ with) quotType.input
-                , output = List.map (replaceType type_ with) quotType.output
+                { input = List.map (replaceType type_ with) functionType.input
+                , output = List.map (replaceType type_ with) functionType.output
                 }
 
         _ ->
@@ -555,27 +554,27 @@ replaceType type_ with el =
 
 
 equalizeWhenTypes : List FunctionType -> List FunctionType
-equalizeWhenTypes wordTypes =
+equalizeWhenTypes functionTypes =
     let
-        splitFirstInputType wordType =
-            case wordType.input of
+        splitFirstInputType functionType =
+            case functionType.input of
                 first :: rest ->
-                    Just ( first, { wordType | input = rest } )
+                    Just ( first, { functionType | input = rest } )
 
                 _ ->
                     -- Should never happen
                     Nothing
 
-        joinSplitWordType ( firstType, wordType ) =
-            { wordType | input = firstType :: wordType.input }
+        joinSplitFunctionType ( firstType, functionType ) =
+            { functionType | input = firstType :: functionType.input }
     in
-    List.filterMap splitFirstInputType wordTypes
+    List.filterMap splitFirstInputType functionTypes
         |> List.foldr
-            (\( firstType, wordType ) ( typeAcc, wordTypeAcc ) -> ( firstType :: typeAcc, wordType :: wordTypeAcc ))
+            (\( firstType, functionType ) ( typeAcc, functionTypeAcc ) -> ( firstType :: typeAcc, functionType :: functionTypeAcc ))
             ( [], [] )
-        |> Tuple.mapSecond (\lobotomizedWordTypes -> equalizeWhenTypesHelper lobotomizedWordTypes Dict.empty [])
+        |> Tuple.mapSecond (\lobotomizedFunctionTypes -> equalizeWhenTypesHelper lobotomizedFunctionTypes Dict.empty [])
         |> (\( firstTypes, equalizedWhenTypes ) -> List.map2 Tuple.pair firstTypes equalizedWhenTypes)
-        |> List.map joinSplitWordType
+        |> List.map joinSplitFunctionType
 
 
 equalizeWhenTypesHelper : List FunctionType -> Dict String Type -> List FunctionType -> List FunctionType
@@ -762,25 +761,25 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
                         inferredRest
                         (annotatedEl :: acc)
 
-        ( (Type.FunctionSignature annotatedQuote) :: annotatedRest, (Type.FunctionSignature inferredQuote) :: inferredRest ) ->
+        ( (Type.FunctionSignature annotatedFunction) :: annotatedRest, (Type.FunctionSignature inferredFunction) :: inferredRest ) ->
             let
-                ( quoteRemappedGens, constrainedInputs ) =
-                    constrainGenericsHelper remappedGenerics annotatedQuote.input inferredQuote.input []
+                ( functionRemappedGens, constrainedInputs ) =
+                    constrainGenericsHelper remappedGenerics annotatedFunction.input inferredFunction.input []
 
-                ( quoteRemappedGens2, constrainedOutputs ) =
-                    constrainGenericsHelper quoteRemappedGens annotatedQuote.output inferredQuote.output []
+                ( functionRemappedGens2, constrainedOutputs ) =
+                    constrainGenericsHelper functionRemappedGens annotatedFunction.output inferredFunction.output []
 
-                constrainedQuote =
+                constrainedFunction =
                     Type.FunctionSignature
                         { input = constrainedInputs
                         , output = constrainedOutputs
                         }
             in
             constrainGenericsHelper
-                (Dict.union quoteRemappedGens2 remappedGenerics)
+                (Dict.union functionRemappedGens2 remappedGenerics)
                 annotatedRest
                 inferredRest
-                (constrainedQuote :: acc)
+                (constrainedFunction :: acc)
 
         ( _ :: annotatedRest, inferredEl :: inferredRest ) ->
             constrainGenericsHelper remappedGenerics annotatedRest inferredRest (inferredEl :: acc)
@@ -802,8 +801,8 @@ dropFirstInputType inf =
 
 
 countOutput : FunctionType -> ( List Type, Int )
-countOutput wordType =
-    ( wordType.input, List.length wordType.output )
+countOutput functionType =
+    ( functionType.input, List.length functionType.output )
 
 
 areAllEqual : List ( List Type, Int ) -> Bool
@@ -832,11 +831,11 @@ typeCheckImplementation untypedDef impl context =
     let
         startingStackEffects =
             untypedDef.typeSignature
-                |> TypeSignature.map reverseWordType
+                |> TypeSignature.map reverseFunctionType
                 |> TypeSignature.withDefault Type.emptyFunctionType
-                |> wordTypeToStackEffects
+                |> functionTypeToStackEffects
 
-        reverseWordType wt =
+        reverseFunctionType wt =
             { input = []
             , output = wt.input
             }
@@ -862,9 +861,9 @@ typeCheckImplementation untypedDef impl context =
                 |> Maybe.map .input
                 |> Maybe.withDefault []
     in
-    wordTypeFromStackEffects untypedDef contextWithoutCall
+    functionTypeFromStackEffects untypedDef contextWithoutCall
         |> (\( ctx, wt ) -> ( { wt | input = wt.input ++ annotatedInput }, ctx ))
-        |> simplifyWordType
+        |> simplifyFunctionType
 
 
 extractTypeFromTypeMatch : Qualifier.TypeMatch -> Type
@@ -903,7 +902,7 @@ inexhaustivenessCheck range patterns =
             Nothing
 
         _ ->
-            Just (InexhaustiveMultiWord range inexhaustiveStates)
+            Just (InexhaustiveMultiFunction range inexhaustiveStates)
 
 
 type InexhaustiveState
@@ -979,7 +978,7 @@ verifyTypeSignature inferredType untypedDef context =
         Just annotatedType ->
             let
                 simplifiedAnnotatedType =
-                    Tuple.first <| simplifyWordType ( annotatedType, context )
+                    Tuple.first <| simplifyFunctionType ( annotatedType, context )
             in
             if not <| Type.compatibleFunctions simplifiedAnnotatedType inferredType then
                 let
@@ -1010,12 +1009,12 @@ typeCheckNode idx node context =
             addStackEffect context [ Push Type.Int ]
 
         Qualifier.Function _ name ->
-            case Dict.get name context.typedWords of
+            case Dict.get name context.typedFunctions of
                 Just def ->
-                    addStackEffect context <| wordTypeToStackEffects def.type_
+                    addStackEffect context <| functionTypeToStackEffects def.type_
 
                 Nothing ->
-                    case Dict.get name context.untypedWords of
+                    case Dict.get name context.untypedFunctions of
                         Nothing ->
                             Debug.todo "inconcievable!"
 
@@ -1024,7 +1023,7 @@ typeCheckNode idx node context =
                                 -- recursive definition!
                                 case TypeSignature.toMaybe untypedDef.typeSignature of
                                     Just annotatedType ->
-                                        addStackEffect context <| wordTypeToStackEffects annotatedType
+                                        addStackEffect context <| functionTypeToStackEffects annotatedType
 
                                     Nothing ->
                                         let
@@ -1043,25 +1042,25 @@ typeCheckNode idx node context =
                                     newContext =
                                         { contextWithTypedDef | stackEffects = context.stackEffects }
                                 in
-                                case Dict.get name newContext.typedWords of
+                                case Dict.get name newContext.typedFunctions of
                                     Nothing ->
                                         Debug.todo "inconcievable!"
 
                                     Just def ->
-                                        addStackEffect newContext <| wordTypeToStackEffects def.type_
+                                        addStackEffect newContext <| functionTypeToStackEffects def.type_
 
         Qualifier.FunctionRef loc ref ->
             let
-                stackEffectsBeforeWordCheck =
+                stackEffectsBeforeFunctionCheck =
                     context.stackEffects
 
-                contextAfterWordCheck =
+                contextAfterFunctionCheck =
                     typeCheckNode idx (Qualifier.Function loc ref) context
 
                 newContext =
-                    { contextAfterWordCheck | stackEffects = stackEffectsBeforeWordCheck }
+                    { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            case Dict.get ref newContext.typedWords of
+            case Dict.get ref newContext.typedFunctions of
                 Just def ->
                     addStackEffect newContext <|
                         [ Push <| Type.FunctionSignature def.type_ ]
@@ -1088,7 +1087,7 @@ typeCheckNode idx node context =
                                     Type.CustomGeneric typeName genericMembers
                     in
                     addStackEffect context <|
-                        wordTypeToStackEffects
+                        functionTypeToStackEffects
                             { input = memberTypes
                             , output = [ typeInQuestion ]
                             }
@@ -1119,7 +1118,7 @@ typeCheckNode idx node context =
                                     Type.CustomGeneric typeName genericMembers
                     in
                     addStackEffect context <|
-                        wordTypeToStackEffects
+                        functionTypeToStackEffects
                             { input = [ typeInQuestion, memberType ]
                             , output = [ typeInQuestion ]
                             }
@@ -1150,7 +1149,7 @@ typeCheckNode idx node context =
                                     Type.CustomGeneric typeName genericMembers
                     in
                     addStackEffect context <|
-                        wordTypeToStackEffects
+                        functionTypeToStackEffects
                             { input = [ typeInQuestion ]
                             , output = [ memberType ]
                             }
@@ -1159,7 +1158,7 @@ typeCheckNode idx node context =
                     Debug.todo "inconcievable!"
 
         Qualifier.Builtin _ builtin ->
-            addStackEffect context <| wordTypeToStackEffects <| Builtin.wordType builtin
+            addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
 
 
 getMembers : String -> Dict String TypeDefinition -> Maybe Qualifier.TypeDefinitionMembers
@@ -1200,22 +1199,22 @@ tagGeneric idx type_ =
             type_
 
 
-wordTypeToStackEffects : FunctionType -> List StackEffect
-wordTypeToStackEffects wordType =
-    List.map Pop (List.reverse wordType.input)
-        ++ List.map Push wordType.output
+functionTypeToStackEffects : FunctionType -> List StackEffect
+functionTypeToStackEffects functionType =
+    List.map Pop (List.reverse functionType.input)
+        ++ List.map Push functionType.output
 
 
-wordTypeFromStackEffects : Qualifier.FunctionDefinition -> Context -> ( Context, FunctionType )
-wordTypeFromStackEffects untypedDef context =
-    wordTypeFromStackEffectsHelper
+functionTypeFromStackEffects : Qualifier.FunctionDefinition -> Context -> ( Context, FunctionType )
+functionTypeFromStackEffects untypedDef context =
+    functionTypeFromStackEffectsHelper
         untypedDef
         context.stackEffects
         ( context, { input = [], output = [] } )
 
 
-wordTypeFromStackEffectsHelper : Qualifier.FunctionDefinition -> List StackEffect -> ( Context, FunctionType ) -> ( Context, FunctionType )
-wordTypeFromStackEffectsHelper untypedDef effects ( context, wordType ) =
+functionTypeFromStackEffectsHelper : Qualifier.FunctionDefinition -> List StackEffect -> ( Context, FunctionType ) -> ( Context, FunctionType )
+functionTypeFromStackEffectsHelper untypedDef effects ( context, functionType ) =
     let
         problem expected actual =
             UnexpectedType
@@ -1227,35 +1226,35 @@ wordTypeFromStackEffectsHelper untypedDef effects ( context, wordType ) =
     case effects of
         [] ->
             ( context
-            , { wordType
-                | input = wordType.input
-                , output = List.reverse wordType.output
+            , { functionType
+                | input = functionType.input
+                , output = List.reverse functionType.output
               }
             )
 
         (Pop ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
             case Dict.get rangeName context.boundStackRanges of
                 Just needToPop ->
-                    wordTypeFromStackEffectsHelper untypedDef (List.map Pop needToPop ++ remainingEffects) ( context, wordType )
+                    functionTypeFromStackEffectsHelper untypedDef (List.map Pop needToPop ++ remainingEffects) ( context, functionType )
 
                 Nothing ->
-                    case wordType.output of
+                    case functionType.output of
                         [] ->
-                            wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
-                                ( context, { wordType | input = type_ :: wordType.input } )
+                            functionTypeFromStackEffectsHelper untypedDef remainingEffects <|
+                                ( context, { functionType | input = type_ :: functionType.input } )
 
                         availableType :: remainingOutput ->
                             if availableType /= type_ then
-                                ( { context | errors = problem type_ availableType :: context.errors }, wordType )
+                                ( { context | errors = problem type_ availableType :: context.errors }, functionType )
 
                             else
-                                ( context, { wordType | output = remainingOutput } )
+                                ( context, { functionType | output = remainingOutput } )
 
         (Pop type_) :: remainingEffects ->
-            case wordType.output of
+            case functionType.output of
                 [] ->
-                    wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
-                        ( context, { wordType | input = type_ :: wordType.input } )
+                    functionTypeFromStackEffectsHelper untypedDef remainingEffects <|
+                        ( context, { functionType | input = type_ :: functionType.input } )
 
                 availableType :: remainingOutput ->
                     let
@@ -1263,26 +1262,26 @@ wordTypeFromStackEffectsHelper untypedDef effects ( context, wordType ) =
                             compatibleTypes context availableType type_
                     in
                     if not compatible then
-                        ( { newContext | errors = problem type_ availableType :: context.errors }, wordType )
+                        ( { newContext | errors = problem type_ availableType :: context.errors }, functionType )
 
                     else
-                        wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
-                            ( newContext, { wordType | output = remainingOutput } )
+                        functionTypeFromStackEffectsHelper untypedDef remainingEffects <|
+                            ( newContext, { functionType | output = remainingOutput } )
 
         (Push ((Type.StackRange rangeName) as type_)) :: remainingEffects ->
             case Dict.get rangeName context.boundStackRanges of
                 Just range ->
-                    wordTypeFromStackEffectsHelper untypedDef
+                    functionTypeFromStackEffectsHelper untypedDef
                         (List.map Push range ++ remainingEffects)
-                        ( context, wordType )
+                        ( context, functionType )
 
                 Nothing ->
-                    wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
-                        ( context, { wordType | output = type_ :: wordType.output } )
+                    functionTypeFromStackEffectsHelper untypedDef remainingEffects <|
+                        ( context, { functionType | output = type_ :: functionType.output } )
 
         (Push type_) :: remainingEffects ->
-            wordTypeFromStackEffectsHelper untypedDef remainingEffects <|
-                ( context, { wordType | output = type_ :: wordType.output } )
+            functionTypeFromStackEffectsHelper untypedDef remainingEffects <|
+                ( context, { functionType | output = type_ :: functionType.output } )
 
 
 compatibleTypes : Context -> Type -> Type -> ( Context, Bool )
@@ -1486,14 +1485,14 @@ replaceStackRange boundRanges types =
         types
 
 
-simplifyWordType : ( FunctionType, Context ) -> ( FunctionType, Context )
-simplifyWordType ( wordType, context ) =
+simplifyFunctionType : ( FunctionType, Context ) -> ( FunctionType, Context )
+simplifyFunctionType ( functionType, context ) =
     let
         oldSignature =
-            wordType.input ++ wordType.output
+            functionType.input ++ functionType.output
 
         inputLength =
-            List.length wordType.input
+            List.length functionType.input
 
         aliases =
             oldSignature
