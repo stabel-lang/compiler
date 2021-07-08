@@ -29,7 +29,6 @@ import Stabel.Qualifier.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
-    , referenceableFunctions : Set String
     }
 
 
@@ -52,6 +51,7 @@ type alias FunctionDefinition =
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : TypeSignature
     , exposed : Bool
+    , inline : Bool
     , implementation : FunctionImplementation
     }
 
@@ -73,11 +73,11 @@ type TypeMatchValue
 
 type Node
     = Integer SourceLocationRange Int
-    | Function SourceLocationRange String
-    | FunctionRef SourceLocationRange String
-    | ConstructType String
-    | GetMember String String
-    | SetMember String String
+    | Function SourceLocationRange FunctionDefinition
+    | FunctionRef SourceLocationRange FunctionDefinition
+    | ConstructType TypeDefinition
+    | GetMember TypeDefinition String Type
+    | SetMember TypeDefinition String Type
     | Builtin SourceLocationRange Builtin
 
 
@@ -959,45 +959,46 @@ qualifyNode config currentDefName modRefs node acc =
                 qLoc =
                     mapLoc loc
             in
-            if Dict.member value config.ast.functions then
-                { acc | qualifiedNodes = Ok (Function qLoc qualifiedName) :: acc.qualifiedNodes }
+            case Dict.get value config.ast.functions of
+                Just func ->
+                    { acc | qualifiedNodes = Ok (Function qLoc func) :: acc.qualifiedNodes }
 
-            else
-                case Dict.get value builtinDict of
-                    Just builtin ->
-                        { acc | qualifiedNodes = Ok (Builtin qLoc builtin) :: acc.qualifiedNodes }
+                Nothing ->
+                    case Dict.get value builtinDict of
+                        Just builtin ->
+                            { acc | qualifiedNodes = Ok (Builtin qLoc builtin) :: acc.qualifiedNodes }
 
-                    Nothing ->
-                        case resolveImportedFunction config modRefs value of
-                            Nothing ->
-                                { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
+                        Nothing ->
+                            case resolveImportedFunction config modRefs value of
+                                Nothing ->
+                                    { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
 
-                            Just mod ->
-                                if representsExternalModule mod then
-                                    let
-                                        path =
-                                            splitExternalPackagePath mod
-                                                -- drop author/package
-                                                |> List.drop 2
-                                    in
-                                    qualifyNode
-                                        config
-                                        currentDefName
-                                        modRefs
-                                        (Parser.ExternalFunction loc path value)
-                                        acc
+                                Just mod ->
+                                    if representsExternalModule mod then
+                                        let
+                                            path =
+                                                splitExternalPackagePath mod
+                                                    -- drop author/package
+                                                    |> List.drop 2
+                                        in
+                                        qualifyNode
+                                            config
+                                            currentDefName
+                                            modRefs
+                                            (Parser.ExternalFunction loc path value)
+                                            acc
 
-                                else
-                                    let
-                                        path =
-                                            splitInternalPackagePath mod
-                                    in
-                                    qualifyNode
-                                        config
-                                        currentDefName
-                                        modRefs
-                                        (Parser.PackageFunction loc path value)
-                                        acc
+                                    else
+                                        let
+                                            path =
+                                                splitInternalPackagePath mod
+                                        in
+                                        qualifyNode
+                                            config
+                                            currentDefName
+                                            modRefs
+                                            (Parser.PackageFunction loc path value)
+                                            acc
 
         Parser.PackageFunction loc path value ->
             let
