@@ -14,7 +14,6 @@ import Dict.Extra as Dict
 import List.Extra as List
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
-import Stabel.Data.Metadata exposing (Metadata)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
 import Stabel.Data.TypeSignature as TypeSignature exposing (TypeSignature)
@@ -34,8 +33,9 @@ type alias TypeDefinition =
 
 type alias FunctionDefinition =
     { name : String
+    , sourceLocation : Maybe SourceLocationRange
     , type_ : FunctionType
-    , metadata : Metadata
+    , isInline : Bool
     , implementation : FunctionImplementation
     }
 
@@ -208,10 +208,11 @@ typeCheckSoloImplementation context untypedDef impl =
                 | typedFunctions =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
+                        , sourceLocation = untypedDef.sourceLocation
                         , type_ =
                             untypedDef.typeSignature
                                 |> TypeSignature.withDefault inferredType
-                        , metadata = metadataFromUntypedDef context untypedDef
+                        , isInline = Set.member untypedDef.name context.referenceableFunctions
                         , implementation = typedImplementation
                         }
                         newContext.typedFunctions
@@ -398,8 +399,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 | typedFunctions =
                     Dict.insert untypedDef.name
                         { name = untypedDef.name
+                        , sourceLocation = untypedDef.sourceLocation
                         , type_ = exposedType
-                        , metadata = metadataFromUntypedDef context untypedDef
+                        , isInline = Set.member untypedDef.name context.referenceableFunctions
                         , implementation =
                             MultiImpl
                                 (List.map
@@ -422,16 +424,6 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     in
     verifyTypeSignature inferredType untypedDef finalContext
         |> cleanContext
-
-
-metadataFromUntypedDef : Context -> Qualifier.FunctionDefinition -> Metadata
-metadataFromUntypedDef context def =
-    { isEntryPoint = False
-    , type_ = def.typeSignature
-    , isInline = Set.member def.name context.referenceableFunctions
-    , sourceLocationRange = def.sourceLocation
-    , isExposed = def.exposed
-    }
 
 
 inferWhenTypes :

@@ -464,9 +464,8 @@ suite =
                         Dict.fromListBy .name
                             [ { name = "Nil"
                               , type_ = { input = [], output = [ Type.Custom "Nil" ] }
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.withVerifiedType [] [ Type.Custom "Nil" ]
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ ConstructType "Nil"
@@ -477,11 +476,8 @@ suite =
                                     { input = [ maybeUnion, Type.Generic "a" ]
                                     , output = [ Type.Generic "a" ]
                                     }
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.withType
-                                            [ maybeUnion, Type.Generic "a" ]
-                                            [ Type.Generic "a" ]
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     MultiImpl
                                         [ ( TypeMatch emptyRange (Type.Generic "a") []
@@ -498,7 +494,8 @@ suite =
                               }
                             , { name = "main"
                               , type_ = { input = [], output = [ Type.Int ] }
-                              , metadata = Metadata.default
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ Function emptyRange

@@ -96,7 +96,7 @@ toWasmFuncDef typeInfo ast exportedFunctions def =
     in
     { name = def.name
     , exported = Set.member def.name exportedFunctions
-    , isIndirectlyCalled = def.metadata.isInline
+    , isIndirectlyCalled = def.isInline
     , args = []
     , results = []
     , locals = List.repeat numberOfLocals Wasm.Int32

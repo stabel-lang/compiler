@@ -72,7 +72,8 @@ suite =
                         Dict.fromListBy .name
                             [ { name = "inc"
                               , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                              , metadata = Metadata.default
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
@@ -81,7 +82,8 @@ suite =
                               }
                             , { name = "dec"
                               , type_ = { input = [ Type.Int ], output = [ Type.Int ] }
-                              , metadata = Metadata.default
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
@@ -90,7 +92,8 @@ suite =
                               }
                             , { name = "main"
                               , type_ = { input = [], output = [ Type.Int ] }
-                              , metadata = Metadata.default
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
@@ -1170,7 +1173,8 @@ suite =
                                     { input = []
                                     , output = [ Type.Int ]
                                     }
-                              , metadata = Metadata.default
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1
@@ -1187,11 +1191,8 @@ suite =
                                     { input = [ Type.Generic "a", Type.Generic "b" ]
                                     , output = [ Type.Generic "b" ]
                                     }
-                              , metadata =
-                                    Metadata.default
-                                        |> Metadata.withType
-                                            [ Type.Generic "a", Type.Generic "b" ]
-                                            [ Type.Generic "b" ]
+                              , sourceLocation = Nothing
+                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ Builtin emptyRange Builtin.StackSwap
