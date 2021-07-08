@@ -29,6 +29,7 @@ import Stabel.Qualifier.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
+    , referenceableFunctions : Set String
     }
 
 
@@ -51,7 +52,6 @@ type alias FunctionDefinition =
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : TypeSignature
     , exposed : Bool
-    , inline : Bool
     , implementation : FunctionImplementation
     }
 
