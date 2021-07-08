@@ -4,7 +4,6 @@ import Dict
 import Platform exposing (Program)
 import Set
 import Stabel.Codegen as Codegen
-import Stabel.Data.Metadata as Metadata
 import Stabel.Parser as Parser
 import Stabel.Parser.Problem as ParserProblem
 import Stabel.Qualifier as Qualifier

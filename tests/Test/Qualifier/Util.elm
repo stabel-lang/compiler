@@ -10,7 +10,6 @@ import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Data.TypeSignature as TypeSignature

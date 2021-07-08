@@ -6,7 +6,6 @@ import Expect exposing (Expectation)
 import List.Extra as List
 import Set
 import Stabel.Data.Builtin as Builtin
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.TypeSignature as TypeSignature

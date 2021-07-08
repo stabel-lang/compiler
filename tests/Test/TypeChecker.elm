@@ -4,7 +4,6 @@ import Dict
 import Dict.Extra as Dict
 import Set
 import Stabel.Data.Builtin as Builtin
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Data.TypeSignature as TypeSignature

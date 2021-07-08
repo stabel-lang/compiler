@@ -5,7 +5,6 @@ import Json.Encode as Encode
 import Platform exposing (Program)
 import Set
 import Stabel.Codegen as Codegen
-import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
 import Stabel.PackageLoader as PackageLoader
 import Stabel.TypeChecker as TypeChecker
