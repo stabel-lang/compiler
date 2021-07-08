@@ -1,9 +1,9 @@
 port module CLI exposing (main)
 
-import Dict
 import Json.Decode as Json
 import Json.Encode as Encode
 import Platform exposing (Program)
+import Set
 import Stabel.Codegen as Codegen
 import Stabel.Data.Metadata as Metadata
 import Stabel.Data.PackagePath as PackagePath
@@ -72,28 +72,22 @@ update msg (( entryPoint, packageLoaderModel ) as model) =
                     case updatedModel of
                         PackageLoader.Done qualifiedAst ->
                             let
-                                setEntryPoint word =
-                                    { word | metadata = Metadata.asEntryPoint word.metadata }
-
                                 compilationResult =
                                     case TypeChecker.run qualifiedAst of
                                         Err typeErrors ->
                                             formatErrors (TypeCheckerProblem.toString "") typeErrors
 
                                         Ok typedAst ->
-                                            (case entryPoint of
-                                                Nothing ->
-                                                    typedAst
-
-                                                Just fnName ->
-                                                    { typedAst
-                                                        | functions =
-                                                            Dict.update fnName (Maybe.map setEntryPoint) typedAst.functions
-                                                    }
-                                            )
-                                                |> Codegen.codegen
-                                                |> Result.mapError (always "compfail")
-                                                |> Result.map Wasm.toString
+                                            let
+                                                exportedFunctions =
+                                                    entryPoint
+                                                        |> Maybe.map Set.singleton
+                                                        |> Maybe.withDefault Set.empty
+                                            in
+                                            typedAst
+                                                |> Codegen.run exportedFunctions
+                                                |> Wasm.toString
+                                                |> Ok
                             in
                             case compilationResult of
                                 Ok wast ->

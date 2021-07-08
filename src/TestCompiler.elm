@@ -75,8 +75,8 @@ compile entry sourceCode =
                             }
                         }
 
-                setEntryPoint word =
-                    { word | metadata = Metadata.asEntryPoint word.metadata }
+                exportedFunctions =
+                    Set.singleton entry
             in
             case qualifierResult of
                 Err qualifierErrors ->
@@ -88,12 +88,9 @@ compile entry sourceCode =
                             formatErrors (TypeCheckerProblem.toString sourceCode) typeErrors
 
                         Ok typedAst ->
-                            { typedAst
-                                | functions =
-                                    Dict.update entry (Maybe.map setEntryPoint) typedAst.functions
-                            }
-                                |> Codegen.codegen
-                                |> Result.mapError (always "Codegen failed for unknown reason :(")
+                            typedAst
+                                |> Codegen.run exportedFunctions
+                                |> Ok
 
 
 formatErrors : (a -> String) -> List a -> Result String b

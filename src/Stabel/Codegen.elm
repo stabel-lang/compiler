@@ -1,7 +1,8 @@
-module Stabel.Codegen exposing (..)
+module Stabel.Codegen exposing (run)
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Set exposing (Set)
 import Stabel.Codegen.BaseModule as BaseModule
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
@@ -31,8 +32,8 @@ type AstNode
 -- Codegen
 
 
-codegen : AST -> Result () Wasm.Module
-codegen ast =
+run : Set String -> AST -> Wasm.Module
+run exportedFunctions ast =
     let
         typeMetaDict =
             ast.types
@@ -41,9 +42,8 @@ codegen ast =
     in
     ast.functions
         |> Dict.values
-        |> List.map (toWasmFuncDef typeMetaDict ast)
+        |> List.map (toWasmFuncDef typeMetaDict ast exportedFunctions)
         |> List.foldl Wasm.withFunction BaseModule.baseModule
-        |> Ok
 
 
 typeMeta : List AST.TypeDefinition -> Dict String TypeInformation
@@ -75,9 +75,10 @@ typeMeta types =
 toWasmFuncDef :
     Dict String TypeInformation
     -> AST
+    -> Set String
     -> AST.FunctionDefinition
     -> Wasm.FunctionDef
-toWasmFuncDef typeInfo ast def =
+toWasmFuncDef typeInfo ast exportedFunctions def =
     let
         wasmImplementation =
             case def.implementation of
@@ -94,7 +95,7 @@ toWasmFuncDef typeInfo ast def =
                 |> Maybe.withDefault 0
     in
     { name = def.name
-    , exported = def.metadata.isEntryPoint
+    , exported = Set.member def.name exportedFunctions
     , isIndirectlyCalled = def.metadata.isInline
     , args = []
     , results = []
