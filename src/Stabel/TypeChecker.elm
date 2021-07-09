@@ -241,8 +241,8 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.Integer range num ->
             IntLiteral range num
 
-        Qualifier.Function range name ->
-            case Dict.get name context.typedFunctions of
+        Qualifier.Function range function ->
+            case Dict.get function.name context.typedFunctions of
                 Just def ->
                     let
                         resolvedFunctionType =
@@ -273,50 +273,29 @@ untypedToTypedNode idx context untypedNode =
                                 _ ->
                                     boundType
                     in
-                    Function range name resolvedFunctionType
+                    Function range function.name resolvedFunctionType
 
                 Nothing ->
                     -- TODO: this can't be right?
-                    Dict.get name context.untypedFunctions
+                    Dict.get function.name context.untypedFunctions
                         |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
-                        |> Function range name
+                        |> Function range function.name
 
         Qualifier.FunctionRef range ref ->
-            FunctionRef range ref
+            FunctionRef range ref.name
 
-        Qualifier.ConstructType typeName ->
-            ConstructType typeName
+        Qualifier.ConstructType typeDef ->
+            ConstructType typeDef.name
 
-        Qualifier.SetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    SetMember typeName memberName memberType
+        Qualifier.SetMember typeDef memberName memberType ->
+            SetMember typeDef.name memberName memberType
 
-                Nothing ->
-                    Debug.todo "Inconcievable!"
-
-        Qualifier.GetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    GetMember typeName memberName memberType
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
+        Qualifier.GetMember typeDef memberName memberType ->
+            GetMember typeDef.name memberName memberType
 
         Qualifier.Builtin range builtin ->
             Builtin range builtin
-
-
-getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
-getMemberType typeDict typeName memberName =
-    case getMembers typeName typeDict of
-        Just (Qualifier.StructMembers members) ->
-            List.find (\( name, _ ) -> name == memberName) members
-                |> Maybe.map Tuple.second
-
-        _ ->
-            Nothing
 
 
 
@@ -1000,46 +979,41 @@ typeCheckNode idx node context =
         Qualifier.Integer _ _ ->
             addStackEffect context [ Push Type.Int ]
 
-        Qualifier.Function _ name ->
-            case Dict.get name context.typedFunctions of
+        Qualifier.Function _ untypedDef ->
+            case Dict.get untypedDef.name context.typedFunctions of
                 Just def ->
                     addStackEffect context <| functionTypeToStackEffects def.type_
 
                 Nothing ->
-                    case Dict.get name context.untypedFunctions of
-                        Nothing ->
-                            Debug.todo "inconcievable!"
+                    if Set.member untypedDef.name context.callStack then
+                        -- recursive definition!
+                        case TypeSignature.toMaybe untypedDef.typeSignature of
+                            Just annotatedType ->
+                                addStackEffect context <| functionTypeToStackEffects annotatedType
 
-                        Just untypedDef ->
-                            if Set.member name context.callStack then
-                                -- recursive definition!
-                                case TypeSignature.toMaybe untypedDef.typeSignature of
-                                    Just annotatedType ->
-                                        addStackEffect context <| functionTypeToStackEffects annotatedType
-
-                                    Nothing ->
-                                        let
-                                            problem =
-                                                MissingTypeAnnotationInRecursiveCallStack
-                                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
-                                                    untypedDef.name
-                                        in
-                                        { context | errors = problem :: context.errors }
-
-                            else
+                            Nothing ->
                                 let
-                                    contextWithTypedDef =
-                                        typeCheckDefinition untypedDef context
-
-                                    newContext =
-                                        { contextWithTypedDef | stackEffects = context.stackEffects }
+                                    problem =
+                                        MissingTypeAnnotationInRecursiveCallStack
+                                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
+                                            untypedDef.name
                                 in
-                                case Dict.get name newContext.typedFunctions of
-                                    Nothing ->
-                                        Debug.todo "inconcievable!"
+                                { context | errors = problem :: context.errors }
 
-                                    Just def ->
-                                        addStackEffect newContext <| functionTypeToStackEffects def.type_
+                    else
+                        let
+                            contextWithTypedDef =
+                                typeCheckDefinition untypedDef context
+
+                            newContext =
+                                { contextWithTypedDef | stackEffects = context.stackEffects }
+                        in
+                        case Dict.get untypedDef.name newContext.typedFunctions of
+                            Nothing ->
+                                Debug.todo "inconcievable!"
+
+                            Just def ->
+                                addStackEffect newContext <| functionTypeToStackEffects def.type_
 
         Qualifier.FunctionRef loc ref ->
             let
@@ -1052,7 +1026,7 @@ typeCheckNode idx node context =
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            case Dict.get ref newContext.typedFunctions of
+            case Dict.get ref.name newContext.typedFunctions of
                 Just def ->
                     addStackEffect newContext <|
                         [ Push <| Type.FunctionSignature def.type_ ]
@@ -1060,103 +1034,73 @@ typeCheckNode idx node context =
                 _ ->
                     Debug.todo "inconcievable!"
 
-        Qualifier.ConstructType typeName ->
-            case getMembers typeName context.types of
-                Just (Qualifier.StructMembers members) ->
-                    let
-                        memberTypes =
-                            List.map Tuple.second members
+        Qualifier.ConstructType typeDef ->
+            let
+                memberTypes =
+                    getStructMembers typeDef
+                        |> List.map Tuple.second
 
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = memberTypes
+                    , output = [ typeInQuestion ]
+                    }
 
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
+        Qualifier.SetMember typeDef _ memberType ->
+            let
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = [ typeInQuestion, memberType ]
+                    , output = [ typeInQuestion ]
+                    }
 
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
-                    in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = memberTypes
-                            , output = [ typeInQuestion ]
-                            }
-
-                other ->
-                    Debug.todo ("inconcievable: " ++ typeName ++ ": " ++ Debug.toString other)
-
-        Qualifier.SetMember typeName memberName ->
-            case
-                ( getMembers typeName context.types
-                , getMemberType context.types typeName memberName
-                )
-            of
-                ( Just (Qualifier.StructMembers members), Just memberType ) ->
-                    let
-                        memberTypes =
-                            List.map Tuple.second members
-
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
-
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
-
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
-                    in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = [ typeInQuestion, memberType ]
-                            , output = [ typeInQuestion ]
-                            }
-
-                other ->
-                    Debug.todo ("inconcievable! " ++ Debug.toString other)
-
-        Qualifier.GetMember typeName memberName ->
-            case
-                ( getMembers typeName context.types
-                , getMemberType context.types typeName memberName
-                )
-            of
-                ( Just (Qualifier.StructMembers members), Just memberType ) ->
-                    let
-                        memberTypes =
-                            List.map Tuple.second members
-
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
-
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
-
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
-                    in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = [ typeInQuestion ]
-                            , output = [ memberType ]
-                            }
-
-                _ ->
-                    Debug.todo "inconcievable!"
+        Qualifier.GetMember typeDef _ memberType ->
+            let
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = [ typeInQuestion ]
+                    , output = [ memberType ]
+                    }
 
         Qualifier.Builtin _ builtin ->
             addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
 
 
-getMembers : String -> Dict String TypeDefinition -> Maybe Qualifier.TypeDefinitionMembers
-getMembers typeName types =
-    Dict.get typeName types
-        |> Maybe.map .members
+getStructMembers : TypeDefinition -> List ( String, Type )
+getStructMembers typeDef =
+    case typeDef.members of
+        Qualifier.StructMembers members ->
+            members
+
+        Qualifier.UnionMembers _ ->
+            []
+
+
+getStructType : TypeDefinition -> Type
+getStructType typeDef =
+    let
+        memberTypes =
+            getStructMembers typeDef
+                |> List.map Tuple.second
+
+        genericMembers =
+            List.filter Type.isGeneric memberTypes
+    in
+    case genericMembers of
+        [] ->
+            Type.Custom typeDef.name
+
+        _ ->
+            Type.CustomGeneric typeDef.name genericMembers
 
 
 tagGenericEffect : Int -> StackEffect -> StackEffect
