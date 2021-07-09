@@ -1143,13 +1143,22 @@ qualifyNode config currentDefName modRefs node acc =
                                 { acc | qualifiedNodes = Err (FunctionNotExposed qLoc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
-            { acc | qualifiedNodes = Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes }
+            { acc
+                | qualifiedNodes =
+                    Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes
+            }
 
         Parser.SetMember typeName memberName ->
-            { acc | qualifiedNodes = Ok (SetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes }
+            { acc
+                | qualifiedNodes =
+                    Ok (SetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes
+            }
 
         Parser.GetMember typeName memberName ->
-            { acc | qualifiedNodes = Ok (GetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes }
+            { acc
+                | qualifiedNodes =
+                    Ok (GetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes
+            }
 
         Parser.InlineFunction sourceLocation quotImpl ->
             let
@@ -1161,13 +1170,19 @@ qualifyNode config currentDefName modRefs node acc =
                         "inlinefn:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
 
                 qualifyNodeResult =
-                    initQualifyNode config inlineFuncName modRefs acc.qualifiedFunctions quotImpl
+                    initQualifyNode
+                        config
+                        acc.qualifiedTypes
+                        acc.qualifiedFunctions
+                        inlineFuncName
+                        modRefs
+                        quotImpl
             in
             case qualifyNodeResult.qualifiedNodes of
-                Ok [ Function _ qualifiedName ] ->
+                Ok [ Function _ qualifiedFunction ] ->
                     { acc
                         | qualifiedNodes =
-                            Ok (FunctionRef (mapLoc sourceLocation) qualifiedName)
+                            Ok (FunctionRef (mapLoc sourceLocation) qualifiedFunction)
                                 :: acc.qualifiedNodes
                         , qualifiedFunctions =
                             Dict.union
@@ -1176,21 +1191,26 @@ qualifyNode config currentDefName modRefs node acc =
                         , inlineFunctionNames =
                             acc.inlineFunctionNames
                                 |> Set.union qualifyNodeResult.inlineFunctionNames
-                                |> Set.insert qualifiedName
+                                |> Set.insert qualifiedFunction.name
                     }
 
                 Ok qualifiedQuotImpl ->
+                    let
+                        qualifiedFunction =
+                            { name = inlineFuncName
+                            , sourceLocation = Nothing
+                            , typeSignature = TypeSignature.NotProvided
+                            , exposed = False
+                            , implementation = SoloImpl qualifiedQuotImpl
+                            }
+                    in
                     { acc
                         | availableInlineFuncId =
                             acc.availableInlineFuncId + 1
                         , qualifiedFunctions =
-                            Dict.insert inlineFuncName
-                                { name = inlineFuncName
-                                , sourceLocation = Nothing
-                                , typeSignature = TypeSignature.NotProvided
-                                , exposed = False
-                                , implementation = SoloImpl qualifiedQuotImpl
-                                }
+                            Dict.insert
+                                qualifiedFunction.name
+                                qualifiedFunction
                                 (Dict.union
                                     acc.qualifiedFunctions
                                     qualifyNodeResult.qualifiedFunctions
