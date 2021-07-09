@@ -128,7 +128,7 @@ run config =
 
         ( functionErrors, qualifiedFunctions, inlineFunctionNames ) =
             Dict.foldl
-                (\_ val acc -> qualifyDefinition config allQualifiedTypes val acc)
+                (\_ val acc -> qualifyDefinitionFoldHelper config allQualifiedTypes val acc)
                 ( [], Dict.empty, Set.empty )
                 config.ast.functions
     in
@@ -142,6 +142,33 @@ run config =
 
         _ ->
             Err <| typeErrors ++ functionErrors
+
+
+qualifyDefinitionFoldHelper :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> Parser.FunctionDefinition
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+    -> ( List Problem, Dict String FunctionDefinition, Set String )
+qualifyDefinitionFoldHelper config qualifiedTypes functionDef ( errors, qualifiedFunctions, inlineFunctionNames ) =
+    let
+        qualificationResult =
+            qualifyDefinition config qualifiedTypes qualifiedFunctions functionDef
+    in
+    case qualificationResult.qualifiedFunction of
+        Err err ->
+            ( err :: errors
+            , qualificationResult.qualifiedFunctions
+            , inlineFunctionNames
+                |> Set.union qualificationResult.inlineFunctionNames
+            )
+
+        Ok _ ->
+            ( errors
+            , qualificationResult.qualifiedFunctions
+            , inlineFunctionNames
+                |> Set.union qualificationResult.inlineFunctionNames
+            )
 
 
 type alias ModuleDefinitionConfig a =
@@ -724,7 +751,7 @@ qualifyWhen :
 qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, inlineFunctionNames, result ) =
     let
         qualifyNodeResult =
-            initQualifyNode config functionName modRefs qualifiedFunctions impl
+            initQualifyNode config qualifiedTypes qualifiedFunctions functionName modRefs impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes modRefs typeMatch
@@ -1268,7 +1295,7 @@ qualifyNode config currentDefName modRefs node acc =
                                     qualifyNodeResult.qualifiedFunctions
                                 )
                         , qualifiedNodes =
-                            Ok (FunctionRef (mapLoc sourceLocation) inlineFuncName)
+                            Ok (FunctionRef (mapLoc sourceLocation) qualifiedFunction)
                                 :: acc.qualifiedNodes
                         , inlineFunctionNames =
                             acc.inlineFunctionNames
