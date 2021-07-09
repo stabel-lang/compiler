@@ -1143,22 +1143,74 @@ qualifyNode config currentDefName modRefs node acc =
                                 { acc | qualifiedNodes = Err (FunctionNotExposed qLoc fullReference) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
-            { acc
-                | qualifiedNodes =
-                    Ok (ConstructType (qualifyName config typeName)) :: acc.qualifiedNodes
-            }
+            let
+                qualifiedName =
+                    qualifyName config typeName
+            in
+            case Dict.get qualifiedName acc.qualifiedTypes of
+                Just t ->
+                    { acc
+                        | qualifiedNodes =
+                            Ok (ConstructType t) :: acc.qualifiedNodes
+                    }
+
+                Nothing ->
+                    { acc
+                        | qualifiedNodes =
+                            Err (UnknownTypeRef SourceLocation.emptyRange qualifiedName) :: acc.qualifiedNodes
+                    }
 
         Parser.SetMember typeName memberName ->
-            { acc
-                | qualifiedNodes =
-                    Ok (SetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes
-            }
+            let
+                qualifiedName =
+                    qualifyName config typeName
+            in
+            case Dict.get qualifiedName acc.qualifiedTypes of
+                Just t ->
+                    case getMemberType t memberName of
+                        Just memberType ->
+                            { acc
+                                | qualifiedNodes =
+                                    Ok (SetMember t memberName memberType) :: acc.qualifiedNodes
+                            }
+
+                        Nothing ->
+                            { acc
+                                | qualifiedNodes =
+                                    Err (NoSuchMemberOnType SourceLocation.emptyRange qualifiedName memberName) :: acc.qualifiedNodes
+                            }
+
+                Nothing ->
+                    { acc
+                        | qualifiedNodes =
+                            Err (UnknownTypeRef SourceLocation.emptyRange qualifiedName) :: acc.qualifiedNodes
+                    }
 
         Parser.GetMember typeName memberName ->
-            { acc
-                | qualifiedNodes =
-                    Ok (GetMember (qualifyName config typeName) memberName) :: acc.qualifiedNodes
-            }
+            let
+                qualifiedName =
+                    qualifyName config typeName
+            in
+            case Dict.get qualifiedName acc.qualifiedTypes of
+                Just t ->
+                    case getMemberType t memberName of
+                        Just memberType ->
+                            { acc
+                                | qualifiedNodes =
+                                    Ok (GetMember t memberName memberType) :: acc.qualifiedNodes
+                            }
+
+                        Nothing ->
+                            { acc
+                                | qualifiedNodes =
+                                    Err (NoSuchMemberOnType SourceLocation.emptyRange qualifiedName memberName) :: acc.qualifiedNodes
+                            }
+
+                Nothing ->
+                    { acc
+                        | qualifiedNodes =
+                            Err (UnknownTypeRef SourceLocation.emptyRange qualifiedName) :: acc.qualifiedNodes
+                    }
 
         Parser.InlineFunction sourceLocation quotImpl ->
             let
@@ -1242,6 +1294,22 @@ qualifyName config name =
             , "/"
             , name
             ]
+
+
+getMemberType : TypeDefinition -> String -> Maybe Type
+getMemberType typeDef memberName =
+    let
+        members =
+            case typeDef.members of
+                StructMembers mems ->
+                    mems
+
+                UnionMembers _ ->
+                    []
+    in
+    members
+        |> List.find (Tuple.first >> (==) memberName)
+        |> Maybe.map Tuple.second
 
 
 qualifyPackageModule : String -> String -> String
