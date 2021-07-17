@@ -18,6 +18,10 @@ exports.toWat = function toWat(entry, sourceCode) {
     });
 }
 
+exports.toProjectWat = function toWat(entry, sourceCode) {
+    /* TODO */
+}
+
 exports.run = async function run(wat, functionName) {
     const wabt = await wabtInit();
     const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;

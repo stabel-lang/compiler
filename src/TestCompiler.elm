@@ -17,47 +17,64 @@ type alias Model =
     ()
 
 
-type Msg
-    = CompileString ( String, String )
+type Input
+    = CompileString CompileStringOpts
+    | CompileProject CompileProjectOpts
 
 
-main : Program () Model Msg
+type alias CompileStringOpts =
+    { entryPoint : String
+    , sourceCode : String
+    }
+
+
+type alias CompileProjectOpts =
+    { entryPoint : String
+    , modules : List ModuleSource
+    }
+
+
+type alias ModuleSource =
+    { package : String
+    , modulePath : String
+    , source : String
+    }
+
+
+main : Program Input Model msg
 main =
     Platform.worker
-        { init = init
-        , update = update
-        , subscriptions = subscriptions
+        { init = \input -> ( (), init input )
+        , update = \_ _ -> ( (), Cmd.none )
+        , subscriptions = always Sub.none
         }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( ()
-    , Cmd.none
-    )
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg _ =
-    case msg of
-        CompileString ( entry, sourceCode ) ->
-            case compile entry sourceCode of
+init : Input -> Cmd msg
+init input =
+    case input of
+        CompileString opts ->
+            case compileString opts of
                 Ok wasm ->
-                    ( ()
-                    , compileFinished ( True, Wasm.toString wasm )
-                    )
+                    compileSucceded wasm
 
                 Err errmsg ->
-                    ( ()
-                    , compileFinished ( False, "Compilation failed:\n\n" ++ errmsg )
-                    )
+                    compileFailed errmsg
+
+        CompileProject opts ->
+            case compileProject opts of
+                Ok wasm ->
+                    compileSucceded wasm
+
+                Err errmsg ->
+                    compileFailed errmsg
 
 
-compile : String -> String -> Result String Wasm.Module
-compile entry sourceCode =
-    case Parser.run "test" sourceCode of
+compileString : CompileStringOpts -> Result String Wasm.Module
+compileString opts =
+    case Parser.run "test" opts.sourceCode of
         Err parserErrors ->
-            formatErrors (ParserProblem.toString sourceCode) parserErrors
+            formatErrors (ParserProblem.toString opts.sourceCode) parserErrors
 
         Ok ast ->
             let
@@ -75,16 +92,55 @@ compile entry sourceCode =
                         }
 
                 exportedFunctions =
-                    Set.singleton entry
+                    Set.singleton opts.entryPoint
             in
             case qualifierResult of
                 Err qualifierErrors ->
-                    formatErrors (QualifierProblem.toString sourceCode) qualifierErrors
+                    formatErrors (QualifierProblem.toString opts.sourceCode) qualifierErrors
 
                 Ok qualifiedAst ->
                     case TypeChecker.run qualifiedAst of
                         Err typeErrors ->
-                            formatErrors (TypeCheckerProblem.toString sourceCode) typeErrors
+                            formatErrors (TypeCheckerProblem.toString opts.sourceCode) typeErrors
+
+                        Ok typedAst ->
+                            typedAst
+                                |> Codegen.run exportedFunctions
+                                |> Ok
+
+
+compileProject : CompileProjectOpts -> Result String Wasm.Module
+compileProject opts =
+    case Parser.run "test" opts.sourceCode of
+        Err parserErrors ->
+            formatErrors (ParserProblem.toString opts.sourceCode) parserErrors
+
+        Ok ast ->
+            let
+                qualifierResult =
+                    Qualifier.run
+                        { packageName = ""
+                        , modulePath = ""
+                        , ast = ast
+                        , externalModules = Dict.empty
+                        , inProgressAST =
+                            { types = Dict.empty
+                            , functions = Dict.empty
+                            , referenceableFunctions = Set.empty
+                            }
+                        }
+
+                exportedFunctions =
+                    Set.singleton opts.entryPoint
+            in
+            case qualifierResult of
+                Err qualifierErrors ->
+                    formatErrors (QualifierProblem.toString opts.sourceCode) qualifierErrors
+
+                Ok qualifiedAst ->
+                    case TypeChecker.run qualifiedAst of
+                        Err typeErrors ->
+                            formatErrors (TypeCheckerProblem.toString opts.sourceCode) typeErrors
 
                         Ok typedAst ->
                             typedAst
@@ -100,12 +156,14 @@ formatErrors fn problems =
         |> Err
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    compileString CompileString
+compileSucceded : Wasm.Module -> Cmd msg
+compileSucceded wasm =
+    compileFinished ( True, Wasm.toString wasm )
 
 
-port compileString : (( String, String ) -> msg) -> Sub msg
+compileFailed : String -> Cmd msg
+compileFailed err =
+    compileFinished ( False, "Compilation failed:\n\n" ++ err )
 
 
 port compileFinished : ( Bool, String ) -> Cmd msg
