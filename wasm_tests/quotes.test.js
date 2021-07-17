@@ -17,7 +17,38 @@ test('Basic quotation', async () => {
     expect(result.stackElement()).toBe(1);
 });
 
-test('Basic quotation', async () => {
+test('Basic quotation with type signature', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : 1 
+          [ 1 + ] apply-to-num
+          [ 1 - ] apply-to-num
+
+        def: apply-to-num
+        type: Int [ Int -- Int ] -- Int
+        : !
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});
+
+test('Can reference function inline before it\'s defined', async () => {
+    const wat = await compiler.toWat('main', `
+        def: a
+        : 1 [ inc ] !
+
+        def: inc
+        : 1 +
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(2);
+});
+
+test('Update function', async () => {
     const wat = await compiler.toWat('main', `
         defstruct: Coordinate
         : x Int
@@ -40,4 +71,17 @@ test('Basic quotation', async () => {
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(2);
+});
+
+test('Inline function within inline function', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : 1
+          [ 1 [ 1 + ] ! + ]
+          !
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(3);
 });

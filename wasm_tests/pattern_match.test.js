@@ -141,3 +141,66 @@ test('Recursive match reverse case', async () => {
 
     expect(result.stackElement()).toBe(0);
 });
+
+test('Generic case', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Maybe a
+        : a
+        : Nothing
+
+        defstruct: Nothing
+
+        defmulti: with-default
+        : a
+          drop
+        else: swap drop
+
+        def: main
+        : 5
+          10 with-default
+
+          Nothing
+          10 with-default
+
+          +
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(15);
+});
+
+test('Unions as struct member', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Bool
+        : True
+        : False
+
+        defstruct: True
+        defstruct: False
+
+        defstruct: Box
+        : value Bool
+
+        defmulti: true?
+        type: Box -- Bool
+        : Box( value True )
+          value>
+        else: drop False
+
+        defmulti: as-int
+        type: Bool -- Int
+        : True
+          drop 20
+        : False
+          drop 10
+
+        def: main
+        : True >Box
+          true? as-int
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(20);
+});

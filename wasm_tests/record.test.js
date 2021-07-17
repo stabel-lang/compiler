@@ -15,6 +15,23 @@ test('Enum type', async () => {
     expect(result.typeIdForPointer()).toBe(1);
 });
 
+test('Struct with annotations', async () => {
+    const wat = await compiler.toWat('main', `
+        defstruct: True
+
+        def: main
+        : True as-int
+
+        def: as-int
+        type: True -- Int
+        : drop 1
+    `);
+
+    const result = await.compiler.run(wat, 'main');
+
+    expect(result).toBe(1);
+});
+
 test('Compound type', async () => {
     const wat = await compiler.toWat('main', `
         defstruct: Person
