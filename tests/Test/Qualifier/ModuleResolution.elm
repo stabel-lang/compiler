@@ -1,522 +1,296 @@
-module Test.Qualifier.ModuleResolution exposing (..)
+module Test.Qualifier.ModuleResolution exposing (suite)
 
-import Dict
-import Dict.Extra as Dict
-import Expect
-import Set
-import Stabel.Data.Builtin as Builtin
-import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.TypeSignature as TypeSignature
-import Stabel.Parser as AST
-import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
-import Stabel.Parser.ModuleDefinition as ModuleDefinition
-import Stabel.Parser.SourceLocation as PSourceLoc
-import Stabel.Parser.Type as AST
+import Expect exposing (Expectation)
 import Stabel.Qualifier exposing (..)
-import Stabel.Qualifier.Problem as Problem
+import Stabel.Qualifier.Problem as Problem exposing (Problem)
 import Test exposing (Test, describe, test)
-import Test.Qualifier.Util as QualifierUtil
 
 
 suite : Test
 suite =
     describe "Qualifier -- Module resolution"
-        [ test "When module does have a definition, only functions defined to be exposed are" <|
+        [ test "Referencing a function from an internal module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition =
-                            ModuleDefinition.Defined
-                                { aliases = Dict.empty
-                                , imports = Dict.empty
-                                , exposes = Set.fromList [ "fn2" ]
-                                }
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "fn1"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Integer PSourceLoc.emptyRange 1
-                                            , AST.Integer PSourceLoc.emptyRange 2
-                                            , AST.Function PSourceLoc.emptyRange "+"
-                                            ]
-                                  }
-                                , { name = "fn2"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Integer PSourceLoc.emptyRange 2
-                                            , AST.Integer PSourceLoc.emptyRange 3
-                                            , AST.Function PSourceLoc.emptyRange "+"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/test/internal/mod"
+                          , """
+                            defmodule:
+                            exposes: dummy
+                            :
 
-                    expectedAst =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "fn1"
-                                  , exposed = False
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer emptyRange 1
-                                            , Integer emptyRange 2
-                                            , Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "fn2"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer emptyRange 2
-                                            , Integer emptyRange 3
-                                            , Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                            def: value
+                            : 1
+
+                            def: dummy
+                            : 1
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defmodule:
+                            import: internal/mod
+                            :
+
+                            def: main
+                            : value
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.FunctionNotExposed _ "internal/mod/value" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                QualifierUtil.expectOutput unqualifiedAst expectedAst
-        , test "Referencing a function from an internal module which isn't exposed ends in a error" <|
-            \_ ->
-                let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition =
-                            ModuleDefinition.Defined
-                                { aliases = Dict.empty
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "internal/mod", [] )
-                                        ]
-                                , exposes = Set.empty
-                                }
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Integer PSourceLoc.emptyRange 1
-                                            , AST.Function PSourceLoc.emptyRange "value"
-                                            ]
-                                  }
-                                ]
-                        }
-
-                    inProgressAst =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromList
-                                [ dummyWordUnexposed "internal/mod/value"
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
-
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/mod", "external/package" ) ]
-                            , inProgressAST = inProgressAst
-                            }
-                in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed function is called"
-
-                    Err [ Problem.FunctionNotExposed _ "internal/mod/value" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a function from an external module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition =
-                            ModuleDefinition.Defined
-                                { aliases = Dict.empty
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "/mod", [ "add" ] )
-                                        ]
-                                , exposes = Set.empty
-                                }
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Integer PSourceLoc.emptyRange 1
-                                            , AST.Function PSourceLoc.emptyRange "add"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/external/mod"
+                          , """
+                            defmodule:
+                            exposes: dummy
+                            :
 
-                    inProgressAst =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromList
-                                [ dummyWordUnexposed "/external/package/mod/add"
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                            def: add
+                            : 1
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/mod", "external/package" ) ]
-                            , inProgressAST = inProgressAst
-                            }
+                            def: dummy
+                            : 1
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defmodule:
+                            import: /mod
+                            :
+
+                            def: main
+                            : 1 2 add
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.FunctionNotExposed _ "/stabel/external/mod/add" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed function is called"
-
-                    Err [ Problem.FunctionNotExposed _ "/external/package/mod/add" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type signature from an external module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.ExternalRef [ "mod" ] "Tipe" [] ]
-                                            , output = []
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Function PSourceLoc.emptyRange "drop"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/external/mod"
+                          , """
+                            defmodule:
+                            exposes: dummy
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defstruct: Tipe
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/mod", "external/package" ) ]
-                            , inProgressAST = inProgressAst
-                            }
+                            def: dummy
+                            : 1
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            def: main
+                            type: /mod/Tipe
+                            : drop
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/external/mod/Tipe" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type definition from an external module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types =
-                            Dict.fromListBy .name
-                                [ { name = "BoxedTipe"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "value", AST.ExternalRef [ "mod" ] "TipeUnion" [] ) ]
-                                  }
-                                ]
-                        , functions = Dict.empty
-                        }
+                    sources =
+                        [ ( "/stabel/external/mod"
+                          , """
+                            defmodule:
+                            exposes: Tipe
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defunion: TipeUnion
+                            : a
+                            : Tipe
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/mod", "external/package" ) ]
-                            , inProgressAST = inProgressAst
-                            }
+                            defstruct: Tipe
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defstruct: BoxedTipe
+                            : value /mod/TipeUnion
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/external/mod/TipeUnion" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "/external/package/mod/TipeUnion" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type match from an external module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.MultiImpl
-                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.ExternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Function PSourceLoc.emptyRange "drop"
-                                                ]
-                                              )
-                                            ]
-                                            [ AST.Function PSourceLoc.emptyRange "drop"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/external/mod"
+                          , """
+                            defmodule:
+                            exposes: Dummy
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "/external/package/mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defstruct: Tipe
+                            defstruct: Dummy
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defmulti: call
+                            : /mod/Tipe
+                              drop
+                            else: drop
+                            """
+                          )
+                        ]
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/mod", "external/package" ) ]
-                            , inProgressAST = inProgressAst
-                            }
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/external/mod/Tipe" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "/external/package/mod/Tipe" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type signature from an internal module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "mod" ] "Tipe" [] ]
-                                            , output = []
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Function PSourceLoc.emptyRange "drop"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/test/mod"
+                          , """
+                            defmodule:
+                            exposes: Dummy
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defstruct: Tipe
+                            defstruct: Dummy
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            def: call
+                            type: mod/Tipe --
+                            : drop
+                            """
+                          )
+                        ]
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules = Dict.empty
-                            , inProgressAST = inProgressAst
-                            }
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/test/mod/Tipe" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type definition from an internal module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types =
-                            Dict.fromListBy .name
-                                [ { name = "BoxedTipe"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "value", AST.InternalRef [ "mod" ] "TipeUnion" [] ) ]
-                                  }
-                                ]
-                        , functions = Dict.empty
-                        }
+                    sources =
+                        [ ( "/stabel/test/mod"
+                          , """
+                            defmodule:
+                            exposes: Tipe
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defunion: TipeUnion
+                            : Tipe
+                            : a
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules = Dict.empty
-                            , inProgressAST = inProgressAst
-                            }
+                            defstruct: Tipe
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defstruct: BoxedTipe
+                            : value mod/TipeUnion
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/test/mod/TipeUnion" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "mod/TipeUnion" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         , test "Referencing a type in a type match from an internal module which isn't exposed ends in a error" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "external-call"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.MultiImpl
-                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.InternalRef [ "mod" ] "Tipe" []) []
-                                              , [ AST.Function PSourceLoc.emptyRange "drop"
-                                                ]
-                                              )
-                                            ]
-                                            [ AST.Function PSourceLoc.emptyRange "drop"
-                                            ]
-                                  }
-                                ]
-                        }
+                    sources =
+                        [ ( "/stabel/test/mod"
+                          , """
+                            defmodule:
+                            exposes: TipeUnion
+                            :
 
-                    inProgressAst =
-                        { types =
-                            Dict.fromList <|
-                                dummyTypeUnexposed "mod/Tipe"
-                        , functions = Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
+                            defunion: TipeUnion
+                            : Tipe
+                            : a
 
-                    result =
-                        run
-                            { packageName = ""
-                            , modulePath = ""
-                            , ast = unqualifiedAst
-                            , externalModules = Dict.empty
-                            , inProgressAST = inProgressAst
-                            }
+                            defstruct: Tipe
+                            """
+                          )
+                        , ( "/stabel/test/core"
+                          , """
+                            defmulti: call
+                            : mod/Tipe
+                              drop
+                            else: drop
+                            """
+                          )
+                        ]
+
+                    findError err =
+                        case err of
+                            Problem.TypeNotExposed _ "/stabel/test/mod/Tipe" ->
+                                True
+
+                            _ ->
+                                False
                 in
-                case result of
-                    Ok _ ->
-                        Expect.fail "Expected qualification to fail because an unexposed type is referenced"
-
-                    Err [ Problem.TypeNotExposed _ "mod/Tipe" ] ->
-                        Expect.pass
-
-                    Err errs ->
-                        Expect.fail <| "Qualification failed with unexpected error: " ++ Debug.toString errs
+                checkForError findError sources
         ]
+
+
+checkForError : (Problem -> Bool) -> List ( String, String ) -> Expectation
+checkForError pred sources =
+    Expect.fail ""

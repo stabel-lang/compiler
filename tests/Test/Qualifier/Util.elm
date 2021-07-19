@@ -1,8 +1,5 @@
 module Test.Qualifier.Util exposing
-    ( addFunctionsForStructs
-    , expectExternalOutput
-    , expectModuleOutput
-    , expectOutput
+    ( expectModuleOutput
     , stripLocations
     )
 
@@ -11,8 +8,6 @@ import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type exposing (Type)
-import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
@@ -34,162 +29,33 @@ emptyAst =
     }
 
 
-expectOutput : Parser.AST -> AST -> Expectation
-expectOutput parserAst expectedAst =
-    let
-        result =
-            AST.run
-                { packageName = ""
-                , modulePath = ""
-                , ast = parserAst
-                , externalModules = Dict.empty
-                , inProgressAST = emptyAst
-                }
-    in
-    case result of
+expectModuleOutput : String -> AST -> Expectation
+expectModuleOutput source expectedAst =
+    case Parser.run "test" source of
         Err errors ->
-            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+            Expect.fail <| "Parser error: " ++ Debug.toString errors
 
-        Ok actualAst ->
-            Expect.equal expectedAst
-                { types = actualAst.types
-                , functions = actualAst.functions
-                , referenceableFunctions = actualAst.referenceableFunctions
-                }
-
-
-expectModuleOutput : Parser.AST -> AST -> Expectation
-expectModuleOutput parserAst expectedAst =
-    let
-        result =
-            AST.run
-                { packageName = "stabel/test"
-                , modulePath = "some/module"
-                , ast = parserAst
-                , externalModules = Dict.empty
-                , inProgressAST = emptyAst
-                }
-    in
-    case result of
-        Err errors ->
-            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
-
-        Ok actualAst ->
-            Expect.equal expectedAst
-                { types = actualAst.types
-                , functions = actualAst.functions
-                , referenceableFunctions = actualAst.referenceableFunctions
-                }
-
-
-expectExternalOutput : AST -> Parser.AST -> AST -> Expectation
-expectExternalOutput inProgressAst parserAst expectedAst =
-    let
-        config =
-            { packageName = ""
-            , modulePath = ""
-            , ast = parserAst
-            , externalModules =
-                Dict.fromList
-                    [ ( "/mod", "external/package" ) ]
-            , inProgressAST = emptyAst
-            }
-
-        result =
-            AST.run config
-    in
-    case result of
-        Ok _ ->
-            Expect.fail "Expected qualification to fail when inProgressAST is missing"
-
-        Err _ ->
-            case AST.run { config | inProgressAST = inProgressAst } of
+        Ok parserAst ->
+            let
+                result =
+                    AST.run
+                        { packageName = "stabel/test"
+                        , modulePath = "some/module"
+                        , ast = parserAst
+                        , externalModules = Dict.empty
+                        , inProgressAST = emptyAst
+                        }
+            in
+            case result of
                 Err errors ->
-                    Expect.fail <| "Did not expect qualification to fail: " ++ Debug.toString errors
+                    Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
 
-                Ok ast ->
-                    Expect.equal expectedAst ast
-
-
-addFunctionsForStructs : AST -> AST
-addFunctionsForStructs ast =
-    let
-        helper _ t wipAst =
-            case t.members of
-                AST.StructMembers members ->
-                    addFunctionsForStructsHelper t.name t.generics members wipAst
-
-                _ ->
-                    wipAst
-    in
-    Dict.foldl helper ast ast.types
-
-
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
-addFunctionsForStructsHelper name generics members ast =
-    let
-        selfType =
-            if List.isEmpty generics then
-                Type.Custom name
-
-            else
-                Type.CustomGeneric name (List.map Type.Generic generics)
-
-        ctor =
-            { name =
-                if List.isEmpty members then
-                    name
-
-                else
-                    ">" ++ name
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = List.map Tuple.second members
-                    , output = [ selfType ]
-                    }
-            , exposed = True
-            , implementation = AST.SoloImpl [ AST.ConstructType name ]
-            }
-
-        setters =
-            List.map settersHelper members
-
-        settersHelper ( memberName, type_ ) =
-            { name = ">" ++ memberName
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = [ selfType, type_ ]
-                    , output = [ selfType ]
-                    }
-            , exposed = True
-            , implementation =
-                AST.SoloImpl [ AST.SetMember name memberName ]
-            }
-
-        getters =
-            List.map gettersHelper members
-
-        gettersHelper ( memberName, type_ ) =
-            { name = memberName ++ ">"
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = [ selfType ]
-                    , output = [ type_ ]
-                    }
-            , exposed = True
-            , implementation =
-                AST.SoloImpl [ AST.GetMember name memberName ]
-            }
-
-        allFuncs =
-            (ctor :: setters)
-                ++ getters
-                |> Dict.fromListBy .name
-    in
-    { ast | functions = Dict.union ast.functions allFuncs }
+                Ok actualAst ->
+                    Expect.equal expectedAst
+                        { types = actualAst.types
+                        , functions = actualAst.functions
+                        , referenceableFunctions = actualAst.referenceableFunctions
+                        }
 
 
 stripLocations : AST -> AST

@@ -1,4 +1,4 @@
-module Test.Qualifier exposing (..)
+module Test.Qualifier exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
@@ -8,14 +8,9 @@ import Stabel.Data.Builtin as Builtin
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Data.TypeSignature as TypeSignature
-import Stabel.Parser as AST
-import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
-import Stabel.Parser.ModuleDefinition as ModuleDefinition
-import Stabel.Parser.SourceLocation as PSourceLoc
-import Stabel.Parser.Type as AST
+import Stabel.Parser as Parser
 import Stabel.Qualifier exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Parser.Util as ParserUtil
 import Test.Qualifier.Util as QualifierUtil
 
 
@@ -34,101 +29,37 @@ suite =
                         Type.Union (Just "/stabel/test/some/module/USMoney")
                             qualifiedUsMoneyUnion
 
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types =
-                            Dict.fromListBy .name
-                                [ { name = "USMoney"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.UnionMembers
-                                            [ AST.LocalRef "Dollar" []
-                                            , AST.LocalRef "Cent" []
-                                            ]
-                                  }
-                                , { name = "Dollar"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
-                                  }
-                                , { name = "Cent"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "cent-value", AST.LocalRef "Int" [] ) ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "into-cents"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
-                                            , output = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.MultiImpl
-                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Dollar" []) []
-                                              , [ AST.Function PSourceLoc.emptyRange "dollar-value>"
-                                                , AST.Integer PSourceLoc.emptyRange 100
-                                                , AST.Function PSourceLoc.emptyRange "*"
-                                                ]
-                                              )
-                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Cent" []) []
-                                              , [ AST.Function PSourceLoc.emptyRange "cent-value>"
-                                                ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                , { name = "add-money"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.LocalRef "USMoney" [], AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
-                                            , output = [ AST.NotStackRange <| AST.LocalRef "USMoney" [] ]
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Function PSourceLoc.emptyRange "into-cents"
-                                            , AST.Function PSourceLoc.emptyRange "swap"
-                                            , AST.Function PSourceLoc.emptyRange "into-cents"
-                                            , AST.Function PSourceLoc.emptyRange "+"
-                                            ]
-                                  }
-                                , { name = "quote-excuse"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.LocalRef "Dollar" [] ]
-                                            , output = [ AST.NotStackRange <| AST.LocalRef "Dollar" [] ]
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.Function PSourceLoc.emptyRange "dollar-value>"
-                                            , AST.InlineFunction PSourceLoc.emptyRange
-                                                [ AST.Integer PSourceLoc.emptyRange 2
-                                                , AST.Function PSourceLoc.emptyRange "*"
-                                                ]
-                                            , AST.Function PSourceLoc.emptyRange "!"
-                                            , AST.Function PSourceLoc.emptyRange ">Dollar"
-                                            ]
-                                  }
-                                ]
-                        }
-                            |> ParserUtil.addFunctionsForStructs
+                    source =
+                        """
+                        defunion: USMoney
+                        : Dollar
+                        : Cent
+
+                        defstruct: Dollar
+                        : dollar-value Int
+                        : cent-value Int
+
+                        defmulti: into-cents
+                        type: USMoney -- Int
+                        : Dollar
+                          dollar-value>
+                          100 *
+                        : Cent
+                          cent-value>
+
+                        def: add-money
+                        type: USMoney USMoney -- USMoney
+                        : into-cents
+                          swap into-cents
+                          +
+                          >Cent
+
+                        def: quote-excuse
+                        type: Dollar -- Dollar
+                        : dollar-value>
+                          [ 2 * ] !
+                          >Dollar
+                        """
 
                     expectedAst =
                         { types =
@@ -299,7 +230,7 @@ suite =
                                 [ "inlinefn:/stabel/test/some/module/quote-excuse/1" ]
                         }
                 in
-                QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
+                QualifierUtil.expectModuleOutput source expectedAst
         , test "member types are qualified" <|
             \_ ->
                 let
@@ -312,47 +243,22 @@ suite =
                         Type.Union (Just "/stabel/test/some/module/USMoney")
                             qualifiedUsMoneyUnion
 
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types =
-                            Dict.fromListBy .name
-                                [ { name = "USMoney"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.UnionMembers
-                                            [ AST.LocalRef "Dollar" []
-                                            , AST.LocalRef "Cent" []
-                                            ]
-                                  }
-                                , { name = "Wallet"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "user-id", AST.LocalRef "Int" [] )
-                                            , ( "value", AST.LocalRef "USMoney" [] )
-                                            ]
-                                  }
-                                , { name = "Dollar"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
-                                  }
-                                , { name = "Cent"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "cent-value", AST.LocalRef "Int" [] ) ]
-                                  }
-                                ]
-                        , functions = Dict.empty
-                        }
-                            |> ParserUtil.addFunctionsForStructs
+                    source =
+                        """
+                        defunion: USMoney
+                        : Dollar
+                        : Cent
+
+                        defstruct: Wallet
+                        : user-id Int
+                        : value USMoney
+
+                        defstruct: Dollar
+                        : dollar-value Int
+
+                        defstruct: Cent
+                        : cent-value Int
+                        """
 
                     expectedAst =
                         { types =
@@ -525,70 +431,36 @@ suite =
                         , referenceableFunctions = Set.empty
                         }
                 in
-                QualifierUtil.expectModuleOutput unqualifiedAst expectedAst
+                QualifierUtil.expectModuleOutput source expectedAst
         , test "Retrieve dependant modules" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition =
-                            ModuleDefinition.Defined
-                                { aliases =
-                                    Dict.fromList
-                                        [ ( "html", "/external/html" ) ]
-                                , imports =
-                                    Dict.fromList
-                                        [ ( "/external/module", [] ) ]
-                                , exposes = Set.fromList []
-                                }
-                        , types =
-                            Dict.fromListBy .name
-                                [ { name = "Tipe"
-                                  , sourceLocation = PSourceLoc.emptyRange
-                                  , generics = []
-                                  , members =
-                                        AST.StructMembers
-                                            [ ( "value", AST.ExternalRef [ "external", "double" ] "Tipe" [] ) ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "call-external"
-                                  , typeSignature =
-                                        AssociatedFunctionSignature.UserProvided
-                                            { input = [ AST.NotStackRange <| AST.InternalRef [ "internal", "types" ] "In" [] ]
-                                            , output = [ AST.NotStackRange <| AST.ExternalRef [ "external", "types" ] "Out" [] ]
-                                            }
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.empty
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.MultiImpl
-                                            [ ( AST.TypeMatch PSourceLoc.emptyRange (AST.LocalRef "Int" []) [ ( "value", AST.LiteralInt 1 ) ]
-                                              , [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-one"
-                                                ]
-                                              )
-                                            , ( AST.TypeMatch PSourceLoc.emptyRange (AST.InternalRef [ "internal", "match" ] "Some" []) []
-                                              , [ AST.Function PSourceLoc.emptyRange "drop" ]
-                                              )
-                                            ]
-                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "package", "module" ] "when-other-one" ]
-                                  }
-                                , { name = "main"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.fromList [ ( "ali", "internal/alias" ) ]
-                                  , imports = Dict.fromList [ ( "/list/of/names", [ "one" ] ) ]
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "html" ] "div"
-                                            , AST.Function PSourceLoc.emptyRange "call-external"
-                                            , AST.ExternalFunction PSourceLoc.emptyRange [ "some", "ext" ] "word"
-                                            , AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
-                                            ]
-                                  }
-                                ]
-                        }
+                    source =
+                        """
+                        defmodule:
+                        alias: html /external/html
+                        import: /external/module
+                        :
+
+                        defstruct: Tipe
+                        : value /external/double/Tipe
+
+                        defmulti: call-external
+                        type: internal/types/In -- /external/types/Out
+                        : Int( value 1 )
+                          package/module/when-one
+                        : internal/match/Some
+                          drop
+                        : package/module/when-other-one
+
+                        def: main
+                        alias: ali internal/alias
+                        import: /list/of/names one
+                        : html/div
+                          call-external
+                          /some/ext/word
+                          ali/word1
+                        """
 
                     expectedRequiredModules =
                         Set.fromList
@@ -604,57 +476,57 @@ suite =
                             , "/package/test/package/module"
                             , "/stabel/standard_library/core"
                             ]
-
-                    actualRequiredModules =
-                        requiredModules
-                            { packageName = "package/test"
-                            , ast = unqualifiedAst
-                            , externalModules =
-                                Dict.fromList
-                                    [ ( "/list/of/names", "robheghan/dummy" )
-                                    , ( "/some/ext", "robheghan/dummy" )
-                                    , ( "/external/html", "robheghan/html" )
-                                    , ( "/external/module", "robheghan/html" )
-                                    , ( "/external/types", "robheghan/html" )
-                                    , ( "/external/double", "robheghan/html" )
-                                    , ( "/core", "stabel/standard_library" )
-                                    ]
-                            }
                 in
-                Expect.equal expectedRequiredModules actualRequiredModules
+                case Parser.run "test" source of
+                    Err errors ->
+                        Expect.fail <| "Parser error: " ++ Debug.toString errors
+
+                    Ok parserAst ->
+                        let
+                            actualRequiredModules =
+                                requiredModules
+                                    { packageName = "package/test"
+                                    , ast = parserAst
+                                    , externalModules =
+                                        Dict.fromList
+                                            [ ( "/list/of/names", "robheghan/dummy" )
+                                            , ( "/some/ext", "robheghan/dummy" )
+                                            , ( "/external/html", "robheghan/html" )
+                                            , ( "/external/module", "robheghan/html" )
+                                            , ( "/external/types", "robheghan/html" )
+                                            , ( "/external/double", "robheghan/html" )
+                                            , ( "/core", "stabel/standard_library" )
+                                            ]
+                                    }
+                        in
+                        Expect.equal expectedRequiredModules actualRequiredModules
         , test "Reliance on standard_library/core only when standard_library is specified as externalModule" <|
             \_ ->
                 let
-                    unqualifiedAst =
-                        { sourceReference = ""
-                        , moduleDefinition = ModuleDefinition.Undefined
-                        , types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , typeSignature = AssociatedFunctionSignature.NotProvided
-                                  , sourceLocationRange = Nothing
-                                  , aliases = Dict.fromList [ ( "ali", "internal/alias" ) ]
-                                  , imports = Dict.empty
-                                  , implementation =
-                                        AST.SoloImpl
-                                            [ AST.PackageFunction PSourceLoc.emptyRange [ "ali" ] "word1"
-                                            ]
-                                  }
-                                ]
-                        }
+                    source =
+                        """
+                        def: main
+                        alias: ali internal/alias
+                        : ali/word1
+                        """
 
                     expectedRequiredModules =
                         Set.fromList
                             [ "/package/test/internal/alias"
                             ]
-
-                    actualRequiredModules =
-                        requiredModules
-                            { packageName = "package/test"
-                            , ast = unqualifiedAst
-                            , externalModules = Dict.empty
-                            }
                 in
-                Expect.equal expectedRequiredModules actualRequiredModules
+                case Parser.run "test" source of
+                    Err errors ->
+                        Expect.fail <| "Parser error: " ++ Debug.toString errors
+
+                    Ok parserAst ->
+                        let
+                            actualRequiredModules =
+                                requiredModules
+                                    { packageName = "package/test"
+                                    , ast = parserAst
+                                    , externalModules = Dict.empty
+                                    }
+                        in
+                        Expect.equal expectedRequiredModules actualRequiredModules
         ]
