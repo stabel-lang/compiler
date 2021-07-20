@@ -20,15 +20,6 @@ suite =
         [ test "Name mangling" <|
             \_ ->
                 let
-                    qualifiedUsMoneyUnion =
-                        [ Type.Custom "/stabel/test/some/module/Dollar"
-                        , Type.Custom "/stabel/test/some/module/Cent"
-                        ]
-
-                    qualifiedUsMoneyUnionType =
-                        Type.Union (Just "/stabel/test/some/module/USMoney")
-                            qualifiedUsMoneyUnion
-
                     source =
                         """
                         defunion: USMoney
@@ -37,7 +28,13 @@ suite =
 
                         defstruct: Dollar
                         : dollar-value Int
+
+                        defstruct: Cent
                         : cent-value Int
+
+                        defstruct: Wallet
+                        : user-id Int
+                        : value USMoney
 
                         defmulti: into-cents
                         type: USMoney -- Int
@@ -60,6 +57,15 @@ suite =
                           [ 2 * ] !
                           >Dollar
                         """
+
+                    qualifiedUsMoneyUnion =
+                        [ Type.Custom "/stabel/test/some/module/Dollar"
+                        , Type.Custom "/stabel/test/some/module/Cent"
+                        ]
+
+                    qualifiedUsMoneyUnionType =
+                        Type.Union (Just "/stabel/test/some/module/USMoney")
+                            qualifiedUsMoneyUnion
 
                     expectedAst =
                         { types =
@@ -85,6 +91,16 @@ suite =
                                   , members =
                                         StructMembers
                                             [ ( "cent-value", Type.Int ) ]
+                                  }
+                                , { name = "/stabel/test/some/module/Wallet"
+                                  , exposed = True
+                                  , sourceLocation = emptyRange
+                                  , generics = []
+                                  , members =
+                                        StructMembers
+                                            [ ( "user-id", Type.Int )
+                                            , ( "value", qualifiedUsMoneyUnionType )
+                                            ]
                                   }
                                 ]
                         , functions =
@@ -155,150 +171,6 @@ suite =
                                             ]
                                   }
                                 , { name = "/stabel/test/some/module/>Dollar"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>Cent"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>dollar-value"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>cent-value"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/dollar-value>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/cent-value>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
-                                  }
-                                ]
-                        , referenceableFunctions =
-                            Set.fromList
-                                [ "inlinefn:/stabel/test/some/module/quote-excuse/1" ]
-                        }
-                in
-                QualifierUtil.expectModuleOutput source expectedAst
-        , test "member types are qualified" <|
-            \_ ->
-                let
-                    qualifiedUsMoneyUnion =
-                        [ Type.Custom "/stabel/test/some/module/Dollar"
-                        , Type.Custom "/stabel/test/some/module/Cent"
-                        ]
-
-                    qualifiedUsMoneyUnionType =
-                        Type.Union (Just "/stabel/test/some/module/USMoney")
-                            qualifiedUsMoneyUnion
-
-                    source =
-                        """
-                        defunion: USMoney
-                        : Dollar
-                        : Cent
-
-                        defstruct: Wallet
-                        : user-id Int
-                        : value USMoney
-
-                        defstruct: Dollar
-                        : dollar-value Int
-
-                        defstruct: Cent
-                        : cent-value Int
-                        """
-
-                    expectedAst =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "/stabel/test/some/module/USMoney"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members = UnionMembers qualifiedUsMoneyUnion
-                                  }
-                                , { name = "/stabel/test/some/module/Dollar"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "dollar-value", Type.Int ) ]
-                                  }
-                                , { name = "/stabel/test/some/module/Cent"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "cent-value", Type.Int ) ]
-                                  }
-                                , { name = "/stabel/test/some/module/Wallet"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "user-id", Type.Int )
-                                            , ( "value", qualifiedUsMoneyUnionType )
-                                            ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "/stabel/test/some/module/>Dollar"
                                   , exposed = True
                                   , sourceLocation = Nothing
                                   , typeSignature =
@@ -428,7 +300,9 @@ suite =
                                             [ GetMember "/stabel/test/some/module/Wallet" "value" ]
                                   }
                                 ]
-                        , referenceableFunctions = Set.empty
+                        , referenceableFunctions =
+                            Set.fromList
+                                [ "inlinefn:/stabel/test/some/module/quote-excuse/1" ]
                         }
                 in
                 QualifierUtil.expectModuleOutput source expectedAst
