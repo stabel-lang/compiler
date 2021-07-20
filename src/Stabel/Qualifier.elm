@@ -3,6 +3,7 @@ module Stabel.Qualifier exposing
     , FunctionDefinition
     , FunctionImplementation(..)
     , Node(..)
+    , RunConfig
     , TypeDefinition
     , TypeDefinitionMembers(..)
     , TypeMatch(..)

@@ -1,9 +1,14 @@
 module Test.Qualifier.ModuleResolution exposing (suite)
 
+import Dict
 import Expect exposing (Expectation)
+import Stabel.Parser as Parser
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
+import Stabel.Parser.Problem as Parser
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem as Problem exposing (Problem)
 import Test exposing (Test, describe, test)
+import Test.Qualifier.Util as Util
 
 
 suite : Test
@@ -13,7 +18,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/test/internal/mod"
+                        [ ( "stabel/test"
+                          , "internal/mod"
                           , """
                             defmodule:
                             exposes: dummy
@@ -26,7 +32,8 @@ suite =
                             : 1
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defmodule:
                             import: internal/mod
@@ -51,7 +58,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/external/mod"
+                        [ ( "stabel/external"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: dummy
@@ -64,7 +72,8 @@ suite =
                             : 1
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defmodule:
                             import: /mod
@@ -89,7 +98,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/external/mod"
+                        [ ( "stabel/external"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: dummy
@@ -101,7 +111,8 @@ suite =
                             : 1
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             def: main
                             type: /mod/Tipe
@@ -123,7 +134,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/external/mod"
+                        [ ( "stabel/external"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: Tipe
@@ -136,7 +148,8 @@ suite =
                             defstruct: Tipe
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defstruct: BoxedTipe
                             : value /mod/TipeUnion
@@ -157,7 +170,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/external/mod"
+                        [ ( "stabel/external"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: Dummy
@@ -167,7 +181,8 @@ suite =
                             defstruct: Dummy
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defmulti: call
                             : /mod/Tipe
@@ -190,7 +205,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/test/mod"
+                        [ ( "stabel/test"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: Dummy
@@ -200,7 +216,8 @@ suite =
                             defstruct: Dummy
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             def: call
                             type: mod/Tipe --
@@ -222,7 +239,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/test/mod"
+                        [ ( "stabel/test"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: Tipe
@@ -235,7 +253,8 @@ suite =
                             defstruct: Tipe
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defstruct: BoxedTipe
                             : value mod/TipeUnion
@@ -256,7 +275,8 @@ suite =
             \_ ->
                 let
                     sources =
-                        [ ( "/stabel/test/mod"
+                        [ ( "stabel/test"
+                          , "mod"
                           , """
                             defmodule:
                             exposes: TipeUnion
@@ -269,7 +289,8 @@ suite =
                             defstruct: Tipe
                             """
                           )
-                        , ( "/stabel/test/core"
+                        , ( "stabel/test"
+                          , "core"
                           , """
                             defmulti: call
                             : mod/Tipe
@@ -291,6 +312,84 @@ suite =
         ]
 
 
-checkForError : (Problem -> Bool) -> List ( String, String ) -> Expectation
+checkForError : (Problem -> Bool) -> List ( String, String, String ) -> Expectation
 checkForError pred sources =
-    Expect.fail ""
+    let
+        parserResult =
+            sources
+                |> List.map (mapThird <| Parser.run "test")
+                |> collectErrors
+    in
+    case parserResult of
+        Err errs ->
+            Expect.fail <| "Parse error: " ++ Debug.toString errs
+
+        Ok withAst ->
+            let
+                initialConfig =
+                    { packageName = ""
+                    , modulePath = ""
+                    , ast =
+                        { sourceReference = "test"
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions = Dict.empty
+                        }
+                    , externalModules = Dict.empty
+                    , inProgressAST = Util.emptyAst
+                    }
+
+                qualifyResult =
+                    withAst
+                        |> List.foldl qualifyTestTuples ( [], initialConfig )
+                        |> Tuple.first
+            in
+            case qualifyResult of
+                [] ->
+                    Expect.fail "Expected error."
+
+                errs ->
+                    if List.any pred errs then
+                        Expect.pass
+
+                    else
+                        Expect.fail "Failed for unknown qualification error."
+
+
+mapThird : (c -> d) -> ( a, b, c ) -> ( a, b, d )
+mapThird fn ( a, b, c ) =
+    ( a, b, fn c )
+
+
+collectErrors :
+    List ( a, b, Result e o )
+    -> Result (List e) (List ( a, b, o ))
+collectErrors tuples =
+    case List.foldr collectErrorsHelper ( [], [] ) tuples of
+        ( [], oks ) ->
+            Ok oks
+
+        ( errs, _ ) ->
+            Err errs
+
+
+collectErrorsHelper :
+    ( a, b, Result e o )
+    -> ( List e, List ( a, b, o ) )
+    -> ( List e, List ( a, b, o ) )
+collectErrorsHelper ( a, b, result ) ( errors, oks ) =
+    case result of
+        Err error ->
+            ( error :: errors, oks )
+
+        Ok ast ->
+            ( errors, ( a, b, ast ) :: oks )
+
+
+qualifyTestTuples :
+    ( String, String, Parser.AST )
+    -> ( List Problem, RunConfig )
+    -> ( List Problem, RunConfig )
+qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
+    -- TODO
+    ( problems, config )

@@ -1,5 +1,6 @@
 module Test.Qualifier.Util exposing
-    ( expectModuleOutput
+    ( emptyAst
+    , expectModuleOutput
     , stripLocations
     )
 
