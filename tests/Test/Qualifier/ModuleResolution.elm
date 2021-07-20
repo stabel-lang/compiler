@@ -2,6 +2,7 @@ module Test.Qualifier.ModuleResolution exposing (suite)
 
 import Dict
 import Expect exposing (Expectation)
+import Set
 import Stabel.Parser as Parser
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.Problem as Parser
@@ -391,5 +392,34 @@ qualifyTestTuples :
     -> ( List Problem, RunConfig )
     -> ( List Problem, RunConfig )
 qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
-    -- TODO
-    ( problems, config )
+    let
+        updatedConfig =
+            { config
+                | packageName = packageName
+                , modulePath = modulePath
+                , ast = parserAst
+            }
+    in
+    case run updatedConfig of
+        Err errs ->
+            ( errs ++ problems, updatedConfig )
+
+        Ok qualifiedAST ->
+            let
+                inProgressAST =
+                    updatedConfig.inProgressAST
+
+                updatedInProgressAst =
+                    { inProgressAST
+                        | types = Dict.union qualifiedAST.types inProgressAST.types
+                        , functions = Dict.union qualifiedAST.functions inProgressAST.functions
+                        , referenceableFunctions = Set.union qualifiedAST.referenceableFunctions inProgressAST.referenceableFunctions
+                    }
+
+                configWithQualifiedAst =
+                    { updatedConfig
+                        | inProgressAST = updatedInProgressAst
+                        , externalModules = Dict.insert modulePath packageName updatedConfig.externalModules
+                    }
+            in
+            ( problems, configWithQualifiedAst )
