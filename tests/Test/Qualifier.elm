@@ -58,247 +58,304 @@ suite =
                           >Dollar
                         """
 
-                    qualifiedUsMoneyUnion =
+                    usMoneyUnion =
                         [ Type.Custom "/stabel/test/some/module/Dollar"
                         , Type.Custom "/stabel/test/some/module/Cent"
                         ]
 
-                    qualifiedUsMoneyUnionType =
+                    usMoneyUnionType =
                         Type.Union (Just "/stabel/test/some/module/USMoney")
-                            qualifiedUsMoneyUnion
+                            usMoneyUnion
+
+                    usMoneyTypeDef =
+                        { name = "/stabel/test/some/module/USMoney"
+                        , exposed = True
+                        , sourceLocation = emptyRange
+                        , generics = []
+                        , members = UnionMembers usMoneyUnion
+                        }
+
+                    dollarTypeDef =
+                        { name = "/stabel/test/some/module/Dollar"
+                        , exposed = True
+                        , sourceLocation = emptyRange
+                        , generics = []
+                        , members =
+                            StructMembers
+                                [ ( "dollar-value", Type.Int ) ]
+                        }
+
+                    centTypeDef =
+                        { name = "/stabel/test/some/module/Cent"
+                        , exposed = True
+                        , sourceLocation = emptyRange
+                        , generics = []
+                        , members =
+                            StructMembers
+                                [ ( "cent-value", Type.Int ) ]
+                        }
+
+                    walletTypeDef =
+                        { name = "/stabel/test/some/module/Wallet"
+                        , exposed = True
+                        , sourceLocation = emptyRange
+                        , generics = []
+                        , members =
+                            StructMembers
+                                [ ( "user-id", Type.Int )
+                                , ( "value", usMoneyUnionType )
+                                ]
+                        }
+
+                    intoCentsFn =
+                        { name = "/stabel/test/some/module/into-cents"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.UserProvided
+                                { input = [ usMoneyUnionType ]
+                                , output = [ usMoneyUnionType ]
+                                }
+                        , implementation =
+                            MultiImpl
+                                [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
+                                  , [ Function emptyRange dollarValueGetFn
+                                    , Integer emptyRange 100
+                                    , Builtin emptyRange Builtin.Multiply
+                                    ]
+                                  )
+                                , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
+                                  , [ Function emptyRange centValueGetFn
+                                    ]
+                                  )
+                                ]
+                                []
+                        }
+
+                    addMoneyFn =
+                        { name = "/stabel/test/some/module/add-money"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.UserProvided
+                                { input = [ usMoneyUnionType, usMoneyUnionType ]
+                                , output = [ usMoneyUnionType ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ Function emptyRange intoCentsFn
+                                , Builtin emptyRange Builtin.StackSwap
+                                , Function emptyRange intoCentsFn
+                                , Builtin emptyRange Builtin.Plus
+                                ]
+                        }
+
+                    quoteExcuseFn =
+                        { name = "/stabel/test/some/module/quote-excuse"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.UserProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ Function emptyRange dollarValueGetFn
+                                , FunctionRef emptyRange quoteExcuseIFn1
+                                , Builtin emptyRange Builtin.Apply
+                                , Function emptyRange dollarCtorFn
+                                ]
+                        }
+
+                    quoteExcuseIFn1 =
+                        { name = "inlinefn:/stabel/test/some/module/quote-excuse/1"
+                        , exposed = False
+                        , sourceLocation = Nothing
+                        , typeSignature = TypeSignature.NotProvided
+                        , implementation =
+                            SoloImpl
+                                [ Integer emptyRange 2
+                                , Builtin emptyRange Builtin.Multiply
+                                ]
+                        }
+
+                    dollarCtorFn =
+                        { name = "/stabel/test/some/module/>Dollar"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Int ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                }
+                        , implementation =
+                            SoloImpl [ ConstructType dollarTypeDef ]
+                        }
+
+                    centCtorFn =
+                        { name = "/stabel/test/some/module/>Cent"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Int ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                }
+                        , implementation =
+                            SoloImpl [ ConstructType centTypeDef ]
+                        }
+
+                    walletCtorFn =
+                        { name = "/stabel/test/some/module/>Wallet"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Int, usMoneyUnionType ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                }
+                        , implementation =
+                            SoloImpl [ ConstructType walletTypeDef ]
+                        }
+
+                    dollarValueSetFn =
+                        { name = "/stabel/test/some/module/>dollar-value"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ SetMember dollarTypeDef "dollar-value" Type.Int ]
+                        }
+
+                    centValueSetFn =
+                        { name = "/stabel/test/some/module/>cent-value"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ SetMember centTypeDef "cent-value" Type.Int ]
+                        }
+
+                    userIdSetFn =
+                        { name = "/stabel/test/some/module/>user-id"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ SetMember walletTypeDef "user-id" Type.Int ]
+                        }
+
+                    valueSetFn =
+                        { name = "/stabel/test/some/module/>value"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Wallet", usMoneyUnionType ]
+                                , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ SetMember walletTypeDef "value" usMoneyUnionType ]
+                        }
+
+                    dollarValueGetFn =
+                        { name = "/stabel/test/some/module/dollar-value>"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
+                                , output = [ Type.Int ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ GetMember dollarTypeDef "dollar-value" Type.Int ]
+                        }
+
+                    centValueGetFn =
+                        { name = "/stabel/test/some/module/cent-value>"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
+                                , output = [ Type.Int ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ GetMember centTypeDef "cent-value" Type.Int ]
+                        }
+
+                    userIdGetFn =
+                        { name = "/stabel/test/some/module/user-id>"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                , output = [ Type.Int ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ GetMember walletTypeDef "user-id" Type.Int ]
+                        }
+
+                    valueGetFn =
+                        { name = "/stabel/test/some/module/value>"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature =
+                            TypeSignature.CompilerProvided
+                                { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
+                                , output = [ usMoneyUnionType ]
+                                }
+                        , implementation =
+                            SoloImpl
+                                [ GetMember walletTypeDef "value" usMoneyUnionType ]
+                        }
 
                     expectedAst =
                         { types =
                             Dict.fromListBy .name
-                                [ { name = "/stabel/test/some/module/USMoney"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members = UnionMembers qualifiedUsMoneyUnion
-                                  }
-                                , { name = "/stabel/test/some/module/Dollar"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "dollar-value", Type.Int ) ]
-                                  }
-                                , { name = "/stabel/test/some/module/Cent"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "cent-value", Type.Int ) ]
-                                  }
-                                , { name = "/stabel/test/some/module/Wallet"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        StructMembers
-                                            [ ( "user-id", Type.Int )
-                                            , ( "value", qualifiedUsMoneyUnionType )
-                                            ]
-                                  }
+                                [ usMoneyTypeDef
+                                , dollarTypeDef
+                                , centTypeDef
+                                , walletTypeDef
                                 ]
                         , functions =
                             Dict.fromListBy .name
-                                [ { name = "/stabel/test/some/module/into-cents"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ qualifiedUsMoneyUnionType ]
-                                            , output = [ qualifiedUsMoneyUnionType ]
-                                            }
-                                  , implementation =
-                                        MultiImpl
-                                            [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
-                                              , [ Function emptyRange "/stabel/test/some/module/dollar-value>"
-                                                , Integer emptyRange 100
-                                                , Builtin emptyRange Builtin.Multiply
-                                                ]
-                                              )
-                                            , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
-                                              , [ Function emptyRange "/stabel/test/some/module/cent-value>"
-                                                ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                , { name = "/stabel/test/some/module/add-money"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ qualifiedUsMoneyUnionType, qualifiedUsMoneyUnionType ]
-                                            , output = [ qualifiedUsMoneyUnionType ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ Function emptyRange "/stabel/test/some/module/into-cents"
-                                            , Builtin emptyRange Builtin.StackSwap
-                                            , Function emptyRange "/stabel/test/some/module/into-cents"
-                                            , Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "/stabel/test/some/module/quote-excuse"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ Function emptyRange "/stabel/test/some/module/dollar-value>"
-                                            , FunctionRef emptyRange "inlinefn:/stabel/test/some/module/quote-excuse/1"
-                                            , Builtin emptyRange Builtin.Apply
-                                            , Function emptyRange "/stabel/test/some/module/>Dollar"
-                                            ]
-                                  }
-                                , { name = "inlinefn:/stabel/test/some/module/quote-excuse/1"
-                                  , exposed = False
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        SoloImpl
-                                            [ Integer emptyRange 2
-                                            , Builtin emptyRange Builtin.Multiply
-                                            ]
-                                  }
-                                , { name = "/stabel/test/some/module/>Dollar"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl [ ConstructType "/stabel/test/some/module/Dollar" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>Cent"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl [ ConstructType "/stabel/test/some/module/Cent" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>Wallet"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Int, qualifiedUsMoneyUnionType ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl [ ConstructType "/stabel/test/some/module/Wallet" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>dollar-value"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar", Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>cent-value"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Cent", Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Cent" "cent-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>user-id"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", Type.Int ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Wallet" "user-id" ]
-                                  }
-                                , { name = "/stabel/test/some/module/>value"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet", qualifiedUsMoneyUnionType ]
-                                            , output = [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ SetMember "/stabel/test/some/module/Wallet" "value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/dollar-value>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Dollar" ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Dollar" "dollar-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/cent-value>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Cent" ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Cent" "cent-value" ]
-                                  }
-                                , { name = "/stabel/test/some/module/user-id>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Wallet" "user-id" ]
-                                  }
-                                , { name = "/stabel/test/some/module/value>"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.CompilerProvided
-                                            { input = [ Type.Custom "/stabel/test/some/module/Wallet" ]
-                                            , output = [ qualifiedUsMoneyUnionType ]
-                                            }
-                                  , implementation =
-                                        SoloImpl
-                                            [ GetMember "/stabel/test/some/module/Wallet" "value" ]
-                                  }
+                                [ intoCentsFn
+                                , addMoneyFn
+                                , quoteExcuseFn
+                                , quoteExcuseIFn1
+                                , dollarCtorFn
+                                , centCtorFn
+                                , walletCtorFn
+                                , dollarValueSetFn
+                                , centValueSetFn
+                                , userIdSetFn
+                                , valueSetFn
+                                , dollarValueGetFn
+                                , centValueGetFn
+                                , userIdGetFn
+                                , valueGetFn
                                 ]
                         , referenceableFunctions =
                             Set.fromList
