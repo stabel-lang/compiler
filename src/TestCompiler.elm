@@ -41,10 +41,10 @@ type alias ModuleSource =
     }
 
 
-main : Program Input Model msg
+main : Program CompileStringOpts Model msg
 main =
     Platform.worker
-        { init = \input -> ( (), init input )
+        { init = \input -> ( (), init (CompileString input) )
         , update = \_ _ -> ( (), Cmd.none )
         , subscriptions = always Sub.none
         }
@@ -111,41 +111,7 @@ compileString opts =
 
 compileProject : CompileProjectOpts -> Result String Wasm.Module
 compileProject opts =
-    case Parser.run "test" opts.sourceCode of
-        Err parserErrors ->
-            formatErrors (ParserProblem.toString opts.sourceCode) parserErrors
-
-        Ok ast ->
-            let
-                qualifierResult =
-                    Qualifier.run
-                        { packageName = ""
-                        , modulePath = ""
-                        , ast = ast
-                        , externalModules = Dict.empty
-                        , inProgressAST =
-                            { types = Dict.empty
-                            , functions = Dict.empty
-                            , referenceableFunctions = Set.empty
-                            }
-                        }
-
-                exportedFunctions =
-                    Set.singleton opts.entryPoint
-            in
-            case qualifierResult of
-                Err qualifierErrors ->
-                    formatErrors (QualifierProblem.toString opts.sourceCode) qualifierErrors
-
-                Ok qualifiedAst ->
-                    case TypeChecker.run qualifiedAst of
-                        Err typeErrors ->
-                            formatErrors (TypeCheckerProblem.toString opts.sourceCode) typeErrors
-
-                        Ok typedAst ->
-                            typedAst
-                                |> Codegen.run exportedFunctions
-                                |> Ok
+    Debug.todo "TODO"
 
 
 formatErrors : (a -> String) -> List a -> Result String b
