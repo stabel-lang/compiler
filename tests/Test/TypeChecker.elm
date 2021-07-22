@@ -26,501 +26,151 @@ suite =
             \_ ->
                 let
                     input =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ Type.Int ]
-                                            , output = []
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Builtin emptyRange Builtin.Equal
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                        """
+                        def: main
+                        type: Int --
+                        : 1 2 =
+                        """
                 in
                 expectTypeCheckFailure input
         , test "Generic types" <|
             \_ ->
                 let
                     input =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Function emptyRange "over"
-                                            , QAST.Builtin emptyRange Builtin.Plus
-                                            , QAST.Builtin emptyRange Builtin.Minus
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Builtin emptyRange Builtin.Equal
-                                            ]
-                                  }
-                                , { name = "over"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        -- Most would start at a and increment, but we need to check that
-                                        -- the typechecker cares about the relationship between these generic
-                                        -- variables, not the names themselves
-                                        TypeSignature.UserProvided
-                                            { input = [ Type.Generic "b", Type.Generic "c" ]
-                                            , output = [ Type.Generic "b", Type.Generic "c", Type.Generic "b" ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.StackSwap
-                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                            , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                        """
+                        def: main
+                        type: -- Int
+                        : 1 2 over + - 2 =
+
+                        def: over
+                        type: b c -- b c b
+                        : swap dup rotate
+                        """
                 in
                 expectTypeCheck input
         , test "Generic types with type annotation" <|
             \_ ->
                 let
                     input =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 5
-                                            , QAST.Function emptyRange "square"
-                                            ]
-                                  }
-                                , { name = "square"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ Type.Int ]
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.StackDuplicate
-                                            , QAST.Builtin emptyRange Builtin.Multiply
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                        """
+                        def: main
+                        type: -- Int
+                        : 5 square
+
+                        def: square
+                        type: Int -- Int
+                        : dup *
+                        """
                 in
                 expectTypeCheck input
         , test "Generic custom type" <|
             \_ ->
                 let
                     input =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "Box"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = [ "a" ]
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "element", Type.Generic "a" ) ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 5
-                                            , QAST.Function emptyRange ">Box"
-                                            , QAST.Function emptyRange "element>"
-                                            , QAST.Integer emptyRange 10
-                                            , QAST.Builtin emptyRange Builtin.Plus
-                                            , QAST.Integer emptyRange 15
-                                            , QAST.Builtin emptyRange Builtin.Equal
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
-                            |> QualifierUtil.addFunctionsForStructs
+                        """
+                        defstruct: Box a
+                        : element a
+
+                        def: main
+                        type: -- Int
+                        : 5 >Box element>
+                          10 +
+                          15 =
+                        """
                 in
                 expectTypeCheck input
         , test "Generic types with rotations and quotations" <|
             \_ ->
                 let
                     input =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "Coordinate"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "x", Type.Int )
-                                            , ( "y", Type.Int )
-                                            ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Function emptyRange ">Coordinate"
-                                            , QAST.FunctionRef emptyRange "main__quot1"
-                                            , QAST.Function emptyRange "update-x"
-                                            , QAST.Function emptyRange "x>"
-                                            ]
-                                  }
-                                , { name = "main__quot1"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "update-x"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input =
-                                                [ Type.Custom "Coordinate"
-                                                , Type.FunctionSignature { input = [ Type.Int ], output = [ Type.Int ] }
-                                                ]
-                                            , output = [ Type.Custom "Coordinate" ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.StackSwap
-                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                            , QAST.Function emptyRange "x>"
-                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
-                                            , QAST.Builtin emptyRange Builtin.Apply
-                                            , QAST.Function emptyRange ">x"
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
-                            |> QualifierUtil.addFunctionsForStructs
+                        """
+                        defstruct: Coordinate
+                        : x Int
+                        : y Int
+
+                        def: main
+                        type: -- Int
+                        : 1 2 >Coordinate
+                          [ 1 + ] update-x
+                          x>
+
+                        def: update-x
+                        type: Coordinate [ Int -- Int ] -- Coordinate
+                        : swap dup x> # [ Int -- Int] Coordinate x
+                          -rotate !
+                          >x
+                        """
                 in
                 expectTypeCheck input
         , test "Generic types with generic quotations" <|
             \_ ->
                 let
-                    listUnion =
-                        [ Type.Custom "Empty"
-                        , Type.CustomGeneric "NonEmpty" [ Type.Generic "a" ]
-                        ]
-
                     input =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "Pair"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = [ "a", "b" ]
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "first", Type.Generic "a" )
-                                            , ( "second", Type.Generic "b" )
-                                            ]
-                                  }
-                                , { name = "List"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = [ "a" ]
-                                  , members = QAST.UnionMembers listUnion
-                                  }
-                                , { name = "NonEmpty"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = [ "a" ]
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "head", Type.Generic "a" )
-                                            , ( "rest", Type.Union (Just "List") listUnion )
-                                            ]
-                                  }
-                                , { name = "Empty"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members = QAST.StructMembers []
-                                  }
-                                ]
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = []
-                                            , output = [ Type.Int ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Integer emptyRange 3
-                                            , QAST.Function emptyRange "Empty"
-                                            , QAST.Function emptyRange ">NonEmpty"
-                                            , QAST.Function emptyRange ">NonEmpty"
-                                            , QAST.Function emptyRange ">NonEmpty"
-                                            , QAST.Integer emptyRange 0
-                                            , QAST.FunctionRef emptyRange "main__quot1"
-                                            , QAST.Function emptyRange "fold"
-                                            ]
-                                  }
-                                , { name = "main__quot1"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.Plus
-                                            ]
-                                  }
-                                , { name = "fold"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input =
-                                                [ Type.Union (Just "List") listUnion
-                                                , Type.Generic "b"
-                                                , Type.FunctionSignature
-                                                    { input =
-                                                        [ Type.Generic "a"
-                                                        , Type.Generic "b"
-                                                        ]
-                                                    , output =
-                                                        [ Type.Generic "b"
-                                                        ]
-                                                    }
-                                                ]
-                                            , output = [ Type.Generic "b" ]
-                                            }
-                                  , implementation =
-                                        QAST.MultiImpl
-                                            [ ( QAST.TypeMatch emptyRange (Type.Custom "Empty") []
-                                              , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.Builtin emptyRange Builtin.StackDrop
-                                                ]
-                                              )
-                                            , ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmpty" [ Type.Generic "a" ]) []
-                                              , [ QAST.Function emptyRange ">Pair"
-                                                , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.FunctionRef emptyRange "fold_quot1"
-                                                , QAST.FunctionRef emptyRange "fold_quot2"
-                                                , QAST.Function emptyRange "split"
-                                                , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                                , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                , QAST.Function emptyRange "spill"
-                                                , QAST.Builtin emptyRange Builtin.Apply
-                                                , QAST.Builtin emptyRange Builtin.StackSwap
-                                                , QAST.Function emptyRange "second>"
-                                                , QAST.Function emptyRange "fold"
-                                                ]
-                                              )
-                                            ]
-                                            []
-                                  }
-                                , { name = "fold_quot1"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Function emptyRange "head>" ]
-                                  }
-                                , { name = "fold_quot2"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Function emptyRange "rest>" ]
-                                  }
-                                , { name = "split"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input =
-                                                [ Type.Generic "a"
-                                                , Type.FunctionSignature
-                                                    { input = [ Type.Generic "a" ]
-                                                    , output = [ Type.Generic "b" ]
-                                                    }
-                                                , Type.FunctionSignature
-                                                    { input = [ Type.Generic "a" ]
-                                                    , output = [ Type.Generic "c" ]
-                                                    }
-                                                ]
-                                            , output =
-                                                [ Type.Generic "b"
-                                                , Type.Generic "c"
-                                                ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.StackLeftRotate
-                                            , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
-                                            , QAST.Builtin emptyRange Builtin.Apply
-                                            , QAST.Builtin emptyRange Builtin.StackSwap
-                                            , QAST.Builtin emptyRange Builtin.StackLeftRotate
-                                            , QAST.Builtin emptyRange Builtin.Apply
-                                            , QAST.Builtin emptyRange Builtin.StackSwap
-                                            ]
-                                  }
-                                , { name = "spill"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input =
-                                                [ Type.CustomGeneric "Pair"
-                                                    [ Type.Generic "a"
-                                                    , Type.Generic "b"
-                                                    ]
-                                                ]
-                                            , output =
-                                                [ Type.Generic "a"
-                                                , Type.Generic "b"
-                                                ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.FunctionRef emptyRange "spill_quot1"
-                                            , QAST.FunctionRef emptyRange "spill_quot2"
-                                            , QAST.Function emptyRange "split"
-                                            ]
-                                  }
-                                , { name = "spill_quot1"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Function emptyRange "first>" ]
-                                  }
-                                , { name = "spill_quot2"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Function emptyRange "second>" ]
-                                  }
-                                ]
-                        , referenceableFunctions =
-                            Set.fromList
-                                [ "fold_quot1"
-                                , "fold_quot2"
-                                , "spill_quot1"
-                                , "spill_quot2"
-                                ]
-                        }
-                            |> QualifierUtil.addFunctionsForStructs
+                        """
+                        defstruct: Pair a b
+                        : first a
+                        : second b
+
+                        defunion: List a
+                        : NonEmpty a
+                        : Empty
+
+                        defstruct: NonEmpty a
+                        : head a
+                        : rest (List a)
+
+                        defstruct: Empty
+
+                        def: main
+                        type: -- Int
+                        : 1 2 3 Empty >NonEmpty >NonEmpty >NonEmpty
+                          0 [ + ] fold
+
+                        defmulti: fold
+                        type: (List a) b [ a b -- b ] -- b
+                        : Empty
+                          drop swap drop
+                        : NonEmpty
+                          >Pair swap
+                          [ head> ] [ rest> ] split
+                          rotate swap dup 
+                          rotate
+                          spill !
+                          swap second>
+                          fold
+
+                        def: split
+                        type: a [ a -- b ] [ a -- c ] -- b c
+                        : -rotate dup -rotate
+                          !
+                          swap -rotate
+                          !
+                          swap
+
+                        def: spill
+                        type: (Pair a b) -- a b
+                        : [ first> ] [ second> ] split
+                        """
                 in
                 expectTypeCheck input
         , test "Generic custom type fails if not generic is listed" <|
             \_ ->
                 let
                     input =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "Box"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = []
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "element", Type.Generic "a" ) ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
-                            |> QualifierUtil.addFunctionsForStructs
+                        """
+                        defstruct: Box
+                        : element a
+                        """
                 in
                 expectTypeCheckFailure input
         , test "Generic custom type fails if wrong generic is listed" <|
             \_ ->
                 let
                     input =
-                        { types =
-                            Dict.fromListBy .name
-                                [ { name = "Box"
-                                  , exposed = True
-                                  , sourceLocation = emptyRange
-                                  , generics = [ "a" ]
-                                  , members =
-                                        QAST.StructMembers
-                                            [ ( "element", Type.Generic "b" ) ]
-                                  }
-                                ]
-                        , functions =
-                            Dict.empty
-                        , referenceableFunctions = Set.empty
-                        }
-                            |> QualifierUtil.addFunctionsForStructs
+                        """
+                        defstruct: Box a
+                        : element b
+                        """
                 in
                 expectTypeCheckFailure input
         , describe "Quotations"
@@ -528,321 +178,82 @@ suite =
                 \_ ->
                     let
                         input =
-                            { types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "apply-to-num"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Builtin emptyRange Builtin.Apply
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.FunctionRef emptyRange "main__quot2"
-                                                , QAST.Function emptyRange "apply-to-num"
-                                                , QAST.FunctionRef emptyRange "main__quot1"
-                                                , QAST.Function emptyRange "apply-to-num"
-                                                ]
-                                      }
-                                    , { name = "main__quot2"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Plus
-                                                ]
-                                      }
-                                    , { name = "main__quot1"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Minus
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions =
-                                Set.fromList
-                                    [ "main__quot2"
-                                    , "main__quot1"
-                                    ]
-                            }
+                            """
+                            def: main
+                            : 1
+                              [ 1 + ] apply-to-num
+                              [ 1 - ] apply-to-num
+
+                            def: apply-to-num
+                            : !
+                            """
                     in
                     expectTypeCheck input
             , test "With type annotation" <|
                 \_ ->
                     let
                         input =
-                            { types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "apply-to-num"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature =
-                                            TypeSignature.UserProvided
-                                                { input =
-                                                    [ Type.Int
-                                                    , Type.FunctionSignature
-                                                        { input = [ Type.Int ]
-                                                        , output = [ Type.Int ]
-                                                        }
-                                                    ]
-                                                , output = [ Type.Int ]
-                                                }
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Builtin emptyRange Builtin.Apply
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.FunctionRef emptyRange "main__quot2"
-                                                , QAST.Function emptyRange "apply-to-num"
-                                                , QAST.FunctionRef emptyRange "main__quot1"
-                                                , QAST.Function emptyRange "apply-to-num"
-                                                ]
-                                      }
-                                    , { name = "main__quot2"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Plus
-                                                ]
-                                      }
-                                    , { name = "main__quot1"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Minus
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions =
-                                Set.fromList
-                                    [ "main__quot2"
-                                    , "main__quot1"
-                                    ]
-                            }
+                            """
+                            def: main
+                            : 1
+                              [ 1 + ] apply-to-num
+                              [ 1 - ] apply-to-num
+
+                            def: apply-to-num
+                            type: Int [ Int -- Int ] -- Int
+                            : !
+                            """
                     in
                     expectTypeCheck input
             , test "Typechecking involving a multi-arity quotation is fine _if_ arity info is in type annotation" <|
                 \_ ->
                     let
                         input =
-                            { types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "apply-to-nums"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature =
-                                            TypeSignature.UserProvided
-                                                { input =
-                                                    [ Type.FunctionSignature
-                                                        { input = [ Type.Int, Type.Int ]
-                                                        , output = [ Type.Int ]
-                                                        }
-                                                    ]
-                                                , output = [ Type.Int ]
-                                                }
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Integer emptyRange 2
-                                                , QAST.Builtin emptyRange Builtin.StackLeftRotate
-                                                , QAST.Builtin emptyRange Builtin.Apply
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.FunctionRef emptyRange "main__quot1"
-                                                , QAST.Function emptyRange "apply-to-nums"
-                                                ]
-                                      }
-                                    , { name = "main__quot1"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Builtin emptyRange Builtin.Plus
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions =
-                                Set.fromList
-                                    [ "main__quot1" ]
-                            }
+                            """
+                            def: main
+                            : [ + ] apply-to-nums
+
+                            def: apply-to-nums
+                            type: [ Int Int -- Int ] -- Int
+                            : 1 2 -rotate !
+                            """
                     in
                     expectTypeCheck input
             , test "With generics" <|
                 \_ ->
                     let
                         input =
-                            { types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "map"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature =
-                                            TypeSignature.UserProvided
-                                                { input =
-                                                    [ Type.Generic "a"
-                                                    , Type.FunctionSignature
-                                                        { input = [ Type.Generic "a" ]
-                                                        , output = [ Type.Generic "b" ]
-                                                        }
-                                                    ]
-                                                , output = [ Type.Generic "b" ]
-                                                }
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Builtin emptyRange Builtin.Apply
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.FunctionRef emptyRange "main__quot1"
-                                                , QAST.Function emptyRange "map"
-                                                ]
-                                      }
-                                    , { name = "main__quot1"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Minus
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions =
-                                Set.fromList
-                                    [ "main__quot1" ]
-                            }
+                            """
+                            def: main
+                            : 1 [ 1 - ] map
+
+                            def: map
+                            type: a [ a -- b ] -- b
+                            : !
+                            """
                     in
                     expectTypeCheck input
             , test "Within multiwords" <|
                 \_ ->
                     let
-                        maybeUnion genericName =
-                            Type.Union (Just "Maybe")
-                                [ Type.Generic genericName
-                                , Type.Custom "Nil"
-                                ]
-
                         input =
-                            { types =
-                                Dict.fromListBy .name
-                                    [ { name = "Maybe"
-                                      , exposed = True
-                                      , sourceLocation = emptyRange
-                                      , generics = [ "a" ]
-                                      , members =
-                                            QAST.UnionMembers
-                                                [ Type.Generic "a"
-                                                , Type.Custom "Nil"
-                                                ]
-                                      }
-                                    , { name = "Nil"
-                                      , exposed = True
-                                      , sourceLocation = emptyRange
-                                      , generics = []
-                                      , members = QAST.StructMembers []
-                                      }
-                                    ]
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "map"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature =
-                                            TypeSignature.UserProvided
-                                                { input =
-                                                    [ maybeUnion "a"
-                                                    , Type.FunctionSignature
-                                                        { input = [ Type.Generic "a" ]
-                                                        , output = [ Type.Generic "b" ]
-                                                        }
-                                                    ]
-                                                , output = [ maybeUnion "b" ]
-                                                }
-                                      , implementation =
-                                            QAST.MultiImpl
-                                                [ ( QAST.TypeMatch emptyRange (Type.Generic "a") []
-                                                  , [ QAST.Builtin emptyRange Builtin.Apply
-                                                    ]
-                                                  )
-                                                , ( QAST.TypeMatch emptyRange (Type.Custom "Nil") []
-                                                  , [ QAST.Builtin emptyRange Builtin.StackDrop
-                                                    ]
-                                                  )
-                                                ]
-                                                []
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Function emptyRange "Nil"
-                                                , QAST.FunctionRef emptyRange "main__quot1"
-                                                , QAST.Function emptyRange "map"
-                                                ]
-                                      }
-                                    , { name = "main__quot1"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Builtin emptyRange Builtin.Minus
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions =
-                                Set.fromList
-                                    [ "main__quot1" ]
-                            }
-                                |> QualifierUtil.addFunctionsForStructs
+                            """
+                            defunion: Maybe a
+                            : a
+                            : Nil
+
+                            defstruct: Nil
+
+                            defmulti: map
+                            type: (Maybe a) [ a -- b ] -- (Maybe b)
+                            : a
+                              !
+                            : Nil
+                              drop
+
+                            def: main
+                            : Nil [ 1 - ] map
+                            """
                     in
                     expectTypeCheck input
             ]
@@ -850,103 +261,35 @@ suite =
             [ test "With type annotation" <|
                 \_ ->
                     let
-                        listUnion =
-                            Type.Union (Just "List")
-                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
-                                , Type.Custom "EmptyList"
-                                ]
-
                         input =
-                            { types =
-                                Dict.fromListBy .name
-                                    [ { name = "List"
-                                      , exposed = True
-                                      , sourceLocation = emptyRange
-                                      , generics = [ "a" ]
-                                      , members =
-                                            QAST.UnionMembers
-                                                [ Type.CustomGeneric "NonEmptyList" [ Type.Generic "a" ]
-                                                , Type.Custom "EmptyList"
-                                                ]
-                                      }
-                                    , { name = "NonEmptyList"
-                                      , exposed = True
-                                      , sourceLocation = emptyRange
-                                      , generics = [ "a" ]
-                                      , members =
-                                            QAST.StructMembers
-                                                [ ( "first", Type.Generic "a" )
-                                                , ( "rest", listUnion )
-                                                ]
-                                      }
-                                    , { name = "EmptyList"
-                                      , exposed = True
-                                      , sourceLocation = emptyRange
-                                      , generics = []
-                                      , members = QAST.StructMembers []
-                                      }
-                                    ]
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "sum"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 0
-                                                , QAST.Function emptyRange "sum-helper"
-                                                ]
-                                      }
-                                    , { name = "sum-helper"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature =
-                                            TypeSignature.UserProvided
-                                                { input = [ listUnion, Type.Int ]
-                                                , output = [ Type.Int ]
-                                                }
-                                      , implementation =
-                                            QAST.MultiImpl
-                                                [ ( QAST.TypeMatch emptyRange (Type.CustomGeneric "NonEmptyList" [ Type.Int ]) []
-                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
-                                                    , QAST.Builtin emptyRange Builtin.StackDuplicate
-                                                    , QAST.Function emptyRange "first>"
-                                                    , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                    , QAST.Function emptyRange "rest>"
-                                                    , QAST.Builtin emptyRange Builtin.StackRightRotate
-                                                    , QAST.Builtin emptyRange Builtin.Plus
-                                                    , QAST.Function emptyRange "sum-helper"
-                                                    ]
-                                                  )
-                                                , ( QAST.TypeMatch emptyRange (Type.Custom "EmptyList") []
-                                                  , [ QAST.Builtin emptyRange Builtin.StackSwap
-                                                    , QAST.Builtin emptyRange Builtin.StackDrop
-                                                    ]
-                                                  )
-                                                ]
-                                                []
-                                      }
-                                    , { name = "main"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            QAST.SoloImpl
-                                                [ QAST.Integer emptyRange 1
-                                                , QAST.Integer emptyRange 2
-                                                , QAST.Integer emptyRange 3
-                                                , QAST.Function emptyRange "EmptyList"
-                                                , QAST.Function emptyRange ">NonEmptyList"
-                                                , QAST.Function emptyRange ">NonEmptyList"
-                                                , QAST.Function emptyRange ">NonEmptyList"
-                                                , QAST.Function emptyRange "sum"
-                                                ]
-                                      }
-                                    ]
-                            , referenceableFunctions = Set.empty
-                            }
-                                |> QualifierUtil.addFunctionsForStructs
+                            """
+                            defunion: List a
+                            : NonEmptyList a
+                            : EmptyList
+
+                            defstruct: NonEmptyList a
+                            : first a
+                            : rest (List a)
+
+                            defstruct: EmptyList
+
+                            def: sum
+                            : 0 sum-helper
+
+                            defmulti: sum-helper
+                            type: (List a) Int -- Int
+                            : (NonEmptyList Int)
+                              swap dup first> 
+                              rotate rest>
+                              rotate +
+                              sum-helper
+                            : EmptyList
+                              swap drop
+
+                            def: main
+                            : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+                              sum
+                            """
                     in
                     expectTypeCheck input
             ]
