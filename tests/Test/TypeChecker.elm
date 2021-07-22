@@ -297,37 +297,14 @@ suite =
             \_ ->
                 let
                     input =
-                        { types = Dict.empty
-                        , functions =
-                            Dict.fromListBy .name
-                                [ { name = "main"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature = TypeSignature.NotProvided
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Integer emptyRange 1
-                                            , QAST.Integer emptyRange 2
-                                            , QAST.Function emptyRange "drop-first"
-                                            ]
-                                  }
-                                , { name = "drop-first"
-                                  , exposed = True
-                                  , sourceLocation = Nothing
-                                  , typeSignature =
-                                        TypeSignature.UserProvided
-                                            { input = [ Type.Generic "a", Type.Generic "b" ]
-                                            , output = [ Type.Generic "b" ]
-                                            }
-                                  , implementation =
-                                        QAST.SoloImpl
-                                            [ QAST.Builtin emptyRange Builtin.StackSwap
-                                            , QAST.Builtin emptyRange Builtin.StackDrop
-                                            ]
-                                  }
-                                ]
-                        , referenceableFunctions = Set.empty
-                        }
+                        """
+                        def: main
+                        : 1 2 drop-first
+
+                        def: drop-first
+                        type: a b -- b
+                        : swap drop
+                        """
 
                     expectedResult =
                         Dict.fromListBy .name
