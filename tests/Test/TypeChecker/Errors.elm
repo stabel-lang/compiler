@@ -126,7 +126,7 @@ suite =
                         { input = [], output = [ Type.Generic "a" ] }
                         { input = []
                         , output =
-                            [ Type.Union Nothing
+                            [ Type.Union (Just "Tmp")
                                 [ Type.Generic "b", Type.Generic "a" ]
                             ]
                         }
@@ -134,13 +134,13 @@ suite =
                         "true-or-false"
                         { input = [ Type.Int ]
                         , output =
-                            [ Type.Union Nothing
+                            [ Type.Union (Just "Tmp")
                                 [ Type.Generic "b", Type.Generic "a" ]
                             ]
                         }
                         { input = [ Type.Int ]
                         , output =
-                            [ Type.Union Nothing
+                            [ Type.Union (Just "Tmp")
                                 [ Type.Custom "False", Type.Custom "True" ]
                             ]
                         }
@@ -197,7 +197,7 @@ suite =
                             type: -- Int
                             : 1 >IntBox mword value>
 
-                            def: mword
+                            defmulti: mword
                             : IntBox( value Int( value 1 ) )
                               value> 1 + >IntBox
                             """

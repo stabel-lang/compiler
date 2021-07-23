@@ -62,7 +62,7 @@ expectModuleOutput source expectedAst =
 stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
-    , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
+    , functions = Dict.map (\_ d -> stripFunctionLocation d) ast.functions
     , referenceableFunctions = ast.referenceableFunctions
     }
 
@@ -72,8 +72,8 @@ stripTypeLocation typeDef =
     { typeDef | sourceLocation = emptyRange }
 
 
-stripWordLocation : FunctionDefinition -> FunctionDefinition
-stripWordLocation word =
+stripFunctionLocation : FunctionDefinition -> FunctionDefinition
+stripFunctionLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
         , sourceLocation = Nothing
@@ -99,10 +99,10 @@ stripNodeLocation node =
             AST.Integer emptyRange val
 
         AST.Function _ val ->
-            AST.Function emptyRange val
+            AST.Function emptyRange (stripFunctionLocation val)
 
         AST.FunctionRef _ val ->
-            AST.FunctionRef emptyRange val
+            AST.FunctionRef emptyRange (stripFunctionLocation val)
 
         AST.Builtin _ val ->
             AST.Builtin emptyRange val

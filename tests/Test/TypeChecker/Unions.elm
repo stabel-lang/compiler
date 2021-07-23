@@ -2,15 +2,11 @@ module Test.TypeChecker.Unions exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
-import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type exposing (Type)
-import Stabel.Data.TypeSignature as TypeSignature
-import Stabel.Qualifier as QAST
+import Stabel.Data.Type as Type
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Qualifier.Util as QualifierUtil
 import Test.TypeChecker.Util
     exposing
         ( expectAst
@@ -27,7 +23,7 @@ suite =
                 let
                     input =
                         template ++ """
-                        def: to-int
+                        defmulti: to-int
                         : False
                           drop 0
                         : True
@@ -40,7 +36,7 @@ suite =
                 let
                     input =
                         template ++ """
-                        def: to-int
+                        defmulti: to-int
                         type: Bool -- Int
                         : False
                           drop 0
@@ -54,7 +50,7 @@ suite =
                 let
                     input =
                         template ++ """
-                        def: to-int
+                        defmulti: to-int
                         type: Bool -- Int
                         : False
                           drop 0
@@ -68,7 +64,7 @@ suite =
                 let
                     input =
                         template ++ """
-                        def: to-int
+                        defmulti: to-int
                         : False
                           drop 0
                         else:

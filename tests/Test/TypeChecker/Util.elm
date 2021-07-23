@@ -82,7 +82,7 @@ checkForError fn input =
 getTypeErrors : String -> List Problem
 getTypeErrors input =
     case qualifyInput input of
-        Err err ->
+        Err _ ->
             []
 
         Ok qualifiedAst ->
@@ -116,4 +116,4 @@ qualifyInput source =
                     Err <| "Qualifier error: " ++ Debug.toString err
 
                 Ok qualifiedAst ->
-                    Ok qualifiedAst
+                    Ok <| QualifierUtil.stripLocations qualifiedAst
