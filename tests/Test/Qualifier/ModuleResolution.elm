@@ -23,7 +23,7 @@ suite =
                           , "internal/mod"
                           , """
                             defmodule:
-                            exposes: dummy
+                            exposing: dummy
                             :
 
                             def: value
@@ -48,7 +48,7 @@ suite =
 
                     findError err =
                         case err of
-                            Problem.FunctionNotExposed _ "internal/mod/value" ->
+                            Problem.FunctionNotExposed _ "/stabel/test/internal/mod/value" ->
                                 True
 
                             _ ->
@@ -63,7 +63,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: dummy
+                            exposing: dummy
                             :
 
                             def: add
@@ -103,7 +103,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: dummy
+                            exposing: dummy
                             :
 
                             defstruct: Tipe
@@ -116,7 +116,7 @@ suite =
                           , "core"
                           , """
                             def: main
-                            type: /mod/Tipe
+                            type: /mod/Tipe --
                             : drop
                             """
                           )
@@ -139,7 +139,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: Tipe
+                            exposing: Tipe
                             :
 
                             defunion: TipeUnion
@@ -175,7 +175,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: Dummy
+                            exposing: Dummy
                             :
 
                             defstruct: Tipe
@@ -210,7 +210,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: Dummy
+                            exposing: Dummy
                             :
 
                             defstruct: Tipe
@@ -244,7 +244,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: Tipe
+                            exposing: Tipe
                             :
 
                             defunion: TipeUnion
@@ -280,7 +280,7 @@ suite =
                           , "mod"
                           , """
                             defmodule:
-                            exposes: TipeUnion
+                            exposing: TipeUnion
                             :
 
                             defunion: TipeUnion
@@ -318,7 +318,7 @@ checkForError pred sources =
     let
         parserResult =
             sources
-                |> List.map (mapThird <| Parser.run "test")
+                |> List.map (\( a, name, source ) -> ( a, name, Parser.run name source ))
                 |> collectErrors
     in
     case parserResult of
@@ -354,7 +354,7 @@ checkForError pred sources =
                         Expect.pass
 
                     else
-                        Expect.fail "Failed for unknown qualification error."
+                        Expect.fail <| "Failed for unknown qualification error: " ++ Debug.toString errs
 
 
 mapThird : (c -> d) -> ( a, b, c ) -> ( a, b, d )
@@ -419,7 +419,7 @@ qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
                 configWithQualifiedAst =
                     { updatedConfig
                         | inProgressAST = updatedInProgressAst
-                        , externalModules = Dict.insert modulePath packageName updatedConfig.externalModules
+                        , externalModules = Dict.insert ("/" ++ modulePath) packageName updatedConfig.externalModules
                     }
             in
             ( problems, configWithQualifiedAst )

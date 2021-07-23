@@ -115,9 +115,9 @@ suite =
                         defmulti: true-or-false
                         type: Int -- (Tmp a b)
                         : Int( value 0 )
-                          False
+                          drop False
                         : Int
-                          True
+                          drop True
                         """
                 in
                 Expect.equalLists
@@ -140,12 +140,34 @@ suite =
                         }
                         { input = [ Type.Int ]
                         , output =
-                            [ Type.Union (Just "Tmp")
+                            [ Type.Union Nothing
                                 [ Type.Custom "False", Type.Custom "True" ]
                             ]
                         }
                     ]
                     (Util.getTypeErrors input)
+        , test "Type checker should detect and fail when the number of outputs doesn't match" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defunion: Bool
+                        : True
+                        : False
+
+                        defstruct: True
+                        defstruct: False
+
+                        defmulti: true-or-false
+                        # should be Int -- Int (Maybe a)
+                        type: Int -- Int
+                        : Int( value 0 )
+                          False
+                        : Int
+                          True
+                        """
+                in
+                Util.expectTypeCheckFailure input
         , describe "Inexhaustiveness checking"
             [ test "Simple example" <|
                 \_ ->

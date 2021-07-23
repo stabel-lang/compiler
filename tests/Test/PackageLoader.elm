@@ -96,7 +96,7 @@ suite =
                             |> resolveSideEffects testFilesInternalConsistency []
                             |> Result.map Tuple.second
 
-                    versionDef =
+                    bumpVersionDef =
                         { name = "/robheghan/dummy/mod1/bump-version"
                         , exposed = True
                         , sourceLocation = Nothing
@@ -108,7 +108,7 @@ suite =
                                 ]
                         }
 
-                    bumpVersionDef =
+                    versionDef =
                         { name = "/robheghan/dummy/mod2/version"
                         , exposed = True
                         , sourceLocation = Nothing

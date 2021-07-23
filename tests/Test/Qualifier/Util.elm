@@ -53,10 +53,12 @@ expectModuleOutput source expectedAst =
 
                 Ok actualAst ->
                     Expect.equal expectedAst
-                        { types = actualAst.types
-                        , functions = actualAst.functions
-                        , referenceableFunctions = actualAst.referenceableFunctions
-                        }
+                        (stripLocations
+                            { types = actualAst.types
+                            , functions = actualAst.functions
+                            , referenceableFunctions = actualAst.referenceableFunctions
+                            }
+                        )
 
 
 stripLocations : AST -> AST
@@ -107,8 +109,14 @@ stripNodeLocation node =
         AST.Builtin _ val ->
             AST.Builtin emptyRange val
 
-        _ ->
-            node
+        AST.ConstructType t ->
+            AST.ConstructType (stripTypeLocation t)
+
+        AST.GetMember td n t ->
+            AST.GetMember (stripTypeLocation td) n t
+
+        AST.SetMember td n t ->
+            AST.SetMember (stripTypeLocation td) n t
 
 
 stripMultiWordBranchLocation : ( TypeMatch, List Node ) -> ( TypeMatch, List Node )

@@ -114,7 +114,7 @@ suite =
                         , typeSignature =
                             TypeSignature.UserProvided
                                 { input = [ usMoneyUnionType ]
-                                , output = [ usMoneyUnionType ]
+                                , output = [ Type.Int ]
                                 }
                         , implementation =
                             MultiImpl
@@ -147,6 +147,7 @@ suite =
                                 , Builtin emptyRange Builtin.StackSwap
                                 , Function emptyRange intoCentsFn
                                 , Builtin emptyRange Builtin.Plus
+                                , Function emptyRange centCtorFn
                                 ]
                         }
 
@@ -382,7 +383,7 @@ suite =
                           package/module/when-one
                         : internal/match/Some
                           drop
-                        : package/module/when-other-one
+                        else: package/module/when-other-one
 
                         def: main
                         alias: ali internal/alias

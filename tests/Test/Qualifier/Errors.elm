@@ -20,7 +20,7 @@ suite =
                         source =
                             """
                             def: inc
-                            1 +
+                            : 1 +
 
                             def: main
                             : 1 inc inc dec 2 =
@@ -47,7 +47,7 @@ suite =
                             : 1 +
 
                             def: main
-                            1 inc 2 =
+                            : 1 inc 2 =
                             """
                     in
                     checkForError (noSuchTypeReferenceError "Ints") source
