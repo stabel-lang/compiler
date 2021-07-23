@@ -1,7 +1,9 @@
 module Test.TypeChecker.Util exposing
-    ( expectAst
+    ( checkForError
+    , expectAst
     , expectTypeCheck
     , expectTypeCheckFailure
+    , getTypeErrors
     )
 
 import Dict exposing (Dict)
@@ -9,6 +11,7 @@ import Expect exposing (Expectation)
 import Stabel.Parser as Parser
 import Stabel.Qualifier as Qualifier
 import Stabel.TypeChecker as TypeChecker exposing (FunctionDefinition)
+import Stabel.TypeChecker.Problem exposing (Problem)
 import Test.Qualifier.Util as QualifierUtil
 
 
@@ -55,6 +58,40 @@ expectAst input expectedResult =
 
                 Ok typedAst ->
                     Expect.equal expectedResult typedAst.functions
+
+
+checkForError : (Problem -> Bool) -> String -> Expectation
+checkForError fn input =
+    case qualifyInput input of
+        Err err ->
+            Expect.fail err
+
+        Ok qualifiedAst ->
+            case TypeChecker.run qualifiedAst of
+                Err errors ->
+                    if List.any fn errors then
+                        Expect.pass
+
+                    else
+                        Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+
+                Ok _ ->
+                    Expect.fail "Expected error."
+
+
+getTypeErrors : String -> List Problem
+getTypeErrors input =
+    case qualifyInput input of
+        Err err ->
+            []
+
+        Ok qualifiedAst ->
+            case TypeChecker.run qualifiedAst of
+                Err errors ->
+                    errors
+
+                Ok _ ->
+                    []
 
 
 qualifyInput : String -> Result String Qualifier.AST
