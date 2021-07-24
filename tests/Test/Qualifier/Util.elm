@@ -1,6 +1,7 @@
 module Test.Qualifier.Util exposing
     ( emptyAst
     , expectModuleOutput
+    , expectQualification
     , stripLocations
     )
 
@@ -28,6 +29,31 @@ emptyAst =
     , functions = Dict.empty
     , referenceableFunctions = Set.empty
     }
+
+
+expectQualification : String -> Expectation
+expectQualification source =
+    case Parser.run "test" source of
+        Err errors ->
+            Expect.fail <| "Parser error: " ++ Debug.toString errors
+
+        Ok parserAst ->
+            let
+                result =
+                    AST.run
+                        { packageName = "stabel/test"
+                        , modulePath = "some/module"
+                        , ast = parserAst
+                        , externalModules = Dict.empty
+                        , inProgressAST = emptyAst
+                        }
+            in
+            case result of
+                Err errors ->
+                    Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+
+                Ok _ ->
+                    Expect.pass
 
 
 expectModuleOutput : String -> AST -> Expectation

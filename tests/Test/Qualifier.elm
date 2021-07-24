@@ -17,7 +17,36 @@ import Test.Qualifier.Util as QualifierUtil
 suite : Test
 suite =
     describe "Qualifier"
-        [ test "Name mangling" <|
+        [ test "Recursive function" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmulti: count-down
+                        : Int( value 0 )
+                          0
+                        : Int
+                          1 - count-down
+                        """
+                in
+                QualifierUtil.expectQualification source
+        , test "Function cycle" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: dec-down
+                        : 1 - count-down 
+
+                        defmulti: count-down
+                        : Int( value 0 )
+                          0
+                        : Int
+                          dec-down
+                        """
+                in
+                QualifierUtil.expectQualification source
+        , test "Name mangling" <|
             \_ ->
                 let
                     source =
