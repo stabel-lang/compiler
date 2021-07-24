@@ -4,7 +4,6 @@ import Expect
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Qualifier exposing (..)
-import Stabel.TypeChecker as TypeChecker
 import Stabel.TypeChecker.Problem as Problem
 import Test exposing (Test, describe, test)
 import Test.TypeChecker.Util as Util exposing (checkForError)
@@ -167,7 +166,21 @@ suite =
                           True
                         """
                 in
-                Util.expectTypeCheckFailure input
+                Expect.equalLists
+                    [ Problem.TypeError emptyRange
+                        "true-or-false"
+                        { input = [ Type.Int ]
+                        , output = [ Type.Int ]
+                        }
+                        { input = [ Type.Int ]
+                        , output =
+                            [ Type.Int
+                            , Type.Union Nothing
+                                [ Type.Custom "False", Type.Custom "True" ]
+                            ]
+                        }
+                    ]
+                    (Util.getTypeErrors input)
         , describe "Inexhaustiveness checking"
             [ test "Simple example" <|
                 \_ ->

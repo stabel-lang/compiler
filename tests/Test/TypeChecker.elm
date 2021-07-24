@@ -2,15 +2,11 @@ module Test.TypeChecker exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
-import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
-import Stabel.Data.TypeSignature as TypeSignature
-import Stabel.Qualifier as QAST
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
-import Test.Qualifier.Util as QualifierUtil
 import Test.TypeChecker.Util
     exposing
         ( expectAst

@@ -682,8 +682,8 @@ constrainGenerics typeSignature inferredType =
 constrainGenericsHelper : Dict String Type -> List Type -> List Type -> List Type -> ( Dict String Type, List Type )
 constrainGenericsHelper remappedGenerics annotated inferred acc =
     case ( annotated, inferred ) of
-        ( [], _ ) ->
-            ( remappedGenerics, List.reverse acc )
+        ( [], rest ) ->
+            ( remappedGenerics, List.reverse acc ++ rest )
 
         ( _, [] ) ->
             ( remappedGenerics, List.reverse acc )
