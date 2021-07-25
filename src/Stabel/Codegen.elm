@@ -683,4 +683,3 @@ getMemberType typeInfoDict typeName memberName =
     Dict.get typeName typeInfoDict
         |> Maybe.map (List.indexedMap (\idx ( name, _ ) -> ( idx, name )) << .members)
         |> Maybe.andThen (List.find (\( _, name ) -> name == memberName))
-        |> Maybe.map Tuple.first

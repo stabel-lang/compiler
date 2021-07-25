@@ -206,7 +206,11 @@ typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qu
 typeCheckSoloImplementation context untypedDef impl =
     let
         ( inferredType, newContext ) =
-            typeCheckImplementation untypedDef impl (cleanContext context)
+            typeCheckImplementation
+                untypedDef
+                untypedDef.typeSignature
+                impl
+                (cleanContext context)
 
         typedImplementation =
             SoloImpl (untypedToTypedImplementation newContext impl)
@@ -337,7 +341,11 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 _ ->
                     let
                         ( inferredDefaultType, _ ) =
-                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                            typeCheckImplementation
+                                untypedDef
+                                untypedDef.typeSignature
+                                defaultImpl
+                                (cleanContext context)
                     in
                     case inferredDefaultType.input of
                         [] ->
@@ -445,11 +453,8 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 x ->
                     x
 
-        alteredDef =
-            { untypedDef | typeSignature = alteredTypeSignature }
-
         ( inf, newCtx ) =
-            typeCheckImplementation alteredDef im (cleanContext ctx)
+            typeCheckImplementation untypedDef alteredTypeSignature im (cleanContext ctx)
     in
     ( inf :: infs, newCtx )
 
@@ -663,6 +668,13 @@ joinOutputs outputs result =
 
                 unionize lhs rhs =
                     case ( lhs, rhs ) of
+                        ( Type.Union _ lhsMems, Type.Union _ rhsMems ) ->
+                            if lhsMems == rhsMems then
+                                lhs
+
+                            else
+                                Type.Union Nothing (lhsMems ++ rhsMems)
+
                         _ ->
                             if lhs == rhs then
                                 lhs
@@ -816,11 +828,16 @@ compatibleTypeList aLs bLs =
         |> List.all identity
 
 
-typeCheckImplementation : Qualifier.FunctionDefinition -> List Qualifier.Node -> Context -> ( FunctionType, Context )
-typeCheckImplementation untypedDef impl context =
+typeCheckImplementation :
+    Qualifier.FunctionDefinition
+    -> TypeSignature
+    -> List Qualifier.Node
+    -> Context
+    -> ( FunctionType, Context )
+typeCheckImplementation untypedDef typeSignatureToUse impl context =
     let
         startingStackEffects =
-            untypedDef.typeSignature
+            typeSignatureToUse
                 |> TypeSignature.map reverseFunctionType
                 |> TypeSignature.withDefault Type.emptyFunctionType
                 |> functionTypeToStackEffects
@@ -840,7 +857,7 @@ typeCheckImplementation untypedDef impl context =
                 impl
 
         annotatedInput =
-            untypedDef.typeSignature
+            typeSignatureToUse
                 |> TypeSignature.toMaybe
                 |> Maybe.map .input
                 |> Maybe.withDefault []

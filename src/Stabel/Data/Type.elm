@@ -90,6 +90,9 @@ genericlyCompatible lhs rhs =
         ( CustomGeneric lName _, CustomGeneric rName _ ) ->
             lName == rName
 
+        ( Union _ lMems, Union _ rMems ) ->
+            lMems == rMems
+
         _ ->
             lhs == rhs
 
