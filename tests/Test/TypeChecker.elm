@@ -274,7 +274,7 @@ suite =
 
                             defmulti: sum-helper
                             type: (List a) Int -- Int
-                            : (NonEmptyList Int)
+                            : NonEmptyList
                               swap dup first> 
                               rotate rest>
                               rotate +
