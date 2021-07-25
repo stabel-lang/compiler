@@ -62,6 +62,7 @@ type alias CycleData =
     { name : String
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : TypeSignature
+    , exposed : Bool
     }
 
 
@@ -164,7 +165,7 @@ qualifyDefinitionFoldHelper :
 qualifyDefinitionFoldHelper config qualifiedTypes functionDef ( errors, qualifiedFunctions, inlineFunctionNames ) =
     let
         qualificationResult =
-            qualifyDefinition config qualifiedTypes qualifiedFunctions functionDef
+            qualifyDefinition config qualifiedTypes qualifiedFunctions Set.empty functionDef
     in
     case qualificationResult.qualifiedFunction of
         Err err ->
@@ -554,9 +555,10 @@ qualifyDefinition :
     RunConfig
     -> Dict String TypeDefinition
     -> Dict String FunctionDefinition
+    -> Set String
     -> Parser.FunctionDefinition
     -> QualifyDefinitionResult
-qualifyDefinition config qualifiedTypes qualifiedFunctions unqualifiedFunction =
+qualifyDefinition config qualifiedTypes qualifiedFunctions currentlyParsing unqualifiedFunction =
     case Dict.get unqualifiedFunction.name qualifiedFunctions of
         Just qualifiedFunction ->
             { qualifiedFunction = Ok qualifiedFunction
@@ -569,6 +571,7 @@ qualifyDefinition config qualifiedTypes qualifiedFunctions unqualifiedFunction =
                 config
                 qualifiedTypes
                 qualifiedFunctions
+                currentlyParsing
                 unqualifiedFunction
 
 
@@ -576,9 +579,10 @@ qualifyDefinitionHelp :
     RunConfig
     -> Dict String TypeDefinition
     -> Dict String FunctionDefinition
+    -> Set String
     -> Parser.FunctionDefinition
     -> QualifyDefinitionResult
-qualifyDefinitionHelp config qualifiedTypes qualifiedFunctions unqualifiedFunction =
+qualifyDefinitionHelp config qualifiedTypes qualifiedFunctions currentlyParsing unqualifiedFunction =
     let
         ( whens, impl ) =
             case unqualifiedFunction.implementation of
@@ -604,6 +608,7 @@ qualifyDefinitionHelp config qualifiedTypes qualifiedFunctions unqualifiedFuncti
                         qualifiedTypes
                         unqualifiedFunction.name
                         moduleReferences
+                        currentlyParsing
                     )
                     ( qualifiedFunctions, Set.empty, [] )
                 |> (\( a, b, c ) -> ( a, b, Result.combine c ))
@@ -615,6 +620,7 @@ qualifyDefinitionHelp config qualifiedTypes qualifiedFunctions unqualifiedFuncti
                 newFunctionsAfterWhens
                 unqualifiedFunction.name
                 moduleReferences
+                currentlyParsing
                 impl
 
         qualifiedMetadataResult =
@@ -756,13 +762,21 @@ qualifyWhen :
     -> Dict String TypeDefinition
     -> String
     -> ModuleReferences
+    -> Set String
     -> ( Parser.TypeMatch, List Parser.AstNode )
     -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
     -> ( Dict String FunctionDefinition, Set String, List (Result Problem ( TypeMatch, List Node )) )
-qualifyWhen config qualifiedTypes functionName modRefs ( typeMatch, impl ) ( qualifiedFunctions, inlineFunctionNames, result ) =
+qualifyWhen config qualifiedTypes functionName modRefs currentlyParsing ( typeMatch, impl ) ( qualifiedFunctions, inlineFunctionNames, result ) =
     let
         qualifyNodeResult =
-            initQualifyNode config qualifiedTypes qualifiedFunctions functionName modRefs impl
+            initQualifyNode
+                config
+                qualifiedTypes
+                qualifiedFunctions
+                functionName
+                modRefs
+                currentlyParsing
+                impl
 
         qualifiedMatchResult =
             qualifyMatch config qualifiedTypes modRefs typeMatch
@@ -968,12 +982,18 @@ initQualifyNode :
     -> Dict String FunctionDefinition
     -> String
     -> ModuleReferences
+    -> Set String
     -> List Parser.AstNode
     -> QualifyNodeResult
-initQualifyNode config qualifiedTypes qualifiedFunctions currentDefName modRefs impl =
+initQualifyNode config qualifiedTypes qualifiedFunctions currentDefName modRefs currentlyParsing impl =
     List.foldr
-        (qualifyNode config currentDefName modRefs)
-        (initQualifyNodeAccumulator qualifiedTypes qualifiedFunctions)
+        (qualifyNode config currentDefName)
+        (initQualifyNodeAccumulator
+            qualifiedTypes
+            qualifiedFunctions
+            modRefs
+            (Set.insert currentDefName currentlyParsing)
+        )
         impl
         |> (\acc ->
                 { qualifiedFunctions = acc.qualifiedFunctions
@@ -989,6 +1009,8 @@ type alias QualifyNodeAccumulator =
     , qualifiedFunctions : Dict String FunctionDefinition
     , qualifiedNodes : List (Result Problem Node)
     , inlineFunctionNames : Set String
+    , modRefs : ModuleReferences
+    , currentlyParsing : Set String
     }
 
 
@@ -999,24 +1021,30 @@ type alias QualifyNodeResult =
     }
 
 
-initQualifyNodeAccumulator : Dict String TypeDefinition -> Dict String FunctionDefinition -> QualifyNodeAccumulator
-initQualifyNodeAccumulator qualifiedTypes qualifiedFunctions =
+initQualifyNodeAccumulator :
+    Dict String TypeDefinition
+    -> Dict String FunctionDefinition
+    -> ModuleReferences
+    -> Set String
+    -> QualifyNodeAccumulator
+initQualifyNodeAccumulator qualifiedTypes qualifiedFunctions modRefs currentlyParsing =
     { availableInlineFuncId = 1
     , qualifiedTypes = qualifiedTypes
     , qualifiedFunctions = qualifiedFunctions
     , qualifiedNodes = []
     , inlineFunctionNames = Set.empty
+    , modRefs = modRefs
+    , currentlyParsing = currentlyParsing
     }
 
 
 qualifyNode :
     RunConfig
     -> String
-    -> ModuleReferences
     -> Parser.AstNode
     -> QualifyNodeAccumulator
     -> QualifyNodeAccumulator
-qualifyNode config currentDefName modRefs node acc =
+qualifyNode config currentDefName node acc =
     let
         mapLoc loc =
             SourceLocationRange
@@ -1033,6 +1061,7 @@ qualifyNode config currentDefName modRefs node acc =
             }
 
         Parser.Function loc value ->
+            -- TODO: Clean this branch up
             let
                 qLoc =
                     mapLoc loc
@@ -1051,7 +1080,7 @@ qualifyNode config currentDefName modRefs node acc =
                             { acc | qualifiedNodes = Ok (Function qLoc func) :: acc.qualifiedNodes }
 
                         Nothing ->
-                            case resolveImportedFunction config modRefs value of
+                            case resolveImportedFunction config acc.modRefs value of
                                 Just mod ->
                                     if representsExternalModule mod then
                                         let
@@ -1063,7 +1092,6 @@ qualifyNode config currentDefName modRefs node acc =
                                         qualifyNode
                                             config
                                             currentDefName
-                                            modRefs
                                             (Parser.ExternalFunction loc path value)
                                             acc
 
@@ -1075,35 +1103,63 @@ qualifyNode config currentDefName modRefs node acc =
                                         qualifyNode
                                             config
                                             currentDefName
-                                            modRefs
                                             (Parser.PackageFunction loc path value)
                                             acc
 
                                 Nothing ->
-                                    case Dict.get value config.ast.functions of
-                                        Just fn ->
-                                            let
-                                                qualifyDefinitionResult =
-                                                    qualifyDefinition
-                                                        config
-                                                        acc.qualifiedTypes
-                                                        acc.qualifiedFunctions
-                                                        fn
-                                            in
-                                            case qualifyDefinitionResult.qualifiedFunction of
-                                                Ok qualifiedFunction ->
-                                                    { acc
-                                                        | qualifiedNodes = Ok (Function qLoc qualifiedFunction) :: acc.qualifiedNodes
-                                                        , qualifiedFunctions = qualifyDefinitionResult.qualifiedFunctions
-                                                        , inlineFunctionNames =
-                                                            Set.union qualifyDefinitionResult.inlineFunctionNames acc.inlineFunctionNames
-                                                    }
+                                    if value == currentDefName then
+                                        { acc | qualifiedNodes = Ok (Recurse qLoc) :: acc.qualifiedNodes }
 
-                                                Err err ->
-                                                    { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
+                                    else
+                                        case Dict.get value config.ast.functions of
+                                            Just fn ->
+                                                if Set.member value acc.currentlyParsing then
+                                                    case qualifyMetadata config acc.qualifiedTypes fn of
+                                                        Ok ( typeSignature, exposed ) ->
+                                                            { acc
+                                                                | qualifiedNodes =
+                                                                    Ok
+                                                                        (Cycle qLoc
+                                                                            { name = value
+                                                                            , sourceLocation = Maybe.map mapLoc fn.sourceLocationRange
+                                                                            , typeSignature = typeSignature
+                                                                            , exposed = exposed
+                                                                            }
+                                                                        )
+                                                                        :: acc.qualifiedNodes
+                                                            }
 
-                                        Nothing ->
-                                            { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
+                                                        Err err ->
+                                                            { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
+
+                                                else
+                                                    let
+                                                        qualifyDefinitionResult =
+                                                            qualifyDefinitionHelp
+                                                                config
+                                                                acc.qualifiedTypes
+                                                                acc.qualifiedFunctions
+                                                                (Set.insert fn.name acc.currentlyParsing)
+                                                                fn
+                                                    in
+                                                    case qualifyDefinitionResult.qualifiedFunction of
+                                                        Ok qualifiedFunction ->
+                                                            { acc
+                                                                | qualifiedNodes = Ok (Function qLoc qualifiedFunction) :: acc.qualifiedNodes
+                                                                , qualifiedFunctions = qualifyDefinitionResult.qualifiedFunctions
+                                                                , inlineFunctionNames =
+                                                                    Set.union qualifyDefinitionResult.inlineFunctionNames acc.inlineFunctionNames
+                                                                , currentlyParsing = Set.remove fn.name acc.currentlyParsing
+                                                            }
+
+                                                        Err err ->
+                                                            { acc
+                                                                | qualifiedNodes = Err err :: acc.qualifiedNodes
+                                                                , currentlyParsing = Set.remove fn.name acc.currentlyParsing
+                                                            }
+
+                                            Nothing ->
+                                                { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc value) :: acc.qualifiedNodes }
 
         Parser.PackageFunction loc path value ->
             let
@@ -1114,7 +1170,7 @@ qualifyNode config currentDefName modRefs node acc =
                     String.join "/" path
 
                 normalizedPath =
-                    Dict.get normalizedPathPreAliasCheck modRefs.aliases
+                    Dict.get normalizedPathPreAliasCheck acc.modRefs.aliases
                         |> Maybe.withDefault normalizedPathPreAliasCheck
             in
             if representsExternalModule normalizedPath then
@@ -1125,7 +1181,7 @@ qualifyNode config currentDefName modRefs node acc =
                             (splitExternalPackagePath normalizedPath)
                             value
                 in
-                qualifyNode config currentDefName modRefs externalFunctionNode acc
+                qualifyNode config currentDefName externalFunctionNode acc
 
             else
                 let
@@ -1270,7 +1326,8 @@ qualifyNode config currentDefName modRefs node acc =
                         acc.qualifiedTypes
                         acc.qualifiedFunctions
                         inlineFuncName
-                        modRefs
+                        acc.modRefs
+                        acc.currentlyParsing
                         quotImpl
             in
             case qualifyNodeResult.qualifiedNodes of
