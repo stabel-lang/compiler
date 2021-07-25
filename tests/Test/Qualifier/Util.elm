@@ -132,6 +132,12 @@ stripNodeLocation node =
         AST.FunctionRef _ val ->
             AST.FunctionRef emptyRange (stripFunctionLocation val)
 
+        AST.Recurse _ ->
+            AST.Recurse emptyRange
+
+        AST.Cycle _ data ->
+            AST.Cycle emptyRange data
+
         AST.Builtin _ val ->
             AST.Builtin emptyRange val
 

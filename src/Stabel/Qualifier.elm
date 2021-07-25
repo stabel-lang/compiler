@@ -1,5 +1,6 @@
 module Stabel.Qualifier exposing
     ( AST
+    , CycleData
     , FunctionDefinition
     , FunctionImplementation(..)
     , Node(..)
@@ -57,6 +58,13 @@ type alias FunctionDefinition =
     }
 
 
+type alias CycleData =
+    { name : String
+    , sourceLocation : Maybe SourceLocationRange
+    , typeSignature : TypeSignature
+    }
+
+
 type FunctionImplementation
     = SoloImpl (List Node)
     | MultiImpl (List ( TypeMatch, List Node )) (List Node)
@@ -76,10 +84,12 @@ type Node
     = Integer SourceLocationRange Int
     | Function SourceLocationRange FunctionDefinition
     | FunctionRef SourceLocationRange FunctionDefinition
+    | Recurse SourceLocationRange
+    | Cycle SourceLocationRange CycleData
+    | Builtin SourceLocationRange Builtin
     | ConstructType TypeDefinition
     | GetMember TypeDefinition String Type
     | SetMember TypeDefinition String Type
-    | Builtin SourceLocationRange Builtin
 
 
 type alias ModuleReferences =
@@ -1244,10 +1254,15 @@ qualifyNode config currentDefName modRefs node acc =
             let
                 inlineFuncName =
                     if String.startsWith "inlinefn:" currentDefName then
-                        currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
+                        currentDefName
+                            ++ "/"
+                            ++ String.fromInt acc.availableInlineFuncId
 
                     else
-                        "inlinefn:" ++ qualifyName config currentDefName ++ "/" ++ String.fromInt acc.availableInlineFuncId
+                        "inlinefn:"
+                            ++ qualifyName config currentDefName
+                            ++ "/"
+                            ++ String.fromInt acc.availableInlineFuncId
 
                 qualifyNodeResult =
                     initQualifyNode
