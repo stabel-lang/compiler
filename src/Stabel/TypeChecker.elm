@@ -1,6 +1,7 @@
 module Stabel.TypeChecker exposing
     ( AST
     , AstNode(..)
+    , CycleData
     , FunctionDefinition
     , FunctionImplementation(..)
     , TypeDefinition
@@ -59,10 +60,19 @@ type AstNode
     = IntLiteral SourceLocationRange Int
     | Function SourceLocationRange String FunctionType
     | FunctionRef SourceLocationRange String
+    | Recurse SourceLocationRange
+    | Cycle SourceLocationRange CycleData
+    | Builtin SourceLocationRange Builtin
     | ConstructType String
     | SetMember String String Type
     | GetMember String String Type
-    | Builtin SourceLocationRange Builtin
+
+
+type alias CycleData =
+    { name : String
+    , sourceLocation : Maybe SourceLocationRange
+    , typeSignature : FunctionType
+    }
 
 
 type StackEffect
@@ -87,7 +97,6 @@ type alias Context =
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
-    , callStack : Set String
     , errors : List Problem
     }
 
@@ -101,7 +110,6 @@ initContext ast =
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
-    , callStack = Set.empty
     , errors =
         ast.types
             |> Dict.values
@@ -285,6 +293,20 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.FunctionRef range ref ->
             FunctionRef range ref.name
 
+        Qualifier.Recurse range ->
+            Recurse range
+
+        Qualifier.Cycle range data ->
+            -- TODO: Not right
+            Cycle range
+                { name = data.name
+                , sourceLocation = data.sourceLocation
+                , typeSignature = { input = [], output = [] }
+                }
+
+        Qualifier.Builtin range builtin ->
+            Builtin range builtin
+
         Qualifier.ConstructType typeDef ->
             ConstructType typeDef.name
 
@@ -293,9 +315,6 @@ untypedToTypedNode idx context untypedNode =
 
         Qualifier.GetMember typeDef memberName memberType ->
             GetMember typeDef.name memberName memberType
-
-        Qualifier.Builtin range builtin ->
-            Builtin range builtin
 
 
 
@@ -812,19 +831,13 @@ typeCheckImplementation untypedDef impl context =
             }
 
         contextWithCall =
-            { context
-                | callStack = Set.insert untypedDef.name context.callStack
-                , stackEffects = startingStackEffects
-            }
+            { context | stackEffects = startingStackEffects }
 
         ( _, contextWithStackEffects ) =
             List.foldl
-                (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode idx node ctx ))
+                (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode untypedDef idx node ctx ))
                 ( 0, contextWithCall )
                 impl
-
-        contextWithoutCall =
-            { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
 
         annotatedInput =
             untypedDef.typeSignature
@@ -832,7 +845,7 @@ typeCheckImplementation untypedDef impl context =
                 |> Maybe.map .input
                 |> Maybe.withDefault []
     in
-    functionTypeFromStackEffects untypedDef contextWithoutCall
+    functionTypeFromStackEffects untypedDef contextWithStackEffects
         |> (\( ctx, wt ) -> ( { wt | input = wt.input ++ annotatedInput }, ctx ))
         |> simplifyFunctionType
 
@@ -969,8 +982,8 @@ verifyTypeSignature inferredType untypedDef context =
             context
 
 
-typeCheckNode : Int -> Qualifier.Node -> Context -> Context
-typeCheckNode idx node context =
+typeCheckNode : Qualifier.FunctionDefinition -> Int -> Qualifier.Node -> Context -> Context
+typeCheckNode currentDef idx node context =
     let
         addStackEffect ctx effects =
             { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
@@ -985,35 +998,19 @@ typeCheckNode idx node context =
                     addStackEffect context <| functionTypeToStackEffects def.type_
 
                 Nothing ->
-                    if Set.member untypedDef.name context.callStack then
-                        -- recursive definition!
-                        case TypeSignature.toMaybe untypedDef.typeSignature of
-                            Just annotatedType ->
-                                addStackEffect context <| functionTypeToStackEffects annotatedType
+                    let
+                        contextWithTypedDef =
+                            typeCheckDefinition untypedDef context
 
-                            Nothing ->
-                                let
-                                    problem =
-                                        MissingTypeAnnotationInRecursiveCallStack
-                                            (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
-                                            untypedDef.name
-                                in
-                                { context | errors = problem :: context.errors }
+                        newContext =
+                            { contextWithTypedDef | stackEffects = context.stackEffects }
+                    in
+                    case Dict.get untypedDef.name newContext.typedFunctions of
+                        Nothing ->
+                            Debug.todo "inconcievable!"
 
-                    else
-                        let
-                            contextWithTypedDef =
-                                typeCheckDefinition untypedDef context
-
-                            newContext =
-                                { contextWithTypedDef | stackEffects = context.stackEffects }
-                        in
-                        case Dict.get untypedDef.name newContext.typedFunctions of
-                            Nothing ->
-                                Debug.todo "inconcievable!"
-
-                            Just def ->
-                                addStackEffect newContext <| functionTypeToStackEffects def.type_
+                        Just def ->
+                            addStackEffect newContext <| functionTypeToStackEffects def.type_
 
         Qualifier.FunctionRef loc ref ->
             let
@@ -1021,7 +1018,7 @@ typeCheckNode idx node context =
                     context.stackEffects
 
                 contextAfterFunctionCheck =
-                    typeCheckNode idx (Qualifier.Function loc ref) context
+                    typeCheckNode currentDef idx (Qualifier.Function loc ref) context
 
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
@@ -1033,6 +1030,34 @@ typeCheckNode idx node context =
 
                 _ ->
                     Debug.todo "inconcievable!"
+
+        Qualifier.Recurse _ ->
+            case TypeSignature.toMaybe currentDef.typeSignature of
+                Just annotatedType ->
+                    addStackEffect context <| functionTypeToStackEffects annotatedType
+
+                Nothing ->
+                    let
+                        problem =
+                            MissingTypeAnnotationInRecursiveCallStack
+                                (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
+                                currentDef.name
+                    in
+                    { context | errors = problem :: context.errors }
+
+        Qualifier.Cycle _ data ->
+            case TypeSignature.toMaybe data.typeSignature of
+                Just annotatedType ->
+                    addStackEffect context <| functionTypeToStackEffects annotatedType
+
+                Nothing ->
+                    let
+                        problem =
+                            MissingTypeAnnotationInRecursiveCallStack
+                                (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
+                                data.name
+                    in
+                    { context | errors = problem :: context.errors }
 
         Qualifier.ConstructType typeDef ->
             let

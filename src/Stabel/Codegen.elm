@@ -112,18 +112,19 @@ astNodesToInstructions :
     -> List Wasm.Instruction
 astNodesToInstructions typeInfo ast def astNodes =
     astNodes
-        |> List.foldl (astNodeToCodegenNode ast) ( def.type_.input, [] )
+        |> List.foldl (astNodeToCodegenNode def ast) ( def.type_.input, [] )
         |> Tuple.second
         |> List.reverse
         |> List.map (nodeToInstruction typeInfo)
 
 
 astNodeToCodegenNode :
-    AST
+    AST.FunctionDefinition
+    -> AST
     -> AST.AstNode
     -> ( List Type, List AstNode )
     -> ( List Type, List AstNode )
-astNodeToCodegenNode ast node ( stack, result ) =
+astNodeToCodegenNode def ast node ( stack, result ) =
     let
         newNode =
             case node of
@@ -136,6 +137,15 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 AST.FunctionRef _ name ->
                     WordRef name
 
+                AST.Recurse _ ->
+                    Word def.name def.type_
+
+                AST.Cycle _ data ->
+                    Word data.name data.typeSignature
+
+                AST.Builtin _ builtin ->
+                    Builtin builtin
+
                 AST.ConstructType typeName ->
                     ConstructType typeName
 
@@ -144,9 +154,6 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.GetMember typeName memberName type_ ->
                     GetMember typeName memberName type_
-
-                AST.Builtin _ builtin ->
-                    Builtin builtin
 
         nodeType =
             case node of
@@ -160,13 +167,22 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                 AST.FunctionRef _ name ->
                     case Dict.get name ast.functions of
-                        Just def ->
+                        Just fn ->
                             { input = []
-                            , output = [ Type.FunctionSignature def.type_ ]
+                            , output = [ Type.FunctionSignature fn.type_ ]
                             }
 
                         Nothing ->
                             Debug.todo "help"
+
+                AST.Recurse _ ->
+                    def.type_
+
+                AST.Cycle _ data ->
+                    data.typeSignature
+
+                AST.Builtin _ builtin ->
+                    Builtin.functionType builtin
 
                 AST.ConstructType typeName ->
                     case Dict.get typeName ast.types of
@@ -210,9 +226,6 @@ astNodeToCodegenNode ast node ( stack, result ) =
 
                         _ ->
                             Debug.todo "help"
-
-                AST.Builtin _ builtin ->
-                    Builtin.functionType builtin
 
         typeFromTypeDef typeName gens =
             if List.isEmpty gens then
@@ -267,8 +280,8 @@ astNodeToCodegenNode ast node ( stack, result ) =
             case possibleMultiWordNode of
                 Word name _ ->
                     case Dict.get name ast.functions of
-                        Just def ->
-                            case def.implementation of
+                        Just fn ->
+                            case fn.implementation of
                                 AST.SoloImpl _ ->
                                     False
 
