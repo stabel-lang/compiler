@@ -30,6 +30,19 @@ suite =
                         """
                 in
                 QualifierUtil.expectQualification source
+        , test "Recursive function through inline function" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmulti: count-down
+                        : Int( value 0 )
+                          0
+                        : Int
+                          [ count-down ] !
+                        """
+                in
+                QualifierUtil.expectQualification source
         , test "Function cycle" <|
             \_ ->
                 let
@@ -43,6 +56,22 @@ suite =
                           0
                         : Int
                           dec-down
+                        """
+                in
+                QualifierUtil.expectQualification source
+        , test "Function cycle with inline function" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: dec-down
+                        : 1 - count-down 
+
+                        defmulti: count-down
+                        : Int( value 0 )
+                          0
+                        : Int
+                          [ dec-down ] !
                         """
                 in
                 QualifierUtil.expectQualification source
