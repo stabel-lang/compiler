@@ -4,7 +4,13 @@ const stripIndent = require('strip-indent');
 
 exports.toWat = function toWat(entry, sourceCode) {
     return new Promise((resolve, reject) => {
-        const compiler = Compiler.Elm.TestCompiler.init({});
+        const compiler = Compiler.Elm.TestCompiler.init({
+            flags: {
+                __type: 'CompileString',
+                entryPoint: entry,
+                sourceCode: stripIndent(sourceCode)
+            }
+        });
 
         compiler.ports.compileFinished.subscribe(([ok, output]) => {
             if (ok) {
@@ -13,13 +19,30 @@ exports.toWat = function toWat(entry, sourceCode) {
                 reject(output);
             }
         });
-
-        compiler.ports.compileString.send([entry, stripIndent(sourceCode)]);
     });
 }
 
-exports.toProjectWat = function toWat(entry, sourceCode) {
-    /* TODO */
+exports.toProjectWat = function toWat(payload) {
+    return new Promise((resolve, reject) => {
+        const compiler = Compiler.Elm.TestCompiler.init({
+            flags: {
+                __type: 'CompileProject',
+                entryPoint: payload.entryPoint,
+                modules: payload.modules.map((mod) => {
+                    mod.source = stripIndent(mod.source)
+                    return mod
+                })
+            }
+        });
+
+        compiler.ports.compileFinished.subscribe(([ok, output]) => {
+            if (ok) {
+                resolve(output);
+            } else {
+                reject(output);
+            }
+        });
+    });
 }
 
 exports.run = async function run(wat, functionName) {

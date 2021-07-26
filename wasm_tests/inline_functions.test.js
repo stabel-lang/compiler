@@ -35,7 +35,7 @@ test('Basic quotation with type signature', async () => {
 });
 
 test('Can reference function inline before it\'s defined', async () => {
-    const wat = await compiler.toWat('main', `
+    const wat = await compiler.toWat('a', `
         def: a
         : 1 [ inc ] !
 
@@ -43,7 +43,7 @@ test('Can reference function inline before it\'s defined', async () => {
         : 1 +
     `);
 
-    const result = await compiler.run(wat, 'main');
+    const result = await compiler.run(wat, 'a');
 
     expect(result.stackElement()).toBe(2);
 });

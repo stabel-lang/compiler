@@ -27,9 +27,9 @@ test('Struct with annotations', async () => {
         : drop 1
     `);
 
-    const result = await.compiler.run(wat, 'main');
+    const result = await compiler.run(wat, 'main');
 
-    expect(result).toBe(1);
+    expect(result.stackElement()).toBe(1);
 });
 
 test('Compound type', async () => {

@@ -1,6 +1,7 @@
 port module TestCompiler exposing (main)
 
 import Dict
+import Json.Decode as Json
 import Platform exposing (Program)
 import Set
 import Stabel.Codegen as Codegen
@@ -41,19 +42,77 @@ type alias ModuleSource =
     }
 
 
-main : Program CompileStringOpts Model msg
+
+-- Json Decoding --
+
+
+decodeInput : Json.Value -> Result Json.Error Input
+decodeInput json =
+    Json.decodeValue inputDecoder json
+
+
+inputDecoder : Json.Decoder Input
+inputDecoder =
+    let
+        specializedDecoder type_ =
+            case String.toUpper type_ of
+                "COMPILESTRING" ->
+                    compileStringOptsDecoder
+
+                "COMPILEPROJECT" ->
+                    compileProjectOptsDecoder
+
+                _ ->
+                    Json.fail <| "Unknown compilation mode: " ++ type_
+    in
+    Json.field "__type" Json.string
+        |> Json.andThen specializedDecoder
+
+
+compileStringOptsDecoder : Json.Decoder Input
+compileStringOptsDecoder =
+    Json.map CompileString <|
+        Json.map2 CompileStringOpts
+            (Json.field "entryPoint" Json.string)
+            (Json.field "sourceCode" Json.string)
+
+
+compileProjectOptsDecoder : Json.Decoder Input
+compileProjectOptsDecoder =
+    Json.map CompileProject <|
+        Json.map2 CompileProjectOpts
+            (Json.field "entryPoint" Json.string)
+            (Json.field "modules" (Json.list moduleSourceDecoder))
+
+
+moduleSourceDecoder : Json.Decoder ModuleSource
+moduleSourceDecoder =
+    Json.map3 ModuleSource
+        (Json.field "package" Json.string)
+        (Json.field "module" Json.string)
+        (Json.field "source" Json.string)
+
+
+
+-- Main Logic --
+
+
+main : Program Json.Value Model msg
 main =
     Platform.worker
-        { init = \input -> ( (), init (CompileString input) )
+        { init = \input -> ( (), init input )
         , update = \_ _ -> ( (), Cmd.none )
         , subscriptions = always Sub.none
         }
 
 
-init : Input -> Cmd msg
+init : Json.Value -> Cmd msg
 init input =
-    case input of
-        CompileString opts ->
+    case decodeInput input of
+        Err err ->
+            compileFailed <| "Something is wrong with the input: " ++ Json.errorToString err
+
+        Ok (CompileString opts) ->
             case compileString opts of
                 Ok wasm ->
                     compileSucceded wasm
@@ -61,7 +120,7 @@ init input =
                 Err errmsg ->
                     compileFailed errmsg
 
-        CompileProject opts ->
+        Ok (CompileProject opts) ->
             case compileProject opts of
                 Ok wasm ->
                     compileSucceded wasm

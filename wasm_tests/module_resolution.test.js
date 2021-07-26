@@ -1,3 +1,5 @@
+const compiler = require('./compiler.wrapper');
+
 test('Internal package functions', async () => {
     const entryPoint = '/author/sample/core/main'
     const wat = await compiler.toProjectWat({
