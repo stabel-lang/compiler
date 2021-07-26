@@ -192,7 +192,7 @@ compileProject opts =
     in
     case parserResult of
         Err errs ->
-            Err <| "Parse error: " ++ Debug.toString errs
+            formatErrors (ParserProblem.toString "") errs
 
         Ok withAst ->
             let
