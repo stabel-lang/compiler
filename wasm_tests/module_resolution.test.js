@@ -91,7 +91,7 @@ test('Internal package type', async () => {
     expect(result.stackElement()).toBe(100);
 });
 
-test('External package functons', async () => {
+test('External package functions', async () => {
     const entryPoint = '/author/sample/core/main'
     const wat = await compiler.toProjectWat({
         entryPoint: entryPoint, 
@@ -376,7 +376,7 @@ test('Defined module requires explicit exports', async () => {
                 module: 'ext',
                 source: `
                     defmodule:
-                    expose: fn1
+                    exposing: fn1
                     :
 
                     def: fn1
@@ -388,7 +388,7 @@ test('Defined module requires explicit exports', async () => {
                 module: 'internal',
                 source: `
                     defmodule:
-                    expose: fn2
+                    exposing: fn2
                     :
 
                     def: fn2
@@ -459,7 +459,7 @@ test('Implicit import on stdlib in defined modules', async () => {
                 module: 'core',
                 source: `
                     defmodule:
-                    expose: main
+                    exposing: main
                     :
 
                     def: main

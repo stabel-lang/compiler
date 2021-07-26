@@ -153,7 +153,8 @@ test('Generic case', async () => {
         defmulti: with-default
         : a
           drop
-        else: swap drop
+        : Nothing
+          swap drop
 
         def: main
         : 5
@@ -168,6 +169,36 @@ test('Generic case', async () => {
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(15);
+});
+
+test('Generic case with else keyword', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Maybe a
+        : a
+        : Nothing
+
+        defstruct: Nothing
+
+        defmulti: with-default
+        type: (Maybe a) a -- a
+        : a
+          drop
+        else: 
+          swap drop
+
+        def: main
+        : 5
+          15 with-default
+
+          Nothing
+          2 with-default
+
+          +
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(7);
 });
 
 test('Unions as struct member', async () => {

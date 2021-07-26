@@ -357,11 +357,6 @@ checkForError pred sources =
                         Expect.fail <| "Failed for unknown qualification error: " ++ Debug.toString errs
 
 
-mapThird : (c -> d) -> ( a, b, c ) -> ( a, b, d )
-mapThird fn ( a, b, c ) =
-    ( a, b, fn c )
-
-
 collectErrors :
     List ( a, b, Result e o )
     -> Result (List e) (List ( a, b, o ))

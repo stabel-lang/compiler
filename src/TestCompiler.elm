@@ -3,9 +3,11 @@ port module TestCompiler exposing (main)
 import Dict
 import Json.Decode as Json
 import Platform exposing (Program)
+import Result.Extra as Result
 import Set
 import Stabel.Codegen as Codegen
 import Stabel.Parser as Parser
+import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.Problem as ParserProblem
 import Stabel.Qualifier as Qualifier
 import Stabel.Qualifier.Problem as QualifierProblem
@@ -143,11 +145,7 @@ compileString opts =
                         , modulePath = ""
                         , ast = ast
                         , externalModules = Dict.empty
-                        , inProgressAST =
-                            { types = Dict.empty
-                            , functions = Dict.empty
-                            , referenceableFunctions = Set.empty
-                            }
+                        , inProgressAST = emptyQualifierAst
                         }
 
                 exportedFunctions =
@@ -168,9 +166,106 @@ compileString opts =
                                 |> Ok
 
 
+emptyQualifierAst : Qualifier.AST
+emptyQualifierAst =
+    { types = Dict.empty
+    , functions = Dict.empty
+    , referenceableFunctions = Set.empty
+    }
+
+
 compileProject : CompileProjectOpts -> Result String Wasm.Module
 compileProject opts =
-    Debug.todo "TODO"
+    let
+        parserResult =
+            opts.modules
+                |> List.map parseModuleSource
+                |> Result.combine
+
+        parseModuleSource mod =
+            case Parser.run mod.modulePath mod.source of
+                Err err ->
+                    Err err
+
+                Ok ast ->
+                    Ok ( mod.package, mod.modulePath, ast )
+    in
+    case parserResult of
+        Err errs ->
+            Err <| "Parse error: " ++ Debug.toString errs
+
+        Ok withAst ->
+            let
+                initialConfig =
+                    { packageName = ""
+                    , modulePath = ""
+                    , ast =
+                        { sourceReference = "test"
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions = Dict.empty
+                        }
+                    , externalModules = Dict.empty
+                    , inProgressAST = emptyQualifierAst
+                    }
+
+                qualifierResult =
+                    List.foldl qualifyTestTuples ( [], initialConfig ) withAst
+
+                exportedFunctions =
+                    Set.singleton opts.entryPoint
+            in
+            case qualifierResult of
+                ( (_ :: _) as qualifierErrors, _ ) ->
+                    formatErrors (QualifierProblem.toString "") qualifierErrors
+
+                ( _, qualifiedAst ) ->
+                    case TypeChecker.run qualifiedAst.inProgressAST of
+                        Err typeErrors ->
+                            formatErrors (TypeCheckerProblem.toString "") typeErrors
+
+                        Ok typedAst ->
+                            typedAst
+                                |> Codegen.run exportedFunctions
+                                |> Ok
+
+
+qualifyTestTuples :
+    ( String, String, Parser.AST )
+    -> ( List QualifierProblem.Problem, Qualifier.RunConfig )
+    -> ( List QualifierProblem.Problem, Qualifier.RunConfig )
+qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
+    let
+        updatedConfig =
+            { config
+                | packageName = packageName
+                , modulePath = modulePath
+                , ast = parserAst
+            }
+    in
+    case Qualifier.run updatedConfig of
+        Err errs ->
+            ( errs ++ problems, updatedConfig )
+
+        Ok qualifiedAST ->
+            let
+                inProgressAST =
+                    updatedConfig.inProgressAST
+
+                updatedInProgressAst =
+                    { inProgressAST
+                        | types = Dict.union qualifiedAST.types inProgressAST.types
+                        , functions = Dict.union qualifiedAST.functions inProgressAST.functions
+                        , referenceableFunctions = Set.union qualifiedAST.referenceableFunctions inProgressAST.referenceableFunctions
+                    }
+
+                configWithQualifiedAst =
+                    { updatedConfig
+                        | inProgressAST = updatedInProgressAst
+                        , externalModules = Dict.insert ("/" ++ modulePath) packageName updatedConfig.externalModules
+                    }
+            in
+            ( problems, configWithQualifiedAst )
 
 
 formatErrors : (a -> String) -> List a -> Result String b
