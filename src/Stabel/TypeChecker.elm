@@ -1322,14 +1322,49 @@ compatibleTypes context typeA typeB =
                         , lengthTest && allMembersTest
                         )
 
-                    ( Type.Union _ _, _ ) ->
-                        -- Cannot go from union to concrete type
-                        ( context, False )
+                    ( Type.Union _ unionTypes, rhs ) ->
+                        -- Cannot normally go from union to concrete type
+                        -- Special case: all generic members of union are bound to same type
+                        case unionTypes of
+                            [] ->
+                                ( context, False )
+
+                            firstType :: rest ->
+                                let
+                                    ( finalCtx, allBoundToSame ) =
+                                        List.foldl helper ( context, True ) rest
+
+                                    helper t ( ctx, oldTruth ) =
+                                        let
+                                            ( newCtx, thisTruth ) =
+                                                compatibleTypes context firstType t
+                                        in
+                                        ( newCtx, oldTruth && thisTruth )
+                                in
+                                if allBoundToSame then
+                                    compatibleTypes finalCtx firstType rhs
+
+                                else
+                                    ( context, False )
 
                     ( lhsType, Type.Union _ unionTypes ) ->
-                        List.map (compatibleTypes context lhsType) unionTypes
-                            |> List.find Tuple.second
-                            |> Maybe.withDefault ( context, False )
+                        let
+                            ( generics, nonGenerics ) =
+                                List.partition Type.isGeneric unionTypes
+
+                            ( nonGenericContext, compatibleNonGenericMember ) =
+                                findCompatibleMember nonGenerics
+
+                            findCompatibleMember members =
+                                List.map (compatibleTypes context lhsType) members
+                                    |> List.find Tuple.second
+                                    |> Maybe.withDefault ( context, False )
+                        in
+                        if compatibleNonGenericMember then
+                            ( nonGenericContext, True )
+
+                        else
+                            findCompatibleMember generics
 
                     ( Type.CustomGeneric lName lMembers, Type.CustomGeneric rName rMembers ) ->
                         let

@@ -144,10 +144,6 @@ test('Recursive match reverse case', async () => {
 
 test('Generic case', async () => {
     const wat = await compiler.toWat('main', `
-        defunion: Maybe a
-        : a
-        : Nothing
-
         defstruct: Nothing
 
         defmulti: with-default
@@ -171,7 +167,37 @@ test('Generic case', async () => {
     expect(result.stackElement()).toBe(15);
 });
 
-test('Generic case with else keyword', async () => {
+test('Generic case with type annotations', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Maybe a
+        : a
+        : Nothing
+
+        defstruct: Nothing
+
+        defmulti: with-default
+        type: (Maybe a) a -- a
+        : a
+          drop
+        : Nothing
+          swap drop
+
+        def: main
+        : 5
+          10 with-default
+
+          Nothing
+          10 with-default
+
+          +
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(15);
+});
+
+test('Generic case with type annotations and else keyword', async () => {
     const wat = await compiler.toWat('main', `
         defunion: Maybe a
         : a
