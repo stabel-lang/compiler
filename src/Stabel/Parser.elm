@@ -780,6 +780,22 @@ multiFunctionMetadataParser def =
                 |. Parser.keyword (Token "else:" UnknownError)
                 |. noiseParser
                 |= implementationParser
+        , Parser.inContext AliasKeyword <|
+            Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |. Parser.keyword (Token "alias:" UnknownError)
+                |. noiseParser
+                |= symbolParser
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+        , Parser.inContext ImportKeyword <|
+            Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
+                |. Parser.keyword (Token "import:" UnknownError)
+                |. noiseParser
+                |= modulePathStringParser
+                |. noiseParser
+                |= Parser.loop [] symbolImplListParser
+                |. noiseParser
         , Parser.inContext ImplementationKeyword <|
             Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
                 |. Parser.keyword (Token ":" UnknownError)
@@ -1057,7 +1073,7 @@ qualifiedSymbolImplParser =
             if checkForUpperCaseLetterInPath path then
                 Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
 
-            else if List.length path <= 1 then
+            else if List.length path == 0 then
                 Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path ++ "/" ++ reference
 
             else

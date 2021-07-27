@@ -133,4 +133,84 @@ suite =
                             |> addFunctionsForStructs
                 in
                 expectAst source expectedAst
+        , test "Multifunctions can have its own aliases and imports" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmulti: with-default
+                        alias: other /some/mod
+                        alias: moar local/mod
+                        import: /some/other/mod test1 word2
+                        import: internals foo
+                        import: internal/mod
+                        : a
+                          drop
+                        else:
+                          swap drop
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "with-default"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases =
+                                        Dict.fromList
+                                            [ ( "other", "/some/mod" )
+                                            , ( "moar", "local/mod" )
+                                            ]
+                                  , imports =
+                                        Dict.fromList
+                                            [ ( "/some/other/mod", [ "test1", "word2" ] )
+                                            , ( "internals", [ "foo" ] )
+                                            , ( "internal/mod", [] )
+                                            ]
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( AST.TypeMatch emptyRange (Generic "a") []
+                                              , [ AST.Function emptyRange "drop" ]
+                                              )
+                                            ]
+                                            [ AST.Function emptyRange "swap"
+                                            , AST.Function emptyRange "drop"
+                                            ]
+                                  }
+                                ]
+                        }
+                            |> addFunctionsForStructs
+                in
+                expectAst source expectedAst
+        , test "external reference path can be single module" <|
+            \_ ->
+                let
+                    source =
+                        """
+                            def: test
+                            : /ext/fn1
+                            """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "test"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.ExternalFunction emptyRange [ "ext" ] "fn1" ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst source expectedAst
         ]
