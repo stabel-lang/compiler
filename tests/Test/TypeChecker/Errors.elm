@@ -91,42 +91,56 @@ suite =
                                 False
                 in
                 checkForError typeError input
-        , test "An inferred concrete output type should not successfully type check against a generic variable, multi-fn" <|
+        , test "An inferred concrete struct input type should not successfully type check against a generic struct" <|
             \_ ->
                 let
                     input =
                         """
-                        defunion: List a
-                        : NonEmptyList a 
-                        : EmptyList
+                        defstruct: Box a
+                        : value a
 
-                        defstruct: NonEmptyList a
-                        : first a
-                        : rest List a
-
-                        defstruct: EmptyList
-
-                        def: sum
-                        : 0 sum-helper
-
-                        defmulti: sum-helper
-                        type: (List a) Int -- Int
-                        : NonEmptyList
-                          swap dup first>
-                          rotate rest> 
-                          rotate + 
-                          sum-helper
-                        : EmptyList
-                          swap drop
+                        def: box-inc
+                        type: (Box a) -- Int
+                        : value> 1 +
 
                         def: main
-                        : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
-                        sum
+                        : 1 >Box box-inc
                         """
 
                     typeError problem =
                         case problem of
-                            Problem.TypeError _ "sum-helper" _ _ ->
+                            Problem.TypeError _ "box-inc" _ _ ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError typeError input
+        , test "An inferred concrete union input type should not successfully type check against a generic union" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defunion: Maybe a
+                        : a
+                        : Nothing
+
+                        defstruct: Nothing
+
+                        defmulti: maybe-inc
+                        type: (Maybe a) -- Int
+                        : a
+                          1 +
+                        : Nothing
+                          drop 0
+
+                        def: main
+                        : 1 maybe-inc
+                        """
+
+                    typeError problem =
+                        case problem of
+                            Problem.TypeError _ "maybe-inc" _ _ ->
                                 True
 
                             _ ->
