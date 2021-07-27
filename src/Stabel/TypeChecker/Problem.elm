@@ -44,7 +44,7 @@ toString source problem =
                 ++ name
                 ++ "'.\n\nExpected:\n\n"
                 ++ Type.toDisplayString expected
-                ++ "\n\nActual:\n"
+                ++ "\n\nActual:\n\n"
                 ++ Type.toDisplayString actual
 
         InconsistentWhens range name ->

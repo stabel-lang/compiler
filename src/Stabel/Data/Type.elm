@@ -150,8 +150,11 @@ toDisplayString t =
         Custom name ->
             name
 
-        CustomGeneric name _ ->
+        CustomGeneric name [] ->
             name
+
+        CustomGeneric name gens ->
+            name ++ "<" ++ String.join ", " (List.map toDisplayString gens) ++ ">"
 
         Union (Just name) _ ->
             name

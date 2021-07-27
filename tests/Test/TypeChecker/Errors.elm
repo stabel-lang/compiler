@@ -91,6 +91,48 @@ suite =
                                 False
                 in
                 checkForError typeError input
+        , test "An inferred concrete output type should not successfully type check against a generic variable, multi-fn" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defunion: List a
+                        : NonEmptyList a 
+                        : EmptyList
+
+                        defstruct: NonEmptyList a
+                        : first a
+                        : rest List a
+
+                        defstruct: EmptyList
+
+                        def: sum
+                        : 0 sum-helper
+
+                        defmulti: sum-helper
+                        type: (List a) Int -- Int
+                        : NonEmptyList
+                          swap dup first>
+                          rotate rest> 
+                          rotate + 
+                          sum-helper
+                        : EmptyList
+                          swap drop
+
+                        def: main
+                        : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+                        sum
+                        """
+
+                    typeError problem =
+                        case problem of
+                            Problem.TypeError _ "sum-helper" _ _ ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError typeError input
         , test "An inferred union output type should not successfully type check against a generic variable" <|
             \_ ->
                 let

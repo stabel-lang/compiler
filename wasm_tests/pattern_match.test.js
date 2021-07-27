@@ -261,3 +261,28 @@ test('Unions as struct member', async () => {
 
     expect(result.stackElement()).toBe(20);
 });
+
+test('Generic struct as pattern match conditional', async () => {
+    const wat = await compiler.toWat('main', `
+        defstruct: Box a
+        : value BoxGen a
+
+        defstruct: BoxGen a
+        : value-g a
+
+        defmulti: zero?
+        type: (Box Int) -- Int
+        : Box( value BoxGen( value-g 0 ) )
+          drop 1
+        else: 
+          drop 0
+
+        def: main
+        : 0 >BoxGen >Box
+          zero?
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});
