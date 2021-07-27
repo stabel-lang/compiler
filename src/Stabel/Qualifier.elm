@@ -238,27 +238,9 @@ resolveUnion typeDefs type_ =
                 Just result ->
                     case result.members of
                         UnionMembers members ->
-                            let
-                                genericsMap =
-                                    List.map2 Tuple.pair result.generics types
-                                        |> Dict.fromList
-
-                                rebindGenerics t =
-                                    case t of
-                                        Type.Generic val ->
-                                            Dict.get val genericsMap
-                                                |> Maybe.withDefault t
-
-                                        Type.CustomGeneric cgName cgMembers ->
-                                            Type.CustomGeneric cgName <|
-                                                List.map rebindGenerics cgMembers
-
-                                        _ ->
-                                            t
-                            in
                             Type.Union
                                 (Just typeName)
-                                (List.map rebindGenerics members)
+                                (rebindGenerics result.generics types members)
 
                         _ ->
                             type_
@@ -268,6 +250,33 @@ resolveUnion typeDefs type_ =
 
         _ ->
             type_
+
+
+rebindGenerics : List String -> List Type -> List Type -> List Type
+rebindGenerics genericNames types members =
+    let
+        genericsMap =
+            List.map2 Tuple.pair genericNames types
+                |> Dict.fromList
+
+        rebindGenericsHelper t =
+            case t of
+                Type.Generic val ->
+                    Dict.get val genericsMap
+                        |> Maybe.withDefault t
+
+                Type.CustomGeneric cgName cgMembers ->
+                    Type.CustomGeneric cgName <|
+                        List.map rebindGenericsHelper cgMembers
+
+                Type.Union uName uMembers ->
+                    Type.Union uName <|
+                        List.map rebindGenericsHelper uMembers
+
+                _ ->
+                    t
+    in
+    List.map rebindGenericsHelper members
 
 
 qualifyType :
@@ -386,6 +395,10 @@ qualifyMemberType config modRefs range type_ =
                 maybeType =
                     Dict.get name config.inProgressAST.types
 
+                genericNames =
+                    Maybe.map .generics maybeType
+                        |> Maybe.withDefault []
+
                 maybeMembers =
                     Maybe.map .members maybeType
 
@@ -410,8 +423,8 @@ qualifyMemberType config modRefs range type_ =
                 ( True, Just (StructMembers _), Ok qualifiedBinds ) ->
                     Ok <| Type.CustomGeneric name qualifiedBinds
 
-                ( True, Just (UnionMembers members), _ ) ->
-                    Ok <| Type.Union (Just name) members
+                ( True, Just (UnionMembers members), Ok qualifiedBinds ) ->
+                    Ok <| Type.Union (Just name) (rebindGenerics genericNames qualifiedBinds members)
 
         importsLookup name binds =
             case resolveImportedType config modRefs name of

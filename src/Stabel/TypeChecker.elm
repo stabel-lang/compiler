@@ -444,14 +444,33 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 TypeSignature.UserProvided wt ->
                     TypeSignature.UserProvided <|
                         case wt.input of
-                            _ :: rest ->
-                                { wt | input = t :: rest }
+                            firstAnnotatedType :: rest ->
+                                { wt | input = resolveFirstType firstAnnotatedType t :: rest }
 
                             _ ->
                                 wt
 
                 x ->
                     x
+
+        resolveFirstType : Type -> Type -> Type
+        resolveFirstType annotatedType typeMatchType =
+            case ( annotatedType, typeMatchType ) of
+                ( Type.Union _ unionMembers, Type.CustomGeneric name _ ) ->
+                    List.find (matchingCustomGenericType name) unionMembers
+                        |> Maybe.withDefault typeMatchType
+
+                _ ->
+                    typeMatchType
+
+        matchingCustomGenericType : String -> Type -> Bool
+        matchingCustomGenericType nameToMatch tipe =
+            case tipe of
+                Type.CustomGeneric name _ ->
+                    name == nameToMatch
+
+                _ ->
+                    False
 
         ( inf, newCtx ) =
             typeCheckImplementation untypedDef alteredTypeSignature im (cleanContext ctx)
