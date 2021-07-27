@@ -1212,8 +1212,8 @@ functionTypeFromStackEffectsHelper untypedDef effects ( context, functionType ) 
             UnexpectedType
                 (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                 untypedDef.name
-                (Maybe.withDefault expected (getGenericBinding context expected))
-                (Maybe.withDefault actual (getGenericBinding context actual))
+                (resolveType context expected)
+                (resolveType context actual)
     in
     case effects of
         [] ->
@@ -1446,8 +1446,25 @@ getGenericBinding context type_ =
                 otherwise ->
                     otherwise
 
+        Type.Union name members ->
+            members
+                |> List.map (resolveType context)
+                |> Type.Union name
+                |> Just
+
+        Type.CustomGeneric name members ->
+            members
+                |> List.map (resolveType context)
+                |> Type.CustomGeneric name
+                |> Just
+
         _ ->
             Just type_
+
+
+resolveType : Context -> Type -> Type
+resolveType context t =
+    Maybe.withDefault t (getGenericBinding context t)
 
 
 bindGeneric : Type -> Type -> Context -> Context
