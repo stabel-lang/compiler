@@ -675,6 +675,20 @@ joinOutputs outputs result =
                             else
                                 Type.Union Nothing (lhsMems ++ rhsMems)
 
+                        ( Type.Union _ lhsMems, _ ) ->
+                            if List.member rhs lhsMems then
+                                lhs
+
+                            else
+                                Type.Union Nothing (rhs :: lhsMems)
+
+                        ( _, Type.Union _ rhsMems ) ->
+                            if List.member lhs rhsMems then
+                                rhs
+
+                            else
+                                Type.Union Nothing (lhs :: rhsMems)
+
                         _ ->
                             if lhs == rhs then
                                 lhs
