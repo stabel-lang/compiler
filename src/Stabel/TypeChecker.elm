@@ -1198,8 +1198,8 @@ functionTypeFromStackEffectsHelper untypedDef effects ( context, functionType ) 
             UnexpectedType
                 (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                 untypedDef.name
-                expected
-                actual
+                (Maybe.withDefault expected (getGenericBinding context expected))
+                (Maybe.withDefault actual (getGenericBinding context actual))
     in
     case effects of
         [] ->
