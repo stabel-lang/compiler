@@ -1012,7 +1012,7 @@ verifyTypeSignature inferredType untypedDef context =
         Just annotatedType ->
             let
                 simplifiedAnnotatedType =
-                    Tuple.first <| simplifyFunctionType ( annotatedType, context )
+                    simplifyFunctionTypeGenerics annotatedType
             in
             if not <| Type.compatibleFunctions simplifiedAnnotatedType inferredType then
                 let
@@ -1594,49 +1594,74 @@ simplifyFunctionType ( functionType, context ) =
 
                 _ ->
                     type_
-
-        renameGenerics type_ ( nextId, seenGenerics, acc ) =
-            case type_ of
-                Type.Generic genName ->
-                    case Dict.get genName seenGenerics of
-                        Just newName ->
-                            ( nextId, seenGenerics, Type.Generic newName :: acc )
-
-                        Nothing ->
-                            let
-                                newName =
-                                    String.fromChar nextId
-                            in
-                            ( nextId
-                                |> Char.toCode
-                                |> (+) 1
-                                |> Char.fromCode
-                            , Dict.insert genName newName seenGenerics
-                            , Type.Generic newName :: acc
-                            )
-
-                Type.Union name members ->
-                    let
-                        ( newNextId, newSeenGenerics, newMembers ) =
-                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
-                    in
-                    ( newNextId, newSeenGenerics, Type.Union name newMembers :: acc )
-
-                Type.CustomGeneric name members ->
-                    let
-                        ( newNextId, newSeenGenerics, newMembers ) =
-                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
-                    in
-                    ( newNextId, newSeenGenerics, Type.CustomGeneric name newMembers :: acc )
-
-                _ ->
-                    ( nextId, seenGenerics, type_ :: acc )
     in
     ( { input = List.take inputLength newSignature
       , output = List.drop inputLength newSignature
       }
     , context
     )
+
+
+simplifyFunctionTypeGenerics : FunctionType -> FunctionType
+simplifyFunctionTypeGenerics functionType =
+    let
+        oldSignature =
+            functionType.input ++ functionType.output
+
+        inputLength =
+            List.length functionType.input
+
+        newSignature =
+            oldSignature
+                |> List.foldl renameGenerics ( 'a', Dict.empty, [] )
+                |> (\( _, _, ns ) -> ns)
+                |> List.reverse
+    in
+    { input = List.take inputLength newSignature
+    , output = List.drop inputLength newSignature
+    }
+
+
+renameGenerics :
+    Type
+    -> ( Char, Dict String String, List Type )
+    -> ( Char, Dict String String, List Type )
+renameGenerics type_ ( nextId, seenGenerics, acc ) =
+    case type_ of
+        Type.Generic genName ->
+            case Dict.get genName seenGenerics of
+                Just newName ->
+                    ( nextId, seenGenerics, Type.Generic newName :: acc )
+
+                Nothing ->
+                    let
+                        newName =
+                            String.fromChar nextId
+                    in
+                    ( nextId
+                        |> Char.toCode
+                        |> (+) 1
+                        |> Char.fromCode
+                    , Dict.insert genName newName seenGenerics
+                    , Type.Generic newName :: acc
+                    )
+
+        Type.Union name members ->
+            let
+                ( newNextId, newSeenGenerics, newMembers ) =
+                    List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
+            in
+            ( newNextId, newSeenGenerics, Type.Union name newMembers :: acc )
+
+        Type.CustomGeneric name members ->
+            let
+                ( newNextId, newSeenGenerics, newMembers ) =
+                    List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
+            in
+            ( newNextId, newSeenGenerics, Type.CustomGeneric name newMembers :: acc )
+
+        _ ->
+            ( nextId, seenGenerics, type_ :: acc )
 
 
 findAliases : Context -> String -> ( String, List String )

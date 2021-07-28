@@ -91,6 +91,25 @@ suite =
                                 False
                 in
                 checkForError typeError input
+        , test "An inferred concrete input type should not successfully type check against a generic variable" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        def: main
+                        type: in -- Int
+                        : 1 +
+                        """
+
+                    typeError problem =
+                        case problem of
+                            Problem.TypeError _ "main" _ _ ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError typeError input
         , test "An inferred concrete struct input type should not successfully type check against a generic struct" <|
             \_ ->
                 let
