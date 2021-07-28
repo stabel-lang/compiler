@@ -159,7 +159,7 @@ suite =
 
                     typeError problem =
                         case problem of
-                            Problem.TypeError _ "maybe-inc" _ _ ->
+                            Problem.InconsistentWhens _ "maybe-inc" ->
                                 True
 
                             _ ->

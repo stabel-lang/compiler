@@ -821,10 +821,10 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
 
 
 patternMatchIsCompatibleWithInferredType : ( Qualifier.TypeMatch, FunctionType ) -> Bool
-patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ forType _, inf ) =
+patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ typeMatchType _, inf ) =
     case inf.input of
-        firstInput :: _ ->
-            Type.genericlyCompatible firstInput forType
+        inferredType :: _ ->
+            Type.genericlyCompatible typeMatchType inferredType
 
         [] ->
             False

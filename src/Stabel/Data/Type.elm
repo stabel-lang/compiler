@@ -81,8 +81,11 @@ referencedGenerics t =
 genericlyCompatible : Type -> Type -> Bool
 genericlyCompatible lhs rhs =
     case ( lhs, rhs ) of
-        ( Generic _, _ ) ->
+        ( Generic _, Generic _ ) ->
             True
+
+        ( Generic _, _ ) ->
+            False
 
         ( _, Generic _ ) ->
             True
