@@ -1162,20 +1162,12 @@ getStructMembers typeDef =
 
 getStructType : TypeDefinition -> Type
 getStructType typeDef =
-    let
-        memberTypes =
-            getStructMembers typeDef
-                |> List.map Tuple.second
-
-        genericMembers =
-            List.filter Type.isGeneric memberTypes
-    in
-    case genericMembers of
+    case typeDef.generics of
         [] ->
             Type.Custom typeDef.name
 
-        _ ->
-            Type.CustomGeneric typeDef.name genericMembers
+        gens ->
+            Type.CustomGeneric typeDef.name (List.map Type.Generic gens)
 
 
 tagGenericEffect : Int -> StackEffect -> StackEffect
