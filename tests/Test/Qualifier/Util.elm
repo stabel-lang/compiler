@@ -19,6 +19,7 @@ import Stabel.Qualifier as AST
         , Node(..)
         , TypeDefinition
         , TypeMatch(..)
+        , TypeMatchCond(..)
         , TypeMatchValue(..)
         )
 
@@ -161,7 +162,12 @@ stripMultiWordBranchLocation ( typeMatch, nodes ) =
 stripTypeMatchLocation : TypeMatch -> TypeMatch
 stripTypeMatchLocation (TypeMatch _ type_ otherConds) =
     TypeMatch emptyRange type_ <|
-        List.map (Tuple.mapSecond stripRecursiveTypeMatchLocation) otherConds
+        List.map (mapTypeMatchCondValue stripRecursiveTypeMatchLocation) otherConds
+
+
+mapTypeMatchCondValue : (TypeMatchValue -> TypeMatchValue) -> TypeMatchCond -> TypeMatchCond
+mapTypeMatchCondValue fn (TypeMatchCond name tipe val) =
+    TypeMatchCond name tipe (fn val)
 
 
 stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue

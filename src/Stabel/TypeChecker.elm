@@ -333,7 +333,7 @@ typeCheckMultiImplementation :
     -> Context
 typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     let
-        whens =
+        allBranches =
             case defaultImpl of
                 [] ->
                     initialWhens
@@ -356,11 +356,14 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         firstType :: _ ->
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
+        whens =
+            List.map (Tuple.mapFirst resolveWhenConditions) allBranches
+
         ( inferredWhenTypes, newContext ) =
             whens
                 |> List.foldr (inferWhenTypes untypedDef) ( [], context )
                 |> Tuple.mapFirst normalizeWhenTypes
-                |> (\( wts, ctx ) -> simplifyWhenFunctionTypes wts ctx)
+                |> simplifyWhenFunctionTypes
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (List.map (constrainGenerics untypedDef.typeSignature))
@@ -432,6 +435,85 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         |> cleanContext
 
 
+resolveWhenConditions : Qualifier.TypeMatch -> Qualifier.TypeMatch
+resolveWhenConditions ((Qualifier.TypeMatch loc typeMatch conds) as match) =
+    case typeMatch of
+        Type.CustomGeneric structName structGenerics ->
+            let
+                bindings =
+                    List.foldl whenConditionsGenericBindings Dict.empty conds
+            in
+            Qualifier.TypeMatch
+                loc
+                (Type.CustomGeneric
+                    structName
+                    (List.map (bindGenericsInType bindings) structGenerics)
+                )
+                (List.map (whenConditionsBindGenerics bindings) conds)
+
+        _ ->
+            match
+
+
+whenConditionsGenericBindings : Qualifier.TypeMatchCond -> Dict String Type -> Dict String Type
+whenConditionsGenericBindings (Qualifier.TypeMatchCond _ fieldType value) bindings =
+    case ( fieldType, value ) of
+        ( Type.Generic genericName, Qualifier.LiteralInt _ ) ->
+            Dict.insert genericName Type.Int bindings
+
+        ( Type.Generic genericName, Qualifier.LiteralType t ) ->
+            Dict.insert genericName t bindings
+
+        ( _, Qualifier.RecursiveMatch (Qualifier.TypeMatch _ _ subConds) ) ->
+            List.foldl whenConditionsGenericBindings bindings subConds
+
+        _ ->
+            bindings
+
+
+whenConditionsBindGenerics : Dict String Type -> Qualifier.TypeMatchCond -> Qualifier.TypeMatchCond
+whenConditionsBindGenerics bindings (Qualifier.TypeMatchCond fieldName fieldType value) =
+    let
+        boundValue =
+            case value of
+                Qualifier.LiteralType t ->
+                    Qualifier.LiteralType <| bindGenericsInType bindings t
+
+                Qualifier.RecursiveMatch (Qualifier.TypeMatch subLoc subType subConds) ->
+                    Qualifier.RecursiveMatch <|
+                        Qualifier.TypeMatch
+                            subLoc
+                            (bindGenericsInType bindings subType)
+                            (List.map (whenConditionsBindGenerics bindings) subConds)
+
+                _ ->
+                    value
+    in
+    Qualifier.TypeMatchCond
+        fieldName
+        (bindGenericsInType bindings fieldType)
+        boundValue
+
+
+bindGenericsInType : Dict String Type -> Type -> Type
+bindGenericsInType bindings t =
+    case t of
+        Type.Generic genericName ->
+            Dict.get genericName bindings
+                |> Maybe.withDefault t
+
+        Type.CustomGeneric name gens ->
+            Type.CustomGeneric name <|
+                List.map (bindGenericsInType bindings) gens
+
+        Type.Union name members ->
+            Type.Union name <|
+                List.map (bindGenericsInType bindings) members
+
+        _ ->
+            t
+
+
 inferWhenTypes :
     Qualifier.FunctionDefinition
     -> ( Qualifier.TypeMatch, List Qualifier.Node )
@@ -459,6 +541,13 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 ( Type.Union _ unionMembers, Type.CustomGeneric name _ ) ->
                     List.find (matchingCustomGenericType name) unionMembers
                         |> Maybe.withDefault typeMatchType
+
+                ( Type.CustomGeneric annName _, Type.CustomGeneric matchName _ ) ->
+                    if annName == matchName then
+                        annotatedType
+
+                    else
+                        typeMatchType
 
                 _ ->
                     typeMatchType
@@ -520,9 +609,11 @@ normalizeWhenTypes whenTypes =
             whenTypes
 
 
-simplifyWhenFunctionTypes : List FunctionType -> Context -> ( List FunctionType, Context )
-simplifyWhenFunctionTypes functionTypes context =
-    ( List.map (\wt -> Tuple.first (simplifyFunctionType ( wt, context ))) functionTypes
+simplifyWhenFunctionTypes : ( List FunctionType, Context ) -> ( List FunctionType, Context )
+simplifyWhenFunctionTypes ( functionTypes, context ) =
+    ( List.map
+        (\wt -> Tuple.first (simplifyFunctionType ( wt, context )))
+        functionTypes
     , context
     )
 
@@ -907,11 +998,11 @@ extractTypeFromTypeMatch (Qualifier.TypeMatch _ t_ _) =
 
 mapTypeMatch : Qualifier.TypeMatch -> TypeMatch
 mapTypeMatch (Qualifier.TypeMatch range type_ cond) =
-    TypeMatch range type_ (List.map mapTypeMatchValue cond)
+    TypeMatch range type_ (List.map mapTypeMatchCond cond)
 
 
-mapTypeMatchValue : ( String, Qualifier.TypeMatchValue ) -> ( String, TypeMatchValue )
-mapTypeMatchValue ( fieldName, value ) =
+mapTypeMatchCond : Qualifier.TypeMatchCond -> ( String, TypeMatchValue )
+mapTypeMatchCond (Qualifier.TypeMatchCond fieldName _ value) =
     case value of
         Qualifier.LiteralInt val ->
             ( fieldName, LiteralInt val )
@@ -921,6 +1012,11 @@ mapTypeMatchValue ( fieldName, value ) =
 
         Qualifier.RecursiveMatch val ->
             ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
+
+type InexhaustiveState
+    = Total
+    | SeenInt
 
 
 inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
@@ -939,11 +1035,6 @@ inexhaustivenessCheck range patterns =
             Just (InexhaustiveMultiFunction range inexhaustiveStates)
 
 
-type InexhaustiveState
-    = Total
-    | SeenInt
-
-
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
 inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
     let
@@ -957,14 +1048,13 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
         let
             subcases =
                 conds
-                    |> List.map Tuple.second
                     |> List.filterMap isRecursiveMatch
                     |> List.foldl (inexhaustivenessCheckHelper typeList) acc
 
-            isRecursiveMatch match =
-                case match of
-                    Qualifier.RecursiveMatch cond ->
-                        Just cond
+            isRecursiveMatch cond =
+                case cond of
+                    Qualifier.TypeMatchCond _ _ (Qualifier.RecursiveMatch val) ->
+                        Just val
 
                     _ ->
                         Nothing

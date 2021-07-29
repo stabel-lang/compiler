@@ -8,6 +8,7 @@ module Stabel.Qualifier exposing
     , TypeDefinition
     , TypeDefinitionMembers(..)
     , TypeMatch(..)
+    , TypeMatchCond(..)
     , TypeMatchValue(..)
     , requiredModules
     , run
@@ -72,7 +73,11 @@ type FunctionImplementation
 
 
 type TypeMatch
-    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
+    = TypeMatch SourceLocationRange Type (List TypeMatchCond)
+
+
+type TypeMatchCond
+    = TypeMatchCond String Type TypeMatchValue
 
 
 type TypeMatchValue
@@ -832,11 +837,6 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         case typeDef.members of
                             StructMembers members ->
                                 let
-                                    memberNames =
-                                        members
-                                            |> List.map Tuple.first
-                                            |> Set.fromList
-
                                     qualifiedPatternsResult =
                                         patterns
                                             |> List.map
@@ -846,7 +846,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                                     modRefs
                                                     range
                                                     name
-                                                    memberNames
+                                                    members
                                                 )
                                             |> Result.combine
 
@@ -882,7 +882,11 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
             Ok <| TypeMatch (qualifiedRange range) Type.Int []
 
         Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
-            Ok <| TypeMatch (qualifiedRange range) Type.Int [ ( "value", LiteralInt val ) ]
+            Ok <|
+                TypeMatch
+                    (qualifiedRange range)
+                    Type.Int
+                    [ TypeMatchCond "value" Type.Int (LiteralInt val) ]
 
         Parser.TypeMatch range (Parser.Generic sym) [] ->
             Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
@@ -966,27 +970,40 @@ qualifyMatchValue :
     -> ModuleReferences
     -> SourceLocationRange
     -> String
-    -> Set String
+    -> List ( String, Type )
     -> ( String, Parser.TypeMatchValue )
-    -> Result Problem ( String, TypeMatchValue )
-qualifyMatchValue config qualifiedTypes modRefs range typeName memberNames ( fieldName, matchValue ) =
-    if Set.member fieldName memberNames then
-        case matchValue of
-            Parser.LiteralInt val ->
-                Ok <| ( fieldName, LiteralInt val )
+    -> Result Problem TypeMatchCond
+qualifyMatchValue config qualifiedTypes modRefs range typeName members ( fieldName, matchValue ) =
+    case List.find ((==) fieldName << Tuple.first) members of
+        Just ( _, fieldType ) ->
+            case matchValue of
+                Parser.LiteralInt val ->
+                    Ok <| TypeMatchCond fieldName fieldType (LiteralInt val)
 
-            Parser.LiteralType type_ ->
-                type_
-                    |> qualifyMemberType config modRefs range
-                    |> Result.map (\qualifiedType -> ( fieldName, LiteralType qualifiedType ))
+                Parser.LiteralType type_ ->
+                    type_
+                        |> qualifyMemberType config modRefs range
+                        |> Result.map
+                            (\qualifiedType ->
+                                TypeMatchCond
+                                    fieldName
+                                    fieldType
+                                    (LiteralType qualifiedType)
+                            )
 
-            Parser.RecursiveMatch typeMatch ->
-                typeMatch
-                    |> qualifyMatch config qualifiedTypes modRefs
-                    |> Result.map (\match -> ( fieldName, RecursiveMatch match ))
+                Parser.RecursiveMatch typeMatch ->
+                    typeMatch
+                        |> qualifyMatch config qualifiedTypes modRefs
+                        |> Result.map
+                            (\match ->
+                                TypeMatchCond
+                                    fieldName
+                                    fieldType
+                                    (RecursiveMatch match)
+                            )
 
-    else
-        Err <| NoSuchMemberOnType range typeName fieldName
+        _ ->
+            Err <| NoSuchMemberOnType range typeName fieldName
 
 
 initQualifyNode :
