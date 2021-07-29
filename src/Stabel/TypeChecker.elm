@@ -171,7 +171,10 @@ typeCheck : Context -> Qualifier.AST -> Result (List Problem) AST
 typeCheck context ast =
     let
         updatedContext =
-            Dict.foldl (\_ v acc -> typeCheckDefinition v acc) context ast.functions
+            Dict.foldl
+                (\_ v acc -> Tuple.second <| typeCheckDefinition v acc)
+                context
+                ast.functions
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
@@ -183,26 +186,33 @@ typeCheck context ast =
         Err updatedContext.errors
 
 
-typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> Context
+typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> ( FunctionDefinition, Context )
 typeCheckDefinition untypedDef context =
     case Dict.get untypedDef.name context.typedFunctions of
-        Just _ ->
-            context
+        Just def ->
+            ( def, context )
 
         Nothing ->
             case untypedDef.implementation of
                 Qualifier.SoloImpl impl ->
-                    typeCheckSoloImplementation context untypedDef impl
+                    typeCheckSoloImplementation
+                        context
+                        untypedDef
+                        impl
 
                 Qualifier.MultiImpl initialWhens defaultImpl ->
-                    typeCheckMultiImplementation context untypedDef initialWhens defaultImpl
+                    typeCheckMultiImplementation
+                        context
+                        untypedDef
+                        initialWhens
+                        defaultImpl
 
 
 
 -- Type Check Solo Impl --
 
 
-typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qualifier.Node -> Context
+typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qualifier.Node -> ( FunctionDefinition, Context )
 typeCheckSoloImplementation context untypedDef impl =
     let
         ( inferredType, newContext ) =
@@ -215,23 +225,25 @@ typeCheckSoloImplementation context untypedDef impl =
         typedImplementation =
             SoloImpl (untypedToTypedImplementation newContext impl)
 
+        typedDef =
+            { name = untypedDef.name
+            , sourceLocation = untypedDef.sourceLocation
+            , type_ =
+                untypedDef.typeSignature
+                    |> TypeSignature.withDefault inferredType
+            , isInline = Set.member untypedDef.name context.referenceableFunctions
+            , implementation = typedImplementation
+            }
+
         finalContext =
             { newContext
                 | typedFunctions =
-                    Dict.insert untypedDef.name
-                        { name = untypedDef.name
-                        , sourceLocation = untypedDef.sourceLocation
-                        , type_ =
-                            untypedDef.typeSignature
-                                |> TypeSignature.withDefault inferredType
-                        , isInline = Set.member untypedDef.name context.referenceableFunctions
-                        , implementation = typedImplementation
-                        }
-                        newContext.typedFunctions
+                    Dict.insert untypedDef.name typedDef newContext.typedFunctions
             }
+                |> verifyTypeSignature inferredType untypedDef
+                |> cleanContext
     in
-    verifyTypeSignature inferredType untypedDef finalContext
-        |> cleanContext
+    ( typedDef, finalContext )
 
 
 untypedToTypedImplementation : Context -> List Qualifier.Node -> List AstNode
@@ -342,7 +354,7 @@ typeCheckMultiImplementation :
     -> Qualifier.FunctionDefinition
     -> List ( Qualifier.TypeMatch, List Qualifier.Node )
     -> List Qualifier.Node
-    -> Context
+    -> ( FunctionDefinition, Context )
 typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     let
         allBranches =
@@ -415,23 +427,27 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         sourceLocation =
             Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation
 
+        typedDef =
+            { name = untypedDef.name
+            , sourceLocation = untypedDef.sourceLocation
+            , type_ = exposedType
+            , isInline = Set.member untypedDef.name context.referenceableFunctions
+            , implementation =
+                MultiImpl
+                    (List.map
+                        (Tuple.mapBoth mapTypeMatch typeImplementation)
+                        initialWhens
+                    )
+                    (typeImplementation defaultImpl)
+            }
+
+        typeImplementation impl =
+            untypedToTypedImplementation newContext impl
+
         finalContext =
             { newContext
                 | typedFunctions =
-                    Dict.insert untypedDef.name
-                        { name = untypedDef.name
-                        , sourceLocation = untypedDef.sourceLocation
-                        , type_ = exposedType
-                        , isInline = Set.member untypedDef.name context.referenceableFunctions
-                        , implementation =
-                            MultiImpl
-                                (List.map
-                                    (Tuple.mapBoth mapTypeMatch typeImplementation)
-                                    initialWhens
-                                )
-                                (typeImplementation defaultImpl)
-                        }
-                        newContext.typedFunctions
+                    Dict.insert untypedDef.name typedDef newContext.typedFunctions
                 , errors =
                     List.filterMap identity
                         [ maybeConsistencyError
@@ -439,12 +455,10 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         ]
                         ++ newContext.errors
             }
-
-        typeImplementation =
-            untypedToTypedImplementation newContext
+                |> verifyTypeSignature inferredType untypedDef
+                |> cleanContext
     in
-    verifyTypeSignature inferredType untypedDef finalContext
-        |> cleanContext
+    ( typedDef, finalContext )
 
 
 resolveWhenConditions : Qualifier.FunctionDefinition -> Qualifier.TypeMatch -> Qualifier.TypeMatch
@@ -475,12 +489,7 @@ initialBindingsFromFunctionDef def structGenerics =
                 (Type.CustomGeneric _ possiblyBoundGenerics) :: _ ->
                     let
                         liftTupleMaybe ( first, second ) =
-                            case first of
-                                Just x ->
-                                    Just ( x, second )
-
-                                Nothing ->
-                                    Nothing
+                            Maybe.map (\x -> ( x, second )) first
                     in
                     List.map2 Tuple.pair structGenerics possiblyBoundGenerics
                         |> List.map (Tuple.mapFirst Type.genericName)
@@ -1172,43 +1181,28 @@ typeCheckNode currentDef idx node context =
             addStackEffect context [ Push Type.Int ]
 
         Qualifier.Function _ untypedDef ->
-            case Dict.get untypedDef.name context.typedFunctions of
-                Just def ->
-                    addStackEffect context <| functionTypeToStackEffects def.type_
+            let
+                ( def, contextWithTypedDef ) =
+                    typeCheckDefinition untypedDef context
 
-                Nothing ->
-                    let
-                        contextWithTypedDef =
-                            typeCheckDefinition untypedDef context
+                newContext =
+                    { contextWithTypedDef | stackEffects = context.stackEffects }
+            in
+            addStackEffect newContext <| functionTypeToStackEffects def.type_
 
-                        newContext =
-                            { contextWithTypedDef | stackEffects = context.stackEffects }
-                    in
-                    case Dict.get untypedDef.name newContext.typedFunctions of
-                        Nothing ->
-                            Debug.todo "inconcievable!"
-
-                        Just def ->
-                            addStackEffect newContext <| functionTypeToStackEffects def.type_
-
-        Qualifier.FunctionRef loc ref ->
+        Qualifier.FunctionRef _ ref ->
             let
                 stackEffectsBeforeFunctionCheck =
                     context.stackEffects
 
-                contextAfterFunctionCheck =
-                    typeCheckNode currentDef idx (Qualifier.Function loc ref) context
+                ( def, contextAfterFunctionCheck ) =
+                    typeCheckDefinition ref context
 
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            case Dict.get ref.name newContext.typedFunctions of
-                Just def ->
-                    addStackEffect newContext <|
-                        [ Push <| Type.FunctionSignature def.type_ ]
-
-                _ ->
-                    Debug.todo "inconcievable!"
+            addStackEffect newContext <|
+                [ Push <| Type.FunctionSignature def.type_ ]
 
         Qualifier.Recurse _ ->
             case TypeSignature.toMaybe currentDef.typeSignature of
