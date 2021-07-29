@@ -256,39 +256,14 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.Function range function ->
             case Dict.get function.name context.typedFunctions of
                 Just def ->
-                    let
-                        resolvedFunctionType =
-                            { input =
-                                def.type_.input
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            , output =
-                                def.type_.output
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            }
-
-                        replaceGenericWithBoundValue t =
-                            let
-                                boundType =
-                                    case getGenericBinding context t of
-                                        Just boundValue ->
-                                            boundValue
-
-                                        Nothing ->
-                                            t
-                            in
-                            case boundType of
-                                -- TODO: not structs?
-                                Type.Union unionName members ->
-                                    Type.Union unionName <|
-                                        List.map replaceGenericWithBoundValue members
-
-                                _ ->
-                                    boundType
-                    in
-                    Function range function.name resolvedFunctionType
+                    Function
+                        range
+                        function.name
+                        (resolveGenericsInFunctionType idx context def.type_)
 
                 Nothing ->
-                    -- TODO: this can't be right?
+                    -- Only here to satisfy the type checker
+                    -- By the time this code runs, there will always be a typed function
                     Dict.get function.name context.untypedFunctions
                         |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
                         |> Maybe.withDefault { input = [], output = [] }
@@ -301,11 +276,16 @@ untypedToTypedNode idx context untypedNode =
             Recurse range
 
         Qualifier.Cycle range data ->
-            -- TODO: Not right
+            let
+                functionType =
+                    data.typeSignature
+                        |> TypeSignature.map (resolveGenericsInFunctionType idx context)
+                        |> TypeSignature.withDefault Type.emptyFunctionType
+            in
             Cycle range
                 { name = data.name
                 , sourceLocation = data.sourceLocation
-                , typeSignature = { input = [], output = [] }
+                , typeSignature = functionType
                 }
 
         Qualifier.Builtin range builtin ->
@@ -319,6 +299,38 @@ untypedToTypedNode idx context untypedNode =
 
         Qualifier.GetMember typeDef memberName memberType ->
             GetMember typeDef.name memberName memberType
+
+
+resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
+resolveGenericsInFunctionType idx context wt =
+    let
+        replaceGenericWithBoundValue t =
+            let
+                boundType =
+                    case getGenericBinding context t of
+                        Just boundValue ->
+                            boundValue
+
+                        Nothing ->
+                            t
+            in
+            case boundType of
+                Type.Union unionName members ->
+                    Type.Union unionName <|
+                        List.map replaceGenericWithBoundValue members
+
+                Type.CustomGeneric name members ->
+                    Type.CustomGeneric name <|
+                        List.map replaceGenericWithBoundValue members
+
+                _ ->
+                    boundType
+    in
+    { input =
+        List.map (tagGeneric idx >> replaceGenericWithBoundValue) wt.input
+    , output =
+        List.map (tagGeneric idx >> replaceGenericWithBoundValue) wt.output
+    }
 
 
 
