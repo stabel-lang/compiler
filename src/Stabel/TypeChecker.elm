@@ -373,9 +373,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                     in
                     case inferredDefaultType.input of
                         [] ->
-                            -- TODO: Generic arg?
-                            -- TODO: Add test to see if we can make this fail
-                            Debug.todo "Default impl doesn't have an input argument"
+                            ( Qualifier.TypeMatch SourceLocation.emptyRange (Type.Generic "*") [], defaultImpl ) :: initialWhens
 
                         firstType :: _ ->
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
