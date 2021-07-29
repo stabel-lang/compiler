@@ -355,13 +355,6 @@ formatInstruction ((Module module_) as fullModule) ins =
                     Str <| "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
 
                 Nothing ->
-                    let
-                        _ =
-                            Debug.log "name" word
-
-                        _ =
-                            Debug.log "available" (List.map .name module_.functions)
-                    in
                     Debug.todo "Did not expect this"
 
         CallIndirect ->
