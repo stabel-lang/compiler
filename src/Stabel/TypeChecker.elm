@@ -357,7 +357,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
         whens =
-            List.map (Tuple.mapFirst resolveWhenConditions) allBranches
+            List.map (Tuple.mapFirst (resolveWhenConditions untypedDef)) allBranches
 
         ( inferredWhenTypes, newContext ) =
             whens
@@ -435,24 +435,51 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         |> cleanContext
 
 
-resolveWhenConditions : Qualifier.TypeMatch -> Qualifier.TypeMatch
-resolveWhenConditions ((Qualifier.TypeMatch loc typeMatch conds) as match) =
+resolveWhenConditions : Qualifier.FunctionDefinition -> Qualifier.TypeMatch -> Qualifier.TypeMatch
+resolveWhenConditions untypedDef ((Qualifier.TypeMatch loc typeMatch conds) as match) =
     case typeMatch of
-        Type.CustomGeneric structName structGenerics ->
+        Type.CustomGeneric _ structGenerics ->
             let
                 bindings =
-                    List.foldl whenConditionsGenericBindings Dict.empty conds
+                    List.foldl
+                        whenConditionsGenericBindings
+                        (initialBindingsFromFunctionDef untypedDef structGenerics)
+                        conds
             in
             Qualifier.TypeMatch
                 loc
-                (Type.CustomGeneric
-                    structName
-                    (List.map (bindGenericsInType bindings) structGenerics)
-                )
+                (bindGenericsInType bindings typeMatch)
                 (List.map (whenConditionsBindGenerics bindings) conds)
 
         _ ->
             match
+
+
+initialBindingsFromFunctionDef : Qualifier.FunctionDefinition -> List Type -> Dict String Type
+initialBindingsFromFunctionDef def structGenerics =
+    case TypeSignature.toMaybe def.typeSignature of
+        Just wt ->
+            case wt.input of
+                (Type.CustomGeneric _ possiblyBoundGenerics) :: _ ->
+                    let
+                        liftTupleMaybe ( first, second ) =
+                            case first of
+                                Just x ->
+                                    Just ( x, second )
+
+                                Nothing ->
+                                    Nothing
+                    in
+                    List.map2 Tuple.pair structGenerics possiblyBoundGenerics
+                        |> List.map (Tuple.mapFirst Type.genericName)
+                        |> List.filterMap liftTupleMaybe
+                        |> Dict.fromList
+
+                _ ->
+                    Dict.empty
+
+        Nothing ->
+            Dict.empty
 
 
 whenConditionsGenericBindings : Qualifier.TypeMatchCond -> Dict String Type -> Dict String Type
