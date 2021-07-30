@@ -94,8 +94,8 @@ type Node
     | Cycle SourceLocationRange CycleData
     | Builtin SourceLocationRange Builtin
     | ConstructType TypeDefinition
-    | GetMember TypeDefinition String Type
-    | SetMember TypeDefinition String Type
+    | GetMember TypeDefinition String Int Type
+    | SetMember TypeDefinition String Int Type
 
 
 type alias ModuleReferences =
@@ -1292,10 +1292,11 @@ qualifyNode config currentDefName node acc =
             case Dict.get qualifiedName acc.qualifiedTypes of
                 Just t ->
                     case getMemberType t memberName of
-                        Just memberType ->
+                        Just ( memberIndex, memberType ) ->
                             { acc
                                 | qualifiedNodes =
-                                    Ok (SetMember t memberName memberType) :: acc.qualifiedNodes
+                                    Ok (SetMember t memberName memberIndex memberType)
+                                        :: acc.qualifiedNodes
                             }
 
                         Nothing ->
@@ -1318,10 +1319,11 @@ qualifyNode config currentDefName node acc =
             case Dict.get qualifiedName acc.qualifiedTypes of
                 Just t ->
                     case getMemberType t memberName of
-                        Just memberType ->
+                        Just ( memberIndex, memberType ) ->
                             { acc
                                 | qualifiedNodes =
-                                    Ok (GetMember t memberName memberType) :: acc.qualifiedNodes
+                                    Ok (GetMember t memberName memberIndex memberType)
+                                        :: acc.qualifiedNodes
                             }
 
                         Nothing ->
@@ -1426,7 +1428,7 @@ qualifyName config name =
             ]
 
 
-getMemberType : TypeDefinition -> String -> Maybe Type
+getMemberType : TypeDefinition -> String -> Maybe ( Int, Type )
 getMemberType typeDef memberName =
     let
         members =
@@ -1438,8 +1440,9 @@ getMemberType typeDef memberName =
                     []
     in
     members
-        |> List.find (Tuple.first >> (==) memberName)
-        |> Maybe.map Tuple.second
+        |> List.indexedMap Tuple.pair
+        |> List.find (\( _, ( name, _ ) ) -> name == memberName)
+        |> Maybe.map (\( idx, ( _, t ) ) -> ( idx, t ))
 
 
 qualifyPackageModule : String -> String -> String

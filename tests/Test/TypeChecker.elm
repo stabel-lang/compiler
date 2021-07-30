@@ -301,6 +301,21 @@ suite =
                         : swap drop
                         """
 
+                    dropFirstFn =
+                        { name = "drop-first"
+                        , type_ =
+                            { input = [ Type.Generic "a", Type.Generic "b" ]
+                            , output = [ Type.Generic "b" ]
+                            }
+                        , sourceLocation = Nothing
+                        , isInline = False
+                        , implementation =
+                            SoloImpl
+                                [ Builtin emptyRange Builtin.StackSwap
+                                , Builtin emptyRange Builtin.StackDrop
+                                ]
+                        }
+
                     expectedResult =
                         Dict.fromListBy .name
                             [ { name = "main"
@@ -315,25 +330,13 @@ suite =
                                         [ IntLiteral emptyRange 1
                                         , IntLiteral emptyRange 2
                                         , Function emptyRange
-                                            "drop-first"
+                                            dropFirstFn
                                             { input = [ Type.Int, Type.Int ]
                                             , output = [ Type.Int ]
                                             }
                                         ]
                               }
-                            , { name = "drop-first"
-                              , type_ =
-                                    { input = [ Type.Generic "a", Type.Generic "b" ]
-                                    , output = [ Type.Generic "b" ]
-                                    }
-                              , sourceLocation = Nothing
-                              , isInline = False
-                              , implementation =
-                                    SoloImpl
-                                        [ Builtin emptyRange Builtin.StackSwap
-                                        , Builtin emptyRange Builtin.StackDrop
-                                        ]
-                              }
+                            , dropFirstFn
                             ]
                 in
                 expectAst input expectedResult

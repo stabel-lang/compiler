@@ -5,6 +5,7 @@ import Dict.Extra as Dict
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
+import Stabel.Qualifier as QAST
 import Stabel.TypeChecker exposing (..)
 import Test exposing (Test, describe, test)
 import Test.TypeChecker.Util
@@ -190,44 +191,56 @@ suite =
                         : Nil 1 with-default
                         """
 
+                    nilTypeDef =
+                        { name = "Nil"
+                        , exposed = True
+                        , generics = []
+                        , sourceLocation = emptyRange
+                        , members = QAST.StructMembers []
+                        }
+
+                    nilCtorDef =
+                        { name = "Nil"
+                        , type_ = { input = [], output = [ Type.Custom "Nil" ] }
+                        , sourceLocation = Nothing
+                        , isInline = False
+                        , implementation =
+                            SoloImpl
+                                [ ConstructType nilTypeDef ]
+                        }
+
+                    withDefaultFn =
+                        { name = "with-default"
+                        , type_ =
+                            { input =
+                                [ Type.Union (Just "Maybe")
+                                    [ Type.Generic "a"
+                                    , Type.Custom "Nil"
+                                    ]
+                                , Type.Generic "a"
+                                ]
+                            , output = [ Type.Generic "a" ]
+                            }
+                        , sourceLocation = Nothing
+                        , isInline = False
+                        , implementation =
+                            MultiImpl
+                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                  , [ Builtin emptyRange Builtin.StackDrop
+                                    ]
+                                  )
+                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                  , [ Builtin emptyRange Builtin.StackSwap
+                                    , Builtin emptyRange Builtin.StackDrop
+                                    ]
+                                  )
+                                ]
+                                []
+                        }
+
                     expectedResult =
                         Dict.fromListBy .name
-                            [ { name = "Nil"
-                              , type_ = { input = [], output = [ Type.Custom "Nil" ] }
-                              , sourceLocation = Nothing
-                              , isInline = False
-                              , implementation =
-                                    SoloImpl
-                                        [ ConstructType "Nil"
-                                        ]
-                              }
-                            , { name = "with-default"
-                              , type_ =
-                                    { input =
-                                        [ Type.Union (Just "Maybe")
-                                            [ Type.Generic "a"
-                                            , Type.Custom "Nil"
-                                            ]
-                                        , Type.Generic "a"
-                                        ]
-                                    , output = [ Type.Generic "a" ]
-                                    }
-                              , sourceLocation = Nothing
-                              , isInline = False
-                              , implementation =
-                                    MultiImpl
-                                        [ ( TypeMatch emptyRange (Type.Generic "a") []
-                                          , [ Builtin emptyRange Builtin.StackDrop
-                                            ]
-                                          )
-                                        , ( TypeMatch emptyRange (Type.Custom "Nil") []
-                                          , [ Builtin emptyRange Builtin.StackSwap
-                                            , Builtin emptyRange Builtin.StackDrop
-                                            ]
-                                          )
-                                        ]
-                                        []
-                              }
+                            [ nilCtorDef
                             , { name = "main"
                               , type_ = { input = [], output = [ Type.Int ] }
                               , sourceLocation = Nothing
@@ -235,13 +248,13 @@ suite =
                               , implementation =
                                     SoloImpl
                                         [ Function emptyRange
-                                            "Nil"
+                                            nilCtorDef
                                             { input = []
                                             , output = [ Type.Custom "Nil" ]
                                             }
                                         , IntLiteral emptyRange 1
                                         , Function emptyRange
-                                            "with-default"
+                                            withDefaultFn
                                             { input =
                                                 [ Type.Union (Just "Maybe")
                                                     [ Type.Int
@@ -253,6 +266,7 @@ suite =
                                             }
                                         ]
                               }
+                            , withDefaultFn
                             ]
                 in
                 expectAst input expectedResult

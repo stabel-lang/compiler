@@ -145,11 +145,11 @@ stripNodeLocation node =
         AST.ConstructType t ->
             AST.ConstructType (stripTypeLocation t)
 
-        AST.GetMember td n t ->
-            AST.GetMember (stripTypeLocation td) n t
+        AST.GetMember td n i t ->
+            AST.GetMember (stripTypeLocation td) n i t
 
-        AST.SetMember td n t ->
-            AST.SetMember (stripTypeLocation td) n t
+        AST.SetMember td n i t ->
+            AST.SetMember (stripTypeLocation td) n i t
 
 
 stripMultiWordBranchLocation : ( TypeMatch, List Node ) -> ( TypeMatch, List Node )

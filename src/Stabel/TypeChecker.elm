@@ -58,14 +58,14 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
-    | Function SourceLocationRange String FunctionType
-    | FunctionRef SourceLocationRange String
+    | Function SourceLocationRange FunctionDefinition FunctionType
+    | FunctionRef SourceLocationRange FunctionDefinition
     | Recurse SourceLocationRange
     | Cycle SourceLocationRange CycleData
     | Builtin SourceLocationRange Builtin
-    | ConstructType String
-    | SetMember String String Type
-    | GetMember String String Type
+    | ConstructType TypeDefinition
+    | SetMember TypeDefinition String Int Type
+    | GetMember TypeDefinition String Int Type
 
 
 type alias CycleData =
@@ -266,23 +266,19 @@ untypedToTypedNode idx context untypedNode =
             IntLiteral range num
 
         Qualifier.Function range function ->
-            case Dict.get function.name context.typedFunctions of
-                Just def ->
-                    Function
-                        range
-                        function.name
-                        (resolveGenericsInFunctionType idx context def.type_)
-
-                Nothing ->
-                    -- Only here to satisfy the type checker
-                    -- By the time this code runs, there will always be a typed function
-                    Dict.get function.name context.untypedFunctions
-                        |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
-                        |> Maybe.withDefault { input = [], output = [] }
-                        |> Function range function.name
+            let
+                ( def, _ ) =
+                    typeCheckDefinition function context
+            in
+            Function range def <|
+                resolveGenericsInFunctionType idx context def.type_
 
         Qualifier.FunctionRef range ref ->
-            FunctionRef range ref.name
+            let
+                ( def, _ ) =
+                    typeCheckDefinition ref context
+            in
+            FunctionRef range def
 
         Qualifier.Recurse range ->
             Recurse range
@@ -304,13 +300,13 @@ untypedToTypedNode idx context untypedNode =
             Builtin range builtin
 
         Qualifier.ConstructType typeDef ->
-            ConstructType typeDef.name
+            ConstructType typeDef
 
-        Qualifier.SetMember typeDef memberName memberType ->
-            SetMember typeDef.name memberName memberType
+        Qualifier.SetMember typeDef memberName memberIndex memberType ->
+            SetMember typeDef memberName memberIndex memberType
 
-        Qualifier.GetMember typeDef memberName memberType ->
-            GetMember typeDef.name memberName memberType
+        Qualifier.GetMember typeDef memberName memberIndex memberType ->
+            GetMember typeDef memberName memberIndex memberType
 
 
 resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
@@ -1245,7 +1241,7 @@ typeCheckNode currentDef idx node context =
                     , output = [ typeInQuestion ]
                     }
 
-        Qualifier.SetMember typeDef _ memberType ->
+        Qualifier.SetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef
@@ -1256,7 +1252,7 @@ typeCheckNode currentDef idx node context =
                     , output = [ typeInQuestion ]
                     }
 
-        Qualifier.GetMember typeDef _ memberType ->
+        Qualifier.GetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef

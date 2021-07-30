@@ -289,7 +289,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ SetMember dollarTypeDef "dollar-value" Type.Int ]
+                                [ SetMember dollarTypeDef "dollar-value" 0 Type.Int ]
                         }
 
                     centValueSetFn =
@@ -303,7 +303,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ SetMember centTypeDef "cent-value" Type.Int ]
+                                [ SetMember centTypeDef "cent-value" 0 Type.Int ]
                         }
 
                     userIdSetFn =
@@ -317,7 +317,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ SetMember walletTypeDef "user-id" Type.Int ]
+                                [ SetMember walletTypeDef "user-id" 0 Type.Int ]
                         }
 
                     valueSetFn =
@@ -331,7 +331,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ SetMember walletTypeDef "value" usMoneyUnionType ]
+                                [ SetMember walletTypeDef "value" 1 usMoneyUnionType ]
                         }
 
                     dollarValueGetFn =
@@ -345,7 +345,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ GetMember dollarTypeDef "dollar-value" Type.Int ]
+                                [ GetMember dollarTypeDef "dollar-value" 0 Type.Int ]
                         }
 
                     centValueGetFn =
@@ -359,7 +359,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ GetMember centTypeDef "cent-value" Type.Int ]
+                                [ GetMember centTypeDef "cent-value" 0 Type.Int ]
                         }
 
                     userIdGetFn =
@@ -373,7 +373,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ GetMember walletTypeDef "user-id" Type.Int ]
+                                [ GetMember walletTypeDef "user-id" 0 Type.Int ]
                         }
 
                     valueGetFn =
@@ -387,7 +387,7 @@ suite =
                                 }
                         , implementation =
                             SoloImpl
-                                [ GetMember walletTypeDef "value" usMoneyUnionType ]
+                                [ GetMember walletTypeDef "value" 1 usMoneyUnionType ]
                         }
 
                     expectedAst =

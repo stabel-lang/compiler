@@ -19,11 +19,11 @@ type alias TypeInformation =
 
 type AstNode
     = IntLiteral Int
-    | Word String FunctionType
-    | WordRef String
-    | ConstructType String
-    | SetMember String String Type
-    | GetMember String String Type
+    | Word AST.FunctionDefinition FunctionType
+    | WordRef AST.FunctionDefinition
+    | ConstructType AST.TypeDefinition
+    | SetMember AST.TypeDefinition String Int Type
+    | GetMember AST.TypeDefinition String Int Type
     | Builtin Builtin
     | Box Int Int -- stackIdx typeId
 
@@ -131,29 +131,35 @@ astNodeToCodegenNode def ast node ( stack, result ) =
                 AST.IntLiteral _ val ->
                     IntLiteral val
 
-                AST.Function _ name type_ ->
-                    Word name type_
+                AST.Function _ fn type_ ->
+                    Word fn type_
 
-                AST.FunctionRef _ name ->
-                    WordRef name
+                AST.FunctionRef _ fn ->
+                    WordRef fn
 
                 AST.Recurse _ ->
-                    Word def.name def.type_
+                    Word def def.type_
 
                 AST.Cycle _ data ->
-                    Word data.name data.typeSignature
+                    case Dict.get data.name ast.functions of
+                        Just fn ->
+                            Word fn data.typeSignature
+
+                        Nothing ->
+                            -- can't happen
+                            Word def def.type_
 
                 AST.Builtin _ builtin ->
                     Builtin builtin
 
-                AST.ConstructType typeName ->
-                    ConstructType typeName
+                AST.ConstructType typeDef ->
+                    ConstructType typeDef
 
-                AST.SetMember typeName memberName type_ ->
-                    SetMember typeName memberName type_
+                AST.SetMember typeDef memberName memberIndex type_ ->
+                    SetMember typeDef memberName memberIndex type_
 
-                AST.GetMember typeName memberName type_ ->
-                    GetMember typeName memberName type_
+                AST.GetMember typeDef memberName memberIndex type_ ->
+                    GetMember typeDef memberName memberIndex type_
 
         nodeType =
             case node of
@@ -165,15 +171,10 @@ astNodeToCodegenNode def ast node ( stack, result ) =
                 AST.Function _ _ type_ ->
                     type_
 
-                AST.FunctionRef _ name ->
-                    case Dict.get name ast.functions of
-                        Just fn ->
-                            { input = []
-                            , output = [ Type.FunctionSignature fn.type_ ]
-                            }
-
-                        Nothing ->
-                            Debug.todo "help"
+                AST.FunctionRef _ fn ->
+                    { input = []
+                    , output = [ Type.FunctionSignature fn.type_ ]
+                    }
 
                 AST.Recurse _ ->
                     def.type_
@@ -184,48 +185,36 @@ astNodeToCodegenNode def ast node ( stack, result ) =
                 AST.Builtin _ builtin ->
                     Builtin.functionType builtin
 
-                AST.ConstructType typeName ->
-                    case Dict.get typeName ast.types of
-                        Just struct ->
-                            case struct.members of
-                                StructMembers members ->
-                                    { input = List.map Tuple.second members
-                                    , output = [ typeFromTypeDef typeName struct.generics ]
-                                    }
-
-                                _ ->
-                                    Debug.todo "help"
-
-                        _ ->
-                            Debug.todo "help"
-
-                AST.SetMember typeName _ memberType ->
-                    case Dict.get typeName ast.types of
-                        Just tipe ->
-                            let
-                                type_ =
-                                    typeFromTypeDef typeName tipe.generics
-                            in
-                            { input = [ type_, memberType ]
-                            , output = [ type_ ]
+                AST.ConstructType typeDef ->
+                    case typeDef.members of
+                        StructMembers members ->
+                            { input = List.map Tuple.second members
+                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
                             }
 
-                        _ ->
-                            Debug.todo "help"
-
-                AST.GetMember typeName _ memberType ->
-                    case Dict.get typeName ast.types of
-                        Just tipe ->
-                            let
-                                type_ =
-                                    typeFromTypeDef typeName tipe.generics
-                            in
-                            { input = [ type_ ]
-                            , output = [ memberType ]
+                        UnionMembers members ->
+                            -- Cannot happen
+                            { input = members
+                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
                             }
 
-                        _ ->
-                            Debug.todo "help"
+                AST.SetMember typeDef _ _ memberType ->
+                    let
+                        type_ =
+                            typeFromTypeDef typeDef.name typeDef.generics
+                    in
+                    { input = [ type_, memberType ]
+                    , output = [ type_ ]
+                    }
+
+                AST.GetMember typeDef _ _ memberType ->
+                    let
+                        type_ =
+                            typeFromTypeDef typeDef.name typeDef.generics
+                    in
+                    { input = [ type_ ]
+                    , output = [ memberType ]
+                    }
 
         typeFromTypeDef typeName gens =
             if List.isEmpty gens then
@@ -278,18 +267,13 @@ astNodeToCodegenNode def ast node ( stack, result ) =
 
         isMultiWord possibleMultiWordNode =
             case possibleMultiWordNode of
-                Word name _ ->
-                    case Dict.get name ast.functions of
-                        Just fn ->
-                            case fn.implementation of
-                                AST.SoloImpl _ ->
-                                    False
-
-                                AST.MultiImpl _ _ ->
-                                    True
-
-                        Nothing ->
+                Word fn _ ->
+                    case fn.implementation of
+                        AST.SoloImpl _ ->
                             False
+
+                        AST.MultiImpl _ _ ->
+                            True
 
                 _ ->
                     False
@@ -539,14 +523,14 @@ nodeToInstruction typeInfo node =
                 , Wasm.Call BaseModule.stackPushFn
                 ]
 
-        Word value _ ->
-            Wasm.Call value
+        Word fn _ ->
+            Wasm.Call fn.name
 
-        WordRef name ->
-            Wasm.FunctionIndex name
+        WordRef fn ->
+            Wasm.FunctionIndex fn.name
 
-        ConstructType typeName ->
-            case Dict.get typeName typeInfo of
+        ConstructType typeDef ->
+            case Dict.get typeDef.name typeInfo of
                 Just type_ ->
                     let
                         typeSize =
@@ -589,8 +573,8 @@ nodeToInstruction typeInfo node =
                 Nothing ->
                     Debug.todo "This cannot happen."
 
-        SetMember typeName memberName _ ->
-            case Dict.get typeName typeInfo of
+        SetMember typeDef _ memberIndex _ ->
+            case Dict.get typeDef.name typeInfo of
                 Just type_ ->
                     let
                         typeSize =
@@ -599,41 +583,31 @@ nodeToInstruction typeInfo node =
                         memberSize =
                             List.length type_.members
                     in
-                    case getMemberType typeInfo typeName memberName of
-                        Just memberIndex ->
-                            Wasm.Batch
-                                [ Wasm.Call BaseModule.swapFn -- Instance should now be at top of stack
-                                , Wasm.Call BaseModule.stackPopFn
-                                , Wasm.I32_Const typeSize
-                                , Wasm.Call BaseModule.copyStructFn -- Return copy of instance
-                                , Wasm.Local_Tee 0
-                                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
-                                , Wasm.I32_Add -- Calculate member address
-                                , Wasm.Call BaseModule.stackPopFn -- Retrieve new value
-                                , Wasm.I32_Store
-                                , Wasm.Local_Get 0 -- Return instance
-                                , Wasm.Call BaseModule.stackPushFn
-                                ]
-
-                        Nothing ->
-                            Debug.todo "NOOOOO!"
-
-                Nothing ->
-                    Debug.todo "This cannot happen!"
-
-        GetMember typeName memberName _ ->
-            case getMemberType typeInfo typeName memberName of
-                Just memberIndex ->
                     Wasm.Batch
-                        [ Wasm.Call BaseModule.stackPopFn -- Get instance address
+                        [ Wasm.Call BaseModule.swapFn -- Instance should now be at top of stack
+                        , Wasm.Call BaseModule.stackPopFn
+                        , Wasm.I32_Const typeSize
+                        , Wasm.Call BaseModule.copyStructFn -- Return copy of instance
+                        , Wasm.Local_Tee 0
                         , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
                         , Wasm.I32_Add -- Calculate member address
-                        , Wasm.I32_Load -- Retrieve member
-                        , Wasm.Call BaseModule.stackPushFn -- Push member onto stack
+                        , Wasm.Call BaseModule.stackPopFn -- Retrieve new value
+                        , Wasm.I32_Store
+                        , Wasm.Local_Get 0 -- Return instance
+                        , Wasm.Call BaseModule.stackPushFn
                         ]
 
                 Nothing ->
                     Debug.todo "This cannot happen!"
+
+        GetMember _ _ memberIndex _ ->
+            Wasm.Batch
+                [ Wasm.Call BaseModule.stackPopFn -- Get instance address
+                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
+                , Wasm.I32_Add -- Calculate member address
+                , Wasm.I32_Load -- Retrieve member
+                , Wasm.Call BaseModule.stackPushFn -- Push member onto stack
+                ]
 
         Builtin builtin ->
             case builtin of
@@ -676,11 +650,3 @@ nodeToInstruction typeInfo node =
                 , Wasm.I32_Const id
                 , Wasm.Call BaseModule.boxFn
                 ]
-
-
-getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int
-getMemberType typeInfoDict typeName memberName =
-    Dict.get typeName typeInfoDict
-        |> Maybe.map (List.indexedMap (\idx ( name, _ ) -> ( idx, name )) << .members)
-        |> Maybe.andThen (List.find (\( _, name ) -> name == memberName))
-        |> Maybe.map Tuple.first
