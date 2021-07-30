@@ -1,4 +1,16 @@
-module Wasm exposing (..)
+module Wasm exposing
+    ( FunctionDef
+    , Instruction(..)
+    , Module
+    , ModuleType(..)
+    , Type(..)
+    , initModule
+    , maximumLocalIndex
+    , toString
+    , withFunction
+    , withImport
+    , withStartFunction
+    )
 
 import List.Extra as List
 
