@@ -86,6 +86,8 @@ type Instruction
     | I32_Store
     | I32_Load
     | Drop
+    | Unreachable
+    | Commented String Instruction
 
 
 maximumLocalIndex : Instruction -> Maybe Int
@@ -417,6 +419,20 @@ formatInstruction ((Module module_) as fullModule) ins =
 
         Drop ->
             Str "drop"
+
+        Unreachable ->
+            Str "unreachable"
+
+        Commented comment inst ->
+            case formatInstruction fullModule inst of
+                Str val ->
+                    Str <| val ++ ";; " ++ comment
+
+                BatchFormat batch ->
+                    BatchFormat <| (Str <| ";; " ++ comment) :: batch
+
+                Indent batch ->
+                    Indent <| (Str <| ";; " ++ comment) :: batch
 
 
 formatExport : Module -> Int -> List FormatHint

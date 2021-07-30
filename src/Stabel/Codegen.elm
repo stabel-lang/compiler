@@ -404,7 +404,10 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                             whenSetup localIdx name conditions
 
                         _ ->
-                            Debug.todo <| "Not supported in pattern match: " ++ Debug.toString t_
+                            -- Type not supported in pattern match
+                            -- TODO: TypeMatch should maybe change to only support types
+                            -- which are supported in pattern matches
+                            Wasm.Unreachable
 
                 whenSetup localIdx typeName conditions =
                     let
@@ -475,7 +478,7 @@ multiFnToInstructions typeInfo ast def whens defaultImpl =
                                     ]
 
                                 _ ->
-                                    Debug.todo "oops"
+                                    [ Wasm.Unreachable ]
 
                         AST.RecursiveMatch match ->
                             let

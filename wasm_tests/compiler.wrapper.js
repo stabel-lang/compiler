@@ -14,6 +14,10 @@ exports.toWat = function toWat(entry, sourceCode) {
 
         compiler.ports.compileFinished.subscribe(([ok, output]) => {
             if (ok) {
+                if (output.indexOf('unreachable') >= 0) {
+                    reject('output contains \'unreachable\' instruction');
+                }
+
                 resolve(output);
             } else {
                 reject(output);
@@ -37,6 +41,10 @@ exports.toProjectWat = function toWat(payload) {
 
         compiler.ports.compileFinished.subscribe(([ok, output]) => {
             if (ok) {
+                if (output.indexOf('unreachable') >= 0) {
+                    reject('output contains \'unreachable\' instruction');
+                }
+
                 resolve(output);
             } else {
                 reject(output);
