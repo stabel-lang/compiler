@@ -8,7 +8,7 @@ import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Qualifier exposing (TypeDefinitionMembers(..))
 import Stabel.TypeChecker as AST exposing (AST)
-import Wasm
+import Stabel.Wasm as Wasm
 
 
 

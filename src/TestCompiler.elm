@@ -13,7 +13,7 @@ import Stabel.Qualifier as Qualifier
 import Stabel.Qualifier.Problem as QualifierProblem
 import Stabel.TypeChecker as TypeChecker
 import Stabel.TypeChecker.Problem as TypeCheckerProblem
-import Wasm
+import Stabel.Wasm as Wasm
 
 
 type alias Model =

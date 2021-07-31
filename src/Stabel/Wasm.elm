@@ -1,4 +1,4 @@
-module Wasm exposing
+module Stabel.Wasm exposing
     ( FunctionDefinition
     , Instruction(..)
     , Module

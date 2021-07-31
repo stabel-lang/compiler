@@ -1,6 +1,6 @@
 module Stabel.Codegen.BaseModule exposing (..)
 
-import Wasm
+import Stabel.Wasm as Wasm
 
 
 
