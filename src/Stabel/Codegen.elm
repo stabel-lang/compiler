@@ -1,9 +1,10 @@
 module Stabel.Codegen exposing (run)
 
-import Dict exposing (Dict)
+import Dict
 import List.Extra as List
 import Set exposing (Set)
 import Stabel.Codegen.BaseModule as BaseModule
+import Stabel.Codegen.IdAssigner as IdAssigner exposing (IdAssigner)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Qualifier exposing (TypeDefinitionMembers(..))
@@ -11,37 +12,18 @@ import Stabel.TypeChecker as AST exposing (AST)
 import Stabel.Wasm as Wasm
 
 
-
--- ID Assignment
-
-
 type alias Context =
-    { functionIdAssignment : IdAssignment
-    , typeIdAssignment : IdAssignment
+    { functionIdAssignment : IdAssigner
+    , typeIdAssignment : IdAssigner
     , inlineFunctionNames : List String
     }
 
 
 emptyContext : Context
 emptyContext =
-    { functionIdAssignment =
-        { emptyIdAssignment | nextId = BaseModule.firstAvailableFunctionId }
-    , typeIdAssignment =
-        emptyIdAssignment
+    { functionIdAssignment = IdAssigner.empty BaseModule.firstAvailableFunctionId
+    , typeIdAssignment = IdAssigner.empty 0
     , inlineFunctionNames = []
-    }
-
-
-type alias IdAssignment =
-    { nextId : Int
-    , cache : Dict String Int
-    }
-
-
-emptyIdAssignment : IdAssignment
-emptyIdAssignment =
-    { nextId = 0
-    , cache = Dict.empty
     }
 
 
@@ -49,7 +31,7 @@ idForFunction : String -> Context -> ( Int, Context )
 idForFunction funcName context =
     let
         ( id, assign ) =
-            assignId funcName context.functionIdAssignment
+            IdAssigner.assignId funcName context.functionIdAssignment
     in
     ( id
     , { context | functionIdAssignment = assign }
@@ -60,26 +42,11 @@ idForType : String -> Context -> ( Int, Context )
 idForType typeName context =
     let
         ( id, assign ) =
-            assignId typeName context.typeIdAssignment
+            IdAssigner.assignId typeName context.typeIdAssignment
     in
     ( id
     , { context | typeIdAssignment = assign }
     )
-
-
-assignId : String -> IdAssignment -> ( Int, IdAssignment )
-assignId name assign =
-    case Dict.get name assign.cache of
-        Just id ->
-            ( id, assign )
-
-        Nothing ->
-            ( assign.nextId
-            , { assign
-                | nextId = assign.nextId + 1
-                , cache = Dict.insert name assign.nextId assign.cache
-              }
-            )
 
 
 indexOf : String -> List String -> Maybe Int
