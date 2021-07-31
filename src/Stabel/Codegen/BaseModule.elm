@@ -53,7 +53,7 @@ callAllocFn =
 
 copyStructFn : String
 copyStructFn =
-    "__copy_str"
+    "__copy_struct"
 
 
 callCopyStructFn : Wasm.Instruction
@@ -221,14 +221,14 @@ callUnboxFn =
     Wasm.Call 18 unboxFn
 
 
-callQuoteFn : String
-callQuoteFn =
-    "__call_quote"
+execInlineFn : String
+execInlineFn =
+    "__exec_inline"
 
 
-callCallQuoteFn : Wasm.Instruction
-callCallQuoteFn =
-    Wasm.Call 19 callQuoteFn
+callExecInlineFn : Wasm.Instruction
+callExecInlineFn =
+    Wasm.Call 19 execInlineFn
 
 
 
@@ -569,7 +569,7 @@ baseFunctions =
             ]
       }
     , { id = 19
-      , name = callQuoteFn
+      , name = execInlineFn
       , args = []
       , results = []
       , locals = []

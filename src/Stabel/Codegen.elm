@@ -107,8 +107,8 @@ indexOfHelper idx value list =
 
 type AstNode
     = IntLiteral Int
-    | Word Int String -- id name
-    | WordRef Int String -- id name
+    | Function Int String -- id name
+    | FunctionRef Int String -- id name
     | ConstructType Int Int -- id memberQty
     | SetMember Int Int -- offset memberQty
     | GetMember Int -- offset
@@ -225,7 +225,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                         ( fnId, newContext ) =
                             idForFunction fn.name context
                     in
-                    ( Word fnId fn.name
+                    ( Function fnId fn.name
                     , newContext
                     )
 
@@ -234,7 +234,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                         ( fnId, newContext ) =
                             idForFunction fn.name context
                     in
-                    ( WordRef fnId fn.name
+                    ( FunctionRef fnId fn.name
                     , newContext
                     )
 
@@ -243,7 +243,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                         ( fnId, newContext ) =
                             idForFunction def.name context
                     in
-                    ( Word fnId def.name
+                    ( Function fnId def.name
                     , newContext
                     )
 
@@ -252,7 +252,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                         ( fnId, newContext ) =
                             idForFunction data.name context
                     in
-                    ( Word fnId data.name
+                    ( Function fnId data.name
                     , newContext
                     )
 
@@ -365,7 +365,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     Nothing
 
         maybeBoxLeadingElement =
-            case ( List.head stackInScope, isMultiWord node, List.head nodeType.input ) of
+            case ( List.head stackInScope, isMultiFunction node, List.head nodeType.input ) of
                 ( Just _, True, Just (Type.Union _ _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
@@ -384,8 +384,8 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                 _ ->
                     Nothing
 
-        isMultiWord possibleMultiWordNode =
-            case possibleMultiWordNode of
+        isMultiFunction possibleMultiFunctionNode =
+            case possibleMultiFunctionNode of
                 AST.Function _ fn _ ->
                     case fn.implementation of
                         AST.SoloImpl _ ->
@@ -731,10 +731,10 @@ nodeToInstruction context node =
                 , BaseModule.callStackPushFn
                 ]
 
-        Word id name ->
+        Function id name ->
             Wasm.Call id name
 
-        WordRef _ name ->
+        FunctionRef _ name ->
             let
                 indexOfId =
                     indexOf name context.inlineFunctionNames
@@ -844,7 +844,7 @@ nodeToInstruction context node =
                     BaseModule.callLeftRotFn
 
                 Builtin.Apply ->
-                    BaseModule.callCallQuoteFn
+                    BaseModule.callExecInlineFn
 
         Box stackPos id ->
             Wasm.Batch
