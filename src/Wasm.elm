@@ -1,5 +1,5 @@
 module Wasm exposing
-    ( FunctionDef
+    ( FunctionDefinition
     , Instruction(..)
     , Module
     , ModuleType(..)
@@ -7,8 +7,10 @@ module Wasm exposing
     , initModule
     , maximumLocalIndex
     , toString
+    , withExports
     , withFunction
     , withImport
+    , withReferencables
     , withStartFunction
     )
 
@@ -19,16 +21,16 @@ type Module
     = Module
         { typeSignatures : List TypeSignature
         , functions : List Function
-        , nextFunctionIndex : Int
-        , quotables : List Int
+        , referencableFunctions : List Int
         , imports : List Import
-        , exports : List Int
+        , exports : List ( String, Int )
         , start : Maybe Int
         }
 
 
 type alias Function =
-    { name : String
+    { id : Int
+    , name : String
     , typeSignatureIndex : Int
     , locals : List Type
     , instructions : List Instruction
@@ -81,9 +83,8 @@ type Instruction
     | Break Int
     | BreakIf Int
     | Return
-    | Call String
+    | Call Int String
     | CallIndirect
-    | FunctionIndex String -- Not actual WASM, do re-evaluate
     | Local_Get Int
     | Local_Set Int
     | Local_Tee Int
@@ -134,19 +135,17 @@ initModule : Module
 initModule =
     Module
         { typeSignatures = []
-        , nextFunctionIndex = 0
         , functions = []
-        , quotables = []
+        , referencableFunctions = []
         , imports = []
         , exports = []
         , start = Nothing
         }
 
 
-type alias FunctionDef =
-    { name : String
-    , exported : Bool
-    , isIndirectlyCalled : Bool
+type alias FunctionDefinition =
+    { id : Int
+    , name : String
     , args : List Type
     , results : List Type
     , locals : List Type
@@ -154,7 +153,7 @@ type alias FunctionDef =
     }
 
 
-withFunction : FunctionDef -> Module -> Module
+withFunction : FunctionDefinition -> Module -> Module
 withFunction funcDef (Module module_) =
     let
         typeSignature =
@@ -175,42 +174,21 @@ withFunction funcDef (Module module_) =
                     )
 
         newFunction =
-            { name = funcDef.name
+            { id = funcDef.id
+            , name = funcDef.name
             , typeSignatureIndex = tsIndex
             , locals = funcDef.locals
             , instructions = funcDef.instructions
             }
     in
     Module <|
-        { updatedModule
-            | functions = updatedModule.functions ++ [ newFunction ]
-            , nextFunctionIndex = updatedModule.nextFunctionIndex + 1
-            , quotables =
-                if funcDef.isIndirectlyCalled then
-                    updatedModule.quotables ++ [ updatedModule.nextFunctionIndex ]
-
-                else
-                    updatedModule.quotables
-            , exports =
-                if funcDef.exported then
-                    updatedModule.exports ++ [ updatedModule.nextFunctionIndex ]
-
-                else
-                    updatedModule.exports
-        }
+        { updatedModule | functions = newFunction :: updatedModule.functions }
 
 
-withStartFunction : FunctionDef -> Module -> Module
-withStartFunction funcDef module_ =
-    let
-        (Module moduleWithFunction) =
-            withFunction funcDef module_
-
-        startIdx =
-            List.length moduleWithFunction.functions - 1
-    in
+withStartFunction : Int -> Module -> Module
+withStartFunction startIdx (Module fields) =
     Module <|
-        { moduleWithFunction | start = Just startIdx }
+        { fields | start = Just startIdx }
 
 
 withImport : String -> String -> ModuleType -> Module -> Module
@@ -218,27 +196,38 @@ withImport importModule entityName typeToImport (Module module_) =
     Module
         { module_
             | imports =
-                module_.imports
-                    ++ [ { moduleName = importModule
-                         , entityName = entityName
-                         , type_ = typeToImport
-                         }
-                       ]
+                { moduleName = importModule
+                , entityName = entityName
+                , type_ = typeToImport
+                }
+                    :: module_.imports
         }
 
 
+withReferencables : List Int -> Module -> Module
+withReferencables references (Module module_) =
+    Module <|
+        { module_ | referencableFunctions = references }
+
+
+withExports : List ( String, Int ) -> Module -> Module
+withExports exports (Module module_) =
+    Module <|
+        { module_ | exports = exports }
+
+
 toString : Module -> String
-toString ((Module module_) as fullModule) =
+toString (Module module_) =
     [ Str "(module"
-    , List.concatMap formatImports module_.imports
+    , List.map formatImport module_.imports
         |> Indent
     , List.concatMap formatTypeSignature module_.typeSignatures
         |> Indent
-    , formatTable fullModule
+    , formatTable module_.referencableFunctions
         |> Indent
-    , List.concatMap (formatFunction fullModule) module_.functions
+    , List.concatMap formatFunction (List.sortBy .id module_.functions)
         |> Indent
-    , List.concatMap (formatExport fullModule) module_.exports
+    , List.map formatExport module_.exports
         |> Indent
     , formatStartFunction module_.start
     , Str ")"
@@ -248,9 +237,16 @@ toString ((Module module_) as fullModule) =
         |> String.join "\n"
 
 
-formatImports : Import -> List FormatHint
-formatImports importType =
-    [ Str <| "(import \"" ++ importType.moduleName ++ "\" \"" ++ importType.entityName ++ "\" " ++ moduleTypeToString importType.type_ ++ ")" ]
+formatImport : Import -> FormatHint
+formatImport importType =
+    Str <|
+        "(import \""
+            ++ importType.moduleName
+            ++ "\" \""
+            ++ importType.entityName
+            ++ "\" "
+            ++ moduleTypeToString importType.type_
+            ++ ")"
 
 
 formatTypeSignature : TypeSignature -> List FormatHint
@@ -261,14 +257,18 @@ formatTypeSignature typeSignature =
                 ""
 
             else
-                "(param " ++ (String.join " " <| List.map typeToString typeSignature.inputs) ++ ")"
+                "(param "
+                    ++ (String.join " " <| List.map typeToString typeSignature.inputs)
+                    ++ ")"
 
         results =
             if List.isEmpty typeSignature.outputs then
                 ""
 
             else
-                "(result " ++ (String.join " " <| List.map typeToString typeSignature.outputs) ++ ")"
+                "(result "
+                    ++ (String.join " " <| List.map typeToString typeSignature.outputs)
+                    ++ ")"
 
         formattedSignature =
             [ "(type"
@@ -283,13 +283,13 @@ formatTypeSignature typeSignature =
     [ Str formattedSignature ]
 
 
-formatTable : Module -> List FormatHint
-formatTable (Module module_) =
+formatTable : List Int -> List FormatHint
+formatTable references =
     let
         tableDef =
             String.join " "
                 [ "(table"
-                , String.fromInt (List.length module_.quotables)
+                , String.fromInt (List.length references)
                 , "funcref)"
                 ]
 
@@ -298,7 +298,7 @@ formatTable (Module module_) =
                 [ "(elem"
                 , "(i32.const 0)"
                 , String.join " " <|
-                    List.map (\funcIdx -> String.fromInt funcIdx) module_.quotables
+                    List.map String.fromInt references
                 , ")"
                 ]
     in
@@ -307,8 +307,8 @@ formatTable (Module module_) =
     ]
 
 
-formatFunction : Module -> Function -> List FormatHint
-formatFunction module_ function =
+formatFunction : Function -> List FormatHint
+formatFunction function =
     let
         locals =
             if List.isEmpty function.locals then
@@ -326,31 +326,31 @@ formatFunction module_ function =
                 ]
     in
     [ Str fullFuncDef
-    , Indent <| List.map (formatInstruction module_) function.instructions
+    , Indent <| List.map formatInstruction function.instructions
     , Str ")"
     ]
 
 
-formatInstruction : Module -> Instruction -> FormatHint
-formatInstruction ((Module module_) as fullModule) ins =
+formatInstruction : Instruction -> FormatHint
+formatInstruction ins =
     case ins of
         NoOp ->
             Str "nop"
 
         Batch insList ->
-            BatchFormat <| List.map (formatInstruction fullModule) insList
+            BatchFormat <| List.map formatInstruction insList
 
         Block insList ->
             BatchFormat
                 [ Str "(block"
-                , Indent <| List.map (formatInstruction fullModule) insList
+                , Indent <| List.map formatInstruction insList
                 , Str ")"
                 ]
 
         Loop insList ->
             BatchFormat
                 [ Str "(loop"
-                , Indent <| List.map (formatInstruction fullModule) insList
+                , Indent <| List.map formatInstruction insList
                 , Str ")"
                 ]
 
@@ -363,32 +363,11 @@ formatInstruction ((Module module_) as fullModule) ins =
         Return ->
             Str "return"
 
-        Call word ->
-            case List.findIndex (\f -> f.name == word) module_.functions of
-                Just idx ->
-                    Str <| "(call " ++ String.fromInt idx ++ ") ;; $" ++ word
-
-                Nothing ->
-                    Debug.todo "Did not expect this"
+        Call id fnName ->
+            Str <| "(call " ++ String.fromInt id ++ ") ;; $" ++ fnName
 
         CallIndirect ->
             Str "call_indirect"
-
-        FunctionIndex word ->
-            case List.findIndex (\f -> f.name == word) module_.functions of
-                Just idx ->
-                    case List.findIndex ((==) idx) module_.quotables of
-                        Just quoteIdx ->
-                            BatchFormat
-                                [ Str <| "(i32.const " ++ String.fromInt quoteIdx ++ ") ;; $" ++ word
-                                , Str "(call $__stack_push)" -- TODO: WASM module should have no knowledge of runtime
-                                ]
-
-                        Nothing ->
-                            Debug.todo "Did not expect this"
-
-                Nothing ->
-                    Debug.todo "Did not expect this"
 
         Local_Get idx ->
             Str <| "(local.get " ++ String.fromInt idx ++ ")"
@@ -436,7 +415,7 @@ formatInstruction ((Module module_) as fullModule) ins =
             Str "unreachable"
 
         Commented comment inst ->
-            case formatInstruction fullModule inst of
+            case formatInstruction inst of
                 Str val ->
                     Str <| val ++ ";; " ++ comment
 
@@ -447,14 +426,14 @@ formatInstruction ((Module module_) as fullModule) ins =
                     Indent <| (Str <| ";; " ++ comment) :: batch
 
 
-formatExport : Module -> Int -> List FormatHint
-formatExport (Module module_) idx =
-    case List.getAt idx module_.functions of
-        Just func ->
-            [ Str <| "(export \"" ++ func.name ++ "\" (func " ++ String.fromInt idx ++ "))" ]
-
-        Nothing ->
-            Debug.todo "Did not expect this..."
+formatExport : ( String, Int ) -> FormatHint
+formatExport ( functionName, index ) =
+    Str <|
+        "(export \""
+            ++ functionName
+            ++ "\" (func "
+            ++ String.fromInt index
+            ++ "))"
 
 
 formatStartFunction : Maybe Int -> FormatHint

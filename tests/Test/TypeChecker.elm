@@ -308,7 +308,6 @@ suite =
                             , output = [ Type.Generic "b" ]
                             }
                         , sourceLocation = Nothing
-                        , isInline = False
                         , implementation =
                             SoloImpl
                                 [ Builtin emptyRange Builtin.StackSwap
@@ -324,7 +323,6 @@ suite =
                                     , output = [ Type.Int ]
                                     }
                               , sourceLocation = Nothing
-                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ IntLiteral emptyRange 1

@@ -25,6 +25,7 @@ import Stabel.TypeChecker.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
+    , referencableFunctions : Set String
     }
 
 
@@ -36,7 +37,6 @@ type alias FunctionDefinition =
     { name : String
     , sourceLocation : Maybe SourceLocationRange
     , type_ : FunctionType
-    , isInline : Bool
     , implementation : FunctionImplementation
     }
 
@@ -72,6 +72,7 @@ type alias CycleData =
     { name : String
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : FunctionType
+    , isMultiFunction : Bool
     }
 
 
@@ -93,7 +94,6 @@ type alias Context =
     { types : Dict String TypeDefinition
     , typedFunctions : Dict String FunctionDefinition
     , untypedFunctions : Dict String Qualifier.FunctionDefinition
-    , referenceableFunctions : Set String
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
@@ -106,7 +106,6 @@ initContext ast =
     { types = ast.types
     , typedFunctions = Dict.empty
     , untypedFunctions = ast.functions
-    , referenceableFunctions = ast.referenceableFunctions
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
@@ -180,6 +179,7 @@ typeCheck context ast =
         Ok <|
             { types = updatedContext.types
             , functions = updatedContext.typedFunctions
+            , referencableFunctions = ast.referenceableFunctions
             }
 
     else
@@ -231,7 +231,6 @@ typeCheckSoloImplementation context untypedDef impl =
             , type_ =
                 untypedDef.typeSignature
                     |> TypeSignature.withDefault inferredType
-            , isInline = Set.member untypedDef.name context.referenceableFunctions
             , implementation = typedImplementation
             }
 
@@ -243,7 +242,9 @@ typeCheckSoloImplementation context untypedDef impl =
                 |> verifyTypeSignature inferredType untypedDef
                 |> cleanContext
     in
-    ( typedDef, finalContext )
+    ( typedDef
+    , finalContext
+    )
 
 
 untypedToTypedImplementation : Context -> List Qualifier.Node -> List AstNode
@@ -294,6 +295,7 @@ untypedToTypedNode idx context untypedNode =
                 { name = data.name
                 , sourceLocation = data.sourceLocation
                 , typeSignature = functionType
+                , isMultiFunction = data.isMultiFunction
                 }
 
         Qualifier.Builtin range builtin ->
@@ -425,7 +427,6 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
             { name = untypedDef.name
             , sourceLocation = untypedDef.sourceLocation
             , type_ = exposedType
-            , isInline = Set.member untypedDef.name context.referenceableFunctions
             , implementation =
                 MultiImpl
                     (List.map
@@ -452,7 +453,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 |> verifyTypeSignature inferredType untypedDef
                 |> cleanContext
     in
-    ( typedDef, finalContext )
+    ( typedDef
+    , finalContext
+    )
 
 
 resolveWhenConditions : Qualifier.FunctionDefinition -> Qualifier.TypeMatch -> Qualifier.TypeMatch

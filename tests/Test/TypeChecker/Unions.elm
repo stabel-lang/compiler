@@ -203,7 +203,6 @@ suite =
                         { name = "Nil"
                         , type_ = { input = [], output = [ Type.Custom "Nil" ] }
                         , sourceLocation = Nothing
-                        , isInline = False
                         , implementation =
                             SoloImpl
                                 [ ConstructType nilTypeDef ]
@@ -222,7 +221,6 @@ suite =
                             , output = [ Type.Generic "a" ]
                             }
                         , sourceLocation = Nothing
-                        , isInline = False
                         , implementation =
                             MultiImpl
                                 [ ( TypeMatch emptyRange (Type.Generic "a") []
@@ -244,7 +242,6 @@ suite =
                             , { name = "main"
                               , type_ = { input = [], output = [ Type.Int ] }
                               , sourceLocation = Nothing
-                              , isInline = False
                               , implementation =
                                     SoloImpl
                                         [ Function emptyRange

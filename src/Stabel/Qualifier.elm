@@ -64,6 +64,7 @@ type alias CycleData =
     , sourceLocation : Maybe SourceLocationRange
     , typeSignature : TypeSignature
     , exposed : Bool
+    , isMultiFunction : Bool
     }
 
 
@@ -1154,6 +1155,7 @@ qualifyNode config currentDefName node acc =
                                                                             , sourceLocation = Maybe.map mapLoc fn.sourceLocationRange
                                                                             , typeSignature = typeSignature
                                                                             , exposed = exposed
+                                                                            , isMultiFunction = isMultiFunction fn
                                                                             }
                                                                         )
                                                                         :: acc.qualifiedNodes
@@ -1410,6 +1412,16 @@ qualifyNode config currentDefName node acc =
 
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
+
+
+isMultiFunction : Parser.FunctionDefinition -> Bool
+isMultiFunction def =
+    case def.implementation of
+        Parser.SoloImpl _ ->
+            False
+
+        Parser.MultiImpl _ _ ->
+            True
 
 
 qualifyName : RunConfig -> String -> String
