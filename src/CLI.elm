@@ -9,7 +9,7 @@ import Stabel.Data.PackagePath as PackagePath
 import Stabel.PackageLoader as PackageLoader
 import Stabel.TypeChecker as TypeChecker
 import Stabel.TypeChecker.Problem as TypeCheckerProblem
-import Wasm
+import Stabel.Wasm as Wasm
 
 
 type alias Flags =

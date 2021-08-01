@@ -29,6 +29,7 @@ import Stabel.Qualifier.Problem as QualifierProblem
 type Problem
     = InvalidPackageMetadata String String
     | UnknownMessageForState String
+    | UnknownMessageForCompile String
     | NoExposedModulesInRootProject
     | ModuleNotFound String
     | ParserError String (List (DeadEnd ParserProblem.Context ParserProblem.Problem))
@@ -46,6 +47,9 @@ problemToString problem =
 
                 UnknownMessageForState msg ->
                     "Unknown message for state: " ++ msg
+
+                UnknownMessageForCompile msg ->
+                    "Unknown message for compilation stage: " ++ msg
 
                 NoExposedModulesInRootProject ->
                     "No exposed modules in root project"
@@ -287,7 +291,7 @@ loadingMetadataUpdate msg state remainingPaths =
                             nextStep pathsToLoad updatedState ""
 
                 Err err ->
-                    Debug.todo (Json.errorToString err)
+                    Failed <| InternalError <| Json.errorToString err
 
         ResolvedDirectories parentDir paths ->
             let
@@ -528,8 +532,11 @@ parsingUpdate msg state remainingModules =
                 ( Nothing, _ ) ->
                     Failed <| InternalError <| "Don't know why we read file: " ++ fullPath
 
-        _ ->
-            Failed <| InternalError <| "Unknown message for compile stage: " ++ Debug.toString msg
+        ResolvedDirectories _ _ ->
+            Failed <| UnknownMessageForCompile "ResolvedDirectories"
+
+        ResolvedPackageModules _ _ ->
+            Failed <| UnknownMessageForCompile "ResolvedPackageModules"
 
 
 absoluteModuleName : PackageName -> ModuleName -> String

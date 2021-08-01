@@ -51,6 +51,17 @@ suite =
                         PackageLoader.init initOpts
                             |> resolveSideEffects testFiles []
                             |> Result.map Tuple.second
+
+                    numberDef =
+                        { name = "/stabel/version/version/data/number"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature = TypeSignature.NotProvided
+                        , implementation =
+                            Qualifier.SoloImpl
+                                [ Qualifier.Integer emptyRange 2
+                                ]
+                        }
                 in
                 case loaderResult of
                     Err msg ->
@@ -67,20 +78,12 @@ suite =
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Function emptyRange "/stabel/version/version/data/number"
+                                                [ Qualifier.Function emptyRange numberDef
                                                 , Qualifier.Integer emptyRange 1
                                                 , Qualifier.Builtin emptyRange Builtin.Plus
                                                 ]
                                       }
-                                    , { name = "/stabel/version/version/data/number"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            Qualifier.SoloImpl
-                                                [ Qualifier.Integer emptyRange 2
-                                                ]
-                                      }
+                                    , numberDef
                                     ]
                             , referenceableFunctions = Set.empty
                             }
@@ -92,6 +95,29 @@ suite =
                         PackageLoader.init initOpts
                             |> resolveSideEffects testFilesInternalConsistency []
                             |> Result.map Tuple.second
+
+                    bumpVersionDef =
+                        { name = "/robheghan/dummy/mod1/bump-version"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature = TypeSignature.NotProvided
+                        , implementation =
+                            Qualifier.SoloImpl
+                                [ Qualifier.Integer emptyRange 1
+                                , Qualifier.Builtin emptyRange Builtin.Plus
+                                ]
+                        }
+
+                    versionDef =
+                        { name = "/robheghan/dummy/mod2/version"
+                        , exposed = True
+                        , sourceLocation = Nothing
+                        , typeSignature = TypeSignature.NotProvided
+                        , implementation =
+                            Qualifier.SoloImpl
+                                [ Qualifier.Integer emptyRange 5
+                                ]
+                        }
                 in
                 case loaderResult of
                     Err msg ->
@@ -102,33 +128,16 @@ suite =
                             { types = Dict.empty
                             , functions =
                                 Dict.fromListBy .name
-                                    [ { name = "/robheghan/dummy/mod1/bump-version"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            Qualifier.SoloImpl
-                                                [ Qualifier.Integer emptyRange 1
-                                                , Qualifier.Builtin emptyRange Builtin.Plus
-                                                ]
-                                      }
-                                    , { name = "/robheghan/dummy/mod2/version"
-                                      , exposed = True
-                                      , sourceLocation = Nothing
-                                      , typeSignature = TypeSignature.NotProvided
-                                      , implementation =
-                                            Qualifier.SoloImpl
-                                                [ Qualifier.Integer emptyRange 5
-                                                ]
-                                      }
+                                    [ versionDef
+                                    , bumpVersionDef
                                     , { name = "/robheghan/dummy/mod3/next-version"
                                       , exposed = True
                                       , sourceLocation = Nothing
                                       , typeSignature = TypeSignature.NotProvided
                                       , implementation =
                                             Qualifier.SoloImpl
-                                                [ Qualifier.Function emptyRange "/robheghan/dummy/mod2/version"
-                                                , Qualifier.Function emptyRange "/robheghan/dummy/mod1/bump-version"
+                                                [ Qualifier.Function emptyRange versionDef
+                                                , Qualifier.Function emptyRange bumpVersionDef
                                                 ]
                                       }
                                     ]

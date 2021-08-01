@@ -1,16 +1,11 @@
-module Test.Qualifier.Errors exposing (..)
+module Test.Qualifier.Errors exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
-import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Parser as AST
-import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
-import Stabel.Parser.ModuleDefinition as ModuleDefinition
-import Stabel.Parser.SourceLocation as PSourceLoc
-import Stabel.Parser.Type as AST
-import Stabel.Qualifier exposing (..)
+import Stabel.Parser as Parser
+import Stabel.Qualifier as Qualifier
 import Stabel.Qualifier.Problem exposing (Problem(..))
 import Test exposing (Test, describe, test)
 
@@ -22,156 +17,64 @@ suite =
             [ test "Word" <|
                 \_ ->
                     let
-                        ast =
-                            { sourceReference = ""
-                            , moduleDefinition = ModuleDefinition.Undefined
-                            , types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "inc"
-                                      , typeSignature = AssociatedFunctionSignature.NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.Integer PSourceLoc.emptyRange 1
-                                                , AST.Function PSourceLoc.emptyRange "+"
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , typeSignature = AssociatedFunctionSignature.NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.Integer PSourceLoc.emptyRange 1
-                                                , AST.Function PSourceLoc.emptyRange "inc"
-                                                , AST.Function PSourceLoc.emptyRange "inc"
-                                                , AST.Function PSourceLoc.emptyRange "dec"
-                                                , AST.Integer PSourceLoc.emptyRange 2
-                                                , AST.Function PSourceLoc.emptyRange "="
-                                                ]
-                                      }
-                                    ]
-                            }
+                        source =
+                            """
+                            def: inc
+                            : 1 +
+
+                            def: main
+                            : 1 inc inc dec 2 =
+                            """
                     in
-                    checkForError (noSuchWordReferenceError "dec") ast
+                    checkForError (noSuchWordReferenceError "dec") source
             , test "External" <|
                 \_ ->
                     let
-                        ast =
-                            { sourceReference = ""
-                            , moduleDefinition = ModuleDefinition.Undefined
-                            , types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "main"
-                                      , typeSignature = AssociatedFunctionSignature.NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.Integer PSourceLoc.emptyRange 1
-                                                , AST.Function PSourceLoc.emptyRange "/external/module/inc"
-                                                ]
-                                      }
-                                    ]
-                            }
+                        source =
+                            """
+                            def: main
+                            : 1 /external/module/inc
+                            """
                     in
-                    checkForError (noSuchWordReferenceError "/external/module/inc") ast
+                    checkForError (noSuchWordReferenceError "/external/module/inc") source
             , test "Type" <|
                 \_ ->
                     let
-                        ast =
-                            { sourceReference = ""
-                            , moduleDefinition = ModuleDefinition.Undefined
-                            , types = Dict.empty
-                            , functions =
-                                Dict.fromListBy .name
-                                    [ { name = "inc"
-                                      , typeSignature =
-                                            AssociatedFunctionSignature.UserProvided
-                                                { input = [ AST.NotStackRange <| AST.LocalRef "Ints" [] ]
-                                                , output = [ AST.NotStackRange <| AST.LocalRef "Int" [] ]
-                                                }
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.Integer PSourceLoc.emptyRange 1
-                                                , AST.Function PSourceLoc.emptyRange "+"
-                                                ]
-                                      }
-                                    , { name = "main"
-                                      , typeSignature = AssociatedFunctionSignature.NotProvided
-                                      , sourceLocationRange = Nothing
-                                      , aliases = Dict.empty
-                                      , imports = Dict.empty
-                                      , implementation =
-                                            AST.SoloImpl
-                                                [ AST.Integer PSourceLoc.emptyRange 1
-                                                , AST.Function PSourceLoc.emptyRange "inc"
-                                                , AST.Integer PSourceLoc.emptyRange 2
-                                                , AST.Function PSourceLoc.emptyRange "="
-                                                ]
-                                      }
-                                    ]
-                            }
+                        source =
+                            """
+                            def: inc
+                            type: Ints -- Int
+                            : 1 +
+
+                            def: main
+                            : 1 inc 2 =
+                            """
                     in
-                    checkForError (noSuchTypeReferenceError "Ints") ast
+                    checkForError (noSuchTypeReferenceError "Ints") source
             , test "Wrong reference within union definition" <|
                 \_ ->
                     let
-                        ast =
-                            { sourceReference = ""
-                            , moduleDefinition = ModuleDefinition.Undefined
-                            , types =
-                                Dict.fromListBy .name
-                                    [ { name = "USMoney"
-                                      , sourceLocation = PSourceLoc.emptyRange
-                                      , generics = []
-                                      , members =
-                                            AST.UnionMembers
-                                                [ AST.LocalRef "Dollar" []
-                                                , AST.LocalRef "Cent" []
-                                                ]
-                                      }
-                                    , { name = "Dollar"
-                                      , sourceLocation = PSourceLoc.emptyRange
-                                      , generics = []
-                                      , members =
-                                            AST.StructMembers
-                                                [ ( "dollar-value", AST.LocalRef "Int" [] ) ]
-                                      }
-                                    ]
-                            , functions = Dict.empty
-                            }
+                        source =
+                            """
+                            defunion: USMoney
+                            : Dollar
+                            : Cent
+
+                            defstruct: Dollar
+                            : dollar-value Int
+                            """
                     in
-                    checkForError (noSuchTypeReferenceError "Cent") ast
+                    checkForError (noSuchTypeReferenceError "Cent") source
             , test "Wrong reference within custom type definition" <|
                 \_ ->
                     let
-                        ast =
-                            { sourceReference = ""
-                            , moduleDefinition = ModuleDefinition.Undefined
-                            , types =
-                                Dict.fromListBy .name
-                                    [ { name = "BoxWrapper"
-                                      , sourceLocation = PSourceLoc.emptyRange
-                                      , generics = []
-                                      , members =
-                                            AST.StructMembers
-                                                [ ( "box", AST.LocalRef "Box" [] ) ]
-                                      }
-                                    ]
-                            , functions = Dict.empty
-                            }
+                        source =
+                            """
+                            defstruct: BoxWrapper
+                            : box Box
+                            """
                     in
-                    checkForError (noSuchTypeReferenceError "Box") ast
+                    checkForError (noSuchTypeReferenceError "Box") source
             ]
         ]
 
@@ -196,29 +99,34 @@ noSuchTypeReferenceError name problem =
             False
 
 
-checkForError : (Problem -> Bool) -> AST.AST -> Expectation
+checkForError : (Problem -> Bool) -> String -> Expectation
 checkForError fn source =
-    let
-        result =
-            run
-                { packageName = ""
-                , modulePath = ""
-                , ast = source
-                , externalModules = Dict.empty
-                , inProgressAST =
-                    { types = Dict.empty
-                    , functions = Dict.empty
-                    , referenceableFunctions = Set.empty
-                    }
-                }
-    in
-    case result of
+    case Parser.run "test" source of
         Err errors ->
-            if List.any fn errors then
-                Expect.pass
+            Expect.fail <| "Parser error: " ++ Debug.toString errors
 
-            else
-                Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+        Ok parserAst ->
+            let
+                result =
+                    Qualifier.run
+                        { packageName = ""
+                        , modulePath = ""
+                        , ast = parserAst
+                        , externalModules = Dict.empty
+                        , inProgressAST =
+                            { types = Dict.empty
+                            , functions = Dict.empty
+                            , referenceableFunctions = Set.empty
+                            }
+                        }
+            in
+            case result of
+                Err errors ->
+                    if List.any fn errors then
+                        Expect.pass
 
-        Ok _ ->
-            Expect.fail "Did not expect parsing to succeed"
+                    else
+                        Expect.fail <| "Failed for unexpected reason: " ++ Debug.toString errors
+
+                Ok _ ->
+                    Expect.fail "Did not expect parsing to succeed"

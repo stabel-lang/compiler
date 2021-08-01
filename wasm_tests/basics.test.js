@@ -14,13 +14,16 @@ test('Simple expression', async () => {
 test('Function calls', async () => {
     const wat = await compiler.toWat('main', `
         def: main
-        : 1 inc inc
+        : 1 inc inc dec 2 =
 
         def: inc
         : 1 +
+
+        def: dec
+        : 1 -
     `);
 
     const result = await compiler.run(wat, 'main');
 
-    expect(result.stackElement()).toBe(3);
+    expect(result.stackElement()).toBe(1);
 });

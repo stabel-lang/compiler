@@ -81,14 +81,20 @@ referencedGenerics t =
 genericlyCompatible : Type -> Type -> Bool
 genericlyCompatible lhs rhs =
     case ( lhs, rhs ) of
-        ( Generic _, _ ) ->
+        ( Generic _, Generic _ ) ->
             True
+
+        ( Generic _, _ ) ->
+            False
 
         ( _, Generic _ ) ->
             True
 
         ( CustomGeneric lName _, CustomGeneric rName _ ) ->
             lName == rName
+
+        ( Union _ lMems, Union _ rMems ) ->
+            lMems == rMems
 
         _ ->
             lhs == rhs
@@ -147,8 +153,11 @@ toDisplayString t =
         Custom name ->
             name
 
-        CustomGeneric name _ ->
+        CustomGeneric name [] ->
             name
+
+        CustomGeneric name gens ->
+            name ++ "<" ++ String.join ", " (List.map toDisplayString gens) ++ ">"
 
         Union (Just name) _ ->
             name

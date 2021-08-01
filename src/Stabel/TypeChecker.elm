@@ -1,6 +1,7 @@
 module Stabel.TypeChecker exposing
     ( AST
     , AstNode(..)
+    , CycleData
     , FunctionDefinition
     , FunctionImplementation(..)
     , TypeDefinition
@@ -24,6 +25,7 @@ import Stabel.TypeChecker.Problem exposing (Problem(..))
 type alias AST =
     { types : Dict String TypeDefinition
     , functions : Dict String FunctionDefinition
+    , referencableFunctions : Set String
     }
 
 
@@ -35,7 +37,6 @@ type alias FunctionDefinition =
     { name : String
     , sourceLocation : Maybe SourceLocationRange
     , type_ : FunctionType
-    , isInline : Bool
     , implementation : FunctionImplementation
     }
 
@@ -57,12 +58,22 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
-    | Function SourceLocationRange String FunctionType
-    | FunctionRef SourceLocationRange String
-    | ConstructType String
-    | SetMember String String Type
-    | GetMember String String Type
+    | Function SourceLocationRange FunctionDefinition FunctionType
+    | FunctionRef SourceLocationRange FunctionDefinition
+    | Recurse SourceLocationRange
+    | Cycle SourceLocationRange CycleData
     | Builtin SourceLocationRange Builtin
+    | ConstructType TypeDefinition
+    | SetMember TypeDefinition String Int Type
+    | GetMember TypeDefinition String Int Type
+
+
+type alias CycleData =
+    { name : String
+    , sourceLocation : Maybe SourceLocationRange
+    , typeSignature : FunctionType
+    , isMultiFunction : Bool
+    }
 
 
 type StackEffect
@@ -83,11 +94,9 @@ type alias Context =
     { types : Dict String TypeDefinition
     , typedFunctions : Dict String FunctionDefinition
     , untypedFunctions : Dict String Qualifier.FunctionDefinition
-    , referenceableFunctions : Set String
     , stackEffects : List StackEffect
     , boundGenerics : Dict String Type
     , boundStackRanges : Dict String (List Type)
-    , callStack : Set String
     , errors : List Problem
     }
 
@@ -97,11 +106,9 @@ initContext ast =
     { types = ast.types
     , typedFunctions = Dict.empty
     , untypedFunctions = ast.functions
-    , referenceableFunctions = ast.referenceableFunctions
     , stackEffects = []
     , boundGenerics = Dict.empty
     , boundStackRanges = Dict.empty
-    , callStack = Set.empty
     , errors =
         ast.types
             |> Dict.values
@@ -163,63 +170,81 @@ typeCheck : Context -> Qualifier.AST -> Result (List Problem) AST
 typeCheck context ast =
     let
         updatedContext =
-            Dict.foldl (\_ v acc -> typeCheckDefinition v acc) context ast.functions
+            Dict.foldl
+                (\_ v acc -> Tuple.second <| typeCheckDefinition v acc)
+                context
+                ast.functions
     in
     if List.isEmpty updatedContext.errors then
         Ok <|
             { types = updatedContext.types
             , functions = updatedContext.typedFunctions
+            , referencableFunctions = ast.referenceableFunctions
             }
 
     else
         Err updatedContext.errors
 
 
-typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> Context
+typeCheckDefinition : Qualifier.FunctionDefinition -> Context -> ( FunctionDefinition, Context )
 typeCheckDefinition untypedDef context =
     case Dict.get untypedDef.name context.typedFunctions of
-        Just _ ->
-            context
+        Just def ->
+            ( def, context )
 
         Nothing ->
             case untypedDef.implementation of
                 Qualifier.SoloImpl impl ->
-                    typeCheckSoloImplementation context untypedDef impl
+                    typeCheckSoloImplementation
+                        context
+                        untypedDef
+                        impl
 
                 Qualifier.MultiImpl initialWhens defaultImpl ->
-                    typeCheckMultiImplementation context untypedDef initialWhens defaultImpl
+                    typeCheckMultiImplementation
+                        context
+                        untypedDef
+                        initialWhens
+                        defaultImpl
 
 
 
 -- Type Check Solo Impl --
 
 
-typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qualifier.Node -> Context
+typeCheckSoloImplementation : Context -> Qualifier.FunctionDefinition -> List Qualifier.Node -> ( FunctionDefinition, Context )
 typeCheckSoloImplementation context untypedDef impl =
     let
         ( inferredType, newContext ) =
-            typeCheckImplementation untypedDef impl (cleanContext context)
+            typeCheckImplementation
+                untypedDef
+                untypedDef.typeSignature
+                impl
+                (cleanContext context)
 
         typedImplementation =
             SoloImpl (untypedToTypedImplementation newContext impl)
 
+        typedDef =
+            { name = untypedDef.name
+            , sourceLocation = untypedDef.sourceLocation
+            , type_ =
+                untypedDef.typeSignature
+                    |> TypeSignature.withDefault inferredType
+            , implementation = typedImplementation
+            }
+
         finalContext =
             { newContext
                 | typedFunctions =
-                    Dict.insert untypedDef.name
-                        { name = untypedDef.name
-                        , sourceLocation = untypedDef.sourceLocation
-                        , type_ =
-                            untypedDef.typeSignature
-                                |> TypeSignature.withDefault inferredType
-                        , isInline = Set.member untypedDef.name context.referenceableFunctions
-                        , implementation = typedImplementation
-                        }
-                        newContext.typedFunctions
+                    Dict.insert untypedDef.name typedDef newContext.typedFunctions
             }
+                |> verifyTypeSignature inferredType untypedDef
+                |> cleanContext
     in
-    verifyTypeSignature inferredType untypedDef finalContext
-        |> cleanContext
+    ( typedDef
+    , finalContext
+    )
 
 
 untypedToTypedImplementation : Context -> List Qualifier.Node -> List AstNode
@@ -241,82 +266,81 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.Integer range num ->
             IntLiteral range num
 
-        Qualifier.Function range name ->
-            case Dict.get name context.typedFunctions of
-                Just def ->
-                    let
-                        resolvedFunctionType =
-                            { input =
-                                def.type_.input
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            , output =
-                                def.type_.output
-                                    |> List.map (tagGeneric idx >> replaceGenericWithBoundValue)
-                            }
-
-                        replaceGenericWithBoundValue t =
-                            let
-                                boundType =
-                                    case getGenericBinding context t of
-                                        Just boundValue ->
-                                            boundValue
-
-                                        Nothing ->
-                                            t
-                            in
-                            case boundType of
-                                -- TODO: not structs?
-                                Type.Union unionName members ->
-                                    Type.Union unionName <|
-                                        List.map replaceGenericWithBoundValue members
-
-                                _ ->
-                                    boundType
-                    in
-                    Function range name resolvedFunctionType
-
-                Nothing ->
-                    -- TODO: this can't be right?
-                    Dict.get name context.untypedFunctions
-                        |> Maybe.andThen (.typeSignature >> TypeSignature.toMaybe)
-                        |> Maybe.withDefault { input = [], output = [] }
-                        |> Function range name
+        Qualifier.Function range function ->
+            let
+                ( def, _ ) =
+                    typeCheckDefinition function context
+            in
+            Function range def <|
+                resolveGenericsInFunctionType idx context def.type_
 
         Qualifier.FunctionRef range ref ->
-            FunctionRef range ref
+            let
+                ( def, _ ) =
+                    typeCheckDefinition ref context
+            in
+            FunctionRef range def
 
-        Qualifier.ConstructType typeName ->
-            ConstructType typeName
+        Qualifier.Recurse range ->
+            Recurse range
 
-        Qualifier.SetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    SetMember typeName memberName memberType
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
-
-        Qualifier.GetMember typeName memberName ->
-            case getMemberType context.types typeName memberName of
-                Just memberType ->
-                    GetMember typeName memberName memberType
-
-                Nothing ->
-                    Debug.todo "Inconcievable!"
+        Qualifier.Cycle range data ->
+            let
+                functionType =
+                    data.typeSignature
+                        |> TypeSignature.map (resolveGenericsInFunctionType idx context)
+                        |> TypeSignature.withDefault Type.emptyFunctionType
+            in
+            Cycle range
+                { name = data.name
+                , sourceLocation = data.sourceLocation
+                , typeSignature = functionType
+                , isMultiFunction = data.isMultiFunction
+                }
 
         Qualifier.Builtin range builtin ->
             Builtin range builtin
 
+        Qualifier.ConstructType typeDef ->
+            ConstructType typeDef
 
-getMemberType : Dict String TypeDefinition -> String -> String -> Maybe Type
-getMemberType typeDict typeName memberName =
-    case getMembers typeName typeDict of
-        Just (Qualifier.StructMembers members) ->
-            List.find (\( name, _ ) -> name == memberName) members
-                |> Maybe.map Tuple.second
+        Qualifier.SetMember typeDef memberName memberIndex memberType ->
+            SetMember typeDef memberName memberIndex memberType
 
-        _ ->
-            Nothing
+        Qualifier.GetMember typeDef memberName memberIndex memberType ->
+            GetMember typeDef memberName memberIndex memberType
+
+
+resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
+resolveGenericsInFunctionType idx context wt =
+    let
+        replaceGenericWithBoundValue t =
+            let
+                boundType =
+                    case getGenericBinding context t of
+                        Just boundValue ->
+                            boundValue
+
+                        Nothing ->
+                            t
+            in
+            case boundType of
+                Type.Union unionName members ->
+                    Type.Union unionName <|
+                        List.map replaceGenericWithBoundValue members
+
+                Type.CustomGeneric name members ->
+                    Type.CustomGeneric name <|
+                        List.map replaceGenericWithBoundValue members
+
+                _ ->
+                    boundType
+    in
+    { input =
+        List.map (tagGeneric idx >> replaceGenericWithBoundValue) wt.input
+    , output =
+        List.map (tagGeneric idx >> replaceGenericWithBoundValue) wt.output
+    }
 
 
 
@@ -328,10 +352,10 @@ typeCheckMultiImplementation :
     -> Qualifier.FunctionDefinition
     -> List ( Qualifier.TypeMatch, List Qualifier.Node )
     -> List Qualifier.Node
-    -> Context
+    -> ( FunctionDefinition, Context )
 typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
     let
-        whens =
+        allBranches =
             case defaultImpl of
                 [] ->
                     initialWhens
@@ -339,22 +363,27 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 _ ->
                     let
                         ( inferredDefaultType, _ ) =
-                            typeCheckImplementation untypedDef defaultImpl (cleanContext context)
+                            typeCheckImplementation
+                                untypedDef
+                                untypedDef.typeSignature
+                                defaultImpl
+                                (cleanContext context)
                     in
                     case inferredDefaultType.input of
                         [] ->
-                            -- TODO: Generic arg?
-                            -- TODO: Add test to see if we can make this fail
-                            Debug.todo "Default impl doesn't have an input argument"
+                            ( Qualifier.TypeMatch SourceLocation.emptyRange (Type.Generic "*") [], defaultImpl ) :: initialWhens
 
                         firstType :: _ ->
                             ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
+
+        whens =
+            List.map (Tuple.mapFirst (resolveWhenConditions untypedDef)) allBranches
 
         ( inferredWhenTypes, newContext ) =
             whens
                 |> List.foldr (inferWhenTypes untypedDef) ( [], context )
                 |> Tuple.mapFirst normalizeWhenTypes
-                |> (\( wts, ctx ) -> simplifyWhenFunctionTypes wts ctx)
+                |> simplifyWhenFunctionTypes
                 |> Tuple.mapFirst (List.map2 Tuple.pair whenPatterns >> List.map replaceFirstTypeWithPatternMatch)
                 |> Tuple.mapFirst equalizeWhenTypes
                 |> Tuple.mapFirst (List.map (constrainGenerics untypedDef.typeSignature))
@@ -394,23 +423,26 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
         sourceLocation =
             Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation
 
+        typedDef =
+            { name = untypedDef.name
+            , sourceLocation = untypedDef.sourceLocation
+            , type_ = exposedType
+            , implementation =
+                MultiImpl
+                    (List.map
+                        (Tuple.mapBoth mapTypeMatch typeImplementation)
+                        initialWhens
+                    )
+                    (typeImplementation defaultImpl)
+            }
+
+        typeImplementation impl =
+            untypedToTypedImplementation newContext impl
+
         finalContext =
             { newContext
                 | typedFunctions =
-                    Dict.insert untypedDef.name
-                        { name = untypedDef.name
-                        , sourceLocation = untypedDef.sourceLocation
-                        , type_ = exposedType
-                        , isInline = Set.member untypedDef.name context.referenceableFunctions
-                        , implementation =
-                            MultiImpl
-                                (List.map
-                                    (Tuple.mapBoth mapTypeMatch typeImplementation)
-                                    initialWhens
-                                )
-                                (typeImplementation defaultImpl)
-                        }
-                        newContext.typedFunctions
+                    Dict.insert untypedDef.name typedDef newContext.typedFunctions
                 , errors =
                     List.filterMap identity
                         [ maybeConsistencyError
@@ -418,12 +450,113 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         ]
                         ++ newContext.errors
             }
-
-        typeImplementation =
-            untypedToTypedImplementation newContext
+                |> verifyTypeSignature inferredType untypedDef
+                |> cleanContext
     in
-    verifyTypeSignature inferredType untypedDef finalContext
-        |> cleanContext
+    ( typedDef
+    , finalContext
+    )
+
+
+resolveWhenConditions : Qualifier.FunctionDefinition -> Qualifier.TypeMatch -> Qualifier.TypeMatch
+resolveWhenConditions untypedDef ((Qualifier.TypeMatch loc typeMatch conds) as match) =
+    case typeMatch of
+        Type.CustomGeneric _ structGenerics ->
+            let
+                bindings =
+                    List.foldl
+                        whenConditionsGenericBindings
+                        (initialBindingsFromFunctionDef untypedDef structGenerics)
+                        conds
+            in
+            Qualifier.TypeMatch
+                loc
+                (bindGenericsInType bindings typeMatch)
+                (List.map (whenConditionsBindGenerics bindings) conds)
+
+        _ ->
+            match
+
+
+initialBindingsFromFunctionDef : Qualifier.FunctionDefinition -> List Type -> Dict String Type
+initialBindingsFromFunctionDef def structGenerics =
+    case TypeSignature.toMaybe def.typeSignature of
+        Just wt ->
+            case wt.input of
+                (Type.CustomGeneric _ possiblyBoundGenerics) :: _ ->
+                    let
+                        liftTupleMaybe ( first, second ) =
+                            Maybe.map (\x -> ( x, second )) first
+                    in
+                    List.map2 Tuple.pair structGenerics possiblyBoundGenerics
+                        |> List.map (Tuple.mapFirst Type.genericName)
+                        |> List.filterMap liftTupleMaybe
+                        |> Dict.fromList
+
+                _ ->
+                    Dict.empty
+
+        Nothing ->
+            Dict.empty
+
+
+whenConditionsGenericBindings : Qualifier.TypeMatchCond -> Dict String Type -> Dict String Type
+whenConditionsGenericBindings (Qualifier.TypeMatchCond _ fieldType value) bindings =
+    case ( fieldType, value ) of
+        ( Type.Generic genericName, Qualifier.LiteralInt _ ) ->
+            Dict.insert genericName Type.Int bindings
+
+        ( Type.Generic genericName, Qualifier.LiteralType t ) ->
+            Dict.insert genericName t bindings
+
+        ( _, Qualifier.RecursiveMatch (Qualifier.TypeMatch _ _ subConds) ) ->
+            List.foldl whenConditionsGenericBindings bindings subConds
+
+        _ ->
+            bindings
+
+
+whenConditionsBindGenerics : Dict String Type -> Qualifier.TypeMatchCond -> Qualifier.TypeMatchCond
+whenConditionsBindGenerics bindings (Qualifier.TypeMatchCond fieldName fieldType value) =
+    let
+        boundValue =
+            case value of
+                Qualifier.LiteralType t ->
+                    Qualifier.LiteralType <| bindGenericsInType bindings t
+
+                Qualifier.RecursiveMatch (Qualifier.TypeMatch subLoc subType subConds) ->
+                    Qualifier.RecursiveMatch <|
+                        Qualifier.TypeMatch
+                            subLoc
+                            (bindGenericsInType bindings subType)
+                            (List.map (whenConditionsBindGenerics bindings) subConds)
+
+                _ ->
+                    value
+    in
+    Qualifier.TypeMatchCond
+        fieldName
+        (bindGenericsInType bindings fieldType)
+        boundValue
+
+
+bindGenericsInType : Dict String Type -> Type -> Type
+bindGenericsInType bindings t =
+    case t of
+        Type.Generic genericName ->
+            Dict.get genericName bindings
+                |> Maybe.withDefault t
+
+        Type.CustomGeneric name gens ->
+            Type.CustomGeneric name <|
+                List.map (bindGenericsInType bindings) gens
+
+        Type.Union name members ->
+            Type.Union name <|
+                List.map (bindGenericsInType bindings) members
+
+        _ ->
+            t
 
 
 inferWhenTypes :
@@ -438,8 +571,8 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 TypeSignature.UserProvided wt ->
                     TypeSignature.UserProvided <|
                         case wt.input of
-                            _ :: rest ->
-                                { wt | input = t :: rest }
+                            firstAnnotatedType :: rest ->
+                                { wt | input = resolveFirstType firstAnnotatedType t :: rest }
 
                             _ ->
                                 wt
@@ -447,11 +580,34 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 x ->
                     x
 
-        alteredDef =
-            { untypedDef | typeSignature = alteredTypeSignature }
+        resolveFirstType : Type -> Type -> Type
+        resolveFirstType annotatedType typeMatchType =
+            case ( annotatedType, typeMatchType ) of
+                ( Type.Union _ unionMembers, Type.CustomGeneric name _ ) ->
+                    List.find (matchingCustomGenericType name) unionMembers
+                        |> Maybe.withDefault typeMatchType
+
+                ( Type.CustomGeneric annName _, Type.CustomGeneric matchName _ ) ->
+                    if annName == matchName then
+                        annotatedType
+
+                    else
+                        typeMatchType
+
+                _ ->
+                    typeMatchType
+
+        matchingCustomGenericType : String -> Type -> Bool
+        matchingCustomGenericType nameToMatch tipe =
+            case tipe of
+                Type.CustomGeneric name _ ->
+                    name == nameToMatch
+
+                _ ->
+                    False
 
         ( inf, newCtx ) =
-            typeCheckImplementation alteredDef im (cleanContext ctx)
+            typeCheckImplementation untypedDef alteredTypeSignature im (cleanContext ctx)
     in
     ( inf :: infs, newCtx )
 
@@ -498,9 +654,11 @@ normalizeWhenTypes whenTypes =
             whenTypes
 
 
-simplifyWhenFunctionTypes : List FunctionType -> Context -> ( List FunctionType, Context )
-simplifyWhenFunctionTypes functionTypes context =
-    ( List.map (\wt -> Tuple.first (simplifyFunctionType ( wt, context ))) functionTypes
+simplifyWhenFunctionTypes : ( List FunctionType, Context ) -> ( List FunctionType, Context )
+simplifyWhenFunctionTypes ( functionTypes, context ) =
+    ( List.map
+        (\wt -> Tuple.first (simplifyFunctionType ( wt, context )))
+        functionTypes
     , context
     )
 
@@ -665,6 +823,27 @@ joinOutputs outputs result =
 
                 unionize lhs rhs =
                     case ( lhs, rhs ) of
+                        ( Type.Union _ lhsMems, Type.Union _ rhsMems ) ->
+                            if lhsMems == rhsMems then
+                                lhs
+
+                            else
+                                Type.Union Nothing (lhsMems ++ rhsMems)
+
+                        ( Type.Union _ lhsMems, _ ) ->
+                            if List.member rhs lhsMems then
+                                lhs
+
+                            else
+                                Type.Union Nothing (rhs :: lhsMems)
+
+                        ( _, Type.Union _ rhsMems ) ->
+                            if List.member lhs rhsMems then
+                                rhs
+
+                            else
+                                Type.Union Nothing (lhs :: rhsMems)
+
                         _ ->
                             if lhs == rhs then
                                 lhs
@@ -703,8 +882,8 @@ constrainGenerics typeSignature inferredType =
 constrainGenericsHelper : Dict String Type -> List Type -> List Type -> List Type -> ( Dict String Type, List Type )
 constrainGenericsHelper remappedGenerics annotated inferred acc =
     case ( annotated, inferred ) of
-        ( [], _ ) ->
-            ( remappedGenerics, List.reverse acc )
+        ( [], rest ) ->
+            ( remappedGenerics, List.reverse acc ++ rest )
 
         ( _, [] ) ->
             ( remappedGenerics, List.reverse acc )
@@ -778,10 +957,10 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
 
 
 patternMatchIsCompatibleWithInferredType : ( Qualifier.TypeMatch, FunctionType ) -> Bool
-patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ forType _, inf ) =
+patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ typeMatchType _, inf ) =
     case inf.input of
-        firstInput :: _ ->
-            Type.genericlyCompatible firstInput forType
+        inferredType :: _ ->
+            Type.genericlyCompatible typeMatchType inferredType
 
         [] ->
             False
@@ -818,11 +997,16 @@ compatibleTypeList aLs bLs =
         |> List.all identity
 
 
-typeCheckImplementation : Qualifier.FunctionDefinition -> List Qualifier.Node -> Context -> ( FunctionType, Context )
-typeCheckImplementation untypedDef impl context =
+typeCheckImplementation :
+    Qualifier.FunctionDefinition
+    -> TypeSignature
+    -> List Qualifier.Node
+    -> Context
+    -> ( FunctionType, Context )
+typeCheckImplementation untypedDef typeSignatureToUse impl context =
     let
         startingStackEffects =
-            untypedDef.typeSignature
+            typeSignatureToUse
                 |> TypeSignature.map reverseFunctionType
                 |> TypeSignature.withDefault Type.emptyFunctionType
                 |> functionTypeToStackEffects
@@ -833,27 +1017,21 @@ typeCheckImplementation untypedDef impl context =
             }
 
         contextWithCall =
-            { context
-                | callStack = Set.insert untypedDef.name context.callStack
-                , stackEffects = startingStackEffects
-            }
+            { context | stackEffects = startingStackEffects }
 
         ( _, contextWithStackEffects ) =
             List.foldl
-                (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode idx node ctx ))
+                (\node ( idx, ctx ) -> ( idx + 1, typeCheckNode untypedDef idx node ctx ))
                 ( 0, contextWithCall )
                 impl
 
-        contextWithoutCall =
-            { contextWithStackEffects | callStack = Set.remove untypedDef.name contextWithStackEffects.callStack }
-
         annotatedInput =
-            untypedDef.typeSignature
+            typeSignatureToUse
                 |> TypeSignature.toMaybe
                 |> Maybe.map .input
                 |> Maybe.withDefault []
     in
-    functionTypeFromStackEffects untypedDef contextWithoutCall
+    functionTypeFromStackEffects untypedDef contextWithStackEffects
         |> (\( ctx, wt ) -> ( { wt | input = wt.input ++ annotatedInput }, ctx ))
         |> simplifyFunctionType
 
@@ -865,11 +1043,11 @@ extractTypeFromTypeMatch (Qualifier.TypeMatch _ t_ _) =
 
 mapTypeMatch : Qualifier.TypeMatch -> TypeMatch
 mapTypeMatch (Qualifier.TypeMatch range type_ cond) =
-    TypeMatch range type_ (List.map mapTypeMatchValue cond)
+    TypeMatch range type_ (List.map mapTypeMatchCond cond)
 
 
-mapTypeMatchValue : ( String, Qualifier.TypeMatchValue ) -> ( String, TypeMatchValue )
-mapTypeMatchValue ( fieldName, value ) =
+mapTypeMatchCond : Qualifier.TypeMatchCond -> ( String, TypeMatchValue )
+mapTypeMatchCond (Qualifier.TypeMatchCond fieldName _ value) =
     case value of
         Qualifier.LiteralInt val ->
             ( fieldName, LiteralInt val )
@@ -879,6 +1057,11 @@ mapTypeMatchValue ( fieldName, value ) =
 
         Qualifier.RecursiveMatch val ->
             ( fieldName, RecursiveMatch (mapTypeMatch val) )
+
+
+type InexhaustiveState
+    = Total
+    | SeenInt
 
 
 inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
@@ -897,11 +1080,6 @@ inexhaustivenessCheck range patterns =
             Just (InexhaustiveMultiFunction range inexhaustiveStates)
 
 
-type InexhaustiveState
-    = Total
-    | SeenInt
-
-
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
 inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
     let
@@ -915,14 +1093,13 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
         let
             subcases =
                 conds
-                    |> List.map Tuple.second
                     |> List.filterMap isRecursiveMatch
                     |> List.foldl (inexhaustivenessCheckHelper typeList) acc
 
-            isRecursiveMatch match =
-                case match of
-                    Qualifier.RecursiveMatch cond ->
-                        Just cond
+            isRecursiveMatch cond =
+                case cond of
+                    Qualifier.TypeMatchCond _ _ (Qualifier.RecursiveMatch val) ->
+                        Just val
 
                     _ ->
                         Nothing
@@ -970,7 +1147,7 @@ verifyTypeSignature inferredType untypedDef context =
         Just annotatedType ->
             let
                 simplifiedAnnotatedType =
-                    Tuple.first <| simplifyFunctionType ( annotatedType, context )
+                    simplifyFunctionTypeGenerics annotatedType
             in
             if not <| Type.compatibleFunctions simplifiedAnnotatedType inferredType then
                 let
@@ -990,8 +1167,8 @@ verifyTypeSignature inferredType untypedDef context =
             context
 
 
-typeCheckNode : Int -> Qualifier.Node -> Context -> Context
-typeCheckNode idx node context =
+typeCheckNode : Qualifier.FunctionDefinition -> Int -> Qualifier.Node -> Context -> Context
+typeCheckNode currentDef idx node context =
     let
         addStackEffect ctx effects =
             { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
@@ -1000,163 +1177,117 @@ typeCheckNode idx node context =
         Qualifier.Integer _ _ ->
             addStackEffect context [ Push Type.Int ]
 
-        Qualifier.Function _ name ->
-            case Dict.get name context.typedFunctions of
-                Just def ->
-                    addStackEffect context <| functionTypeToStackEffects def.type_
+        Qualifier.Function _ untypedDef ->
+            let
+                ( def, contextWithTypedDef ) =
+                    typeCheckDefinition untypedDef context
 
-                Nothing ->
-                    case Dict.get name context.untypedFunctions of
-                        Nothing ->
-                            Debug.todo "inconcievable!"
+                newContext =
+                    { contextWithTypedDef | stackEffects = context.stackEffects }
+            in
+            addStackEffect newContext <| functionTypeToStackEffects def.type_
 
-                        Just untypedDef ->
-                            if Set.member name context.callStack then
-                                -- recursive definition!
-                                case TypeSignature.toMaybe untypedDef.typeSignature of
-                                    Just annotatedType ->
-                                        addStackEffect context <| functionTypeToStackEffects annotatedType
-
-                                    Nothing ->
-                                        let
-                                            problem =
-                                                MissingTypeAnnotationInRecursiveCallStack
-                                                    (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
-                                                    untypedDef.name
-                                        in
-                                        { context | errors = problem :: context.errors }
-
-                            else
-                                let
-                                    contextWithTypedDef =
-                                        typeCheckDefinition untypedDef context
-
-                                    newContext =
-                                        { contextWithTypedDef | stackEffects = context.stackEffects }
-                                in
-                                case Dict.get name newContext.typedFunctions of
-                                    Nothing ->
-                                        Debug.todo "inconcievable!"
-
-                                    Just def ->
-                                        addStackEffect newContext <| functionTypeToStackEffects def.type_
-
-        Qualifier.FunctionRef loc ref ->
+        Qualifier.FunctionRef _ ref ->
             let
                 stackEffectsBeforeFunctionCheck =
                     context.stackEffects
 
-                contextAfterFunctionCheck =
-                    typeCheckNode idx (Qualifier.Function loc ref) context
+                ( def, contextAfterFunctionCheck ) =
+                    typeCheckDefinition ref context
 
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            case Dict.get ref newContext.typedFunctions of
-                Just def ->
-                    addStackEffect newContext <|
-                        [ Push <| Type.FunctionSignature def.type_ ]
+            addStackEffect newContext <|
+                [ Push <| Type.FunctionSignature def.type_ ]
 
-                _ ->
-                    Debug.todo "inconcievable!"
+        Qualifier.Recurse _ ->
+            case TypeSignature.toMaybe currentDef.typeSignature of
+                Just annotatedType ->
+                    addStackEffect context <| functionTypeToStackEffects annotatedType
 
-        Qualifier.ConstructType typeName ->
-            case getMembers typeName context.types of
-                Just (Qualifier.StructMembers members) ->
+                Nothing ->
                     let
-                        memberTypes =
-                            List.map Tuple.second members
-
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
-
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
-
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
+                        problem =
+                            MissingTypeAnnotationInRecursiveCallStack
+                                (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
+                                currentDef.name
                     in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = memberTypes
-                            , output = [ typeInQuestion ]
-                            }
+                    { context | errors = problem :: context.errors }
 
-                other ->
-                    Debug.todo ("inconcievable: " ++ typeName ++ ": " ++ Debug.toString other)
+        Qualifier.Cycle _ data ->
+            case TypeSignature.toMaybe data.typeSignature of
+                Just annotatedType ->
+                    addStackEffect context <| functionTypeToStackEffects annotatedType
 
-        Qualifier.SetMember typeName memberName ->
-            case
-                ( getMembers typeName context.types
-                , getMemberType context.types typeName memberName
-                )
-            of
-                ( Just (Qualifier.StructMembers members), Just memberType ) ->
+                Nothing ->
                     let
-                        memberTypes =
-                            List.map Tuple.second members
-
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
-
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
-
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
+                        problem =
+                            MissingTypeAnnotationInRecursiveCallStack
+                                (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
+                                data.name
                     in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = [ typeInQuestion, memberType ]
-                            , output = [ typeInQuestion ]
-                            }
+                    { context | errors = problem :: context.errors }
 
-                other ->
-                    Debug.todo ("inconcievable! " ++ Debug.toString other)
+        Qualifier.ConstructType typeDef ->
+            let
+                memberTypes =
+                    getStructMembers typeDef
+                        |> List.map Tuple.second
 
-        Qualifier.GetMember typeName memberName ->
-            case
-                ( getMembers typeName context.types
-                , getMemberType context.types typeName memberName
-                )
-            of
-                ( Just (Qualifier.StructMembers members), Just memberType ) ->
-                    let
-                        memberTypes =
-                            List.map Tuple.second members
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = memberTypes
+                    , output = [ typeInQuestion ]
+                    }
 
-                        genericMembers =
-                            List.filter Type.isGeneric memberTypes
+        Qualifier.SetMember typeDef _ _ memberType ->
+            let
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = [ typeInQuestion, memberType ]
+                    , output = [ typeInQuestion ]
+                    }
 
-                        typeInQuestion =
-                            case genericMembers of
-                                [] ->
-                                    Type.Custom typeName
-
-                                _ ->
-                                    Type.CustomGeneric typeName genericMembers
-                    in
-                    addStackEffect context <|
-                        functionTypeToStackEffects
-                            { input = [ typeInQuestion ]
-                            , output = [ memberType ]
-                            }
-
-                _ ->
-                    Debug.todo "inconcievable!"
+        Qualifier.GetMember typeDef _ _ memberType ->
+            let
+                typeInQuestion =
+                    getStructType typeDef
+            in
+            addStackEffect context <|
+                functionTypeToStackEffects
+                    { input = [ typeInQuestion ]
+                    , output = [ memberType ]
+                    }
 
         Qualifier.Builtin _ builtin ->
             addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
 
 
-getMembers : String -> Dict String TypeDefinition -> Maybe Qualifier.TypeDefinitionMembers
-getMembers typeName types =
-    Dict.get typeName types
-        |> Maybe.map .members
+getStructMembers : TypeDefinition -> List ( String, Type )
+getStructMembers typeDef =
+    case typeDef.members of
+        Qualifier.StructMembers members ->
+            members
+
+        Qualifier.UnionMembers _ ->
+            []
+
+
+getStructType : TypeDefinition -> Type
+getStructType typeDef =
+    case typeDef.generics of
+        [] ->
+            Type.Custom typeDef.name
+
+        gens ->
+            Type.CustomGeneric typeDef.name (List.map Type.Generic gens)
 
 
 tagGenericEffect : Int -> StackEffect -> StackEffect
@@ -1212,8 +1343,8 @@ functionTypeFromStackEffectsHelper untypedDef effects ( context, functionType ) 
             UnexpectedType
                 (Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation)
                 untypedDef.name
-                expected
-                actual
+                (resolveType context expected)
+                (resolveType context actual)
     in
     case effects of
         [] ->
@@ -1322,14 +1453,49 @@ compatibleTypes context typeA typeB =
                         , lengthTest && allMembersTest
                         )
 
-                    ( Type.Union _ _, _ ) ->
-                        -- Cannot go from union to concrete type
-                        ( context, False )
+                    ( Type.Union _ unionTypes, rhs ) ->
+                        -- Cannot normally go from union to concrete type
+                        -- Special case: all generic members of union are bound to same type
+                        case unionTypes of
+                            [] ->
+                                ( context, False )
+
+                            firstType :: rest ->
+                                let
+                                    ( finalCtx, allBoundToSame ) =
+                                        List.foldl helper ( context, True ) rest
+
+                                    helper t ( ctx, oldTruth ) =
+                                        let
+                                            ( newCtx, thisTruth ) =
+                                                compatibleTypes context firstType t
+                                        in
+                                        ( newCtx, oldTruth && thisTruth )
+                                in
+                                if allBoundToSame then
+                                    compatibleTypes finalCtx firstType rhs
+
+                                else
+                                    ( context, False )
 
                     ( lhsType, Type.Union _ unionTypes ) ->
-                        List.map (compatibleTypes context lhsType) unionTypes
-                            |> List.find Tuple.second
-                            |> Maybe.withDefault ( context, False )
+                        let
+                            ( generics, nonGenerics ) =
+                                List.partition Type.isGeneric unionTypes
+
+                            ( nonGenericContext, compatibleNonGenericMember ) =
+                                findCompatibleMember nonGenerics
+
+                            findCompatibleMember members =
+                                List.map (compatibleTypes context lhsType) members
+                                    |> List.find Tuple.second
+                                    |> Maybe.withDefault ( context, False )
+                        in
+                        if compatibleNonGenericMember then
+                            ( nonGenericContext, True )
+
+                        else
+                            findCompatibleMember generics
 
                     ( Type.CustomGeneric lName lMembers, Type.CustomGeneric rName rMembers ) ->
                         let
@@ -1411,8 +1577,25 @@ getGenericBinding context type_ =
                 otherwise ->
                     otherwise
 
+        Type.Union name members ->
+            members
+                |> List.map (resolveType context)
+                |> Type.Union name
+                |> Just
+
+        Type.CustomGeneric name members ->
+            members
+                |> List.map (resolveType context)
+                |> Type.CustomGeneric name
+                |> Just
+
         _ ->
             Just type_
+
+
+resolveType : Context -> Type -> Type
+resolveType context t =
+    Maybe.withDefault t (getGenericBinding context t)
 
 
 bindGeneric : Type -> Type -> Context -> Context
@@ -1523,49 +1706,74 @@ simplifyFunctionType ( functionType, context ) =
 
                 _ ->
                     type_
-
-        renameGenerics type_ ( nextId, seenGenerics, acc ) =
-            case type_ of
-                Type.Generic genName ->
-                    case Dict.get genName seenGenerics of
-                        Just newName ->
-                            ( nextId, seenGenerics, Type.Generic newName :: acc )
-
-                        Nothing ->
-                            let
-                                newName =
-                                    String.fromChar nextId
-                            in
-                            ( nextId
-                                |> Char.toCode
-                                |> (+) 1
-                                |> Char.fromCode
-                            , Dict.insert genName newName seenGenerics
-                            , Type.Generic newName :: acc
-                            )
-
-                Type.Union name members ->
-                    let
-                        ( newNextId, newSeenGenerics, newMembers ) =
-                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
-                    in
-                    ( newNextId, newSeenGenerics, Type.Union name newMembers :: acc )
-
-                Type.CustomGeneric name members ->
-                    let
-                        ( newNextId, newSeenGenerics, newMembers ) =
-                            List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
-                    in
-                    ( newNextId, newSeenGenerics, Type.CustomGeneric name newMembers :: acc )
-
-                _ ->
-                    ( nextId, seenGenerics, type_ :: acc )
     in
     ( { input = List.take inputLength newSignature
       , output = List.drop inputLength newSignature
       }
     , context
     )
+
+
+simplifyFunctionTypeGenerics : FunctionType -> FunctionType
+simplifyFunctionTypeGenerics functionType =
+    let
+        oldSignature =
+            functionType.input ++ functionType.output
+
+        inputLength =
+            List.length functionType.input
+
+        newSignature =
+            oldSignature
+                |> List.foldl renameGenerics ( 'a', Dict.empty, [] )
+                |> (\( _, _, ns ) -> ns)
+                |> List.reverse
+    in
+    { input = List.take inputLength newSignature
+    , output = List.drop inputLength newSignature
+    }
+
+
+renameGenerics :
+    Type
+    -> ( Char, Dict String String, List Type )
+    -> ( Char, Dict String String, List Type )
+renameGenerics type_ ( nextId, seenGenerics, acc ) =
+    case type_ of
+        Type.Generic genName ->
+            case Dict.get genName seenGenerics of
+                Just newName ->
+                    ( nextId, seenGenerics, Type.Generic newName :: acc )
+
+                Nothing ->
+                    let
+                        newName =
+                            String.fromChar nextId
+                    in
+                    ( nextId
+                        |> Char.toCode
+                        |> (+) 1
+                        |> Char.fromCode
+                    , Dict.insert genName newName seenGenerics
+                    , Type.Generic newName :: acc
+                    )
+
+        Type.Union name members ->
+            let
+                ( newNextId, newSeenGenerics, newMembers ) =
+                    List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
+            in
+            ( newNextId, newSeenGenerics, Type.Union name newMembers :: acc )
+
+        Type.CustomGeneric name members ->
+            let
+                ( newNextId, newSeenGenerics, newMembers ) =
+                    List.foldr renameGenerics ( nextId, seenGenerics, [] ) members
+            in
+            ( newNextId, newSeenGenerics, Type.CustomGeneric name newMembers :: acc )
+
+        _ ->
+            ( nextId, seenGenerics, type_ :: acc )
 
 
 findAliases : Context -> String -> ( String, List String )

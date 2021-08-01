@@ -1,92 +1,139 @@
 module Stabel.Codegen exposing (run)
 
-import Dict exposing (Dict)
+import Dict
 import List.Extra as List
 import Set exposing (Set)
 import Stabel.Codegen.BaseModule as BaseModule
+import Stabel.Codegen.IdAssigner as IdAssigner exposing (IdAssigner)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
-import Stabel.Data.Type as Type exposing (FunctionType, Type)
+import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Qualifier exposing (TypeDefinitionMembers(..))
 import Stabel.TypeChecker as AST exposing (AST)
-import Wasm
+import Stabel.Wasm as Wasm
 
 
-type alias TypeInformation =
-    { id : Int
-    , members : List ( String, Type )
+type alias Context =
+    { functionIdAssignment : IdAssigner
+    , typeIdAssignment : IdAssigner
+    , inlineFunctionNames : List String
     }
 
 
-type AstNode
-    = IntLiteral Int
-    | Word String FunctionType
-    | WordRef String
-    | ConstructType String
-    | SetMember String String Type
-    | GetMember String String Type
-    | Builtin Builtin
-    | Box Int Int -- stackIdx typeId
+emptyContext : Context
+emptyContext =
+    { functionIdAssignment = IdAssigner.empty BaseModule.firstAvailableFunctionId
+    , typeIdAssignment = IdAssigner.empty 0
+    , inlineFunctionNames = []
+    }
+
+
+idForFunction : String -> Context -> ( Int, Context )
+idForFunction funcName context =
+    let
+        ( id, assign ) =
+            IdAssigner.assignId funcName context.functionIdAssignment
+    in
+    ( id
+    , { context | functionIdAssignment = assign }
+    )
+
+
+idForType : String -> Context -> ( Int, Context )
+idForType typeName context =
+    let
+        ( id, assign ) =
+            IdAssigner.assignId typeName context.typeIdAssignment
+    in
+    ( id
+    , { context | typeIdAssignment = assign }
+    )
+
+
+indexOf : String -> List String -> Maybe Int
+indexOf value list =
+    indexOfHelper 0 value list
+
+
+indexOfHelper : Int -> String -> List String -> Maybe Int
+indexOfHelper idx value list =
+    case list of
+        [] ->
+            Nothing
+
+        element :: rest ->
+            if element == value then
+                Just idx
+
+            else
+                indexOfHelper (idx + 1) value rest
 
 
 
 -- Codegen
 
 
+type AstNode
+    = IntLiteral Int
+    | Function Int String -- id name
+    | FunctionRef Int String -- id name
+    | ConstructType Int Int -- id memberQty
+    | SetMember Int Int -- offset memberQty
+    | GetMember Int -- offset
+    | Builtin Builtin
+    | Box Int Int -- stackIdx typeId
+
+
 run : Set String -> AST -> Wasm.Module
 run exportedFunctions ast =
     let
-        typeMetaDict =
-            ast.types
-                |> Dict.values
-                |> typeMeta
-    in
-    ast.functions
-        |> Dict.values
-        |> List.map (toWasmFuncDef typeMetaDict ast exportedFunctions)
-        |> List.foldl Wasm.withFunction BaseModule.baseModule
+        inlineFunctionNames =
+            Set.toList ast.referencableFunctions
 
+        ( wasmFunctions, context ) =
+            Dict.foldl
+                (\_ fn acc -> toWasmFuncDef fn acc)
+                ( [], { emptyContext | inlineFunctionNames = inlineFunctionNames } )
+                ast.functions
 
-typeMeta : List AST.TypeDefinition -> Dict String TypeInformation
-typeMeta types =
-    types
-        |> List.filterMap
-            (\typeDef ->
-                case typeDef.members of
-                    StructMembers members ->
-                        Just
-                            ( typeDef.name
-                            , { id = 0
-                              , members = members
-                              }
-                            )
+        inlineFunctionRefs =
+            List.filterMap
+                (\name -> Dict.get name context.functionIdAssignment.cache)
+                inlineFunctionNames
 
-                    _ ->
-                        Nothing
-            )
-        |> List.indexedMap
-            (\idx ( name, def ) ->
-                ( name
-                , { def | id = idx }
+        exportedFunctionRefs =
+            Set.foldr
+                (\name acc ->
+                    context.functionIdAssignment.cache
+                        |> Dict.get name
+                        |> Maybe.map (\id -> ( name, id ))
+                        |> Maybe.map (\res -> res :: acc)
+                        |> Maybe.withDefault acc
                 )
-            )
-        |> Dict.fromList
+                []
+                exportedFunctions
+    in
+    wasmFunctions
+        |> List.foldl Wasm.withFunction BaseModule.baseModule
+        |> Wasm.withReferencables inlineFunctionRefs
+        |> Wasm.withExports exportedFunctionRefs
 
 
 toWasmFuncDef :
-    Dict String TypeInformation
-    -> AST
-    -> Set String
-    -> AST.FunctionDefinition
-    -> Wasm.FunctionDef
-toWasmFuncDef typeInfo ast exportedFunctions def =
+    AST.FunctionDefinition
+    -> ( List Wasm.FunctionDefinition, Context )
+    -> ( List Wasm.FunctionDefinition, Context )
+toWasmFuncDef def ( wasmFuncs, context ) =
     let
-        wasmImplementation =
+        ( defId, idContext ) =
+            idForFunction def.name context
+
+        ( wasmImplementation, updatedContext ) =
             case def.implementation of
                 AST.SoloImpl impl ->
-                    astNodesToInstructions typeInfo ast def impl
+                    astNodesToInstructions idContext def impl
 
                 AST.MultiImpl whens defaultImpl ->
-                    [ multiFnToInstructions typeInfo ast def whens defaultImpl ]
+                    multiFnToInstructions idContext def whens defaultImpl
 
         numberOfLocals =
             List.filterMap Wasm.maximumLocalIndex wasmImplementation
@@ -94,59 +141,111 @@ toWasmFuncDef typeInfo ast exportedFunctions def =
                 |> Maybe.map ((+) 1)
                 |> Maybe.withDefault 0
     in
-    { name = def.name
-    , exported = Set.member def.name exportedFunctions
-    , isIndirectlyCalled = def.isInline
-    , args = []
-    , results = []
-    , locals = List.repeat numberOfLocals Wasm.Int32
-    , instructions = wasmImplementation
-    }
+    ( { id = defId
+      , name = def.name
+      , args = []
+      , results = []
+      , locals = List.repeat numberOfLocals Wasm.Int32
+      , instructions = wasmImplementation
+      }
+        :: wasmFuncs
+    , updatedContext
+    )
 
 
 astNodesToInstructions :
-    Dict String TypeInformation
-    -> AST
+    Context
     -> AST.FunctionDefinition
     -> List AST.AstNode
-    -> List Wasm.Instruction
-astNodesToInstructions typeInfo ast def astNodes =
-    astNodes
-        |> List.foldl (astNodeToCodegenNode ast) ( def.type_.input, [] )
-        |> Tuple.second
+    -> ( List Wasm.Instruction, Context )
+astNodesToInstructions context def astNodes =
+    let
+        ( _, codeGenNodes, updatedContext ) =
+            List.foldl
+                (astNodeToCodegenNode def)
+                ( def.type_.input, [], context )
+                astNodes
+    in
+    ( codeGenNodes
         |> List.reverse
-        |> List.map (nodeToInstruction typeInfo)
+        |> List.map (nodeToInstruction updatedContext)
+    , updatedContext
+    )
 
 
 astNodeToCodegenNode :
-    AST
+    AST.FunctionDefinition
     -> AST.AstNode
-    -> ( List Type, List AstNode )
-    -> ( List Type, List AstNode )
-astNodeToCodegenNode ast node ( stack, result ) =
+    -> ( List Type, List AstNode, Context )
+    -> ( List Type, List AstNode, Context )
+astNodeToCodegenNode def node ( stack, result, context ) =
     let
-        newNode =
+        ( newNode, updatedContext ) =
             case node of
                 AST.IntLiteral _ val ->
-                    IntLiteral val
+                    ( IntLiteral val
+                    , context
+                    )
 
-                AST.Function _ name type_ ->
-                    Word name type_
+                AST.Function _ fn _ ->
+                    let
+                        ( fnId, newContext ) =
+                            idForFunction fn.name context
+                    in
+                    ( Function fnId fn.name
+                    , newContext
+                    )
 
-                AST.FunctionRef _ name ->
-                    WordRef name
+                AST.FunctionRef _ fn ->
+                    let
+                        ( fnId, newContext ) =
+                            idForFunction fn.name context
+                    in
+                    ( FunctionRef fnId fn.name
+                    , newContext
+                    )
 
-                AST.ConstructType typeName ->
-                    ConstructType typeName
+                AST.Recurse _ ->
+                    let
+                        ( fnId, newContext ) =
+                            idForFunction def.name context
+                    in
+                    ( Function fnId def.name
+                    , newContext
+                    )
 
-                AST.SetMember typeName memberName type_ ->
-                    SetMember typeName memberName type_
-
-                AST.GetMember typeName memberName type_ ->
-                    GetMember typeName memberName type_
+                AST.Cycle _ data ->
+                    let
+                        ( fnId, newContext ) =
+                            idForFunction data.name context
+                    in
+                    ( Function fnId data.name
+                    , newContext
+                    )
 
                 AST.Builtin _ builtin ->
-                    Builtin builtin
+                    ( Builtin builtin
+                    , context
+                    )
+
+                AST.ConstructType typeDef ->
+                    let
+                        ( typeId, newContext ) =
+                            idForType typeDef.name context
+                    in
+                    ( ConstructType typeId (memberSize typeDef)
+                    , newContext
+                    )
+
+                AST.SetMember typeDef _ memberIndex _ ->
+                    ( SetMember memberIndex (memberSize typeDef)
+                    , context
+                    )
+
+                AST.GetMember _ _ memberIndex _ ->
+                    ( GetMember memberIndex
+                    , context
+                    )
 
         nodeType =
             case node of
@@ -158,61 +257,50 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 AST.Function _ _ type_ ->
                     type_
 
-                AST.FunctionRef _ name ->
-                    case Dict.get name ast.functions of
-                        Just def ->
-                            { input = []
-                            , output = [ Type.FunctionSignature def.type_ ]
-                            }
+                AST.FunctionRef _ fn ->
+                    { input = []
+                    , output = [ Type.FunctionSignature fn.type_ ]
+                    }
 
-                        Nothing ->
-                            Debug.todo "help"
+                AST.Recurse _ ->
+                    def.type_
 
-                AST.ConstructType typeName ->
-                    case Dict.get typeName ast.types of
-                        Just struct ->
-                            case struct.members of
-                                StructMembers members ->
-                                    { input = List.map Tuple.second members
-                                    , output = [ typeFromTypeDef typeName struct.generics ]
-                                    }
-
-                                _ ->
-                                    Debug.todo "help"
-
-                        _ ->
-                            Debug.todo "help"
-
-                AST.SetMember typeName _ memberType ->
-                    case Dict.get typeName ast.types of
-                        Just tipe ->
-                            let
-                                type_ =
-                                    typeFromTypeDef typeName tipe.generics
-                            in
-                            { input = [ type_, memberType ]
-                            , output = [ type_ ]
-                            }
-
-                        _ ->
-                            Debug.todo "help"
-
-                AST.GetMember typeName _ memberType ->
-                    case Dict.get typeName ast.types of
-                        Just tipe ->
-                            let
-                                type_ =
-                                    typeFromTypeDef typeName tipe.generics
-                            in
-                            { input = [ type_ ]
-                            , output = [ memberType ]
-                            }
-
-                        _ ->
-                            Debug.todo "help"
+                AST.Cycle _ data ->
+                    data.typeSignature
 
                 AST.Builtin _ builtin ->
                     Builtin.functionType builtin
+
+                AST.ConstructType typeDef ->
+                    case typeDef.members of
+                        StructMembers members ->
+                            { input = List.map Tuple.second members
+                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
+                            }
+
+                        UnionMembers members ->
+                            -- Cannot happen
+                            { input = members
+                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
+                            }
+
+                AST.SetMember typeDef _ _ memberType ->
+                    let
+                        type_ =
+                            typeFromTypeDef typeDef.name typeDef.generics
+                    in
+                    { input = [ type_, memberType ]
+                    , output = [ type_ ]
+                    }
+
+                AST.GetMember typeDef _ _ memberType ->
+                    let
+                        type_ =
+                            typeFromTypeDef typeDef.name typeDef.generics
+                    in
+                    { input = [ type_ ]
+                    , output = [ memberType ]
+                    }
 
         typeFromTypeDef typeName gens =
             if List.isEmpty gens then
@@ -244,7 +332,7 @@ astNodeToCodegenNode ast node ( stack, result ) =
                     Nothing
 
         maybeBoxLeadingElement =
-            case ( List.head stackInScope, isMultiWord newNode, List.head nodeType.input ) of
+            case ( List.head stackInScope, isMultiFunction node, List.head nodeType.input ) of
                 ( Just _, True, Just (Type.Union _ _) ) ->
                     -- Already handled by maybePromoteInt
                     Nothing
@@ -263,20 +351,18 @@ astNodeToCodegenNode ast node ( stack, result ) =
                 _ ->
                     Nothing
 
-        isMultiWord possibleMultiWordNode =
-            case possibleMultiWordNode of
-                Word name _ ->
-                    case Dict.get name ast.functions of
-                        Just def ->
-                            case def.implementation of
-                                AST.SoloImpl _ ->
-                                    False
-
-                                AST.MultiImpl _ _ ->
-                                    True
-
-                        Nothing ->
+        isMultiFunction possibleMultiFunctionNode =
+            case possibleMultiFunctionNode of
+                AST.Function _ fn _ ->
+                    case fn.implementation of
+                        AST.SoloImpl _ ->
                             False
+
+                        AST.MultiImpl _ _ ->
+                            True
+
+                AST.Cycle _ data ->
+                    data.isMultiFunction
 
                 _ ->
                     False
@@ -297,7 +383,18 @@ astNodeToCodegenNode ast node ( stack, result ) =
     in
     ( newStack
     , newNode :: (stackElementsToBox ++ result)
+    , updatedContext
     )
+
+
+memberSize : AST.TypeDefinition -> Int
+memberSize def =
+    case def.members of
+        StructMembers members ->
+            List.length members
+
+        UnionMembers members ->
+            List.length members
 
 
 unionBoxMap : List Type -> List ( Type, Int )
@@ -330,344 +427,395 @@ requiresBoxingInPatternMatch type_ =
 
 
 multiFnToInstructions :
-    Dict String TypeInformation
-    -> AST
+    Context
     -> AST.FunctionDefinition
     -> List ( AST.TypeMatch, List AST.AstNode )
     -> List AST.AstNode
-    -> Wasm.Instruction
-multiFnToInstructions typeInfo ast def whens defaultImpl =
+    -> ( List Wasm.Instruction, Context )
+multiFnToInstructions context def whens defaultImpl =
     let
+        ( branches, updatedContext ) =
+            List.foldl
+                (buildMultiFnBranch def boxMap selfIndex)
+                ( Wasm.Batch [], context )
+                whens
+
         boxMap =
             def.type_.input
                 |> List.head
                 |> Maybe.map createBoxMap
                 |> Maybe.withDefault []
 
-        createBoxMap t_ =
-            case t_ of
-                Type.Union _ members ->
-                    unionBoxMap members
-
-                _ ->
-                    if requiresBoxingInPatternMatch t_ then
-                        [ ( t_, -1 ) ]
-
-                    else
-                        []
-
-        branches =
-            List.foldl buildBranch (Wasm.Batch []) whens
-
-        buildBranch ( type_, nodes ) previousBranch =
-            let
-                testForInequality =
-                    makeInequalityTest type_ 0
-
-                makeInequalityTest t_ localIdx =
-                    let
-                        (AST.TypeMatch _ typeFromTypeMatch _) =
-                            t_
-
-                        maybeBoxId =
-                            boxMap
-                                |> List.find (\( boxedType, _ ) -> boxedType == typeFromTypeMatch)
-                                |> Maybe.map Tuple.second
-                    in
-                    case ( t_, maybeBoxId ) of
-                        ( AST.TypeMatch _ Type.Int conditions, Just boxId ) ->
-                            Wasm.Batch
-                                [ Wasm.Local_Get localIdx
-                                , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const boxId
-                                , Wasm.I32_NotEq -- Types doesn't match?
-                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                                , conditions
-                                    |> List.concatMap (matchingIntTest localIdx)
-                                    |> Wasm.Batch
-                                , Wasm.I32_Const selfIndex
-                                , Wasm.Call BaseModule.unboxFn
-                                ]
-
-                        ( AST.TypeMatch _ _ [], Just boxId ) ->
-                            Wasm.Batch
-                                [ Wasm.Local_Get localIdx
-                                , Wasm.I32_Load -- Load instance id
-                                , Wasm.I32_Const boxId
-                                , Wasm.I32_NotEq -- Types doesn't match?
-                                , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                                , Wasm.I32_Const selfIndex
-                                , Wasm.Call BaseModule.unboxFn
-                                ]
-
-                        ( AST.TypeMatch _ (Type.Custom name) conditions, Nothing ) ->
-                            whenSetup localIdx name conditions
-
-                        ( AST.TypeMatch _ (Type.CustomGeneric name _) conditions, Nothing ) ->
-                            whenSetup localIdx name conditions
-
-                        _ ->
-                            Debug.todo <| "Not supported in pattern match: " ++ Debug.toString t_
-
-                whenSetup localIdx typeName conditions =
-                    let
-                        typeId =
-                            Dict.get typeName typeInfo
-                                |> Maybe.map .id
-                                |> Maybe.withDefault 0
-                    in
-                    Wasm.Batch
-                        [ Wasm.Local_Get localIdx
-                        , Wasm.I32_Load -- Load instance id
-                        , Wasm.I32_Const typeId
-                        , Wasm.I32_NotEq -- Types doesn't match?
-                        , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                        , conditions
-                            |> List.concatMap (conditionTest localIdx)
-                            |> Wasm.Batch
-                        ]
-
-                matchingIntTest localIdx ( _, astValue ) =
-                    let
-                        value =
-                            case astValue of
-                                AST.LiteralInt num ->
-                                    num
-
-                                _ ->
-                                    0
-                    in
-                    [ Wasm.Local_Get localIdx
-                    , Wasm.I32_Const BaseModule.wasmPtrSize
-                    , Wasm.I32_Add
-                    , Wasm.I32_Load -- int value
-                    , Wasm.I32_Const value
-                    , Wasm.I32_NotEq -- not same number?
-                    , Wasm.BreakIf 0 -- move to next branch
-                    ]
-
-                conditionTest localIdx ( fieldName, value ) =
-                    case value of
-                        AST.LiteralInt num ->
-                            [ Wasm.Local_Get localIdx
-                            , Wasm.Call BaseModule.stackPushFn
-                            , Wasm.Call <| fieldName ++ ">"
-                            , Wasm.Call BaseModule.stackPopFn
-                            , Wasm.I32_Const num
-                            , Wasm.I32_NotEq -- not same number?
-                            , Wasm.BreakIf 0 -- move to next branch
-                            ]
-
-                        AST.LiteralType typ_ ->
-                            case typ_ of
-                                Type.Custom typeName ->
-                                    let
-                                        typeId =
-                                            Dict.get typeName typeInfo
-                                                |> Maybe.map .id
-                                                |> Maybe.withDefault 0
-                                    in
-                                    [ Wasm.Local_Get localIdx
-                                    , Wasm.Call BaseModule.stackPushFn
-                                    , Wasm.Call <| fieldName ++ ">"
-                                    , Wasm.Call BaseModule.stackPopFn
-                                    , Wasm.I32_Load -- get type id
-                                    , Wasm.I32_Const typeId
-                                    , Wasm.I32_NotEq -- not same type?
-                                    , Wasm.BreakIf 0 -- move to next branch
-                                    ]
-
-                                _ ->
-                                    Debug.todo "oops"
-
-                        AST.RecursiveMatch match ->
-                            let
-                                nextLocalIdx =
-                                    localIdx + 1
-                            in
-                            [ Wasm.Local_Get localIdx
-                            , Wasm.Call BaseModule.stackPushFn
-                            , Wasm.Call <| fieldName ++ ">"
-                            , Wasm.Call BaseModule.stackPopFn
-                            , Wasm.Local_Set nextLocalIdx
-                            , makeInequalityTest match nextLocalIdx
-                            ]
-
-                implementation =
-                    nodes
-                        |> astNodesToInstructions typeInfo ast def
-                        |> Wasm.Batch
-            in
-            Wasm.Block
-                [ previousBranch
-                , testForInequality
-                , implementation
-                , Wasm.Return
-                ]
-
         selfIndex =
             max 0 (List.length def.type_.input - 1)
+
+        ( implementation, finalContext ) =
+            astNodesToInstructions updatedContext def defaultImpl
     in
-    Wasm.Batch
-        [ Wasm.I32_Const selfIndex
-        , Wasm.Call BaseModule.stackGetElementFn
-        , Wasm.Local_Set 0 -- store instance id in local
-        , branches
-        , Wasm.Batch (astNodesToInstructions typeInfo ast def defaultImpl)
+    ( [ Wasm.I32_Const selfIndex
+      , BaseModule.callStackGetElementFn
+      , Wasm.Local_Set 0 -- store instance id in local
+      , branches
+      , Wasm.Batch implementation
+      ]
+    , finalContext
+    )
+
+
+createBoxMap : Type -> List ( Type, Int )
+createBoxMap t_ =
+    case t_ of
+        Type.Union _ members ->
+            unionBoxMap members
+
+        _ ->
+            if requiresBoxingInPatternMatch t_ then
+                [ ( t_, -1 ) ]
+
+            else
+                []
+
+
+buildMultiFnBranch :
+    AST.FunctionDefinition
+    -> List ( Type, Int )
+    -> Int
+    -> ( AST.TypeMatch, List AST.AstNode )
+    -> ( Wasm.Instruction, Context )
+    -> ( Wasm.Instruction, Context )
+buildMultiFnBranch def boxMap selfIndex ( type_, nodes ) ( previousBranch, context ) =
+    let
+        ( instructions, updatedContext ) =
+            astNodesToInstructions context def nodes
+
+        ( inequalityTestImpl, finalContext ) =
+            makeInequalityTest boxMap selfIndex type_ 0 updatedContext
+    in
+    ( Wasm.Block
+        [ previousBranch
+        , inequalityTestImpl
+        , Wasm.Batch instructions
+        , Wasm.Return
         ]
+    , finalContext
+    )
 
 
-nodeToInstruction : Dict String TypeInformation -> AstNode -> Wasm.Instruction
-nodeToInstruction typeInfo node =
+makeInequalityTest :
+    List ( Type, Int )
+    -> Int
+    -> AST.TypeMatch
+    -> Int
+    -> Context
+    -> ( Wasm.Instruction, Context )
+makeInequalityTest boxMap selfIndex ((AST.TypeMatch _ typeFromTypeMatch _) as t_) localIdx context =
+    let
+        maybeBoxId =
+            boxMap
+                |> List.find (\( boxedType, _ ) -> boxedType == typeFromTypeMatch)
+                |> Maybe.map Tuple.second
+    in
+    case ( t_, maybeBoxId ) of
+        ( AST.TypeMatch _ Type.Int conditions, Just boxId ) ->
+            ( Wasm.Batch
+                [ Wasm.Local_Get localIdx
+                , Wasm.I32_Load -- Load instance id
+                , Wasm.I32_Const boxId
+                , Wasm.I32_NotEq -- Types doesn't match?
+                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                , conditions
+                    |> List.concatMap (matchingIntTest localIdx)
+                    |> Wasm.Batch
+                , Wasm.I32_Const selfIndex
+                , BaseModule.callUnboxFn
+                ]
+            , context
+            )
+
+        ( AST.TypeMatch _ _ [], Just boxId ) ->
+            ( Wasm.Batch
+                [ Wasm.Local_Get localIdx
+                , Wasm.I32_Load -- Load instance id
+                , Wasm.I32_Const boxId
+                , Wasm.I32_NotEq -- Types doesn't match?
+                , Wasm.BreakIf 0 -- Move to next branch if above test is true
+                , Wasm.I32_Const selfIndex
+                , BaseModule.callUnboxFn
+                ]
+            , context
+            )
+
+        ( AST.TypeMatch _ (Type.Custom name) conditions, Nothing ) ->
+            matchingStructTest boxMap selfIndex context localIdx name conditions
+
+        ( AST.TypeMatch _ (Type.CustomGeneric name _) conditions, Nothing ) ->
+            matchingStructTest boxMap selfIndex context localIdx name conditions
+
+        _ ->
+            -- Type not supported in pattern match
+            -- TODO: TypeMatch should maybe change to only support types
+            -- which are supported in pattern matches
+            ( Wasm.Unreachable, context )
+
+
+matchingIntTest : Int -> ( String, AST.TypeMatchValue ) -> List Wasm.Instruction
+matchingIntTest localIdx ( _, astValue ) =
+    let
+        value =
+            case astValue of
+                AST.LiteralInt num ->
+                    num
+
+                _ ->
+                    0
+    in
+    [ Wasm.Local_Get localIdx
+    , Wasm.I32_Const BaseModule.wasmPtrSize
+    , Wasm.I32_Add
+    , Wasm.I32_Load -- int value
+    , Wasm.I32_Const value
+    , Wasm.I32_NotEq -- not same number?
+    , Wasm.BreakIf 0 -- move to next branch
+    ]
+
+
+matchingStructTest :
+    List ( Type, Int )
+    -> Int
+    -> Context
+    -> Int
+    -> String
+    -> List ( String, AST.TypeMatchValue )
+    -> ( Wasm.Instruction, Context )
+matchingStructTest boxMap selfIndex context localIdx typeName conditions =
+    let
+        ( typeId, updatedContext ) =
+            idForType typeName context
+
+        ( conditionTestImpls, finalContext ) =
+            List.foldl
+                (matchingConditionTest boxMap selfIndex localIdx)
+                ( [], updatedContext )
+                conditions
+    in
+    ( Wasm.Batch
+        [ Wasm.Local_Get localIdx
+        , Wasm.I32_Load -- Load instance id
+        , Wasm.I32_Const typeId
+        , Wasm.I32_NotEq -- Types doesn't match?
+        , Wasm.BreakIf 0 -- Move to next branch if above test is true
+        , conditionTestImpls
+            |> List.concat
+            |> Wasm.Batch
+        ]
+    , finalContext
+    )
+
+
+matchingConditionTest :
+    List ( Type, Int )
+    -> Int
+    -> Int
+    -> ( String, AST.TypeMatchValue )
+    -> ( List (List Wasm.Instruction), Context )
+    -> ( List (List Wasm.Instruction), Context )
+matchingConditionTest boxMap selfIndex localIdx ( fieldName, value ) ( result, context ) =
+    let
+        getterName =
+            fieldName ++ ">"
+
+        ( getterId, idContext ) =
+            idForFunction getterName context
+
+        callGetter =
+            Wasm.Call getterId getterName
+    in
+    case value of
+        AST.LiteralInt num ->
+            ( [ Wasm.Local_Get localIdx
+              , BaseModule.callStackPushFn
+              , callGetter
+              , BaseModule.callStackPopFn
+              , Wasm.I32_Const num
+              , Wasm.I32_NotEq -- not same number?
+              , Wasm.BreakIf 0 -- move to next branch
+              ]
+                :: result
+            , idContext
+            )
+
+        AST.LiteralType typ_ ->
+            case typ_ of
+                Type.Custom typeName ->
+                    let
+                        ( typeId, updatedContext ) =
+                            idForType typeName idContext
+                    in
+                    ( [ Wasm.Local_Get localIdx
+                      , BaseModule.callStackPushFn
+                      , callGetter
+                      , BaseModule.callStackPopFn
+                      , Wasm.I32_Load -- get type id
+                      , Wasm.I32_Const typeId
+                      , Wasm.I32_NotEq -- not same type?
+                      , Wasm.BreakIf 0 -- move to next branch
+                      ]
+                        :: result
+                    , updatedContext
+                    )
+
+                _ ->
+                    ( [ Wasm.Unreachable ] :: result
+                    , context
+                    )
+
+        AST.RecursiveMatch match ->
+            let
+                nextLocalIdx =
+                    localIdx + 1
+
+                ( inequalityTestImpl, updatedContext ) =
+                    makeInequalityTest boxMap selfIndex match nextLocalIdx idContext
+            in
+            ( [ Wasm.Local_Get localIdx
+              , BaseModule.callStackPushFn
+              , callGetter
+              , BaseModule.callStackPopFn
+              , Wasm.Local_Set nextLocalIdx
+              , inequalityTestImpl
+              ]
+                :: result
+            , updatedContext
+            )
+
+
+nodeToInstruction : Context -> AstNode -> Wasm.Instruction
+nodeToInstruction context node =
     case node of
         IntLiteral value ->
             Wasm.Batch
                 [ Wasm.I32_Const value
-                , Wasm.Call BaseModule.stackPushFn
+                , BaseModule.callStackPushFn
                 ]
 
-        Word value _ ->
-            Wasm.Call value
+        Function id name ->
+            Wasm.Call id name
 
-        WordRef name ->
-            Wasm.FunctionIndex name
+        FunctionRef _ name ->
+            let
+                indexOfId =
+                    indexOf name context.inlineFunctionNames
+                        |> Maybe.withDefault 0
+            in
+            Wasm.Batch
+                [ Wasm.Commented
+                    (name ++ "ref")
+                    (Wasm.I32_Const indexOfId)
+                , BaseModule.callStackPushFn
+                ]
 
-        ConstructType typeName ->
-            case Dict.get typeName typeInfo of
-                Just type_ ->
-                    let
-                        typeSize =
-                            BaseModule.wasmPtrSize + (memberSize * BaseModule.wasmPtrSize)
-
-                        memberSize =
-                            List.length type_.members
-                    in
-                    Wasm.Batch
-                        [ Wasm.I32_Const typeSize
-                        , Wasm.Call BaseModule.allocFn
-                        , Wasm.Local_Tee 0
-                        , Wasm.I32_Const type_.id
-                        , Wasm.I32_Store
-                        , Wasm.I32_Const memberSize
-                        , Wasm.Local_Set 1
-                        , Wasm.Block
-                            [ Wasm.Loop
-                                [ Wasm.Local_Get 1
-                                , Wasm.I32_EqZero
-                                , Wasm.BreakIf 1
-                                , Wasm.Local_Get 0
-                                , Wasm.I32_Const BaseModule.wasmPtrSize
-                                , Wasm.Local_Get 1
-                                , Wasm.I32_Mul
-                                , Wasm.I32_Add
-                                , Wasm.Call BaseModule.stackPopFn
-                                , Wasm.I32_Store
-                                , Wasm.Local_Get 1
-                                , Wasm.I32_Const 1
-                                , Wasm.I32_Sub
-                                , Wasm.Local_Set 1
-                                , Wasm.Break 0
-                                ]
-                            ]
+        ConstructType typeId members ->
+            let
+                typeSize =
+                    BaseModule.wasmPtrSize + (members * BaseModule.wasmPtrSize)
+            in
+            Wasm.Batch
+                [ Wasm.I32_Const typeSize
+                , BaseModule.callAllocFn
+                , Wasm.Local_Tee 0
+                , Wasm.I32_Const typeId
+                , Wasm.I32_Store
+                , Wasm.I32_Const members
+                , Wasm.Local_Set 1
+                , Wasm.Block
+                    [ Wasm.Loop
+                        [ Wasm.Local_Get 1
+                        , Wasm.I32_EqZero
+                        , Wasm.BreakIf 1
                         , Wasm.Local_Get 0
-                        , Wasm.Call BaseModule.stackPushFn
+                        , Wasm.I32_Const BaseModule.wasmPtrSize
+                        , Wasm.Local_Get 1
+                        , Wasm.I32_Mul
+                        , Wasm.I32_Add
+                        , BaseModule.callStackPopFn
+                        , Wasm.I32_Store
+                        , Wasm.Local_Get 1
+                        , Wasm.I32_Const 1
+                        , Wasm.I32_Sub
+                        , Wasm.Local_Set 1
+                        , Wasm.Break 0
                         ]
+                    ]
+                , Wasm.Local_Get 0
+                , BaseModule.callStackPushFn
+                ]
 
-                Nothing ->
-                    Debug.todo "This cannot happen."
+        SetMember memberIndex members ->
+            let
+                typeSize =
+                    BaseModule.wasmPtrSize + (members * BaseModule.wasmPtrSize)
+            in
+            Wasm.Batch
+                [ BaseModule.callSwapFn -- Instance should now be at top of stack
+                , BaseModule.callStackPopFn
+                , Wasm.I32_Const typeSize
+                , BaseModule.callCopyStructFn -- Return copy of instance
+                , Wasm.Local_Tee 0
+                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
+                , Wasm.I32_Add -- Calculate member address
+                , BaseModule.callStackPopFn -- Retrieve new value
+                , Wasm.I32_Store
+                , Wasm.Local_Get 0 -- Return instance
+                , BaseModule.callStackPushFn
+                ]
 
-        SetMember typeName memberName _ ->
-            case Dict.get typeName typeInfo of
-                Just type_ ->
-                    let
-                        typeSize =
-                            BaseModule.wasmPtrSize + (memberSize * BaseModule.wasmPtrSize)
-
-                        memberSize =
-                            List.length type_.members
-                    in
-                    case getMemberType typeInfo typeName memberName of
-                        Just memberIndex ->
-                            Wasm.Batch
-                                [ Wasm.Call BaseModule.swapFn -- Instance should now be at top of stack
-                                , Wasm.Call BaseModule.stackPopFn
-                                , Wasm.I32_Const typeSize
-                                , Wasm.Call BaseModule.copyStructFn -- Return copy of instance
-                                , Wasm.Local_Tee 0
-                                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
-                                , Wasm.I32_Add -- Calculate member address
-                                , Wasm.Call BaseModule.stackPopFn -- Retrieve new value
-                                , Wasm.I32_Store
-                                , Wasm.Local_Get 0 -- Return instance
-                                , Wasm.Call BaseModule.stackPushFn
-                                ]
-
-                        Nothing ->
-                            Debug.todo "NOOOOO!"
-
-                Nothing ->
-                    Debug.todo "This cannot happen!"
-
-        GetMember typeName memberName _ ->
-            case getMemberType typeInfo typeName memberName of
-                Just memberIndex ->
-                    Wasm.Batch
-                        [ Wasm.Call BaseModule.stackPopFn -- Get instance address
-                        , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
-                        , Wasm.I32_Add -- Calculate member address
-                        , Wasm.I32_Load -- Retrieve member
-                        , Wasm.Call BaseModule.stackPushFn -- Push member onto stack
-                        ]
-
-                Nothing ->
-                    Debug.todo "This cannot happen!"
+        GetMember memberIndex ->
+            Wasm.Batch
+                [ BaseModule.callStackPopFn -- Get instance address
+                , Wasm.I32_Const ((memberIndex + 1) * BaseModule.wasmPtrSize) -- Calculate member offset
+                , Wasm.I32_Add -- Calculate member address
+                , Wasm.I32_Load -- Retrieve member
+                , BaseModule.callStackPushFn -- Push member onto stack
+                ]
 
         Builtin builtin ->
             case builtin of
                 Builtin.Plus ->
-                    Wasm.Call BaseModule.addIntFn
+                    BaseModule.callAddIntFn
 
                 Builtin.Minus ->
-                    Wasm.Call BaseModule.subIntFn
+                    BaseModule.callSubIntFn
 
                 Builtin.Multiply ->
-                    Wasm.Call BaseModule.mulIntFn
+                    BaseModule.callMulIntFn
 
                 Builtin.Divide ->
-                    Wasm.Call BaseModule.divIntFn
+                    BaseModule.callDivIntFn
 
                 Builtin.Equal ->
-                    Wasm.Call BaseModule.eqIntFn
+                    BaseModule.callEqIntFn
 
                 Builtin.StackDuplicate ->
-                    Wasm.Call BaseModule.dupFn
+                    BaseModule.callDupFn
 
                 Builtin.StackDrop ->
-                    Wasm.Call BaseModule.dropFn
+                    BaseModule.callDropFn
 
                 Builtin.StackSwap ->
-                    Wasm.Call BaseModule.swapFn
+                    BaseModule.callSwapFn
 
                 Builtin.StackRightRotate ->
-                    Wasm.Call BaseModule.rotFn
+                    BaseModule.callRotFn
 
                 Builtin.StackLeftRotate ->
-                    Wasm.Call BaseModule.leftRotFn
+                    BaseModule.callLeftRotFn
 
                 Builtin.Apply ->
-                    Wasm.Call BaseModule.callQuoteFn
+                    BaseModule.callExecInlineFn
 
         Box stackPos id ->
             Wasm.Batch
                 [ Wasm.I32_Const stackPos
                 , Wasm.I32_Const id
-                , Wasm.Call BaseModule.boxFn
+                , BaseModule.callBoxFn
                 ]
-
-
-getMemberType : Dict String TypeInformation -> String -> String -> Maybe Int
-getMemberType typeInfoDict typeName memberName =
-    Dict.get typeName typeInfoDict
-        |> Maybe.map (List.indexedMap (\idx ( name, _ ) -> ( idx, name )) << .members)
-        |> Maybe.andThen (List.find (\( _, name ) -> name == memberName))
-        |> Maybe.map Tuple.first

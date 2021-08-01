@@ -284,3 +284,24 @@ test('Generic case', async () => {
 
     expect(result.stackElement()).toBe(9);
 });
+
+test('Cyclic case', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : 10 count-down
+
+        defmulti: count-down
+        type: Int -- Int
+        : Int( value 0 )
+          drop 0
+        : Int
+          dec-count-down
+
+        def: dec-count-down
+        : 1 - count-down
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(0);
+});

@@ -1,8 +1,7 @@
 module Test.Qualifier.Util exposing
-    ( addFunctionsForStructs
-    , expectExternalOutput
+    ( emptyAst
     , expectModuleOutput
-    , expectOutput
+    , expectQualification
     , stripLocations
     )
 
@@ -11,8 +10,6 @@ import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type exposing (Type)
-import Stabel.Data.TypeSignature as TypeSignature
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
@@ -22,6 +19,7 @@ import Stabel.Qualifier as AST
         , Node(..)
         , TypeDefinition
         , TypeMatch(..)
+        , TypeMatchCond(..)
         , TypeMatchValue(..)
         )
 
@@ -34,168 +32,66 @@ emptyAst =
     }
 
 
-expectOutput : Parser.AST -> AST -> Expectation
-expectOutput parserAst expectedAst =
-    let
-        result =
-            AST.run
-                { packageName = ""
-                , modulePath = ""
-                , ast = parserAst
-                , externalModules = Dict.empty
-                , inProgressAST = emptyAst
-                }
-    in
-    case result of
+expectQualification : String -> Expectation
+expectQualification source =
+    case Parser.run "test" source of
         Err errors ->
-            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
+            Expect.fail <| "Parser error: " ++ Debug.toString errors
 
-        Ok actualAst ->
-            Expect.equal expectedAst
-                { types = actualAst.types
-                , functions = actualAst.functions
-                , referenceableFunctions = actualAst.referenceableFunctions
-                }
-
-
-expectModuleOutput : Parser.AST -> AST -> Expectation
-expectModuleOutput parserAst expectedAst =
-    let
-        result =
-            AST.run
-                { packageName = "stabel/test"
-                , modulePath = "some/module"
-                , ast = parserAst
-                , externalModules = Dict.empty
-                , inProgressAST = emptyAst
-                }
-    in
-    case result of
-        Err errors ->
-            Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
-
-        Ok actualAst ->
-            Expect.equal expectedAst
-                { types = actualAst.types
-                , functions = actualAst.functions
-                , referenceableFunctions = actualAst.referenceableFunctions
-                }
-
-
-expectExternalOutput : AST -> Parser.AST -> AST -> Expectation
-expectExternalOutput inProgressAst parserAst expectedAst =
-    let
-        config =
-            { packageName = ""
-            , modulePath = ""
-            , ast = parserAst
-            , externalModules =
-                Dict.fromList
-                    [ ( "/mod", "external/package" ) ]
-            , inProgressAST = emptyAst
-            }
-
-        result =
-            AST.run config
-    in
-    case result of
-        Ok _ ->
-            Expect.fail "Expected qualification to fail when inProgressAST is missing"
-
-        Err _ ->
-            case AST.run { config | inProgressAST = inProgressAst } of
+        Ok parserAst ->
+            let
+                result =
+                    AST.run
+                        { packageName = "stabel/test"
+                        , modulePath = "some/module"
+                        , ast = parserAst
+                        , externalModules = Dict.empty
+                        , inProgressAST = emptyAst
+                        }
+            in
+            case result of
                 Err errors ->
-                    Expect.fail <| "Did not expect qualification to fail: " ++ Debug.toString errors
+                    Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
 
-                Ok ast ->
-                    Expect.equal expectedAst ast
-
-
-addFunctionsForStructs : AST -> AST
-addFunctionsForStructs ast =
-    let
-        helper _ t wipAst =
-            case t.members of
-                AST.StructMembers members ->
-                    addFunctionsForStructsHelper t.name t.generics members wipAst
-
-                _ ->
-                    wipAst
-    in
-    Dict.foldl helper ast ast.types
+                Ok _ ->
+                    Expect.pass
 
 
-addFunctionsForStructsHelper : String -> List String -> List ( String, Type ) -> AST -> AST
-addFunctionsForStructsHelper name generics members ast =
-    let
-        selfType =
-            if List.isEmpty generics then
-                Type.Custom name
+expectModuleOutput : String -> AST -> Expectation
+expectModuleOutput source expectedAst =
+    case Parser.run "test" source of
+        Err errors ->
+            Expect.fail <| "Parser error: " ++ Debug.toString errors
 
-            else
-                Type.CustomGeneric name (List.map Type.Generic generics)
+        Ok parserAst ->
+            let
+                result =
+                    AST.run
+                        { packageName = "stabel/test"
+                        , modulePath = "some/module"
+                        , ast = parserAst
+                        , externalModules = Dict.empty
+                        , inProgressAST = emptyAst
+                        }
+            in
+            case result of
+                Err errors ->
+                    Expect.fail <| "Did not expect qualification to fail. Errors: " ++ Debug.toString errors
 
-        ctor =
-            { name =
-                if List.isEmpty members then
-                    name
-
-                else
-                    ">" ++ name
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = List.map Tuple.second members
-                    , output = [ selfType ]
-                    }
-            , exposed = True
-            , implementation = AST.SoloImpl [ AST.ConstructType name ]
-            }
-
-        setters =
-            List.map settersHelper members
-
-        settersHelper ( memberName, type_ ) =
-            { name = ">" ++ memberName
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = [ selfType, type_ ]
-                    , output = [ selfType ]
-                    }
-            , exposed = True
-            , implementation =
-                AST.SoloImpl [ AST.SetMember name memberName ]
-            }
-
-        getters =
-            List.map gettersHelper members
-
-        gettersHelper ( memberName, type_ ) =
-            { name = memberName ++ ">"
-            , sourceLocation = Nothing
-            , typeSignature =
-                TypeSignature.CompilerProvided
-                    { input = [ selfType ]
-                    , output = [ type_ ]
-                    }
-            , exposed = True
-            , implementation =
-                AST.SoloImpl [ AST.GetMember name memberName ]
-            }
-
-        allFuncs =
-            (ctor :: setters)
-                ++ getters
-                |> Dict.fromListBy .name
-    in
-    { ast | functions = Dict.union ast.functions allFuncs }
+                Ok actualAst ->
+                    Expect.equal expectedAst
+                        (stripLocations
+                            { types = actualAst.types
+                            , functions = actualAst.functions
+                            , referenceableFunctions = actualAst.referenceableFunctions
+                            }
+                        )
 
 
 stripLocations : AST -> AST
 stripLocations ast =
     { types = Dict.map (\_ t -> stripTypeLocation t) ast.types
-    , functions = Dict.map (\_ d -> stripWordLocation d) ast.functions
+    , functions = Dict.map (\_ d -> stripFunctionLocation d) ast.functions
     , referenceableFunctions = ast.referenceableFunctions
     }
 
@@ -205,8 +101,8 @@ stripTypeLocation typeDef =
     { typeDef | sourceLocation = emptyRange }
 
 
-stripWordLocation : FunctionDefinition -> FunctionDefinition
-stripWordLocation word =
+stripFunctionLocation : FunctionDefinition -> FunctionDefinition
+stripFunctionLocation word =
     { word
         | implementation = stripImplementationLocation word.implementation
         , sourceLocation = Nothing
@@ -232,16 +128,28 @@ stripNodeLocation node =
             AST.Integer emptyRange val
 
         AST.Function _ val ->
-            AST.Function emptyRange val
+            AST.Function emptyRange (stripFunctionLocation val)
 
         AST.FunctionRef _ val ->
-            AST.FunctionRef emptyRange val
+            AST.FunctionRef emptyRange (stripFunctionLocation val)
+
+        AST.Recurse _ ->
+            AST.Recurse emptyRange
+
+        AST.Cycle _ data ->
+            AST.Cycle emptyRange data
 
         AST.Builtin _ val ->
             AST.Builtin emptyRange val
 
-        _ ->
-            node
+        AST.ConstructType t ->
+            AST.ConstructType (stripTypeLocation t)
+
+        AST.GetMember td n i t ->
+            AST.GetMember (stripTypeLocation td) n i t
+
+        AST.SetMember td n i t ->
+            AST.SetMember (stripTypeLocation td) n i t
 
 
 stripMultiWordBranchLocation : ( TypeMatch, List Node ) -> ( TypeMatch, List Node )
@@ -254,7 +162,12 @@ stripMultiWordBranchLocation ( typeMatch, nodes ) =
 stripTypeMatchLocation : TypeMatch -> TypeMatch
 stripTypeMatchLocation (TypeMatch _ type_ otherConds) =
     TypeMatch emptyRange type_ <|
-        List.map (Tuple.mapSecond stripRecursiveTypeMatchLocation) otherConds
+        List.map (mapTypeMatchCondValue stripRecursiveTypeMatchLocation) otherConds
+
+
+mapTypeMatchCondValue : (TypeMatchValue -> TypeMatchValue) -> TypeMatchCond -> TypeMatchCond
+mapTypeMatchCondValue fn (TypeMatchCond name tipe val) =
+    TypeMatchCond name tipe (fn val)
 
 
 stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue
