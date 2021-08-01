@@ -18,10 +18,11 @@
   "devDependencies": {
     "elm": "^0.19.1-5",
     "elm-format": "^0.8.5",
+    "elm-review": "^2.5.3",
     "elm-test": "^0.19.1-revision7",
-    "jest": "^27.0.0",
+    "jest": "^27.0.6",
     "strip-indent": "^3.0.0",
-    "terser": "^5.7.0"
+    "terser": "^5.7.1"
   },
   "scripts": {
     "test": "npm run test:elm && npm run test:wasm",
