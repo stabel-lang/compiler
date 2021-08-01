@@ -4,7 +4,7 @@ import Expect
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
 import Stabel.Qualifier exposing (..)
-import Stabel.TypeChecker.Problem as Problem
+import Stabel.TypeChecker.Problem as Problem exposing (Problem)
 import Test exposing (Test, describe, test)
 import Test.TypeChecker.Util as Util exposing (checkForError)
 
@@ -12,7 +12,7 @@ import Test.TypeChecker.Util as Util exposing (checkForError)
 suite : Test
 suite =
     describe "TypeChecker -- Errors"
-        [ test "Undeclared generic" <|
+        [ test "Undeclared generic in generic struct" <|
             \_ ->
                 let
                     input =
@@ -20,14 +20,42 @@ suite =
                         defstruct: Box a
                         : value b
                         """
+                in
+                checkForError (undeclaredGenericError "b") input
+        , test "Undeclared generic in struct" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defstruct: Box
+                        : value a
+                        """
+                in
+                checkForError (undeclaredGenericError "a") input
+        , test "Undeclared generic union" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defunion: Maybe
+                        : a
+                        : Nothing
 
-                    undeclaredGenericError generic problem =
-                        case problem of
-                            Problem.UndeclaredGeneric _ problemGeneric _ ->
-                                generic == problemGeneric
+                        defstruct: Nothing
+                        """
+                in
+                checkForError (undeclaredGenericError "a") input
+        , test "Undeclared generic in generic union" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        defunion: Maybe a
+                        : b
+                        : Nothing
 
-                            _ ->
-                                False
+                        defstruct: Nothing
+                        """
                 in
                 checkForError (undeclaredGenericError "b") input
         , test "Wrong type signature" <|
@@ -40,7 +68,7 @@ suite =
                         : 1 2
                         """
 
-                    undeclaredGenericError problem =
+                    unexpectedType problem =
                         case problem of
                             Problem.TypeError _ "main" provided inferred ->
                                 (provided == { input = [], output = [ Type.Int ] })
@@ -49,7 +77,7 @@ suite =
                             _ ->
                                 False
                 in
-                checkForError undeclaredGenericError input
+                checkForError unexpectedType input
         , test "Unexpected function" <|
             \_ ->
                 let
@@ -63,7 +91,7 @@ suite =
                         : 1 value>
                         """
 
-                    undeclaredGenericError problem =
+                    unexpectedType problem =
                         case problem of
                             Problem.UnexpectedType _ "main" (Type.Custom "IntBox") Type.Int ->
                                 True
@@ -71,7 +99,7 @@ suite =
                             _ ->
                                 False
                 in
-                checkForError undeclaredGenericError input
+                checkForError unexpectedType input
         , test "An inferred concrete output type should not successfully type check against a generic variable" <|
             \_ ->
                 let
@@ -389,3 +417,13 @@ suite =
                     checkForError inexhaustiveError input
             ]
         ]
+
+
+undeclaredGenericError : String -> Problem -> Bool
+undeclaredGenericError generic problem =
+    case problem of
+        Problem.UndeclaredGeneric _ problemGeneric _ ->
+            generic == problemGeneric
+
+        _ ->
+            False
