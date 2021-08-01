@@ -48,6 +48,10 @@ type: a... Bool [ a... -- b... ] [ a... -- b... ] -- b...
 
 # stack manipulation
 
+def: dip
+type: a b [ a -- c ] -- c b
+: swap rotate ! swap
+
 def: over
 type: a b -- a b a
 : swap dup rotate
