@@ -157,21 +157,22 @@ toDisplayString t =
             name
 
         CustomGeneric name gens ->
-            name ++ "<" ++ String.join ", " (List.map toDisplayString gens) ++ ">"
+            name ++ "(" ++ String.join ", " (List.map toDisplayString gens) ++ ")"
 
-        Union (Just name) _ ->
-            name
-
-        Union Nothing members ->
+        Union (Just name) members ->
             let
                 memberString =
                     members
                         |> List.map toDisplayString
                         |> String.join ", "
             in
-            "Union("
+            name
+                ++ "("
                 ++ memberString
                 ++ ")"
+
+        Union Nothing members ->
+            toDisplayString (Union (Just "Union") members)
 
         FunctionSignature quotType ->
             "[ " ++ functionTypeToString quotType ++ " ]"

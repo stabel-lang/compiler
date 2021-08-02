@@ -25,14 +25,14 @@ toString source problem =
                 ++ "\n\n"
                 ++ "No such function: '"
                 ++ functionRef
-                ++ "'."
+                ++ "'"
 
         UnknownTypeRef range typeRef ->
             SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "No such type: '"
                 ++ typeRef
-                ++ "'."
+                ++ "'"
 
         UnionTypeMatchWithPatterns range ->
             SourceLocation.extractFromString source range.start range.end
@@ -50,7 +50,7 @@ toString source problem =
                 ++ typeName
                 ++ " does not have a member called '"
                 ++ member
-                ++ "'."
+                ++ "'"
 
         FunctionNotExposed range functionRef ->
             SourceLocation.extractFromString source range.start range.end
