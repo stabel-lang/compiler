@@ -135,7 +135,9 @@ compileString : CompileStringOpts -> Result String Wasm.Module
 compileString opts =
     case Parser.run "test" opts.sourceCode of
         Err parserErrors ->
-            formatErrors (ParserProblem.toString opts.sourceCode) parserErrors
+            parserErrors
+                |> List.map (Tuple.pair opts.sourceCode)
+                |> formatErrors ParserProblem.toString
 
         Ok ast ->
             let
@@ -153,12 +155,16 @@ compileString opts =
             in
             case qualifierResult of
                 Err qualifierErrors ->
-                    formatErrors (QualifierProblem.toString opts.sourceCode) qualifierErrors
+                    qualifierErrors
+                        |> List.map (Tuple.pair opts.sourceCode)
+                        |> formatErrors QualifierProblem.toString
 
                 Ok qualifiedAst ->
                     case TypeChecker.run qualifiedAst of
                         Err typeErrors ->
-                            formatErrors (TypeCheckerProblem.toString opts.sourceCode) typeErrors
+                            typeErrors
+                                |> List.map (Tuple.pair opts.sourceCode)
+                                |> formatErrors TypeCheckerProblem.toString
 
                         Ok typedAst ->
                             typedAst
@@ -183,16 +189,23 @@ compileProject opts =
                 |> Result.combine
 
         parseModuleSource mod =
-            case Parser.run mod.modulePath mod.source of
-                Err err ->
-                    Err err
+            case Parser.run (mod.package ++ mod.modulePath) mod.source of
+                Err errs ->
+                    Err ( mod.source, errs )
 
                 Ok ast ->
                     Ok ( mod.package, mod.modulePath, ast )
+
+        sourceDict =
+            opts.modules
+                |> List.map (\mod -> ( mod.package ++ mod.modulePath, mod.source ))
+                |> Dict.fromList
     in
     case parserResult of
-        Err errs ->
-            formatErrors (ParserProblem.toString "") errs
+        Err ( sourceCode, errs ) ->
+            errs
+                |> List.map (Tuple.pair sourceCode)
+                |> formatErrors ParserProblem.toString
 
         Ok withAst ->
             let
@@ -217,12 +230,32 @@ compileProject opts =
             in
             case qualifierResult of
                 ( (_ :: _) as qualifierErrors, _ ) ->
-                    formatErrors (QualifierProblem.toString "") qualifierErrors
+                    qualifierErrors
+                        |> List.map
+                            (\problem ->
+                                ( Dict.get
+                                    (QualifierProblem.sourceLocationRef problem)
+                                    sourceDict
+                                    |> Maybe.withDefault ""
+                                , problem
+                                )
+                            )
+                        |> formatErrors QualifierProblem.toString
 
                 ( _, qualifiedAst ) ->
                     case TypeChecker.run qualifiedAst.inProgressAST of
                         Err typeErrors ->
-                            formatErrors (TypeCheckerProblem.toString "") typeErrors
+                            typeErrors
+                                |> List.map
+                                    (\problem ->
+                                        ( Dict.get
+                                            (TypeCheckerProblem.sourceLocationRef problem)
+                                            sourceDict
+                                            |> Maybe.withDefault ""
+                                        , problem
+                                        )
+                                    )
+                                |> formatErrors TypeCheckerProblem.toString
 
                         Ok typedAst ->
                             typedAst
@@ -268,10 +301,10 @@ qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
             ( problems, configWithQualifiedAst )
 
 
-formatErrors : (a -> String) -> List a -> Result String b
+formatErrors : (String -> a -> String) -> List ( String, a ) -> Result String b
 formatErrors fn problems =
     problems
-        |> List.map fn
+        |> List.map (\( source, err ) -> fn source err)
         |> String.join "\n\n"
         |> Err
 

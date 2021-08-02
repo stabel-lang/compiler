@@ -1,5 +1,6 @@
 module Stabel.TypeChecker.Problem exposing
     ( Problem(..)
+    , sourceLocationRef
     , toString
     )
 
@@ -70,3 +71,25 @@ toString source problem =
                 ++ "\n\n"
                 ++ "This multi-function doesn't handle all potential patterns. Missing patterns for:\n\n"
                 ++ String.join "\n" (List.map formatTypePattern missingTypes)
+
+
+sourceLocationRef : Problem -> String
+sourceLocationRef problem =
+    case problem of
+        UndeclaredGeneric range _ _ ->
+            range.source
+
+        TypeError range _ _ _ ->
+            range.source
+
+        UnexpectedType range _ _ _ ->
+            range.source
+
+        InconsistentWhens range _ ->
+            range.source
+
+        MissingTypeAnnotationInRecursiveCallStack range _ ->
+            range.source
+
+        InexhaustiveMultiFunction range _ ->
+            range.source

@@ -24,7 +24,7 @@ test('Internal package functions', async () => {
                 module: 'core',
                 source: `
                     def: main
-                    : 0 
+                    : 0
                       internal/flip
                       internal/inc
                 `

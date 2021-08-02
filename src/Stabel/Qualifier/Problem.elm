@@ -1,5 +1,6 @@
 module Stabel.Qualifier.Problem exposing
     ( Problem(..)
+    , sourceLocationRef
     , toString
     )
 
@@ -64,3 +65,28 @@ toString source problem =
                 ++ "Referencing '"
                 ++ typeRef
                 ++ "' but this type is not exposed."
+
+
+sourceLocationRef : Problem -> String
+sourceLocationRef problem =
+    case problem of
+        UnknownFunctionRef range _ ->
+            range.source
+
+        UnknownTypeRef range _ ->
+            range.source
+
+        UnionTypeMatchWithPatterns range ->
+            range.source
+
+        InvalidTypeMatch range ->
+            range.source
+
+        NoSuchMemberOnType range _ _ ->
+            range.source
+
+        FunctionNotExposed range _ ->
+            range.source
+
+        TypeNotExposed range _ ->
+            range.source
