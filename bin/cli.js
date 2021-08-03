@@ -104,6 +104,17 @@ function compileProject(entryPoint) {
                     paths: subFolders
                 });
                 break;
+            case "readFilesToReportError":
+                const files = msg.paths.reduce((acc, path) => { 
+                    acc[path] = fs.readFileSync(path, { encoding: "utf-8" });
+                    return acc;
+                }, {});
+
+                compiler.ports.incomingPort.send({
+                    type: "filesForErrorReporting",
+                    files: files
+                });
+                break;
             case "compilationDone":
                 if (typeof entryPoint === "undefined") {
                     console.log("Compiled successfully");

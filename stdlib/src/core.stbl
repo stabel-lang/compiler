@@ -6,6 +6,7 @@ exposing:
   not
   select
   if
+  dip
   over
   drop2
   split

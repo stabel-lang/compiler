@@ -211,7 +211,7 @@ update msg model =
                             Failed <| InvalidPackageMetadata path <| Json.errorToString err
 
                 _ ->
-                    Failed (InvalidPackageMetadata "todo: path" "Wrong message on initialization")
+                    Failed (InvalidPackageMetadata initOpts.projectDirPath "Wrong message on initialization")
 
         LoadingMetadata state remainingPaths _ ->
             loadingMetadataUpdate msg state remainingPaths

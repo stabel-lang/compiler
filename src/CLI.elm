@@ -1,5 +1,6 @@
 port module CLI exposing (main)
 
+import Dict exposing (Dict)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Platform exposing (Program)
@@ -20,11 +21,20 @@ type alias Flags =
 
 
 type alias Model =
-    ( Maybe String, PackageLoader.Model )
+    -- TODO: Do better
+    ( Maybe String
+    , PackageLoader.Model
+    , List TypeCheckerProblem.Problem
+    )
 
 
 type Msg
     = Incomming Json.Value
+
+
+type CliMsg
+    = FilesForErrorReporting (Dict String String)
+    | PackageLoaderMsg PackageLoader.Msg
 
 
 main : Program Flags Model Msg
@@ -45,7 +55,7 @@ init { projectDir, entryPoint, stdLibPath } =
                 , stdLibPath = stdLibPath
                 }
     in
-    ( ( entryPoint, initialModel )
+    ( ( entryPoint, initialModel, [] )
     , sendSideEffectFromModel initialModel
     )
 
@@ -59,11 +69,11 @@ sendSideEffectFromModel model =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg (( entryPoint, packageLoaderModel ) as model) =
+update msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
     case msg of
         Incomming packageLoaderMsgJson ->
             case Json.decodeValue decodePackageLoaderMsg packageLoaderMsgJson of
-                Ok packageLoaderMsg ->
+                Ok (PackageLoaderMsg packageLoaderMsg) ->
                     let
                         updatedModel =
                             PackageLoader.update packageLoaderMsg packageLoaderModel
@@ -74,7 +84,14 @@ update msg (( entryPoint, packageLoaderModel ) as model) =
                                 compilationResult =
                                     case TypeChecker.run qualifiedAst of
                                         Err typeErrors ->
-                                            formatErrors (TypeCheckerProblem.toString "") typeErrors
+                                            let
+                                                sourceFiles =
+                                                    typeErrors
+                                                        |> List.map TypeCheckerProblem.sourceLocationRef
+                                                        |> Set.fromList
+                                                        |> Set.toList
+                                            in
+                                            Err ( sourceFiles, typeErrors )
 
                                         Ok typedAst ->
                                             let
@@ -90,26 +107,44 @@ update msg (( entryPoint, packageLoaderModel ) as model) =
                             in
                             case compilationResult of
                                 Ok wast ->
-                                    ( model
+                                    ( ( entryPoint, updatedModel, typeErrors_ )
                                     , outgoingPort <| encodeCompilationDone wast
                                     )
 
-                                Err error ->
-                                    ( model
-                                    , outgoingPort <| encodeCompilationFailure error
+                                Err ( sourceFilesRequired, errors ) ->
+                                    ( ( entryPoint, updatedModel, errors )
+                                    , outgoingPort <| encodeReadFilesToReportError sourceFilesRequired
                                     )
 
                         PackageLoader.Failed error ->
-                            ( model
+                            ( ( entryPoint, updatedModel, typeErrors_ )
                             , outgoingPort <|
                                 encodeCompilationFailure <|
                                     PackageLoader.problemToString error
                             )
 
                         _ ->
-                            ( ( entryPoint, updatedModel )
+                            ( ( entryPoint, updatedModel, typeErrors_ )
                             , sendSideEffectFromModel updatedModel
                             )
+
+                Ok (FilesForErrorReporting files) ->
+                    let
+                        errorMessages =
+                            typeErrors_
+                                |> List.map
+                                    (\problem ->
+                                        files
+                                            |> Dict.get (TypeCheckerProblem.sourceLocationRef problem)
+                                            |> Maybe.withDefault ""
+                                            |> (\source -> TypeCheckerProblem.toString source problem)
+                                    )
+                                |> String.join "\n\n"
+                    in
+                    ( model
+                    , outgoingPort <|
+                        encodeCompilationFailure (errorMessages ++ "\n\n")
+                    )
 
                 Err decodeError ->
                     ( model
@@ -117,14 +152,6 @@ update msg (( entryPoint, packageLoaderModel ) as model) =
                         encodeCompilationFailure <|
                             Json.errorToString decodeError
                     )
-
-
-formatErrors : (a -> String) -> List a -> Result String b
-formatErrors fn problems =
-    problems
-        |> List.map fn
-        |> String.join "\n\n"
-        |> Err
 
 
 
@@ -171,26 +198,41 @@ encodeCompilationFailure errorMsg =
         ]
 
 
-decodePackageLoaderMsg : Json.Decoder PackageLoader.Msg
+encodeReadFilesToReportError : List String -> Json.Value
+encodeReadFilesToReportError files =
+    Encode.object
+        [ ( "type", Encode.string "readFilesToReportError" )
+        , ( "paths", Encode.list Encode.string files )
+        ]
+
+
+decodePackageLoaderMsg : Json.Decoder CliMsg
 decodePackageLoaderMsg =
     let
         helper typeStr =
             case typeStr of
                 "fileContents" ->
-                    Json.map3 PackageLoader.FileContents
-                        (Json.field "path" Json.string)
-                        (Json.field "fileName" Json.string)
-                        (Json.field "content" Json.string)
+                    Json.map PackageLoaderMsg <|
+                        Json.map3 PackageLoader.FileContents
+                            (Json.field "path" Json.string)
+                            (Json.field "fileName" Json.string)
+                            (Json.field "content" Json.string)
 
                 "resolvedPackageModules" ->
-                    Json.map2 PackageLoader.ResolvedPackageModules
-                        (Json.field "package" Json.string)
-                        (Json.field "modules" (Json.list Json.string))
+                    Json.map PackageLoaderMsg <|
+                        Json.map2 PackageLoader.ResolvedPackageModules
+                            (Json.field "package" Json.string)
+                            (Json.field "modules" (Json.list Json.string))
 
                 "resolvedDirectories" ->
-                    Json.map2 PackageLoader.ResolvedDirectories
-                        (Json.field "parentDir" Json.string)
-                        (Json.field "paths" (Json.list packagePathDecoder))
+                    Json.map PackageLoaderMsg <|
+                        Json.map2 PackageLoader.ResolvedDirectories
+                            (Json.field "parentDir" Json.string)
+                            (Json.field "paths" (Json.list packagePathDecoder))
+
+                "filesForErrorReporting" ->
+                    Json.map FilesForErrorReporting
+                        (Json.field "files" (Json.dict Json.string))
 
                 _ ->
                     Json.fail <| "Unknown msg type: " ++ typeStr
