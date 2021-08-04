@@ -7,7 +7,10 @@ import Platform exposing (Program)
 import Set
 import Stabel.Codegen as Codegen
 import Stabel.Data.PackagePath as PackagePath
+import Stabel.Data.SourceLocation as SourceLocation
+import Stabel.Data.Type as Type
 import Stabel.PackageLoader as PackageLoader
+import Stabel.Qualifier as Qualifier
 import Stabel.TypeChecker as TypeChecker
 import Stabel.TypeChecker.Problem as TypeCheckerProblem
 import Stabel.Wasm as Wasm
@@ -69,82 +72,12 @@ sendSideEffectFromModel model =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
+update msg model =
     case msg of
         Incomming packageLoaderMsgJson ->
             case Json.decodeValue decodePackageLoaderMsg packageLoaderMsgJson of
-                Ok (PackageLoaderMsg packageLoaderMsg) ->
-                    let
-                        updatedModel =
-                            PackageLoader.update packageLoaderMsg packageLoaderModel
-                    in
-                    case updatedModel of
-                        PackageLoader.Done qualifiedAst ->
-                            let
-                                compilationResult =
-                                    case TypeChecker.run qualifiedAst of
-                                        Err typeErrors ->
-                                            let
-                                                sourceFiles =
-                                                    typeErrors
-                                                        |> List.map TypeCheckerProblem.sourceLocationRef
-                                                        |> Set.fromList
-                                                        |> Set.toList
-                                            in
-                                            Err ( sourceFiles, typeErrors )
-
-                                        Ok typedAst ->
-                                            let
-                                                exportedFunctions =
-                                                    entryPoint
-                                                        |> Maybe.map Set.singleton
-                                                        |> Maybe.withDefault Set.empty
-                                            in
-                                            typedAst
-                                                |> Codegen.run exportedFunctions
-                                                |> Wasm.toString
-                                                |> Ok
-                            in
-                            case compilationResult of
-                                Ok wast ->
-                                    ( ( entryPoint, updatedModel, typeErrors_ )
-                                    , outgoingPort <| encodeCompilationDone wast
-                                    )
-
-                                Err ( sourceFilesRequired, errors ) ->
-                                    ( ( entryPoint, updatedModel, errors )
-                                    , outgoingPort <| encodeReadFilesToReportError sourceFilesRequired
-                                    )
-
-                        PackageLoader.Failed error ->
-                            ( ( entryPoint, updatedModel, typeErrors_ )
-                            , outgoingPort <|
-                                encodeCompilationFailure <|
-                                    PackageLoader.problemToString error
-                            )
-
-                        _ ->
-                            ( ( entryPoint, updatedModel, typeErrors_ )
-                            , sendSideEffectFromModel updatedModel
-                            )
-
-                Ok (FilesForErrorReporting files) ->
-                    let
-                        errorMessages =
-                            typeErrors_
-                                |> List.map
-                                    (\problem ->
-                                        files
-                                            |> Dict.get (TypeCheckerProblem.sourceLocationRef problem)
-                                            |> Maybe.withDefault ""
-                                            |> (\source -> TypeCheckerProblem.toString source problem)
-                                    )
-                                |> String.join "\n\n"
-                    in
-                    ( model
-                    , outgoingPort <|
-                        encodeCompilationFailure (errorMessages ++ "\n\n")
-                    )
+                Ok cliMsg ->
+                    cliUpdate cliMsg model
 
                 Err decodeError ->
                     ( model
@@ -152,6 +85,123 @@ update msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
                         encodeCompilationFailure <|
                             Json.errorToString decodeError
                     )
+
+
+cliUpdate : CliMsg -> Model -> ( Model, Cmd Msg )
+cliUpdate msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
+    case msg of
+        PackageLoaderMsg packageLoaderMsg ->
+            let
+                updatedModel =
+                    PackageLoader.update packageLoaderMsg packageLoaderModel
+            in
+            case updatedModel of
+                PackageLoader.Done qualifiedAst ->
+                    case typeCheckAndRun entryPoint qualifiedAst of
+                        Ok wast ->
+                            ( ( entryPoint, updatedModel, typeErrors_ )
+                            , outgoingPort <| encodeCompilationDone wast
+                            )
+
+                        Err ( sourceFilesRequired, errors ) ->
+                            ( ( entryPoint, updatedModel, errors )
+                            , outgoingPort <| encodeReadFilesToReportError sourceFilesRequired
+                            )
+
+                PackageLoader.Failed error ->
+                    ( ( entryPoint, updatedModel, typeErrors_ )
+                    , outgoingPort <|
+                        encodeCompilationFailure <|
+                            PackageLoader.problemToString error
+                    )
+
+                _ ->
+                    ( ( entryPoint, updatedModel, typeErrors_ )
+                    , sendSideEffectFromModel updatedModel
+                    )
+
+        FilesForErrorReporting files ->
+            let
+                errorMessages =
+                    typeErrors_
+                        |> List.map
+                            (\problem ->
+                                files
+                                    |> Dict.get (TypeCheckerProblem.sourceLocationRef problem)
+                                    |> Maybe.withDefault ""
+                                    |> (\source -> TypeCheckerProblem.toString source problem)
+                            )
+                        |> String.join "\n\n"
+            in
+            ( model
+            , outgoingPort <|
+                encodeCompilationFailure errorMessages
+            )
+
+
+legalEntryPointType : Type.FunctionType
+legalEntryPointType =
+    { input = []
+    , output = [ Type.Int ]
+    }
+
+
+typeCheckAndRun :
+    Maybe String
+    -> Qualifier.AST
+    -> Result ( List String, List TypeCheckerProblem.Problem ) String
+typeCheckAndRun entryPoint qualifiedAst =
+    case TypeChecker.run qualifiedAst of
+        Err typeErrors ->
+            let
+                sourceFiles =
+                    typeErrors
+                        |> List.map TypeCheckerProblem.sourceLocationRef
+                        |> Set.fromList
+                        |> Set.toList
+            in
+            Err ( sourceFiles, typeErrors )
+
+        Ok typedAst ->
+            let
+                exportedFunctions =
+                    entryPoint
+                        |> Maybe.map Set.singleton
+                        |> Maybe.withDefault Set.empty
+
+                entryPointFunction =
+                    entryPoint
+                        |> Maybe.andThen (\n -> Dict.get n typedAst.functions)
+            in
+            case entryPointFunction of
+                Just fn ->
+                    if fn.type_ == legalEntryPointType then
+                        typedAst
+                            |> Codegen.run exportedFunctions
+                            |> Wasm.toString
+                            |> Ok
+
+                    else
+                        let
+                            sourceLoc =
+                                fn.sourceLocation
+                                    |> Maybe.withDefault SourceLocation.emptyRange
+                        in
+                        Err
+                            ( [ sourceLoc.source ]
+                            , [ TypeCheckerProblem.BadEntryPoint
+                                    sourceLoc
+                                    fn.name
+                                    legalEntryPointType
+                                    fn.type_
+                              ]
+                            )
+
+                Nothing ->
+                    typedAst
+                        |> Codegen.run exportedFunctions
+                        |> Wasm.toString
+                        |> Ok
 
 
 
@@ -194,7 +244,7 @@ encodeCompilationFailure : String -> Json.Value
 encodeCompilationFailure errorMsg =
     Encode.object
         [ ( "type", Encode.string "compilationFailure" )
-        , ( "error", Encode.string errorMsg )
+        , ( "error", Encode.string (errorMsg ++ "\n\n") )
         ]
 
 

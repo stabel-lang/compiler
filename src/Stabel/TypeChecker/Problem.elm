@@ -16,6 +16,7 @@ type Problem
     | InconsistentWhens SourceLocationRange String
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
     | InexhaustiveMultiFunction SourceLocationRange (List (List Type))
+    | BadEntryPoint SourceLocationRange String FunctionType FunctionType
 
 
 toString : String -> Problem -> String
@@ -90,6 +91,19 @@ toString source problem =
                 ++ "This multi-function doesn't handle all potential patterns. Missing patterns for:\n\n"
                 ++ String.join "\n" (List.map formatTypePattern missingTypes)
 
+        BadEntryPoint range name actual expected ->
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
+                ++ "\n\n"
+                ++ "In order to be called from the command line, the type of '"
+                ++ name
+                ++ "' needs to be:\n\n"
+                ++ Type.functionTypeToString actual
+                ++ "\n\nHowever, it seems that the actual type is:\n\n"
+                ++ Type.functionTypeToString expected
+
 
 sourceLocationRef : Problem -> String
 sourceLocationRef problem =
@@ -110,4 +124,7 @@ sourceLocationRef problem =
             range.source
 
         InexhaustiveMultiFunction range _ ->
+            range.source
+
+        BadEntryPoint range _ _ _ ->
             range.source
