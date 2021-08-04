@@ -33,7 +33,7 @@ function initProject() {
             "main"
         ],
         dependencies: {
-            "stabel/standard_library": "0.2.0"
+            "stabel/standard_library": "0.2.1"
         },
         "package-paths": []
     };
@@ -154,7 +154,7 @@ function packageDirs(parentDir) {
 
 function printHelp() {
     console.log(`
-Stabel v0.2.0-alpha
+Stabel v0.2.1-alpha
 
 Possible options are:
 * init <package_name>: initialize a new project in the current directory.

@@ -1,6 +1,6 @@
 {
     "name": "stabel/standard_library",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "language-version": "0.2.0",
     "exposed-modules": [
         "core",
