@@ -22,14 +22,20 @@ toString : String -> Problem -> String
 toString source problem =
     case problem of
         UndeclaredGeneric range generic _ ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Generic variable '"
                 ++ generic
                 ++ "' needs to be declared."
 
         TypeError range name actual expected ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "The type of '"
                 ++ name
@@ -39,24 +45,33 @@ toString source problem =
                 ++ Type.functionTypeToString expected
 
         UnexpectedType range name actual expected ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Found a problem in the implementation of '"
                 ++ name
-                ++ "'.\n\nExpected:\n\n"
+                ++ "'\n\nExpected:\n\n"
                 ++ Type.toDisplayString expected
                 ++ "\n\nActual:\n\n"
                 ++ Type.toDisplayString actual
 
         InconsistentWhens range name ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "The branches of '"
                 ++ name
                 ++ "' do not all have the same type."
 
         MissingTypeAnnotationInRecursiveCallStack range name ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "We require a type annotation for '"
                 ++ name
@@ -67,7 +82,10 @@ toString source problem =
                 formatTypePattern tp =
                     String.join " -> " (List.map Type.toDisplayString tp)
             in
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "This multi-function doesn't handle all potential patterns. Missing patterns for:\n\n"
                 ++ String.join "\n" (List.map formatTypePattern missingTypes)

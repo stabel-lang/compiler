@@ -21,31 +21,46 @@ toString : String -> Problem -> String
 toString source problem =
     case problem of
         UnknownFunctionRef range functionRef ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "No such function: '"
                 ++ functionRef
                 ++ "'"
 
         UnknownTypeRef range typeRef ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "No such type: '"
                 ++ typeRef
                 ++ "'"
 
         UnionTypeMatchWithPatterns range ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Union types cannot have sub-patterns."
 
         InvalidTypeMatch range ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "This is not a valid pattern match. Pattern matches look like Type( <member> <value> )."
 
         NoSuchMemberOnType range typeName member ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ typeName
                 ++ " does not have a member called '"
@@ -53,14 +68,20 @@ toString source problem =
                 ++ "'"
 
         FunctionNotExposed range functionRef ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Trying to call '"
                 ++ functionRef
                 ++ "' but this function is not exposed."
 
         TypeNotExposed range typeRef ->
-            SourceLocation.extractFromString source range.start range.end
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
                 ++ "\n\n"
                 ++ "Referencing '"
                 ++ typeRef

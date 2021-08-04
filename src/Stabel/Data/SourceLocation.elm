@@ -77,6 +77,7 @@ dropLastEmptyLines ls =
         |> List.reverse
         |> dropLastEmptyLinesHelper
         |> List.reverse
+        |> dropLastEmptyLinesHelper
 
 
 dropLastEmptyLinesHelper : List ( Int, String ) -> List ( Int, String )
