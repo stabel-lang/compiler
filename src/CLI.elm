@@ -244,7 +244,7 @@ encodeCompilationFailure : String -> Json.Value
 encodeCompilationFailure errorMsg =
     Encode.object
         [ ( "type", Encode.string "compilationFailure" )
-        , ( "error", Encode.string (errorMsg ++ "\n\n") )
+        , ( "error", Encode.string ("\n" ++ errorMsg ++ "\n") )
         ]
 
 

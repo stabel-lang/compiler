@@ -414,7 +414,8 @@ noiseParserLoop : () -> Parser (Parser.Step () ())
 noiseParserLoop _ =
     Parser.oneOf
         [ Parser.succeed (Parser.Loop ())
-            |. Parser.lineComment (Token "#" UnknownError)
+            |. Parser.symbol (Token "#" UnknownError)
+            |. Parser.chompWhile (\c -> c /= '\n')
         , Parser.succeed (Parser.Loop ())
             |. Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
             |. Parser.chompWhile (\c -> Set.member c whitespaceChars)
