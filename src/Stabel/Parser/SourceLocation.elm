@@ -1,4 +1,8 @@
-module Stabel.Parser.SourceLocation exposing (..)
+module Stabel.Parser.SourceLocation exposing
+    ( SourceLocation
+    , SourceLocationRange
+    , emptyRange
+    )
 
 
 type alias SourceLocationRange =

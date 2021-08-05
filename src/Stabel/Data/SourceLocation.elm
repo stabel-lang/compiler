@@ -3,7 +3,6 @@ module Stabel.Data.SourceLocation exposing
     , SourceLocationRange
     , emptyRange
     , extractFromString
-    , toString
     )
 
 
@@ -22,14 +21,10 @@ type alias SourceLocation =
 
 emptyRange : SourceLocationRange
 emptyRange =
-    SourceLocationRange ""
+    SourceLocationRange
+        ""
         (SourceLocation 0 0)
         (SourceLocation 0 0)
-
-
-toString : SourceLocation -> String
-toString location =
-    String.fromInt location.row ++ ":" ++ String.fromInt location.col
 
 
 extractFromString : String -> SourceLocation -> SourceLocation -> String
