@@ -144,6 +144,46 @@ suite =
                             , referenceableFunctions = Set.empty
                             }
                             (Util.stripLocations ast)
+        , describe "Errors" <|
+            let
+                load files =
+                    PackageLoader.init initOpts
+                        |> resolveSideEffects files []
+                        |> Result.map Tuple.second
+            in
+            [ test "Exposed modules is respected" <|
+                \_ ->
+                    case load testFilesAccessUnexposedModule of
+                        Err _ ->
+                            Expect.pass
+
+                        Ok _ ->
+                            Expect.fail "Did not expect qualification to succeed"
+            , test "Exposed modules of transitive deps are not accessible" <|
+                \_ ->
+                    case load testFilesTransitiveDepBleed of
+                        Err _ ->
+                            Expect.pass
+
+                        Ok _ ->
+                            Expect.fail "Did not expect qualification to succeed"
+            , test "Transitive deps are loaded (make sure above test fails for correct reason)" <|
+                \_ ->
+                    case load testFilesTransitiveDep of
+                        Err _ ->
+                            Expect.fail "Did not expect qualification to fail"
+
+                        Ok _ ->
+                            Expect.pass
+            , test "An external reference shouldn't match an internal module" <|
+                \_ ->
+                    case load testFilesExternalRef of
+                        Err _ ->
+                            Expect.fail "Did not expect failure"
+
+                        Ok _ ->
+                            Expect.pass
+            ]
         ]
 
 
@@ -417,6 +457,268 @@ testFilesInternalConsistency =
           , """
             def: next-version
             : mod2/version mod1/bump-version
+            """
+          )
+        ]
+        |> Dict.union stdLibFiles
+
+
+testFilesAccessUnexposedModule : Dict String String
+testFilesAccessUnexposedModule =
+    Dict.fromList
+        [ ( "/project/stabel.json"
+          , """
+            {
+                "name": "robheghan/dummy",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "core"
+                ],
+                "dependencies": {
+                    "robheghan/pack": "1.0.0"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/src/core.stbl"
+          , """
+            def: test
+            : /helper/number-six 4 +
+            """
+          )
+        , ( "/project/lib/pack/stabel.json"
+          , """
+            {
+                "name": "robheghan/pack",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "pub"
+                ],
+                "dependencies": {},
+                "package-paths": []
+            }
+            """
+          )
+        , ( "/project/lib/pack/src/pub.stbl"
+          , """
+            def: number-five
+            : 5
+            """
+          )
+        , ( "/project/lib/pack/src/helper.stbl"
+          , """
+            def: number-six
+            : 6
+            """
+          )
+        ]
+        |> Dict.union stdLibFiles
+
+
+testFilesTransitiveDepBleed : Dict String String
+testFilesTransitiveDepBleed =
+    Dict.fromList
+        [ ( "/project/stabel.json"
+          , """
+            {
+                "name": "robheghan/dummy",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "core"
+                ],
+                "dependencies": {
+                    "robheghan/pack": "1.0.0"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/src/core.stbl"
+          , """
+            def: test
+            : /helper/number-six
+            """
+          )
+        , ( "/project/lib/pack/stabel.json"
+          , """
+            {
+                "name": "robheghan/pack",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "pub"
+                ],
+                "dependencies": {
+                    "robheghan/utils": "1.0.1"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/lib/pack/src/pub.stbl"
+          , """
+            def: number-five
+            : /helper/number-six 1 -
+            """
+          )
+        , ( "/project/lib/pack/lib/utils/stabel.json"
+          , """
+            {
+                "name": "robheghan/utils",
+                "version": "1.0.1",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "helper"
+                ],
+                "dependencies": {
+                },
+                "package-paths": [
+                ]
+            }
+            """
+          )
+        , ( "/project/lib/pack/lib/utils/src/helper.stbl"
+          , """
+            def: number-six
+            : 6
+            """
+          )
+        ]
+        |> Dict.union stdLibFiles
+
+
+testFilesTransitiveDep : Dict String String
+testFilesTransitiveDep =
+    Dict.fromList
+        [ ( "/project/stabel.json"
+          , """
+            {
+                "name": "robheghan/dummy",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "core"
+                ],
+                "dependencies": {
+                    "robheghan/pack": "1.0.0"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/src/core.stbl"
+          , """
+            def: test
+            : /pub/number-five
+            """
+          )
+        , ( "/project/lib/pack/stabel.json"
+          , """
+            {
+                "name": "robheghan/pack",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "pub"
+                ],
+                "dependencies": {
+                    "robheghan/utils": "1.0.1"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/lib/pack/src/pub.stbl"
+          , """
+            def: number-five
+            : /helper/number-six 1 -
+            """
+          )
+        , ( "/project/lib/pack/lib/utils/stabel.json"
+          , """
+            {
+                "name": "robheghan/utils",
+                "version": "1.0.1",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "helper"
+                ],
+                "dependencies": {
+                },
+                "package-paths": [
+                ]
+            }
+            """
+          )
+        , ( "/project/lib/pack/lib/utils/src/helper.stbl"
+          , """
+            def: number-six
+            : 6
+            """
+          )
+        ]
+        |> Dict.union stdLibFiles
+
+
+testFilesExternalRef : Dict String String
+testFilesExternalRef =
+    Dict.fromList
+        [ ( "/project/stabel.json"
+          , """
+            {
+                "name": "robheghan/dummy",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "core"
+                ],
+                "dependencies": {
+                    "robheghan/pack": "1.0.0"
+                },
+                "package-paths": [
+                    "lib/*"
+                ]
+            }
+            """
+          )
+        , ( "/project/src/core.stbl"
+          , """
+            def: test
+            : /core/number-five 4 +
+            """
+          )
+        , ( "/project/lib/pack/stabel.json"
+          , """
+            {
+                "name": "robheghan/pack",
+                "version": "1.0.0",
+                "language-version": "0.2.0",
+                "exposed-modules": [
+                    "core"
+                ],
+                "dependencies": {},
+                "package-paths": []
+            }
+            """
+          )
+        , ( "/project/lib/pack/src/core.stbl"
+          , """
+            def: number-five
+            : 5
             """
           )
         ]
