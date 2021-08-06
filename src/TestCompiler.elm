@@ -133,11 +133,11 @@ init input =
 
 compileString : CompileStringOpts -> Result String Wasm.Module
 compileString opts =
-    case Parser.run "test" opts.sourceCode of
+    case Parser.run "<buffer>" opts.sourceCode of
         Err parserErrors ->
             parserErrors
-                |> List.map (Tuple.pair opts.sourceCode)
-                |> formatErrors ParserProblem.toString
+                |> List.map (\e -> ( "<buffer>", opts.sourceCode, e ))
+                |> formatParserErrors ParserProblem.toString
 
         Ok ast ->
             let
@@ -189,9 +189,13 @@ compileProject opts =
                 |> Result.combine
 
         parseModuleSource mod =
-            case Parser.run (mod.package ++ mod.modulePath) mod.source of
+            let
+                fullPath =
+                    mod.package ++ mod.modulePath
+            in
+            case Parser.run fullPath mod.source of
                 Err errs ->
-                    Err ( mod.source, errs )
+                    Err ( fullPath, mod.source, errs )
 
                 Ok ast ->
                     Ok ( mod.package, mod.modulePath, ast )
@@ -202,10 +206,10 @@ compileProject opts =
                 |> Dict.fromList
     in
     case parserResult of
-        Err ( sourceCode, errs ) ->
+        Err ( ref, sourceCode, errs ) ->
             errs
-                |> List.map (Tuple.pair sourceCode)
-                |> formatErrors ParserProblem.toString
+                |> List.map (\e -> ( ref, sourceCode, e ))
+                |> formatParserErrors ParserProblem.toString
 
         Ok withAst ->
             let
@@ -299,6 +303,14 @@ qualifyTestTuples ( packageName, modulePath, parserAst ) ( problems, config ) =
                     }
             in
             ( problems, configWithQualifiedAst )
+
+
+formatParserErrors : (String -> String -> a -> String) -> List ( String, String, a ) -> Result String b
+formatParserErrors fn problems =
+    problems
+        |> List.map (\( ref, source, err ) -> fn ref source err)
+        |> String.join "\n\n"
+        |> Err
 
 
 formatErrors : (String -> a -> String) -> List ( String, a ) -> Result String b

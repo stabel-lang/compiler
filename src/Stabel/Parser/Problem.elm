@@ -52,8 +52,8 @@ type Problem
     | BadDefinition String
 
 
-toString : String -> DeadEnd Context Problem -> String
-toString source deadEnd =
+toString : String -> String -> DeadEnd Context Problem -> String
+toString sourceRef source deadEnd =
     let
         contextExplination =
             contextStackExplination deadEnd
@@ -82,7 +82,8 @@ toString source deadEnd =
         problemDetail =
             problemToString source deadEnd.problem
     in
-    [ contextExplination
+    [ ">> " ++ sourceRef
+    , contextExplination
     , codeBlock
     , problemDetail
     ]

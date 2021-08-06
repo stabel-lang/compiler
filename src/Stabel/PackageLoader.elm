@@ -32,7 +32,7 @@ type Problem
     | UnknownMessageForCompile String
     | NoExposedModulesInRootProject
     | ModuleNotFound String
-    | ParserError String (List (DeadEnd ParserProblem.Context ParserProblem.Problem))
+    | ParserError String String (List (DeadEnd ParserProblem.Context ParserProblem.Problem))
     | QualifierError String (List QualifierProblem.Problem)
     | InternalError String
 
@@ -55,9 +55,9 @@ problemToString problem =
         ModuleNotFound mod ->
             "Failed to locate module '" ++ mod ++ "' on disk"
 
-        ParserError source errs ->
+        ParserError ref source errs ->
             errs
-                |> List.map (ParserProblem.toString source)
+                |> List.map (ParserProblem.toString ref source)
                 |> String.join "\n\n"
 
         QualifierError source errs ->
@@ -483,7 +483,7 @@ parsingUpdate msg state remainingModules =
             in
             case ( possibleModuleInfo, Parser.run fullPath content ) of
                 ( _, Err parserError ) ->
-                    Failed <| ParserError content parserError
+                    Failed <| ParserError fullPath content parserError
 
                 ( Just ( packageName, moduleName ), Ok parserAst ) ->
                     let
