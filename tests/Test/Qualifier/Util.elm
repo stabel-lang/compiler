@@ -6,7 +6,6 @@ module Test.Qualifier.Util exposing
     )
 
 import Dict
-import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
@@ -16,7 +15,7 @@ import Stabel.Qualifier as AST
         ( AST
         , FunctionDefinition
         , FunctionImplementation(..)
-        , Node(..)
+        , Node
         , TypeDefinition
         , TypeMatch(..)
         , TypeMatchCond(..)

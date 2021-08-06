@@ -16,7 +16,6 @@ config : List Rule
 config =
     [ Simplify.rule Simplify.defaults
     , NoUnused.CustomTypeConstructors.rule []
-    , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
     , NoUnused.Modules.rule

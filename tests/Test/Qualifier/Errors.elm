@@ -1,7 +1,6 @@
 module Test.Qualifier.Errors exposing (suite)
 
 import Dict
-import Dict.Extra as Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Parser as Parser

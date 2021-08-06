@@ -11,7 +11,6 @@ module Stabel.TypeChecker exposing
     )
 
 import Dict exposing (Dict)
-import Dict.Extra as Dict
 import List.Extra as List
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
@@ -150,7 +149,7 @@ collectUndeclaredGenericProblems : SourceLocationRange -> Set String -> List Str
 collectUndeclaredGenericProblems range listedGenerics memberTypes =
     memberTypes
         |> List.filter (\gen -> not (Set.member gen listedGenerics))
-        |> List.map (\gen -> UndeclaredGeneric range gen listedGenerics)
+        |> List.map (\gen -> UndeclaredGeneric range gen)
 
 
 cleanContext : Context -> Context
@@ -920,7 +919,7 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
                             inferredRest
                             (annotatedEl :: acc)
 
-        ( (_ as annotatedEl) :: annotatedRest, (Type.StackRange infGen) :: inferredRest ) ->
+        ( annotatedEl :: annotatedRest, (Type.StackRange infGen) :: inferredRest ) ->
             case Dict.get infGen remappedGenerics of
                 Just val ->
                     constrainGenericsHelper remappedGenerics annotatedRest inferredRest (val :: acc)
@@ -1350,8 +1349,7 @@ functionTypeFromStackEffectsHelper untypedDef effects ( context, functionType ) 
         [] ->
             ( context
             , { functionType
-                | input = functionType.input
-                , output = List.reverse functionType.output
+                | output = List.reverse functionType.output
               }
             )
 
@@ -1468,7 +1466,7 @@ compatibleTypes context typeA typeB =
                                     helper t ( ctx, oldTruth ) =
                                         let
                                             ( newCtx, thisTruth ) =
-                                                compatibleTypes context firstType t
+                                                compatibleTypes ctx firstType t
                                         in
                                         ( newCtx, oldTruth && thisTruth )
                                 in

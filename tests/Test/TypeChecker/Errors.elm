@@ -3,7 +3,6 @@ module Test.TypeChecker.Errors exposing (suite)
 import Expect
 import Stabel.Data.SourceLocation exposing (emptyRange)
 import Stabel.Data.Type as Type
-import Stabel.Qualifier exposing (..)
 import Stabel.TypeChecker.Problem as Problem exposing (Problem)
 import Test exposing (Test, describe, test)
 import Test.TypeChecker.Util as Util exposing (checkForError)
@@ -422,7 +421,7 @@ suite =
 undeclaredGenericError : String -> Problem -> Bool
 undeclaredGenericError generic problem =
     case problem of
-        Problem.UndeclaredGeneric _ problemGeneric _ ->
+        Problem.UndeclaredGeneric _ problemGeneric ->
             generic == problemGeneric
 
         _ ->

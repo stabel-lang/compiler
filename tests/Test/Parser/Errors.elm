@@ -1,7 +1,6 @@
 module Test.Parser.Errors exposing (..)
 
 import Expect exposing (Expectation)
-import Stabel.Parser exposing (..)
 import Stabel.Parser.Problem exposing (Problem(..))
 import Test exposing (Test, describe, test)
 import Test.Parser.Util exposing (compile)

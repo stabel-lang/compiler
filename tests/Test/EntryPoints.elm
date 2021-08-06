@@ -1,9 +1,7 @@
 module Test.EntryPoints exposing (suite)
 
-import CLI
 import Expect
 import Test exposing (Test, describe, test)
-import TestCompiler
 
 
 suite : Test

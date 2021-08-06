@@ -76,5 +76,5 @@ resultDecodeAdapt result =
         Ok value ->
             Json.succeed value
 
-        Err err ->
+        Err _ ->
             Json.fail "Something went wrong"

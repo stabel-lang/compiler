@@ -3,7 +3,6 @@ module Test.PackageLoader exposing (suite)
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Expect exposing (Expectation)
-import List.Extra as List
 import Set
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.PackagePath as PackagePath
@@ -178,11 +177,7 @@ suite =
             , test "An external reference shouldn't match an internal module" <|
                 \_ ->
                     case load testFilesExternalRef of
-                        Err err ->
-                            let
-                                _ =
-                                    Debug.log "err" err
-                            in
+                        Err _ ->
                             Expect.fail "Did not expect failure"
 
                         Ok _ ->

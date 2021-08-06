@@ -69,15 +69,12 @@ type Type
 
 
 typeToString : Type -> String
-typeToString type_ =
-    case type_ of
-        Int32 ->
-            "i32"
+typeToString _ =
+    "i32"
 
 
 type Instruction
-    = NoOp
-    | Batch (List Instruction)
+    = Batch (List Instruction)
     | Block (List Instruction)
     | Loop (List Instruction)
     | Break Int
@@ -334,9 +331,6 @@ formatFunction function =
 formatInstruction : Instruction -> FormatHint
 formatInstruction ins =
     case ins of
-        NoOp ->
-            Str "nop"
-
         Batch insList ->
             BatchFormat <| List.map formatInstruction insList
 

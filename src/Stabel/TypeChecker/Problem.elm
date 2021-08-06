@@ -4,13 +4,12 @@ module Stabel.TypeChecker.Problem exposing
     , toString
     )
 
-import Set exposing (Set)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
 import Stabel.Data.Type as Type exposing (FunctionType, Type)
 
 
 type Problem
-    = UndeclaredGeneric SourceLocationRange String (Set String)
+    = UndeclaredGeneric SourceLocationRange String
     | TypeError SourceLocationRange String FunctionType FunctionType
     | UnexpectedType SourceLocationRange String Type Type
     | InconsistentWhens SourceLocationRange String
@@ -22,7 +21,7 @@ type Problem
 toString : String -> Problem -> String
 toString source problem =
     case problem of
-        UndeclaredGeneric range generic _ ->
+        UndeclaredGeneric range generic ->
             ">> "
                 ++ range.source
                 ++ "\n\n"
@@ -108,7 +107,7 @@ toString source problem =
 sourceLocationRef : Problem -> String
 sourceLocationRef problem =
     case problem of
-        UndeclaredGeneric range _ _ ->
+        UndeclaredGeneric range _ ->
             range.source
 
         TypeError range _ _ _ ->

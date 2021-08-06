@@ -5,7 +5,6 @@ import Expect exposing (Expectation)
 import Set
 import Stabel.Parser as Parser
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
-import Stabel.Parser.Problem as Parser
 import Stabel.Qualifier exposing (..)
 import Stabel.Qualifier.Problem as Problem exposing (Problem)
 import Test exposing (Test, describe, test)

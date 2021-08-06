@@ -1,6 +1,5 @@
 module Test.TypeChecker.Unions exposing (suite)
 
-import Dict
 import Dict.Extra as Dict
 import Stabel.Data.Builtin as Builtin
 import Stabel.Data.SourceLocation exposing (emptyRange)
