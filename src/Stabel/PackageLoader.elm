@@ -107,13 +107,14 @@ type alias ParsedModuleInfo =
     { packageName : PackageName
     , modulePath : ModuleName
     , ast : Parser.AST
+    , externalModules : Dict String String
     , requiredModules : Set String
     , source : String
     }
 
 
-emptyState : InitOptions -> PackageInfo -> State
-emptyState initOptions rootPackage =
+emptyState : PackageInfo -> State
+emptyState rootPackage =
     { rootPackage = rootPackage
     , dependencies = rootPackage.metadata.dependencies
     , dependentPackages = Dict.empty
@@ -181,7 +182,7 @@ update msg model =
                                     }
 
                                 state =
-                                    emptyState initOpts
+                                    emptyState
                                         { path = path
                                         , metadata = metadataWithStdLib
                                         , modules = []
@@ -262,9 +263,12 @@ loadingMetadataUpdate msg state remainingPaths =
                         Just _ ->
                             let
                                 updatedState =
-                                    -- TODO: Register dependencies of sub-packages
                                     { state
-                                        | dependentPackages =
+                                        | dependencies =
+                                            Dict.union
+                                                state.dependencies
+                                                metadata.dependencies
+                                        , dependentPackages =
                                             Dict.update
                                                 (PackageName.toString metadata.name)
                                                 (insertHighestPackage
@@ -489,11 +493,16 @@ parsingUpdate msg state remainingModules =
                         updatedParsedModules =
                             Set.insert fullModuleName state.parsedModuleNames
 
+                        externalModules =
+                            packageInfoByName state packageName
+                                |> Maybe.map (buildExternalModules state)
+                                |> Maybe.withDefault Dict.empty
+
                         requiredModules =
                             Qualifier.requiredModules
                                 { packageName = PackageName.toString packageName
                                 , ast = parserAst
-                                , externalModules = state.moduleNameToPackageName
+                                , externalModules = externalModules
                                 }
 
                         updatedState =
@@ -503,6 +512,7 @@ parsingUpdate msg state remainingModules =
                                     { packageName = packageName
                                     , modulePath = moduleName
                                     , ast = parserAst
+                                    , externalModules = externalModules
                                     , requiredModules = requiredModules
                                     , source = content
                                     }
@@ -565,7 +575,7 @@ nextCompileStep remainingModules state =
                                 { packageName = PackageName.toString parsedModInfo.packageName
                                 , modulePath = ModuleName.toString parsedModInfo.modulePath
                                 , ast = parsedModInfo.ast
-                                , externalModules = state.moduleNameToPackageName
+                                , externalModules = parsedModInfo.externalModules
                                 , inProgressAST = qast
                                 }
                     in
@@ -600,6 +610,34 @@ nextCompileStep remainingModules state =
             Parsing state otherModules (ReadFile path fileName)
 
 
+packageInfoByName : State -> PackageName -> Maybe PackageInfo
+packageInfoByName state packageName =
+    if state.rootPackage.metadata.name == packageName then
+        Just state.rootPackage
+
+    else
+        Dict.get (PackageName.toString packageName) state.dependentPackages
+
+
+buildExternalModules : State -> PackageInfo -> Dict String String
+buildExternalModules state package =
+    package.metadata.dependencies
+        |> Dict.keys
+        |> List.filterMap (\packageName -> Dict.get packageName state.dependentPackages)
+        |> List.map .metadata
+        |> List.concatMap
+            (\packageMeta ->
+                packageMeta.exposedModules
+                    |> List.map
+                        (\modName ->
+                            ( "/" ++ ModuleName.toString modName
+                            , PackageName.toString packageMeta.name
+                            )
+                        )
+            )
+        |> Dict.fromList
+
+
 sortByRequiredModules : ParsedModuleInfo -> ParsedModuleInfo -> Order
 sortByRequiredModules a b =
     let
@@ -622,5 +660,5 @@ sortByRequiredModules a b =
         ( False, True ) ->
             GT
 
-        otherwise ->
+        _ ->
             EQ

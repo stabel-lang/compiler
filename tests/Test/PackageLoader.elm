@@ -178,7 +178,11 @@ suite =
             , test "An external reference shouldn't match an internal module" <|
                 \_ ->
                     case load testFilesExternalRef of
-                        Err _ ->
+                        Err err ->
+                            let
+                                _ =
+                                    Debug.log "err" err
+                            in
                             Expect.fail "Did not expect failure"
 
                         Ok _ ->
