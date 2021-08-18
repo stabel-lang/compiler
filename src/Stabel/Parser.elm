@@ -85,6 +85,7 @@ type AstNode
     | ConstructType String
     | GetMember String String
     | SetMember String String
+    | ArrayLiteral SourceLocationRange (List AstNode)
 
 
 run : String -> String -> Result (List (Parser.DeadEnd Context Problem)) AST
@@ -1047,6 +1048,14 @@ implementationParserHelp nodes =
             |. noiseParser
             |= implementationParser
             |. Parser.symbol (Token "]" ExpectedRightBracket)
+            |= sourceLocationParser
+            |. noiseParser
+        , Parser.succeed (\startLoc arrContent endLoc -> Parser.Loop (ArrayLiteral (SourceLocationRange startLoc endLoc) arrContent :: nodes))
+            |= sourceLocationParser
+            |. Parser.symbol (Token "{" ExpectedLeftCurly)
+            |. noiseParser
+            |= implementationParser
+            |. Parser.symbol (Token "}" ExpectedRightCurly)
             |= sourceLocationParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))

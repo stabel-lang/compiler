@@ -44,6 +44,8 @@ type Problem
     | ExpectedTypeSeperator
     | ExpectedLeftBracket
     | ExpectedRightBracket
+    | ExpectedLeftCurly
+    | ExpectedRightCurly
     | FunctionAlreadyDefined String (Maybe SourceLocationRange)
     | TypeAlreadyDefined String SourceLocationRange
     | UnknownMetadata String
@@ -219,6 +221,12 @@ problemToString source problem =
 
         ExpectedRightBracket ->
             "Expected closing bracket"
+
+        ExpectedLeftCurly ->
+            "Expected opening curly brace"
+
+        ExpectedRightCurly ->
+            "Expected closing curly brace"
 
         FunctionAlreadyDefined functionName maybePreviousDefinitionRange ->
             case maybePreviousDefinitionRange of

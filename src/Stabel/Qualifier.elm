@@ -1413,6 +1413,9 @@ qualifyNode config currentDefName node acc =
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
+        Parser.ArrayLiteral _ _ ->
+            acc
+
 
 isMultiFunction : Parser.FunctionDefinition -> Bool
 isMultiFunction def =
