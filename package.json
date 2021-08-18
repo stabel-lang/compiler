@@ -13,12 +13,12 @@
     "node": ">= 16.0.0"
   },
   "dependencies": {
-    "wabt": "^1.0.23"
+    "wabt": "^1.0.24"
   },
   "devDependencies": {
     "elm": "^0.19.1-5",
     "elm-format": "^0.8.5",
-    "elm-review": "^2.5.3",
+    "elm-review": "^2.5.5",
     "elm-test": "^0.19.1-revision7",
     "jest": "^27.0.6",
     "strip-indent": "^3.0.0",
