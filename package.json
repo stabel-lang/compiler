@@ -10,7 +10,7 @@
     "url": "https://fossils.stabel-lang.org/compiler"
   },
   "engines": {
-    "node": ">= 14.0.0"
+    "node": ">= 16.0.0"
   },
   "dependencies": {
     "wabt": "^1.0.23"
