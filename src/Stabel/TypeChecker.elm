@@ -309,6 +309,10 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.GetMember typeDef memberName memberIndex memberType ->
             GetMember typeDef memberName memberIndex memberType
 
+        Qualifier.ArrayLiteral range _ ->
+            -- TODO: Just get this to compile
+            Recurse range
+
 
 resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
 resolveGenericsInFunctionType idx context wt =
@@ -1267,6 +1271,9 @@ typeCheckNode currentDef idx node context =
 
         Qualifier.Builtin _ builtin ->
             addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
+
+        Qualifier.ArrayLiteral _ _ ->
+            context
 
 
 getStructMembers : TypeDefinition -> List ( String, Type )

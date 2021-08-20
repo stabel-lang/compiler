@@ -150,6 +150,9 @@ stripNodeLocation node =
         AST.SetMember td n i t ->
             AST.SetMember (stripTypeLocation td) n i t
 
+        AST.ArrayLiteral _ nodes ->
+            AST.ArrayLiteral emptyRange nodes
+
 
 stripMultiWordBranchLocation : ( TypeMatch, List Node ) -> ( TypeMatch, List Node )
 stripMultiWordBranchLocation ( typeMatch, nodes ) =

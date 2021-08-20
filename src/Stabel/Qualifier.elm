@@ -97,6 +97,7 @@ type Node
     | ConstructType TypeDefinition
     | GetMember TypeDefinition String Int Type
     | SetMember TypeDefinition String Int Type
+    | ArrayLiteral SourceLocationRange (List Node)
 
 
 type alias ModuleReferences =
@@ -1413,8 +1414,28 @@ qualifyNode config currentDefName node acc =
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
-        Parser.ArrayLiteral _ _ ->
-            acc
+        Parser.ArrayLiteral loc nodes ->
+            let
+                qualifyNodeResult =
+                    initQualifyNode
+                        config
+                        acc.qualifiedTypes
+                        acc.qualifiedFunctions
+                        currentDefName
+                        acc.modRefs
+                        acc.currentlyParsing
+                        nodes
+            in
+            case qualifyNodeResult.qualifiedNodes of
+                Ok qualifiedNodes ->
+                    { acc
+                        | qualifiedNodes =
+                            Ok (ArrayLiteral (mapLoc loc) qualifiedNodes)
+                                :: acc.qualifiedNodes
+                    }
+
+                Err err ->
+                    { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
 
 isMultiFunction : Parser.FunctionDefinition -> Bool
