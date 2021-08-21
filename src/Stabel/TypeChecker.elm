@@ -57,6 +57,7 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
+    | ArrayLiteral SourceLocationRange (List AstNode)
     | Function SourceLocationRange FunctionDefinition FunctionType
     | FunctionRef SourceLocationRange FunctionDefinition
     | Recurse SourceLocationRange
@@ -265,6 +266,10 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.Integer range num ->
             IntLiteral range num
 
+        Qualifier.ArrayLiteral range nodes ->
+            ArrayLiteral range <|
+                List.map (untypedToTypedNode idx context) nodes
+
         Qualifier.Function range function ->
             let
                 ( def, _ ) =
@@ -308,10 +313,6 @@ untypedToTypedNode idx context untypedNode =
 
         Qualifier.GetMember typeDef memberName memberIndex memberType ->
             GetMember typeDef memberName memberIndex memberType
-
-        Qualifier.ArrayLiteral range _ ->
-            -- TODO: Just get this to compile
-            Recurse range
 
 
 resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
@@ -1172,13 +1173,22 @@ verifyTypeSignature inferredType untypedDef context =
 
 typeCheckNode : Qualifier.FunctionDefinition -> Int -> Qualifier.Node -> Context -> Context
 typeCheckNode currentDef idx node context =
-    let
-        addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
-    in
+    case nodeToStackEffect currentDef node context of
+        Ok ( newContext, effects ) ->
+            addStackEffect newContext idx effects
+
+        Err error ->
+            { context | errors = error :: context.errors }
+
+
+nodeToStackEffect : Qualifier.FunctionDefinition -> Qualifier.Node -> Context -> Result Problem ( Context, List StackEffect )
+nodeToStackEffect currentDef node context =
     case node of
         Qualifier.Integer _ _ ->
-            addStackEffect context [ Push Type.Int ]
+            Ok ( context, [ Push Type.Int ] )
+
+        Qualifier.ArrayLiteral _ _ ->
+            Ok ( context, [] )
 
         Qualifier.Function _ untypedDef ->
             let
@@ -1188,7 +1198,7 @@ typeCheckNode currentDef idx node context =
                 newContext =
                     { contextWithTypedDef | stackEffects = context.stackEffects }
             in
-            addStackEffect newContext <| functionTypeToStackEffects def.type_
+            Ok ( newContext, functionTypeToStackEffects def.type_ )
 
         Qualifier.FunctionRef _ ref ->
             let
@@ -1201,36 +1211,32 @@ typeCheckNode currentDef idx node context =
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            addStackEffect newContext <|
-                [ Push <| Type.FunctionSignature def.type_ ]
+            Ok
+                ( newContext
+                , [ Push <| Type.FunctionSignature def.type_ ]
+                )
 
         Qualifier.Recurse _ ->
             case TypeSignature.toMaybe currentDef.typeSignature of
                 Just annotatedType ->
-                    addStackEffect context <| functionTypeToStackEffects annotatedType
+                    Ok ( context, functionTypeToStackEffects annotatedType )
 
                 Nothing ->
-                    let
-                        problem =
-                            MissingTypeAnnotationInRecursiveCallStack
-                                (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
-                                currentDef.name
-                    in
-                    { context | errors = problem :: context.errors }
+                    Err <|
+                        MissingTypeAnnotationInRecursiveCallStack
+                            (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
+                            currentDef.name
 
         Qualifier.Cycle _ data ->
             case TypeSignature.toMaybe data.typeSignature of
                 Just annotatedType ->
-                    addStackEffect context <| functionTypeToStackEffects annotatedType
+                    Ok ( context, functionTypeToStackEffects annotatedType )
 
                 Nothing ->
-                    let
-                        problem =
-                            MissingTypeAnnotationInRecursiveCallStack
-                                (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
-                                data.name
-                    in
-                    { context | errors = problem :: context.errors }
+                    Err <|
+                        MissingTypeAnnotationInRecursiveCallStack
+                            (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
+                            data.name
 
         Qualifier.ConstructType typeDef ->
             let
@@ -1241,39 +1247,51 @@ typeCheckNode currentDef idx node context =
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = memberTypes
                     , output = [ typeInQuestion ]
                     }
+                )
 
         Qualifier.SetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = [ typeInQuestion, memberType ]
                     , output = [ typeInQuestion ]
                     }
+                )
 
         Qualifier.GetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = [ typeInQuestion ]
                     , output = [ memberType ]
                     }
+                )
 
         Qualifier.Builtin _ builtin ->
-            addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
+            Ok
+                ( context
+                , functionTypeToStackEffects <|
+                    Builtin.functionType builtin
+                )
 
-        Qualifier.ArrayLiteral _ _ ->
-            context
+
+addStackEffect : Context -> Int -> List StackEffect -> Context
+addStackEffect ctx idx effects =
+    { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
 
 
 getStructMembers : TypeDefinition -> List ( String, Type )

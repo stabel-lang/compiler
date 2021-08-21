@@ -187,6 +187,12 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     , context
                     )
 
+                AST.ArrayLiteral _ nodes ->
+                    -- TODO: Dummy code to get project to compile
+                    ( IntLiteral 1
+                    , context
+                    )
+
                 AST.Function _ fn _ ->
                     let
                         ( fnId, newContext ) =
@@ -250,6 +256,12 @@ astNodeToCodegenNode def node ( stack, result, context ) =
         nodeType =
             case node of
                 AST.IntLiteral _ _ ->
+                    { input = []
+                    , output = [ Type.Int ]
+                    }
+
+                AST.ArrayLiteral _ _ ->
+                    -- TODO: Dummy code to get project to compile
                     { input = []
                     , output = [ Type.Int ]
                     }
