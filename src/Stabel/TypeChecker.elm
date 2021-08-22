@@ -1262,6 +1262,9 @@ nodeToStackEffect currentDef node context =
                     case ts of
                         [] ->
                             case acc of
+                                [] ->
+                                    Type.Generic "a"
+
                                 [ t ] ->
                                     t
 

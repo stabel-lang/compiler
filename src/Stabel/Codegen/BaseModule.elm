@@ -231,6 +231,36 @@ callExecInlineFn =
     Wasm.Call 19 execInlineFn
 
 
+arrayEmptyFn : String
+arrayEmptyFn =
+    "__array_empty"
+
+
+callArrayEmptyFn : Wasm.Instruction
+callArrayEmptyFn =
+    Wasm.Call 20 arrayEmptyFn
+
+
+arrayLengthFn : String
+arrayLengthFn =
+    "__array_length"
+
+
+callArrayLengthFn : Wasm.Instruction
+callArrayLengthFn =
+    Wasm.Call 21 arrayLengthFn
+
+
+arrayPushFn : String
+arrayPushFn =
+    "__array_push"
+
+
+callArrayPushFn : Wasm.Instruction
+callArrayPushFn =
+    Wasm.Call 22 arrayPushFn
+
+
 
 -- Base module
 
@@ -577,5 +607,31 @@ baseFunctions =
             [ callStackPopFn
             , Wasm.CallIndirect
             ]
+      }
+
+    -- ARRAY
+    , { id = 20
+      , name = arrayEmptyFn
+      , args = []
+      , results = []
+      , locals = []
+      , instructions =
+            []
+      }
+    , { id = 21
+      , name = arrayLengthFn
+      , args = []
+      , results = []
+      , locals = []
+      , instructions =
+            []
+      }
+    , { id = 22
+      , name = arrayPushFn
+      , args = []
+      , results = []
+      , locals = []
+      , instructions =
+            []
       }
     ]

@@ -74,6 +74,7 @@ indexOfHelper idx value list =
 
 type AstNode
     = IntLiteral Int
+    | ArrayLiteral (List AstNode)
     | Function Int String -- id name
     | FunctionRef Int String -- id name
     | ConstructType Int Int -- id memberQty
@@ -710,6 +711,11 @@ nodeToInstruction context node =
                 , BaseModule.callStackPushFn
                 ]
 
+        ArrayLiteral nodes ->
+            Wasm.Batch <|
+                BaseModule.callArrayEmptyFn
+                    :: List.concatMap (\n -> [ nodeToInstruction context n, BaseModule.callArrayPushFn ]) nodes
+
         Function id name ->
             Wasm.Call id name
 
@@ -824,6 +830,15 @@ nodeToInstruction context node =
 
                 Builtin.Apply ->
                     BaseModule.callExecInlineFn
+
+                Builtin.ArrayEmpty ->
+                    BaseModule.callArrayEmptyFn
+
+                Builtin.ArrayLength ->
+                    BaseModule.callArrayLengthFn
+
+                Builtin.ArrayPush ->
+                    BaseModule.callArrayPushFn
 
         Box stackPos id ->
             Wasm.Batch

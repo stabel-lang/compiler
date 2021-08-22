@@ -1414,6 +1414,13 @@ qualifyNode config currentDefName node acc =
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
+        Parser.ArrayLiteral loc [] ->
+            { acc
+                | qualifiedNodes =
+                    Ok (Builtin (mapLoc loc) Builtin.ArrayEmpty)
+                        :: acc.qualifiedNodes
+            }
+
         Parser.ArrayLiteral loc nodes ->
             let
                 qualifyNodeResult =
