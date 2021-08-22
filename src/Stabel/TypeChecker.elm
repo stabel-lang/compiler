@@ -12,6 +12,7 @@ module Stabel.TypeChecker exposing
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
@@ -1187,8 +1188,100 @@ nodeToStackEffect currentDef node context =
         Qualifier.Integer _ _ ->
             Ok ( context, [ Push Type.Int ] )
 
-        Qualifier.ArrayLiteral _ _ ->
-            Ok ( context, [] )
+        Qualifier.ArrayLiteral loc nodes ->
+            let
+                res =
+                    List.foldr
+                        (\n acc ->
+                            case acc of
+                                Err _ ->
+                                    acc
+
+                                Ok ( previousStackEffects, previousContext ) ->
+                                    case nodeToStackEffect currentDef n previousContext of
+                                        Err err ->
+                                            Err err
+
+                                        Ok ( nextContext, nodeStackEffects ) ->
+                                            Ok ( nodeStackEffects :: previousStackEffects, nextContext )
+                        )
+                        (Ok ( [], context ))
+                        nodes
+                        |> Result.map (Tuple.mapFirst (List.map effectsToFunctionType))
+                        |> Result.map (Tuple.mapFirst (List.map validateArrayType))
+                        |> Result.map (Tuple.mapFirst Result.combine)
+                        |> Result.andThen liftTupleFirstResult
+                        |> Result.map (Tuple.mapFirst (List.concatMap .output))
+                        |> Result.map (Tuple.mapFirst unionizeTypes)
+
+                effectsToFunctionType effects =
+                    let
+                        ( inputs, outputs ) =
+                            List.partition stackEffectIsPop effects
+                                |> Tuple.mapBoth (List.map stackEffectType) (List.map stackEffectType)
+                    in
+                    { input = inputs
+                    , output = outputs
+                    }
+
+                stackEffectIsPop effect =
+                    case effect of
+                        Pop _ ->
+                            True
+
+                        Push _ ->
+                            False
+
+                stackEffectType effect =
+                    case effect of
+                        Pop t ->
+                            t
+
+                        Push t ->
+                            t
+
+                validateArrayType type_ =
+                    if List.isEmpty type_.input && List.length type_.output == 1 then
+                        Ok type_
+
+                    else
+                        Err <| BadArrayElement loc type_
+
+                liftTupleFirstResult ( resA, b ) =
+                    case resA of
+                        Ok a ->
+                            Ok ( a, b )
+
+                        Err err ->
+                            Err err
+
+                unionizeTypes ts =
+                    unionizeTypesHelper ts []
+
+                unionizeTypesHelper ts acc =
+                    case ts of
+                        [] ->
+                            case acc of
+                                [ t ] ->
+                                    t
+
+                                _ ->
+                                    Type.Union Nothing acc
+
+                        t :: rest ->
+                            if List.member t acc then
+                                unionizeTypesHelper rest acc
+
+                            else
+                                unionizeTypesHelper rest (t :: acc)
+            in
+            case res of
+                Ok ( _, newContext ) ->
+                    -- TODO: Push array type
+                    Ok ( newContext, [] )
+
+                Err err ->
+                    Err err
 
         Qualifier.Function _ untypedDef ->
             let

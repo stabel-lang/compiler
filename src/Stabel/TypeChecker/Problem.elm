@@ -16,6 +16,7 @@ type Problem
     | MissingTypeAnnotationInRecursiveCallStack SourceLocationRange String
     | InexhaustiveMultiFunction SourceLocationRange (List (List Type))
     | BadEntryPoint SourceLocationRange String FunctionType FunctionType
+    | BadArrayElement SourceLocationRange FunctionType
 
 
 toString : String -> Problem -> String
@@ -103,6 +104,16 @@ toString source problem =
                 ++ "\n\nHowever, it seems that the actual type is:\n\n"
                 ++ Type.functionTypeToString expected
 
+        BadArrayElement range actual ->
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
+                ++ "\n\n"
+                ++ "An Array can only contain elements of type ( -- a ), but found an element with type:"
+                ++ "\n\n"
+                ++ Type.functionTypeToString actual
+
 
 sourceLocationRef : Problem -> String
 sourceLocationRef problem =
@@ -126,4 +137,7 @@ sourceLocationRef problem =
             range.source
 
         BadEntryPoint range _ _ _ ->
+            range.source
+
+        BadArrayElement range _ ->
             range.source
