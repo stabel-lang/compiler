@@ -23,6 +23,7 @@ type Type
     | Union (Maybe String) (List Type)
     | FunctionSignature FunctionType
     | StackRange String
+    | Array Type
 
 
 type alias FunctionType =
@@ -140,6 +141,9 @@ toString t =
         StackRange name ->
             name ++ "..."
 
+        Array _ ->
+            "Array"
+
 
 toDisplayString : Type -> String
 toDisplayString t =
@@ -179,6 +183,9 @@ toDisplayString t =
 
         StackRange name ->
             name ++ "..."
+
+        Array t_ ->
+            "Array(" ++ toDisplayString t_ ++ ")"
 
 
 functionTypeToString : FunctionType -> String

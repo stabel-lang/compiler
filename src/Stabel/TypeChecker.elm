@@ -1276,9 +1276,8 @@ nodeToStackEffect currentDef node context =
                                 unionizeTypesHelper rest (t :: acc)
             in
             case res of
-                Ok ( _, newContext ) ->
-                    -- TODO: Push array type
-                    Ok ( newContext, [] )
+                Ok ( inferredType, newContext ) ->
+                    Ok ( newContext, [ Push <| Type.Array inferredType ] )
 
                 Err err ->
                     Err err
@@ -1434,6 +1433,9 @@ tagGeneric idx type_ =
                 { input = List.map (tagGeneric idx) wt.input
                 , output = List.map (tagGeneric idx) wt.output
                 }
+
+        Type.Array t ->
+            Type.Array <| tagGeneric idx t
 
         _ ->
             type_
@@ -1668,6 +1670,9 @@ compatibleTypes context typeA typeB =
                         ( contextAfterOutputCheck
                         , inputsCompatible && outputsCompatible
                         )
+
+                    ( Type.Array lt, Type.Array rt ) ->
+                        compatibleTypes context lt rt
 
                     _ ->
                         ( context, False )
