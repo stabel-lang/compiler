@@ -34,7 +34,7 @@ initialHeapPositionOffset =
 
 firstAvailableFunctionId : Int
 firstAvailableFunctionId =
-    20
+    List.length baseFunctions
 
 
 
