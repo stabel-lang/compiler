@@ -58,7 +58,7 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
-    | ArrayLiteral SourceLocationRange (List AstNode)
+    | ArrayLiteral SourceLocationRange (List AstNode) Type
     | Function SourceLocationRange FunctionDefinition FunctionType
     | FunctionRef SourceLocationRange FunctionDefinition
     | Recurse SourceLocationRange
@@ -268,8 +268,16 @@ untypedToTypedNode idx context untypedNode =
             IntLiteral range num
 
         Qualifier.ArrayLiteral range nodes ->
-            ArrayLiteral range <|
-                List.map (untypedToTypedNode idx context) nodes
+            let
+                typedNodes =
+                    List.map (untypedToTypedNode idx context) nodes
+
+                arrayType =
+                    List.filterMap arrayNodeToType typedNodes
+                        |> unionizeTypes
+                        |> Type.Array
+            in
+            ArrayLiteral range typedNodes arrayType
 
         Qualifier.Function range function ->
             let
@@ -314,6 +322,40 @@ untypedToTypedNode idx context untypedNode =
 
         Qualifier.GetMember typeDef memberName memberIndex memberType ->
             GetMember typeDef memberName memberIndex memberType
+
+
+arrayNodeToType : AstNode -> Maybe Type
+arrayNodeToType n =
+    case n of
+        IntLiteral _ _ ->
+            Just Type.Int
+
+        ArrayLiteral _ _ t ->
+            Just t
+
+        Function _ _ t ->
+            List.head t.output
+
+        FunctionRef _ def ->
+            Just <| Type.FunctionSignature def.type_
+
+        Recurse _ ->
+            Nothing
+
+        Cycle _ data ->
+            List.head data.typeSignature.output
+
+        Builtin _ _ ->
+            Nothing
+
+        ConstructType _ ->
+            Nothing
+
+        SetMember _ _ _ _ ->
+            Nothing
+
+        GetMember _ _ _ _ ->
+            Nothing
 
 
 resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
@@ -1254,29 +1296,6 @@ nodeToStackEffect currentDef node context =
 
                         Err err ->
                             Err err
-
-                unionizeTypes ts =
-                    unionizeTypesHelper ts []
-
-                unionizeTypesHelper ts acc =
-                    case ts of
-                        [] ->
-                            case acc of
-                                [] ->
-                                    Type.Generic "a"
-
-                                [ t ] ->
-                                    t
-
-                                _ ->
-                                    Type.Union Nothing acc
-
-                        t :: rest ->
-                            if List.member t acc then
-                                unionizeTypesHelper rest acc
-
-                            else
-                                unionizeTypesHelper rest (t :: acc)
             in
             case res of
                 Ok ( inferredType, newContext ) ->
@@ -1387,6 +1406,33 @@ nodeToStackEffect currentDef node context =
 addStackEffect : Context -> Int -> List StackEffect -> Context
 addStackEffect ctx idx effects =
     { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
+
+
+unionizeTypes : List Type -> Type
+unionizeTypes ts =
+    unionizeTypesHelper ts []
+
+
+unionizeTypesHelper : List Type -> List Type -> Type
+unionizeTypesHelper ts acc =
+    case ts of
+        [] ->
+            case acc of
+                [] ->
+                    Type.Generic "a"
+
+                [ t ] ->
+                    t
+
+                _ ->
+                    Type.Union Nothing acc
+
+        t :: rest ->
+            if List.member t acc then
+                unionizeTypesHelper rest acc
+
+            else
+                unionizeTypesHelper rest (t :: acc)
 
 
 getStructMembers : TypeDefinition -> List ( String, Type )

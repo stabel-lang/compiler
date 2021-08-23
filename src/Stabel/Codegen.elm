@@ -188,10 +188,16 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     , context
                     )
 
-                AST.ArrayLiteral _ nodes ->
-                    -- TODO: Dummy code to get project to compile
-                    ( IntLiteral 1
-                    , context
+                AST.ArrayLiteral _ nodes _ ->
+                    let
+                        ( _, codeGenNodes, nextContext ) =
+                            List.foldl
+                                (astNodeToCodegenNode def)
+                                ( [], [], context )
+                                nodes
+                    in
+                    ( ArrayLiteral (List.reverse codeGenNodes)
+                    , nextContext
                     )
 
                 AST.Function _ fn _ ->
@@ -261,10 +267,9 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     , output = [ Type.Int ]
                     }
 
-                AST.ArrayLiteral _ _ ->
-                    -- TODO: Dummy code to get project to compile
+                AST.ArrayLiteral _ _ t ->
                     { input = []
-                    , output = [ Type.Int ]
+                    , output = [ t ]
                     }
 
                 AST.Function _ _ type_ ->
