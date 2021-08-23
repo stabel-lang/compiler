@@ -120,6 +120,7 @@ builtinDict =
         , ( "rotate", Builtin.StackRightRotate )
         , ( "-rotate", Builtin.StackLeftRotate )
         , ( "!", Builtin.Apply )
+        , ( "array-length", Builtin.ArrayLength )
         ]
 
 

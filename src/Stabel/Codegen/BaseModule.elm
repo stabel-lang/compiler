@@ -614,9 +614,16 @@ baseFunctions =
       , name = arrayEmptyFn
       , args = []
       , results = []
-      , locals = []
+      , locals = [ Wasm.Int32 ]
       , instructions =
-            []
+            [ Wasm.I32_Const 4 -- Just enough space for length variable
+            , callAllocFn
+            , Wasm.Local_Tee 0 -- Save output instance
+            , Wasm.I32_Const 0
+            , Wasm.I32_Store -- Set length to 0
+            , Wasm.Local_Get 0
+            , callStackPushFn
+            ]
       }
     , { id = 21
       , name = arrayLengthFn
@@ -624,7 +631,10 @@ baseFunctions =
       , results = []
       , locals = []
       , instructions =
-            []
+            [ callStackPopFn
+            , Wasm.I32_Load
+            , callStackPushFn
+            ]
       }
     , { id = 22
       , name = arrayPushFn
@@ -632,6 +642,7 @@ baseFunctions =
       , results = []
       , locals = []
       , instructions =
+            -- TODO
             []
       }
     ]
