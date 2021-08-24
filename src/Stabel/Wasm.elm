@@ -98,6 +98,7 @@ type Instruction
     | Drop
     | Unreachable
     | Commented String Instruction
+    | Memory_Copy
 
 
 maximumLocalIndex : Instruction -> Maybe Int
@@ -418,6 +419,9 @@ formatInstruction ins =
 
                 Indent batch ->
                     Indent <| (Str <| ";; " ++ comment) :: batch
+
+        Memory_Copy ->
+            Str "memory.copy"
 
 
 formatExport : ( String, Int ) -> FormatHint

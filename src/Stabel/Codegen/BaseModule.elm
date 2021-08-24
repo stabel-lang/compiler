@@ -640,9 +640,51 @@ baseFunctions =
       , name = arrayPushFn
       , args = []
       , results = []
-      , locals = []
+      , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
       , instructions =
-            -- TODO
-            []
+            [ callStackPopFn
+            , Wasm.Local_Set 3 -- object to push
+            , callStackPopFn
+            , Wasm.Local_Tee 0 -- original array pointer
+            , Wasm.I32_Load
+            , Wasm.Local_Tee 1 -- original array length
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul -- bytes required for new array
+            , Wasm.I32_Const (wasmPtrSize * 2)
+            , Wasm.I32_Add -- plus length and new object
+            , callAllocFn
+            , Wasm.Local_Tee 2 -- new array pointer
+
+            -- Set length
+            , Wasm.Local_Get 1
+            , Wasm.I32_Const 1
+            , Wasm.I32_Add
+            , Wasm.I32_Store -- store length in new array
+
+            -- Copy
+            , Wasm.Local_Get 0
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- original array content start ptr
+            , Wasm.Local_Get 2
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- new array content start ptr
+            , Wasm.Local_Get 1
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul -- bytes to copy to new array
+            , Wasm.Memory_Copy
+
+            -- Set new object
+            , Wasm.Local_Get 2
+            , Wasm.Local_Get 2
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul
+            , Wasm.I32_Add -- Last object pos
+            , Wasm.Local_Get 3
+            , Wasm.I32_Store
+
+            -- Return
+            , Wasm.Local_Get 2
+            , callStackPushFn
+            ]
       }
     ]
