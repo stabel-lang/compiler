@@ -845,6 +845,9 @@ nodeToInstruction context node =
                 Builtin.ArrayPush ->
                     BaseModule.callArrayPushFn
 
+                Builtin.ArrayGet ->
+                    BaseModule.callArrayGetFn
+
         Box stackPos id ->
             Wasm.Batch
                 [ Wasm.I32_Const stackPos

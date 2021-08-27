@@ -122,6 +122,7 @@ builtinDict =
         , ( "!", Builtin.Apply )
         , ( "array-length", Builtin.ArrayLength )
         , ( "array-push", Builtin.ArrayPush )
+        , ( "array-get", Builtin.ArrayGet )
         ]
 
 

@@ -36,3 +36,82 @@ test('Pushing', async () => {
     expect(result.stackElement()).toBe(2);
 });
 
+test('Get first', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          0 array-get
+          swap drop
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(5);
+});
+
+test('Get second', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          1 array-get
+          swap drop
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(6);
+});
+
+test('Get last', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          2 array-get
+          swap drop
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(7);
+});
+
+test('Get succeess', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          2 array-get
+          drop
+    `);
+
+    console.log(wat);
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(1);
+});
+
+test('Get out of lower bound', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          0 1 -
+          array-get
+          drop
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(0);
+});
+
+test('Get out of lower bound', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 6 7 }
+          5 array-get
+          drop
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(0);
+});

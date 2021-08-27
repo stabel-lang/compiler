@@ -21,6 +21,7 @@ type Builtin
     | ArrayEmpty
     | ArrayLength
     | ArrayPush
+    | ArrayGet
 
 
 functionType : Builtin -> FunctionType
@@ -100,4 +101,9 @@ functionType builtin =
         ArrayPush ->
             { input = [ Type.Array (Type.Generic "a"), Type.Generic "a" ]
             , output = [ Type.Array (Type.Generic "a") ]
+            }
+
+        ArrayGet ->
+            { input = [ Type.Array (Type.Generic "a"), Type.Int ]
+            , output = [ Type.Int, Type.Generic "a" ]
             }

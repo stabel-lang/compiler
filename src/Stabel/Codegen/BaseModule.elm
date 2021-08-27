@@ -261,6 +261,16 @@ callArrayPushFn =
     Wasm.Call 22 arrayPushFn
 
 
+arrayGetFn : String
+arrayGetFn =
+    "__array_get"
+
+
+callArrayGetFn : Wasm.Instruction
+callArrayGetFn =
+    Wasm.Call 23 arrayGetFn
+
+
 
 -- Base module
 
@@ -684,6 +694,58 @@ baseFunctions =
 
             -- Return
             , Wasm.Local_Get 2
+            , callStackPushFn
+            ]
+      }
+    , { id = 23
+      , name = arrayGetFn
+      , args = []
+      , results = []
+      , locals = [ Wasm.Int32, Wasm.Int32 ]
+      , instructions =
+            [ callStackPopFn
+            , Wasm.Local_Set 0 -- index to get
+            , callStackPopFn
+            , Wasm.Local_Set 1 -- array
+
+            -- check for negative index
+            , Wasm.Local_Get 0
+            , Wasm.I32_Const 0
+            , Wasm.I32_LT
+            , Wasm.If
+                [ Wasm.I32_Const 0
+                , Wasm.I32_Const 0
+                , callStackPushFn
+                , callStackPushFn
+                , Wasm.Return
+                ]
+                []
+
+            -- Check for index too large
+            , Wasm.Local_Get 0
+            , Wasm.Local_Get 1
+            , Wasm.I32_Load -- length of index
+            , Wasm.I32_LT
+            , Wasm.If
+                [ Wasm.I32_Const 0
+                , Wasm.I32_Const 0
+                , callStackPushFn
+                , callStackPushFn
+                , Wasm.Return
+                ]
+                []
+
+            -- Get element at index
+            , Wasm.Local_Get 1
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- move pointer beyond length
+            , Wasm.Local_Get 0
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul -- offset
+            , Wasm.I32_Add -- starting position + offset = ptr to element
+            , Wasm.I32_Load -- element to return
+            , Wasm.I32_Const 1 -- success flag
+            , callStackPushFn
             , callStackPushFn
             ]
       }

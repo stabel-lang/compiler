@@ -79,6 +79,7 @@ type Instruction
     | Loop (List Instruction)
     | Break Int
     | BreakIf Int
+    | If (List Instruction) (List Instruction)
     | Return
     | Call Int String
     | CallIndirect
@@ -95,6 +96,7 @@ type Instruction
     | I32_EqZero
     | I32_Store
     | I32_Load
+    | I32_LT
     | Drop
     | Unreachable
     | Commented String Instruction
@@ -355,6 +357,24 @@ formatInstruction ins =
         BreakIf num ->
             Str <| "(br_if " ++ String.fromInt num ++ ")"
 
+        If thenIns elseIns ->
+            if List.isEmpty elseIns then
+                BatchFormat
+                    [ Str "(if (then"
+                    , Indent <| List.map formatInstruction thenIns
+                    , Str "))"
+                    ]
+
+            else
+                BatchFormat
+                    [ Str "(if (then"
+                    , Indent <| List.map formatInstruction thenIns
+                    , Str ")"
+                    , Str "(else"
+                    , Indent <| List.map formatInstruction elseIns
+                    , Str "))"
+                    ]
+
         Return ->
             Str "return"
 
@@ -402,6 +422,9 @@ formatInstruction ins =
 
         I32_Load ->
             Str "i32.load"
+
+        I32_LT ->
+            Str "i32.lt_s"
 
         Drop ->
             Str "drop"
