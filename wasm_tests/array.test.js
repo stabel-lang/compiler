@@ -102,15 +102,18 @@ test('Get out of lower bound', async () => {
     expect(result.stackElement()).toBe(0);
 });
 
-test('Get out of lower bound', async () => {
+test('Set works', async () => {
     const wat = await compiler.toWat('main', `
         def: main
-        : { 5 6 7 }
-          5 array-get
-          drop
+        : { 5 6 7 8 }
+          20
+          2 array-set
+          2 array-get
+          swap drop
     `);
 
     const result = await compiler.run(wat, 'main');
 
-    expect(result.stackElement()).toBe(0);
+    expect(result.stackElement()).toBe(20);
 });
+

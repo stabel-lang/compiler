@@ -22,6 +22,7 @@ type Builtin
     | ArrayLength
     | ArrayPush
     | ArrayGet
+    | ArraySet
 
 
 functionType : Builtin -> FunctionType
@@ -106,4 +107,9 @@ functionType builtin =
         ArrayGet ->
             { input = [ Type.Array (Type.Generic "a"), Type.Int ]
             , output = [ Type.Int, Type.Generic "a" ]
+            }
+
+        ArraySet ->
+            { input = [ Type.Array (Type.Generic "a"), Type.Generic "a", Type.Int ]
+            , output = [ Type.Array (Type.Generic "a") ]
             }
