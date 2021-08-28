@@ -79,11 +79,10 @@ test('Get succeess', async () => {
     const wat = await compiler.toWat('main', `
         def: main
         : { 5 6 7 }
-          2 array-get
+          1 array-get
           drop
     `);
 
-    console.log(wat);
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(1);

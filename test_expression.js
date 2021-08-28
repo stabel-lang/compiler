@@ -14,10 +14,9 @@ async function init() {
     const wabt = await wabtInit();
     const wat = await compiler.toWat('main', `
         def: main
-        : { 2 3 4 }
-          0 1 -
-          array-get
-          drop
+        : { 5 6 7 }
+          1 array-get
+          swap drop
     `);
 
     const wasmModule = wabt.parseWat('tmp', wat, {

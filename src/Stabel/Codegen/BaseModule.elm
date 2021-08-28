@@ -672,12 +672,12 @@ baseFunctions =
             , Wasm.I32_Store -- store length in new array
 
             -- Copy
-            , Wasm.Local_Get 0
-            , Wasm.I32_Const wasmPtrSize
-            , Wasm.I32_Add -- original array content start ptr
             , Wasm.Local_Get 2
             , Wasm.I32_Const wasmPtrSize
             , Wasm.I32_Add -- new array content start ptr
+            , Wasm.Local_Get 0
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- original array content start ptr
             , Wasm.Local_Get 1
             , Wasm.I32_Const wasmPtrSize
             , Wasm.I32_Mul -- bytes to copy to new array
@@ -686,6 +686,7 @@ baseFunctions =
             -- Set new object
             , Wasm.Local_Get 2
             , Wasm.Local_Get 2
+            , Wasm.I32_Load
             , Wasm.I32_Const wasmPtrSize
             , Wasm.I32_Mul
             , Wasm.I32_Add -- Last object pos
@@ -727,26 +728,25 @@ baseFunctions =
             , Wasm.I32_Load -- length of index
             , Wasm.I32_LT
             , Wasm.If
-                [ Wasm.I32_Const 0
+                [ -- Get element at index
+                  Wasm.Local_Get 1
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Add -- move pointer beyond length
+                , Wasm.Local_Get 0
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Mul -- offset
+                , Wasm.I32_Add -- starting position + offset = ptr to element
+                , Wasm.I32_Load -- element to return
+                , Wasm.I32_Const 1 -- success flag
+                , callStackPushFn
+                , callStackPushFn
+                ]
+                [ -- return failure
+                  Wasm.I32_Const 0
                 , Wasm.I32_Const 0
                 , callStackPushFn
                 , callStackPushFn
-                , Wasm.Return
                 ]
-                []
-
-            -- Get element at index
-            , Wasm.Local_Get 1
-            , Wasm.I32_Const wasmPtrSize
-            , Wasm.I32_Add -- move pointer beyond length
-            , Wasm.Local_Get 0
-            , Wasm.I32_Const wasmPtrSize
-            , Wasm.I32_Mul -- offset
-            , Wasm.I32_Add -- starting position + offset = ptr to element
-            , Wasm.I32_Load -- element to return
-            , Wasm.I32_Const 1 -- success flag
-            , callStackPushFn
-            , callStackPushFn
             ]
       }
     ]
