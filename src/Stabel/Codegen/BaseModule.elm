@@ -339,29 +339,10 @@ baseFunctions =
       , instructions =
             [ Wasm.Local_Get 1 -- Size in bytes
             , callAllocFn
-            , Wasm.Local_Set 2 -- Save output instance
-            , Wasm.Block
-                [ Wasm.Loop
-                    [ Wasm.Local_Get 1
-                    , Wasm.I32_EqZero
-                    , Wasm.BreakIf 1 -- break out of loop
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Const wasmPtrSize
-                    , Wasm.I32_Sub
-                    , Wasm.Local_Set 1 -- Decreased pointer size
-                    , Wasm.Local_Get 0 -- Source struct
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Add
-                    , Wasm.I32_Load -- Get a byte from source struct
-                    , Wasm.Local_Set 3 -- Save byte to copy
-                    , Wasm.Local_Get 2 -- Dest struct
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Add
-                    , Wasm.Local_Get 3
-                    , Wasm.I32_Store -- Copy byte from source to dest struct
-                    , Wasm.Break 0 -- loop
-                    ]
-                ]
+            , Wasm.Local_Tee 2 -- Output struct
+            , Wasm.Local_Get 0 -- Original struct
+            , Wasm.Local_Get 1
+            , Wasm.Memory_Copy
             , Wasm.Local_Get 2
             ]
       }
