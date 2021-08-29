@@ -22,6 +22,20 @@ test('Simple literal', async () => {
     expect(result.stackElement()).toBe(5);
 });
 
+test('Literal with function reference', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 1 five 3 } array-length
+
+        def: five
+        : 5
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(3);
+});
+
 test('Pushing', async () => {
     const wat = await compiler.toWat('main', `
         def: main
@@ -73,6 +87,22 @@ test('Get last', async () => {
     const result = await compiler.run(wat, 'main');
 
     expect(result.stackElement()).toBe(7);
+});
+
+test('Get function value', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        : { 5 six 7 }
+          1 array-get
+          swap drop
+
+        def: six
+        : 6
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(6);
 });
 
 test('Get succeess', async () => {

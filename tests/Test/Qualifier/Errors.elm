@@ -75,6 +75,19 @@ suite =
                     in
                     checkForError (noSuchTypeReferenceError "Box") source
             ]
+        , test "Wrong reference within array literal" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: main
+                        : { one two }
+
+                        def: one
+                        : 1
+                        """
+                in
+                checkForError (noSuchWordReferenceError "two") source
         ]
 
 
