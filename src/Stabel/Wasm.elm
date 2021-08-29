@@ -97,6 +97,7 @@ type Instruction
     | I32_Store
     | I32_Load
     | I32_LT
+    | I32_GTE
     | Drop
     | Unreachable
     | Commented String Instruction
@@ -425,6 +426,9 @@ formatInstruction ins =
 
         I32_LT ->
             Str "i32.lt_s"
+
+        I32_GTE ->
+            Str "i32.gte_s"
 
         Drop ->
             Str "drop"
