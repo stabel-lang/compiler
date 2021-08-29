@@ -699,28 +699,22 @@ baseFunctions =
             , Wasm.Local_Set 0 -- index to get
             , callStackPopFn
             , Wasm.Local_Set 1 -- array
-
-            -- check for negative index
-            , Wasm.Local_Get 0
-            , Wasm.I32_Const 0
-            , Wasm.I32_LT
-            , Wasm.If
-                [ Wasm.I32_Const 0
+            , Wasm.Block
+                [ -- check for negative index
+                  Wasm.Local_Get 0
                 , Wasm.I32_Const 0
-                , callStackPushFn
-                , callStackPushFn
-                , Wasm.Return
-                ]
-                []
+                , Wasm.I32_LT
+                , Wasm.BreakIf 0
 
-            -- Check for index too large
-            , Wasm.Local_Get 0
-            , Wasm.Local_Get 1
-            , Wasm.I32_Load -- length of index
-            , Wasm.I32_LT
-            , Wasm.If
-                [ -- Get element at index
-                  Wasm.Local_Get 1
+                -- Check for index too large
+                , Wasm.Local_Get 0
+                , Wasm.Local_Get 1
+                , Wasm.I32_Load -- length of array
+                , Wasm.I32_GTE
+                , Wasm.BreakIf 0
+
+                -- Get element at index
+                , Wasm.Local_Get 1
                 , Wasm.I32_Const wasmPtrSize
                 , Wasm.I32_Add -- move pointer beyond length
                 , Wasm.Local_Get 0
@@ -731,13 +725,14 @@ baseFunctions =
                 , Wasm.I32_Const 1 -- success flag
                 , callStackPushFn
                 , callStackPushFn
+                , Wasm.Return
                 ]
-                [ -- return failure
-                  Wasm.I32_Const 0
-                , Wasm.I32_Const 0
-                , callStackPushFn
-                , callStackPushFn
-                ]
+
+            -- Failure case
+            , Wasm.I32_Const 0
+            , Wasm.I32_Const 0
+            , callStackPushFn
+            , callStackPushFn
             ]
       }
     , { id = 24

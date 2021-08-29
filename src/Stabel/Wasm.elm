@@ -428,7 +428,7 @@ formatInstruction ins =
             Str "i32.lt_s"
 
         I32_GTE ->
-            Str "i32.gte_s"
+            Str "i32.ge_s"
 
         Drop ->
             Str "drop"
