@@ -175,3 +175,78 @@ test('Type tightening', async () => {
     expect(result.stackElement()).toBe(0);
 });
 
+test('Pattern match', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Test
+        : Int
+        : Array Int
+
+        def: main
+        type: -- Int
+        : { 5 { 1 2 3 } }
+          1 array-get
+          swap drop
+          to-num
+
+        defmulti: to-num
+        type: Test -- Int
+        : Int
+          # do nothing
+        : Array
+          array-length
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(3);
+});
+
+test('Pattern match (reverse case)', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Test
+        : Int
+        : Array Int
+
+        def: main
+        type: -- Int
+        : { 5 { 1 2 3 } }
+          0 array-get
+          swap drop
+          to-num
+
+        defmulti: to-num
+        type: Test -- Int
+        : Int
+          # do nothing
+        : Array
+          array-length
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(5);
+});
+
+test('Pattern match (simple)', async () => {
+    const wat = await compiler.toWat('main', `
+        defunion: Test
+        : Int
+        : Array Int
+
+        def: main
+        type: -- Int
+        : { 1 2 3 }
+          to-num
+
+        defmulti: to-num
+        type: Test -- Int
+        : Int
+          # do nothing
+        : Array
+          array-length
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(3);
+});

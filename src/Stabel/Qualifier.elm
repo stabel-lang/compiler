@@ -908,6 +908,13 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                     Type.Int
                     [ TypeMatchCond "value" Type.Int (LiteralInt val) ]
 
+        Parser.TypeMatch range (Parser.LocalRef "Array" []) [] ->
+            Ok <|
+                TypeMatch
+                    (qualifiedRange range)
+                    (Type.Array (Type.Generic "*a"))
+                    []
+
         Parser.TypeMatch range (Parser.Generic sym) [] ->
             Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
 

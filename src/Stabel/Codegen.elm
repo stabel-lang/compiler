@@ -188,17 +188,34 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     , context
                     )
 
-                AST.ArrayLiteral _ nodes _ ->
+                AST.ArrayLiteral _ nodes arrayType ->
                     let
-                        ( _, codeGenNodes, nextContext ) =
+                        ( _, codeGenNodesReversed, nextContext ) =
                             List.foldl
                                 (astNodeToCodegenNode def)
                                 ( [], [], context )
                                 nodes
+
+                        codeGenNodes =
+                            List.reverse codeGenNodesReversed
                     in
-                    ( ArrayLiteral (List.reverse codeGenNodes)
-                    , nextContext
-                    )
+                    case arrayType of
+                        Type.Union _ members ->
+                            {-
+                               TODO:
+                                  unionBoxMap members
+                                      |> List.find (\( t, _ ) -> Type.equalBaseType t leftType)
+                                      |> Maybe.map Tuple.second
+                                      |> Maybe.map (Box idx)
+                            -}
+                            ( ArrayLiteral codeGenNodes
+                            , nextContext
+                            )
+
+                        _ ->
+                            ( ArrayLiteral codeGenNodes
+                            , nextContext
+                            )
 
                 AST.Function _ fn _ ->
                     let
@@ -342,7 +359,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
             case ( leftType, rightType ) of
                 ( _, Type.Union _ members ) ->
                     unionBoxMap members
-                        |> List.find (\( t, _ ) -> t == leftType)
+                        |> List.find (\( t, _ ) -> Type.equalBaseType t leftType)
                         |> Maybe.map Tuple.second
                         |> Maybe.map (Box idx)
 
@@ -352,7 +369,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
         maybeBoxLeadingElement =
             case ( List.head stackInScope, isMultiFunction node, List.head nodeType.input ) of
                 ( Just _, True, Just (Type.Union _ _) ) ->
-                    -- Already handled by maybePromoteInt
+                    -- Already handled by maybeBox
                     Nothing
 
                 ( Just _, True, Just nodeLeadingType ) ->
@@ -438,6 +455,9 @@ requiresBoxingInPatternMatch type_ =
             True
 
         Type.Generic _ ->
+            True
+
+        Type.Array _ ->
             True
 
         _ ->
@@ -530,7 +550,7 @@ makeInequalityTest boxMap selfIndex ((AST.TypeMatch _ typeFromTypeMatch _) as t_
     let
         maybeBoxId =
             boxMap
-                |> List.find (\( boxedType, _ ) -> boxedType == typeFromTypeMatch)
+                |> List.find (\( boxedType, _ ) -> Type.equalBaseType boxedType typeFromTypeMatch)
                 |> Maybe.map Tuple.second
     in
     case ( t_, maybeBoxId ) of

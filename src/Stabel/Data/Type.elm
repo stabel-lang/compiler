@@ -3,6 +3,7 @@ module Stabel.Data.Type exposing
     , Type(..)
     , compatibleFunctions
     , emptyFunctionType
+    , equalBaseType
     , functionTypeToString
     , genericName
     , genericlyCompatible
@@ -75,6 +76,9 @@ referencedGenerics t =
                 |> List.map referencedGenerics
                 |> List.foldl Set.union Set.empty
 
+        Array val ->
+            referencedGenerics val
+
         _ ->
             Set.empty
 
@@ -96,6 +100,25 @@ genericlyCompatible lhs rhs =
 
         ( Union _ lMems, Union _ rMems ) ->
             lMems == rMems
+
+        ( Array lT, Array rT ) ->
+            genericlyCompatible lT rT
+
+        _ ->
+            lhs == rhs
+
+
+equalBaseType : Type -> Type -> Bool
+equalBaseType lhs rhs =
+    case ( lhs, rhs ) of
+        ( Generic _, Generic _ ) ->
+            True
+
+        ( Array _, Array _ ) ->
+            True
+
+        ( CustomGeneric lName _, CustomGeneric rName _ ) ->
+            lName == rName
 
         _ ->
             lhs == rhs
@@ -323,7 +346,7 @@ compatibleTypeLists annotated inferred rangeDict =
                     compatibleTypeLists [ lMember ] [ rMember ] Dict.empty
             in
             if compatibleMembers then
-                ( rangeDict, True )
+                compatibleTypeLists annotatedRest inferredRest rangeDict
 
             else
                 ( rangeDict, False )

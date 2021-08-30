@@ -1600,21 +1600,13 @@ compatibleTypes context typeA typeB =
             else
                 case ( boundA, boundB ) of
                     ( Type.Union _ leftUnion, Type.Union _ rightUnion ) ->
-                        -- TODO: Requires unions to be sorted in same order
                         let
+                            -- TODO: lift this restriction in the future?
                             lengthTest =
                                 List.length leftUnion == List.length rightUnion
 
                             ( newContext, allMembersTest ) =
-                                List.map2 Tuple.pair leftUnion rightUnion
-                                    |> List.foldl foldHelper ( context, True )
-
-                            foldHelper ( lType, rType ) ( ctx, currValue ) =
-                                if not currValue then
-                                    ( ctx, currValue )
-
-                                else
-                                    compatibleTypes ctx lType rType
+                                subList leftUnion rightUnion context
                         in
                         ( newContext
                         , lengthTest && allMembersTest
@@ -1725,6 +1717,44 @@ compatibleTypes context typeA typeB =
 
                     _ ->
                         ( context, False )
+
+
+{-| Is the first list a subset of the second?
+-}
+subList : List Type -> List Type -> Context -> ( Context, Bool )
+subList lhs rhs ctx =
+    case lhs of
+        [] ->
+            ( ctx, True )
+
+        first :: rest ->
+            case findMap (compatibleTypes ctx first) Tuple.second rhs of
+                Just ( rhsType, ( newContext, _ ) ) ->
+                    subList
+                        rest
+                        (List.filter ((/=) rhsType) rest)
+                        newContext
+
+                Nothing ->
+                    ( ctx, False )
+
+
+findMap : (a -> b) -> (b -> Bool) -> List a -> Maybe ( a, b )
+findMap mapFn predFn ls =
+    case ls of
+        [] ->
+            Nothing
+
+        first :: rest ->
+            let
+                mapped =
+                    mapFn first
+            in
+            if predFn mapped then
+                Just ( first, mapped )
+
+            else
+                findMap mapFn predFn rest
 
 
 getGenericBinding : Context -> Type -> Maybe Type
