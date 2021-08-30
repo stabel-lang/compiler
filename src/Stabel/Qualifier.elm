@@ -461,6 +461,20 @@ qualifyMemberType config modRefs range type_ =
         Parser.LocalRef "Int" [] ->
             Ok <| Type.Int
 
+        Parser.LocalRef "Int" other ->
+            Err <| BadIntType range (List.length other)
+
+        Parser.LocalRef "Array" [ t ] ->
+            case qualifyMemberType config modRefs range t of
+                Err err ->
+                    Err err
+
+                Ok t_ ->
+                    Ok <| Type.Array t_
+
+        Parser.LocalRef "Array" other ->
+            Err <| BadArrayType range (List.length other)
+
         Parser.LocalRef name [] ->
             case Dict.get name config.ast.types of
                 Just _ ->

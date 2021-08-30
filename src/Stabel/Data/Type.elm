@@ -317,6 +317,17 @@ compatibleTypeLists annotated inferred rangeDict =
             else
                 ( rangeDict, False )
 
+        ( (Array lMember) :: annotatedRest, (Array rMember) :: inferredRest ) ->
+            let
+                ( _, compatibleMembers ) =
+                    compatibleTypeLists [ lMember ] [ rMember ] Dict.empty
+            in
+            if compatibleMembers then
+                ( rangeDict, True )
+
+            else
+                ( rangeDict, False )
+
         ( (Union _ lMembers) :: annotatedRest, (Union _ rMembers) :: inferredRest ) ->
             let
                 lSet =

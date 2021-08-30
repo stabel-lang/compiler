@@ -15,6 +15,8 @@ type Problem
     | NoSuchMemberOnType SourceLocationRange String String
     | FunctionNotExposed SourceLocationRange String
     | TypeNotExposed SourceLocationRange String
+    | BadIntType SourceLocationRange Int
+    | BadArrayType SourceLocationRange Int
 
 
 toString : String -> Problem -> String
@@ -87,6 +89,26 @@ toString source problem =
                 ++ typeRef
                 ++ "' but this type is not exposed."
 
+        BadIntType range num ->
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
+                ++ "\n\n"
+                ++ "An Int takes no type parameters, you've provided "
+                ++ String.fromInt num
+                ++ "."
+
+        BadArrayType range num ->
+            ">> "
+                ++ range.source
+                ++ "\n\n"
+                ++ SourceLocation.extractFromString source range.start range.end
+                ++ "\n\n"
+                ++ "An Array requires exactly one type parameter, you've provided "
+                ++ String.fromInt num
+                ++ "."
+
 
 sourceLocationRef : Problem -> String
 sourceLocationRef problem =
@@ -110,4 +132,10 @@ sourceLocationRef problem =
             range.source
 
         TypeNotExposed range _ ->
+            range.source
+
+        BadIntType range _ ->
+            range.source
+
+        BadArrayType range _ ->
             range.source

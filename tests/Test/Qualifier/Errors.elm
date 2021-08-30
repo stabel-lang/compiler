@@ -88,6 +88,63 @@ suite =
                         """
                 in
                 checkForError (noSuchWordReferenceError "two") source
+        , test "Bad Int type" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: main
+                        type: -- (Int a)
+                        : 1
+                        """
+
+                    badIntError problem =
+                        case problem of
+                            BadIntType _ 1 ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError badIntError source
+        , test "Bad Array type" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: main
+                        type: -- (Array a b)
+                        : { 1 { 2 } }
+                        """
+
+                    badArrayError problem =
+                        case problem of
+                            BadArrayType _ 2 ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError badArrayError source
+        , test "Bad Array type (no arguments)" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: main
+                        type: -- Array
+                        : { 1 2 }
+                        """
+
+                    badArrayError problem =
+                        case problem of
+                            BadArrayType _ 0 ->
+                                True
+
+                            _ ->
+                                False
+                in
+                checkForError badArrayError source
         ]
 
 

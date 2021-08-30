@@ -147,3 +147,31 @@ test('Set works', async () => {
     expect(result.stackElement()).toBe(20);
 });
 
+test('Type annotation', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        type: -- Int
+        : { 5 6 7 8 } array-length
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(4);
+});
+
+test('Type tightening', async () => {
+    const wat = await compiler.toWat('main', `
+        def: main
+        type: -- Int
+        : empty array-length
+
+        def: empty
+        type: -- (Array Int)
+        : {}
+    `);
+
+    const result = await compiler.run(wat, 'main');
+
+    expect(result.stackElement()).toBe(0);
+});
+
