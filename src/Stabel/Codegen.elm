@@ -74,7 +74,7 @@ indexOfHelper idx value list =
 
 type AstNode
     = IntLiteral Int
-    | ArrayLiteral (List AstNode)
+    | ArrayLiteral Type (List ( Type, AstNode ))
     | Function Int String -- id name
     | FunctionRef Int String -- id name
     | ConstructType Int Int -- id memberQty
@@ -198,24 +198,18 @@ astNodeToCodegenNode def node ( stack, result, context ) =
 
                         codeGenNodes =
                             List.reverse codeGenNodesReversed
-                    in
-                    case arrayType of
-                        Type.Union _ members ->
-                            {-
-                               TODO:
-                                  unionBoxMap members
-                                      |> List.find (\( t, _ ) -> Type.equalBaseType t leftType)
-                                      |> Maybe.map Tuple.second
-                                      |> Maybe.map (Box idx)
-                            -}
-                            ( ArrayLiteral codeGenNodes
-                            , nextContext
-                            )
 
-                        _ ->
-                            ( ArrayLiteral codeGenNodes
-                            , nextContext
-                            )
+                        codeGenTypes =
+                            nodes
+                                |> List.map (typeOfNode def)
+                                |> List.map (\ft -> Maybe.withDefault Type.Int <| List.head ft.output)
+
+                        codeGenTuples =
+                            List.map2 Tuple.pair codeGenTypes codeGenNodes
+                    in
+                    ( ArrayLiteral arrayType codeGenTuples
+                    , nextContext
+                    )
 
                 AST.Function _ fn _ ->
                     let
@@ -278,71 +272,7 @@ astNodeToCodegenNode def node ( stack, result, context ) =
                     )
 
         nodeType =
-            case node of
-                AST.IntLiteral _ _ ->
-                    { input = []
-                    , output = [ Type.Int ]
-                    }
-
-                AST.ArrayLiteral _ _ t ->
-                    { input = []
-                    , output = [ t ]
-                    }
-
-                AST.Function _ _ type_ ->
-                    type_
-
-                AST.FunctionRef _ fn ->
-                    { input = []
-                    , output = [ Type.FunctionSignature fn.type_ ]
-                    }
-
-                AST.Recurse _ ->
-                    def.type_
-
-                AST.Cycle _ data ->
-                    data.typeSignature
-
-                AST.Builtin _ builtin ->
-                    Builtin.functionType builtin
-
-                AST.ConstructType typeDef ->
-                    case typeDef.members of
-                        StructMembers members ->
-                            { input = List.map Tuple.second members
-                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
-                            }
-
-                        UnionMembers members ->
-                            -- Cannot happen
-                            { input = members
-                            , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
-                            }
-
-                AST.SetMember typeDef _ _ memberType ->
-                    let
-                        type_ =
-                            typeFromTypeDef typeDef.name typeDef.generics
-                    in
-                    { input = [ type_, memberType ]
-                    , output = [ type_ ]
-                    }
-
-                AST.GetMember typeDef _ _ memberType ->
-                    let
-                        type_ =
-                            typeFromTypeDef typeDef.name typeDef.generics
-                    in
-                    { input = [ type_ ]
-                    , output = [ memberType ]
-                    }
-
-        typeFromTypeDef typeName gens =
-            if List.isEmpty gens then
-                Type.Custom typeName
-
-            else
-                Type.CustomGeneric typeName (List.map Type.Generic gens)
+            typeOfNode def node
 
         stackInScope =
             List.reverse stack
@@ -420,6 +350,77 @@ astNodeToCodegenNode def node ( stack, result, context ) =
     , newNode :: (stackElementsToBox ++ result)
     , updatedContext
     )
+
+
+typeOfNode : AST.FunctionDefinition -> AST.AstNode -> Type.FunctionType
+typeOfNode def node =
+    case node of
+        AST.IntLiteral _ _ ->
+            { input = []
+            , output = [ Type.Int ]
+            }
+
+        AST.ArrayLiteral _ _ t ->
+            { input = []
+            , output = [ t ]
+            }
+
+        AST.Function _ _ type_ ->
+            type_
+
+        AST.FunctionRef _ fn ->
+            { input = []
+            , output = [ Type.FunctionSignature fn.type_ ]
+            }
+
+        AST.Recurse _ ->
+            def.type_
+
+        AST.Cycle _ data ->
+            data.typeSignature
+
+        AST.Builtin _ builtin ->
+            Builtin.functionType builtin
+
+        AST.ConstructType typeDef ->
+            case typeDef.members of
+                StructMembers members ->
+                    { input = List.map Tuple.second members
+                    , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
+                    }
+
+                UnionMembers members ->
+                    -- Cannot happen
+                    { input = members
+                    , output = [ typeFromTypeDef typeDef.name typeDef.generics ]
+                    }
+
+        AST.SetMember typeDef _ _ memberType ->
+            let
+                type_ =
+                    typeFromTypeDef typeDef.name typeDef.generics
+            in
+            { input = [ type_, memberType ]
+            , output = [ type_ ]
+            }
+
+        AST.GetMember typeDef _ _ memberType ->
+            let
+                type_ =
+                    typeFromTypeDef typeDef.name typeDef.generics
+            in
+            { input = [ type_ ]
+            , output = [ memberType ]
+            }
+
+
+typeFromTypeDef : String -> List String -> Type
+typeFromTypeDef typeName gens =
+    if List.isEmpty gens then
+        Type.Custom typeName
+
+    else
+        Type.CustomGeneric typeName (List.map Type.Generic gens)
 
 
 memberSize : AST.TypeDefinition -> Int
@@ -736,10 +737,45 @@ nodeToInstruction context node =
                 , BaseModule.callStackPushFn
                 ]
 
-        ArrayLiteral nodes ->
-            Wasm.Batch <|
-                BaseModule.callArrayEmptyFn
-                    :: List.concatMap (\n -> [ nodeToInstruction context n, BaseModule.callArrayPushFn ]) nodes
+        ArrayLiteral arrayType typedNodes ->
+            case arrayType of
+                Type.Array (Type.Union _ unionMembers) ->
+                    let
+                        boxMap =
+                            unionBoxMap unionMembers
+
+                        boxedNodes =
+                            List.map
+                                (\( nType, n ) ->
+                                    ( List.find (\( t, _ ) -> Type.equalBaseType t nType) boxMap
+                                        |> Maybe.map Tuple.second
+                                        |> Maybe.withDefault -1
+                                    , n
+                                    )
+                                )
+                                typedNodes
+                    in
+                    Wasm.Batch <|
+                        BaseModule.callArrayEmptyFn
+                            :: List.concatMap
+                                (\( tag, n ) ->
+                                    [ nodeToInstruction context n
+                                    , nodeToInstruction context <| Box 0 tag
+                                    , BaseModule.callArrayPushFn
+                                    ]
+                                )
+                                boxedNodes
+
+                _ ->
+                    Wasm.Batch <|
+                        BaseModule.callArrayEmptyFn
+                            :: List.concatMap
+                                (\( _, n ) ->
+                                    [ nodeToInstruction context n
+                                    , BaseModule.callArrayPushFn
+                                    ]
+                                )
+                                typedNodes
 
         Function id name ->
             Wasm.Call id name
