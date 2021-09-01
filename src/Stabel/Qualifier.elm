@@ -97,6 +97,7 @@ type Node
     | ConstructType TypeDefinition
     | GetMember TypeDefinition String Int Type
     | SetMember TypeDefinition String Int Type
+    | ArrayLiteral SourceLocationRange (List Node)
 
 
 type alias ModuleReferences =
@@ -119,6 +120,10 @@ builtinDict =
         , ( "rotate", Builtin.StackRightRotate )
         , ( "-rotate", Builtin.StackLeftRotate )
         , ( "!", Builtin.Apply )
+        , ( "array-length", Builtin.ArrayLength )
+        , ( "array-push", Builtin.ArrayPush )
+        , ( "array-get", Builtin.ArrayGet )
+        , ( "array-set", Builtin.ArraySet )
         ]
 
 
@@ -455,6 +460,20 @@ qualifyMemberType config modRefs range type_ =
     case type_ of
         Parser.LocalRef "Int" [] ->
             Ok <| Type.Int
+
+        Parser.LocalRef "Int" other ->
+            Err <| BadIntType range (List.length other)
+
+        Parser.LocalRef "Array" [ t ] ->
+            case qualifyMemberType config modRefs range t of
+                Err err ->
+                    Err err
+
+                Ok t_ ->
+                    Ok <| Type.Array t_
+
+        Parser.LocalRef "Array" other ->
+            Err <| BadArrayType range (List.length other)
 
         Parser.LocalRef name [] ->
             case Dict.get name config.ast.types of
@@ -888,6 +907,13 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                     (qualifiedRange range)
                     Type.Int
                     [ TypeMatchCond "value" Type.Int (LiteralInt val) ]
+
+        Parser.TypeMatch range (Parser.LocalRef "Array" []) [] ->
+            Ok <|
+                TypeMatch
+                    (qualifiedRange range)
+                    (Type.Array (Type.Generic "*a"))
+                    []
 
         Parser.TypeMatch range (Parser.Generic sym) [] ->
             Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
@@ -1408,6 +1434,36 @@ qualifyNode config currentDefName node acc =
                             acc.inlineFunctionNames
                                 |> Set.union qualifyNodeResult.inlineFunctionNames
                                 |> Set.insert inlineFuncName
+                    }
+
+                Err err ->
+                    { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
+
+        Parser.ArrayLiteral loc [] ->
+            { acc
+                | qualifiedNodes =
+                    Ok (Builtin (mapLoc loc) Builtin.ArrayEmpty)
+                        :: acc.qualifiedNodes
+            }
+
+        Parser.ArrayLiteral loc nodes ->
+            let
+                qualifyNodeResult =
+                    initQualifyNode
+                        config
+                        acc.qualifiedTypes
+                        acc.qualifiedFunctions
+                        currentDefName
+                        acc.modRefs
+                        acc.currentlyParsing
+                        nodes
+            in
+            case qualifyNodeResult.qualifiedNodes of
+                Ok qualifiedNodes ->
+                    { acc
+                        | qualifiedNodes =
+                            Ok (ArrayLiteral (mapLoc loc) qualifiedNodes)
+                                :: acc.qualifiedNodes
                     }
 
                 Err err ->

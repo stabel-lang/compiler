@@ -82,6 +82,9 @@ stripNodeLocation node =
         AST.InlineFunction _ val ->
             AST.InlineFunction emptyRange (List.map stripNodeLocation val)
 
+        AST.ArrayLiteral _ val ->
+            AST.ArrayLiteral emptyRange (List.map stripNodeLocation val)
+
         _ ->
             node
 

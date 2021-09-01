@@ -55,7 +55,9 @@ exports.toProjectWat = function toWat(payload) {
 
 exports.run = async function run(wat, functionName) {
     const wabt = await wabtInit();
-    const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;
+    const wasmModule = wabt.parseWat('tmp', wat, {
+        bulk_memory: true
+    }).toBinary({}).buffer;
 
     const memory = new WebAssembly.Memory({
         initial: 1

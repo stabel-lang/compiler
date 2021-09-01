@@ -895,6 +895,47 @@ suite =
                     in
                     expectAst source expectedAst
             ]
+        , test "Array" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: some-array
+                        : { 1 2 /ext/func fn 5 { 1 2 } }
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "some-array"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.ArrayLiteral emptyRange
+                                                [ AST.Integer emptyRange 1
+                                                , AST.Integer emptyRange 2
+                                                , AST.ExternalFunction emptyRange
+                                                    [ "ext" ]
+                                                    "func"
+                                                , AST.Function emptyRange "fn"
+                                                , AST.Integer emptyRange 5
+                                                , AST.ArrayLiteral emptyRange
+                                                    [ AST.Integer emptyRange 1
+                                                    , AST.Integer emptyRange 2
+                                                    ]
+                                                ]
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst source expectedAst
         , test "Definition without implementation should be legal" <|
             \_ ->
                 expectCompiles

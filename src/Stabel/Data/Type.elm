@@ -1,8 +1,10 @@
 module Stabel.Data.Type exposing
     ( FunctionType
     , Type(..)
+    , compareBaseType
     , compatibleFunctions
     , emptyFunctionType
+    , equalBaseType
     , functionTypeToString
     , genericName
     , genericlyCompatible
@@ -15,6 +17,10 @@ import Dict exposing (Dict)
 import Set exposing (Set)
 
 
+
+-- TODO: Are all these functions still needed?
+
+
 type Type
     = Int
     | Generic String
@@ -23,6 +29,7 @@ type Type
     | Union (Maybe String) (List Type)
     | FunctionSignature FunctionType
     | StackRange String
+    | Array Type
 
 
 type alias FunctionType =
@@ -74,6 +81,9 @@ referencedGenerics t =
                 |> List.map referencedGenerics
                 |> List.foldl Set.union Set.empty
 
+        Array val ->
+            referencedGenerics val
+
         _ ->
             Set.empty
 
@@ -96,8 +106,58 @@ genericlyCompatible lhs rhs =
         ( Union _ lMems, Union _ rMems ) ->
             lMems == rMems
 
+        ( Array lT, Array rT ) ->
+            genericlyCompatible lT rT
+
         _ ->
             lhs == rhs
+
+
+equalBaseType : Type -> Type -> Bool
+equalBaseType lhs rhs =
+    case ( lhs, rhs ) of
+        ( Generic _, Generic _ ) ->
+            True
+
+        ( Array _, Array _ ) ->
+            True
+
+        ( CustomGeneric lName _, CustomGeneric rName _ ) ->
+            lName == rName
+
+        _ ->
+            lhs == rhs
+
+
+compareBaseType : Type -> Type -> Order
+compareBaseType lhs rhs =
+    compare
+        (baseTypeToComparable lhs)
+        (baseTypeToComparable rhs)
+
+
+baseTypeToComparable : Type -> String
+baseTypeToComparable t =
+    case t of
+        Int ->
+            "int"
+
+        Array _ ->
+            "array"
+
+        Generic val ->
+            "gen_" ++ val
+
+        Custom name ->
+            "custom_" ++ name
+
+        CustomGeneric name _ ->
+            "custom_" ++ name
+
+        _ ->
+            -- the remaining types cannot be used ina  union,
+            -- so the need for them to be sorted is 0
+            ""
 
 
 sameCategory : Type -> Type -> Bool
@@ -140,6 +200,9 @@ toString t =
         StackRange name ->
             name ++ "..."
 
+        Array _ ->
+            "Array"
+
 
 toDisplayString : Type -> String
 toDisplayString t =
@@ -179,6 +242,9 @@ toDisplayString t =
 
         StackRange name ->
             name ++ "..."
+
+        Array t_ ->
+            "Array(" ++ toDisplayString t_ ++ ")"
 
 
 functionTypeToString : FunctionType -> String
@@ -305,6 +371,17 @@ compatibleTypeLists annotated inferred rangeDict =
                     compatibleTypeLists lMembers rMembers Dict.empty
             in
             if lName == rName && compatibleMembers then
+                compatibleTypeLists annotatedRest inferredRest rangeDict
+
+            else
+                ( rangeDict, False )
+
+        ( (Array lMember) :: annotatedRest, (Array rMember) :: inferredRest ) ->
+            let
+                ( _, compatibleMembers ) =
+                    compatibleTypeLists [ lMember ] [ rMember ] Dict.empty
+            in
+            if compatibleMembers then
                 compatibleTypeLists annotatedRest inferredRest rangeDict
 
             else

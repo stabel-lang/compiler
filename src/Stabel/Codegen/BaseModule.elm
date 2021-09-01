@@ -34,7 +34,7 @@ initialHeapPositionOffset =
 
 firstAvailableFunctionId : Int
 firstAvailableFunctionId =
-    20
+    List.length baseFunctions
 
 
 
@@ -231,6 +231,56 @@ callExecInlineFn =
     Wasm.Call 19 execInlineFn
 
 
+arrayEmptyFn : String
+arrayEmptyFn =
+    "__array_empty"
+
+
+callArrayEmptyFn : Wasm.Instruction
+callArrayEmptyFn =
+    Wasm.Call 20 arrayEmptyFn
+
+
+arrayLengthFn : String
+arrayLengthFn =
+    "__array_length"
+
+
+callArrayLengthFn : Wasm.Instruction
+callArrayLengthFn =
+    Wasm.Call 21 arrayLengthFn
+
+
+arrayPushFn : String
+arrayPushFn =
+    "__array_push"
+
+
+callArrayPushFn : Wasm.Instruction
+callArrayPushFn =
+    Wasm.Call 22 arrayPushFn
+
+
+arrayGetFn : String
+arrayGetFn =
+    "__array_get"
+
+
+callArrayGetFn : Wasm.Instruction
+callArrayGetFn =
+    Wasm.Call 23 arrayGetFn
+
+
+arraySetFn : String
+arraySetFn =
+    "__array_set"
+
+
+callArraySetFn : Wasm.Instruction
+callArraySetFn =
+    Wasm.Call 24 arraySetFn
+
+
 
 -- Base module
 
@@ -289,29 +339,10 @@ baseFunctions =
       , instructions =
             [ Wasm.Local_Get 1 -- Size in bytes
             , callAllocFn
-            , Wasm.Local_Set 2 -- Save output instance
-            , Wasm.Block
-                [ Wasm.Loop
-                    [ Wasm.Local_Get 1
-                    , Wasm.I32_EqZero
-                    , Wasm.BreakIf 1 -- break out of loop
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Const wasmPtrSize
-                    , Wasm.I32_Sub
-                    , Wasm.Local_Set 1 -- Decreased pointer size
-                    , Wasm.Local_Get 0 -- Source struct
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Add
-                    , Wasm.I32_Load -- Get a byte from source struct
-                    , Wasm.Local_Set 3 -- Save byte to copy
-                    , Wasm.Local_Get 2 -- Dest struct
-                    , Wasm.Local_Get 1
-                    , Wasm.I32_Add
-                    , Wasm.Local_Get 3
-                    , Wasm.I32_Store -- Copy byte from source to dest struct
-                    , Wasm.Break 0 -- loop
-                    ]
-                ]
+            , Wasm.Local_Tee 2 -- Output struct
+            , Wasm.Local_Get 0 -- Original struct
+            , Wasm.Local_Get 1
+            , Wasm.Memory_Copy
             , Wasm.Local_Get 2
             ]
       }
@@ -576,6 +607,195 @@ baseFunctions =
       , instructions =
             [ callStackPopFn
             , Wasm.CallIndirect
+            ]
+      }
+
+    -- ARRAY
+    , { id = 20
+      , name = arrayEmptyFn
+      , args = []
+      , results = []
+      , locals = [ Wasm.Int32 ]
+      , instructions =
+            [ Wasm.I32_Const 4 -- Just enough space for length variable
+            , callAllocFn
+            , Wasm.Local_Tee 0 -- Save output instance
+            , Wasm.I32_Const 0
+            , Wasm.I32_Store -- Set length to 0
+            , Wasm.Local_Get 0
+            , callStackPushFn
+            ]
+      }
+    , { id = 21
+      , name = arrayLengthFn
+      , args = []
+      , results = []
+      , locals = []
+      , instructions =
+            [ callStackPopFn
+            , Wasm.I32_Load
+            , callStackPushFn
+            ]
+      }
+    , { id = 22
+      , name = arrayPushFn
+      , args = []
+      , results = []
+      , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
+      , instructions =
+            [ callStackPopFn
+            , Wasm.Local_Set 3 -- object to push
+            , callStackPopFn
+            , Wasm.Local_Tee 0 -- original array pointer
+            , Wasm.I32_Load
+            , Wasm.Local_Tee 1 -- original array length
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul -- bytes required for new array
+            , Wasm.I32_Const (wasmPtrSize * 2)
+            , Wasm.I32_Add -- plus length and new object
+            , callAllocFn
+            , Wasm.Local_Tee 2 -- new array pointer
+
+            -- Set length
+            , Wasm.Local_Get 1
+            , Wasm.I32_Const 1
+            , Wasm.I32_Add
+            , Wasm.I32_Store -- store length in new array
+
+            -- Copy
+            , Wasm.Local_Get 2
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- new array content start ptr
+            , Wasm.Local_Get 0
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Add -- original array content start ptr
+            , Wasm.Local_Get 1
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul -- bytes to copy to new array
+            , Wasm.Memory_Copy
+
+            -- Set new object
+            , Wasm.Local_Get 2
+            , Wasm.Local_Get 2
+            , Wasm.I32_Load
+            , Wasm.I32_Const wasmPtrSize
+            , Wasm.I32_Mul
+            , Wasm.I32_Add -- Last object pos
+            , Wasm.Local_Get 3
+            , Wasm.I32_Store
+
+            -- Return
+            , Wasm.Local_Get 2
+            , callStackPushFn
+            ]
+      }
+    , { id = 23
+      , name = arrayGetFn
+      , args = []
+      , results = []
+      , locals = [ Wasm.Int32, Wasm.Int32 ]
+      , instructions =
+            [ callStackPopFn
+            , Wasm.Local_Set 0 -- index to get
+            , callStackPopFn
+            , Wasm.Local_Set 1 -- array
+            , Wasm.Block
+                [ -- check for negative index
+                  Wasm.Local_Get 0
+                , Wasm.I32_Const 0
+                , Wasm.I32_LT
+                , Wasm.BreakIf 0
+
+                -- Check for index too large
+                , Wasm.Local_Get 0
+                , Wasm.Local_Get 1
+                , Wasm.I32_Load -- length of array
+                , Wasm.I32_GTE
+                , Wasm.BreakIf 0
+
+                -- Get element at index
+                , Wasm.Local_Get 1
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Add -- move pointer beyond length
+                , Wasm.Local_Get 0
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Mul -- offset
+                , Wasm.I32_Add -- starting position + offset = ptr to element
+                , Wasm.I32_Load -- element to return
+                , Wasm.I32_Const 1 -- success flag
+                , callStackPushFn
+                , callStackPushFn
+                , Wasm.Return
+                ]
+
+            -- Failure case
+            , Wasm.I32_Const 0
+            , Wasm.I32_Const 0
+            , callStackPushFn
+            , callStackPushFn
+            ]
+      }
+    , { id = 24
+      , name = arraySetFn
+      , args = []
+      , results = []
+      , locals = [ Wasm.Int32, Wasm.Int32, Wasm.Int32, Wasm.Int32, Wasm.Int32 ]
+      , instructions =
+            [ callStackPopFn
+            , Wasm.Local_Set 0 -- index
+            , callStackPopFn
+            , Wasm.Local_Set 1 -- new value
+            , callStackPopFn
+            , Wasm.Local_Set 2 -- original array
+            , Wasm.Block
+                [ -- Bounds check
+                  -- Lower bound
+                  Wasm.Local_Get 0
+                , Wasm.I32_Const 0
+                , Wasm.I32_LT
+                , Wasm.BreakIf 0
+
+                -- Upper bound
+                , Wasm.Local_Get 0
+                , Wasm.Local_Get 2
+                , Wasm.I32_Load
+                , Wasm.Local_Tee 3 -- original array length
+                , Wasm.I32_GTE
+                , Wasm.BreakIf 0
+
+                -- Copy original array
+                , Wasm.Local_Get 3
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Mul
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Add -- Size of original array in bytes
+                , Wasm.Local_Tee 3 -- overwrite
+                , callAllocFn
+                , Wasm.Local_Tee 4 -- New array
+                , Wasm.Local_Get 2
+                , Wasm.Local_Get 3
+                , Wasm.Memory_Copy
+
+                -- Set element at idx
+                , Wasm.Local_Get 0
+                , Wasm.I32_Const 1
+                , Wasm.I32_Add -- to 'jump over' the length field of the array
+                , Wasm.I32_Const wasmPtrSize
+                , Wasm.I32_Mul -- offset
+                , Wasm.Local_Get 4
+                , Wasm.I32_Add -- address of idx in new array
+                , Wasm.Local_Get 1
+                , Wasm.I32_Store
+
+                --Return
+                , Wasm.Local_Get 4
+                , callStackPushFn
+                , Wasm.Return
+                ]
+
+            -- Failure case
+            , Wasm.Local_Get 2
+            , callStackPushFn
             ]
       }
     ]

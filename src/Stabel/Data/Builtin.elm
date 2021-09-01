@@ -18,6 +18,11 @@ type Builtin
     | StackRightRotate
     | StackLeftRotate
     | Apply
+    | ArrayEmpty
+    | ArrayLength
+    | ArrayPush
+    | ArrayGet
+    | ArraySet
 
 
 functionType : Builtin -> FunctionType
@@ -82,4 +87,29 @@ functionType builtin =
                     }
                 ]
             , output = [ Type.StackRange "b" ]
+            }
+
+        ArrayEmpty ->
+            { input = []
+            , output = [ Type.Array (Type.Generic "a") ]
+            }
+
+        ArrayLength ->
+            { input = [ Type.Array (Type.Generic "a") ]
+            , output = [ Type.Int ]
+            }
+
+        ArrayPush ->
+            { input = [ Type.Array (Type.Generic "a"), Type.Generic "a" ]
+            , output = [ Type.Array (Type.Generic "a") ]
+            }
+
+        ArrayGet ->
+            { input = [ Type.Array (Type.Generic "a"), Type.Int ]
+            , output = [ Type.Int, Type.Generic "a" ]
+            }
+
+        ArraySet ->
+            { input = [ Type.Array (Type.Generic "a"), Type.Generic "a", Type.Int ]
+            , output = [ Type.Array (Type.Generic "a") ]
             }

@@ -12,6 +12,7 @@ module Stabel.TypeChecker exposing
 
 import Dict exposing (Dict)
 import List.Extra as List
+import Result.Extra as Result
 import Set exposing (Set)
 import Stabel.Data.Builtin as Builtin exposing (Builtin)
 import Stabel.Data.SourceLocation as SourceLocation exposing (SourceLocationRange)
@@ -57,6 +58,7 @@ type TypeMatchValue
 
 type AstNode
     = IntLiteral SourceLocationRange Int
+    | ArrayLiteral SourceLocationRange (List AstNode) Type
     | Function SourceLocationRange FunctionDefinition FunctionType
     | FunctionRef SourceLocationRange FunctionDefinition
     | Recurse SourceLocationRange
@@ -265,6 +267,18 @@ untypedToTypedNode idx context untypedNode =
         Qualifier.Integer range num ->
             IntLiteral range num
 
+        Qualifier.ArrayLiteral range nodes ->
+            let
+                typedNodes =
+                    List.map (untypedToTypedNode idx context) nodes
+
+                arrayType =
+                    List.filterMap arrayNodeToType typedNodes
+                        |> unionizeTypes
+                        |> Type.Array
+            in
+            ArrayLiteral range typedNodes arrayType
+
         Qualifier.Function range function ->
             let
                 ( def, _ ) =
@@ -308,6 +322,40 @@ untypedToTypedNode idx context untypedNode =
 
         Qualifier.GetMember typeDef memberName memberIndex memberType ->
             GetMember typeDef memberName memberIndex memberType
+
+
+arrayNodeToType : AstNode -> Maybe Type
+arrayNodeToType n =
+    case n of
+        IntLiteral _ _ ->
+            Just Type.Int
+
+        ArrayLiteral _ _ t ->
+            Just t
+
+        Function _ _ t ->
+            List.head t.output
+
+        FunctionRef _ def ->
+            Just <| Type.FunctionSignature def.type_
+
+        Recurse _ ->
+            Nothing
+
+        Cycle _ data ->
+            List.head data.typeSignature.output
+
+        Builtin _ _ ->
+            Nothing
+
+        ConstructType _ ->
+            Nothing
+
+        SetMember _ _ _ _ ->
+            Nothing
+
+        GetMember _ _ _ _ ->
+            Nothing
 
 
 resolveGenericsInFunctionType : Int -> Context -> FunctionType -> FunctionType
@@ -1168,13 +1216,93 @@ verifyTypeSignature inferredType untypedDef context =
 
 typeCheckNode : Qualifier.FunctionDefinition -> Int -> Qualifier.Node -> Context -> Context
 typeCheckNode currentDef idx node context =
-    let
-        addStackEffect ctx effects =
-            { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
-    in
+    case nodeToStackEffect currentDef node context of
+        Ok ( newContext, effects ) ->
+            addStackEffect newContext idx effects
+
+        Err error ->
+            { context | errors = error :: context.errors }
+
+
+nodeToStackEffect : Qualifier.FunctionDefinition -> Qualifier.Node -> Context -> Result Problem ( Context, List StackEffect )
+nodeToStackEffect currentDef node context =
     case node of
         Qualifier.Integer _ _ ->
-            addStackEffect context [ Push Type.Int ]
+            Ok ( context, [ Push Type.Int ] )
+
+        Qualifier.ArrayLiteral loc nodes ->
+            let
+                res =
+                    List.foldr
+                        (\n acc ->
+                            case acc of
+                                Err _ ->
+                                    acc
+
+                                Ok ( previousStackEffects, previousContext ) ->
+                                    case nodeToStackEffect currentDef n previousContext of
+                                        Err err ->
+                                            Err err
+
+                                        Ok ( nextContext, nodeStackEffects ) ->
+                                            Ok ( nodeStackEffects :: previousStackEffects, nextContext )
+                        )
+                        (Ok ( [], context ))
+                        nodes
+                        |> Result.map (Tuple.mapFirst (List.map effectsToFunctionType))
+                        |> Result.map (Tuple.mapFirst (List.map validateArrayType))
+                        |> Result.map (Tuple.mapFirst Result.combine)
+                        |> Result.andThen liftTupleFirstResult
+                        |> Result.map (Tuple.mapFirst (List.concatMap .output))
+                        |> Result.map (Tuple.mapFirst unionizeTypes)
+
+                effectsToFunctionType effects =
+                    let
+                        ( inputs, outputs ) =
+                            List.partition stackEffectIsPop effects
+                                |> Tuple.mapBoth (List.map stackEffectType) (List.map stackEffectType)
+                    in
+                    { input = inputs
+                    , output = outputs
+                    }
+
+                stackEffectIsPop effect =
+                    case effect of
+                        Pop _ ->
+                            True
+
+                        Push _ ->
+                            False
+
+                stackEffectType effect =
+                    case effect of
+                        Pop t ->
+                            t
+
+                        Push t ->
+                            t
+
+                validateArrayType type_ =
+                    if List.isEmpty type_.input && List.length type_.output == 1 then
+                        Ok type_
+
+                    else
+                        Err <| BadArrayElement loc type_
+
+                liftTupleFirstResult ( resA, b ) =
+                    case resA of
+                        Ok a ->
+                            Ok ( a, b )
+
+                        Err err ->
+                            Err err
+            in
+            case res of
+                Ok ( inferredType, newContext ) ->
+                    Ok ( newContext, [ Push <| Type.Array inferredType ] )
+
+                Err err ->
+                    Err err
 
         Qualifier.Function _ untypedDef ->
             let
@@ -1184,7 +1312,7 @@ typeCheckNode currentDef idx node context =
                 newContext =
                     { contextWithTypedDef | stackEffects = context.stackEffects }
             in
-            addStackEffect newContext <| functionTypeToStackEffects def.type_
+            Ok ( newContext, functionTypeToStackEffects def.type_ )
 
         Qualifier.FunctionRef _ ref ->
             let
@@ -1197,36 +1325,32 @@ typeCheckNode currentDef idx node context =
                 newContext =
                     { contextAfterFunctionCheck | stackEffects = stackEffectsBeforeFunctionCheck }
             in
-            addStackEffect newContext <|
-                [ Push <| Type.FunctionSignature def.type_ ]
+            Ok
+                ( newContext
+                , [ Push <| Type.FunctionSignature def.type_ ]
+                )
 
         Qualifier.Recurse _ ->
             case TypeSignature.toMaybe currentDef.typeSignature of
                 Just annotatedType ->
-                    addStackEffect context <| functionTypeToStackEffects annotatedType
+                    Ok ( context, functionTypeToStackEffects annotatedType )
 
                 Nothing ->
-                    let
-                        problem =
-                            MissingTypeAnnotationInRecursiveCallStack
-                                (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
-                                currentDef.name
-                    in
-                    { context | errors = problem :: context.errors }
+                    Err <|
+                        MissingTypeAnnotationInRecursiveCallStack
+                            (Maybe.withDefault SourceLocation.emptyRange currentDef.sourceLocation)
+                            currentDef.name
 
         Qualifier.Cycle _ data ->
             case TypeSignature.toMaybe data.typeSignature of
                 Just annotatedType ->
-                    addStackEffect context <| functionTypeToStackEffects annotatedType
+                    Ok ( context, functionTypeToStackEffects annotatedType )
 
                 Nothing ->
-                    let
-                        problem =
-                            MissingTypeAnnotationInRecursiveCallStack
-                                (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
-                                data.name
-                    in
-                    { context | errors = problem :: context.errors }
+                    Err <|
+                        MissingTypeAnnotationInRecursiveCallStack
+                            (Maybe.withDefault SourceLocation.emptyRange data.sourceLocation)
+                            data.name
 
         Qualifier.ConstructType typeDef ->
             let
@@ -1237,36 +1361,78 @@ typeCheckNode currentDef idx node context =
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = memberTypes
                     , output = [ typeInQuestion ]
                     }
+                )
 
         Qualifier.SetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = [ typeInQuestion, memberType ]
                     , output = [ typeInQuestion ]
                     }
+                )
 
         Qualifier.GetMember typeDef _ _ memberType ->
             let
                 typeInQuestion =
                     getStructType typeDef
             in
-            addStackEffect context <|
-                functionTypeToStackEffects
+            Ok
+                ( context
+                , functionTypeToStackEffects
                     { input = [ typeInQuestion ]
                     , output = [ memberType ]
                     }
+                )
 
         Qualifier.Builtin _ builtin ->
-            addStackEffect context <| functionTypeToStackEffects <| Builtin.functionType builtin
+            Ok
+                ( context
+                , functionTypeToStackEffects <|
+                    Builtin.functionType builtin
+                )
+
+
+addStackEffect : Context -> Int -> List StackEffect -> Context
+addStackEffect ctx idx effects =
+    { ctx | stackEffects = ctx.stackEffects ++ List.map (tagGenericEffect idx) effects }
+
+
+unionizeTypes : List Type -> Type
+unionizeTypes ts =
+    unionizeTypesHelper ts []
+
+
+unionizeTypesHelper : List Type -> List Type -> Type
+unionizeTypesHelper ts acc =
+    case ts of
+        [] ->
+            case acc of
+                [] ->
+                    Type.Generic "a"
+
+                [ t ] ->
+                    t
+
+                _ ->
+                    Type.Union Nothing acc
+
+        t :: rest ->
+            if List.member t acc then
+                unionizeTypesHelper rest acc
+
+            else
+                unionizeTypesHelper rest (t :: acc)
 
 
 getStructMembers : TypeDefinition -> List ( String, Type )
@@ -1316,6 +1482,9 @@ tagGeneric idx type_ =
                 { input = List.map (tagGeneric idx) wt.input
                 , output = List.map (tagGeneric idx) wt.output
                 }
+
+        Type.Array t ->
+            Type.Array <| tagGeneric idx t
 
         _ ->
             type_
@@ -1431,21 +1600,13 @@ compatibleTypes context typeA typeB =
             else
                 case ( boundA, boundB ) of
                     ( Type.Union _ leftUnion, Type.Union _ rightUnion ) ->
-                        -- TODO: Requires unions to be sorted in same order
                         let
+                            -- TODO: lift this restriction in the future?
                             lengthTest =
                                 List.length leftUnion == List.length rightUnion
 
                             ( newContext, allMembersTest ) =
-                                List.map2 Tuple.pair leftUnion rightUnion
-                                    |> List.foldl foldHelper ( context, True )
-
-                            foldHelper ( lType, rType ) ( ctx, currValue ) =
-                                if not currValue then
-                                    ( ctx, currValue )
-
-                                else
-                                    compatibleTypes ctx lType rType
+                                subList leftUnion rightUnion context
                         in
                         ( newContext
                         , lengthTest && allMembersTest
@@ -1551,8 +1712,49 @@ compatibleTypes context typeA typeB =
                         , inputsCompatible && outputsCompatible
                         )
 
+                    ( Type.Array lt, Type.Array rt ) ->
+                        compatibleTypes context lt rt
+
                     _ ->
                         ( context, False )
+
+
+{-| Is the first list a subset of the second?
+-}
+subList : List Type -> List Type -> Context -> ( Context, Bool )
+subList lhs rhs ctx =
+    case lhs of
+        [] ->
+            ( ctx, True )
+
+        first :: rest ->
+            case findMap (compatibleTypes ctx first) Tuple.second rhs of
+                Just ( rhsType, ( newContext, _ ) ) ->
+                    subList
+                        rest
+                        (List.filter ((/=) rhsType) rest)
+                        newContext
+
+                Nothing ->
+                    ( ctx, False )
+
+
+findMap : (a -> b) -> (b -> Bool) -> List a -> Maybe ( a, b )
+findMap mapFn predFn ls =
+    case ls of
+        [] ->
+            Nothing
+
+        first :: rest ->
+            let
+                mapped =
+                    mapFn first
+            in
+            if predFn mapped then
+                Just ( first, mapped )
+
+            else
+                findMap mapFn predFn rest
 
 
 getGenericBinding : Context -> Type -> Maybe Type

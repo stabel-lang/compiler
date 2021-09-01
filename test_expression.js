@@ -1,5 +1,8 @@
+// Execute with: node --inspect-brk ./test_expression.js
+// Then open chrome and go to: chrome://inspect
+
 const compiler = require('./wasm_tests/compiler.wrapper');
-const wabt = require('wabt')();
+const wabtInit = require('wabt');
 
 const memory = new WebAssembly.Memory({
     initial: 1
@@ -8,24 +11,17 @@ const memory = new WebAssembly.Memory({
 global.memView = new Uint32Array(memory.buffer, 0, 512);
 
 async function init() {
-    const wat = await compiler.toWat(`
-        deftype: Box
-        : { value: Int }
-
-        deftype: BoxOfBox
-        : { box: Box }
-
-        defmulti: deep-one?
-        when: BoxOfBox( box Box( value 1 ) )
-          drop 1
-        : drop 0
-
+    const wabt = await wabtInit();
+    const wat = await compiler.toWat('main', `
         def: main
-        entry: true
-        : 1 >Box >BoxOfBox deep-one?
+        : { 5 6 7 }
+          1 array-get
+          swap drop
     `);
 
-    const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;
+    const wasmModule = wabt.parseWat('tmp', wat, {
+        bulk_memory: true
+    }).toBinary({}).buffer;
 
     const imports = {
         host: {
@@ -34,7 +30,6 @@ async function init() {
     };
 
     const program = await WebAssembly.instantiate(wasmModule, imports);
-    debugger;
     program.instance.exports.main();
 }
 
