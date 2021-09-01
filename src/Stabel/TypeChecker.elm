@@ -769,13 +769,13 @@ equalizeWhenTypes functionTypes =
         |> List.foldr
             (\( firstType, functionType ) ( typeAcc, functionTypeAcc ) -> ( firstType :: typeAcc, functionType :: functionTypeAcc ))
             ( [], [] )
-        |> Tuple.mapSecond (\lobotomizedFunctionTypes -> equalizeWhenTypesHelper lobotomizedFunctionTypes Dict.empty [])
+        |> Tuple.mapSecond (\lobotomizedFunctionTypes -> equalizeWhenTypesHelper lobotomizedFunctionTypes [])
         |> (\( firstTypes, equalizedWhenTypes ) -> List.map2 Tuple.pair firstTypes equalizedWhenTypes)
         |> List.map joinSplitFunctionType
 
 
-equalizeWhenTypesHelper : List FunctionType -> Dict String Type -> List FunctionType -> List FunctionType
-equalizeWhenTypesHelper types remappedGenerics acc =
+equalizeWhenTypesHelper : List FunctionType -> List FunctionType -> List FunctionType
+equalizeWhenTypesHelper types acc =
     case types of
         [] ->
             List.reverse acc
@@ -820,7 +820,6 @@ equalizeWhenTypesHelper types remappedGenerics acc =
             in
             equalizeWhenTypesHelper
                 remaining
-                remappedGenerics
                 (newSecondType :: newFirstType :: acc)
 
 

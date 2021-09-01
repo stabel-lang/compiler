@@ -79,7 +79,6 @@ type Instruction
     | Loop (List Instruction)
     | Break Int
     | BreakIf Int
-    | If (List Instruction) (List Instruction)
     | Return
     | Call Int String
     | CallIndirect
@@ -357,24 +356,6 @@ formatInstruction ins =
 
         BreakIf num ->
             Str <| "(br_if " ++ String.fromInt num ++ ")"
-
-        If thenIns elseIns ->
-            if List.isEmpty elseIns then
-                BatchFormat
-                    [ Str "(if (then"
-                    , Indent <| List.map formatInstruction thenIns
-                    , Str "))"
-                    ]
-
-            else
-                BatchFormat
-                    [ Str "(if (then"
-                    , Indent <| List.map formatInstruction thenIns
-                    , Str ")"
-                    , Str "(else"
-                    , Indent <| List.map formatInstruction elseIns
-                    , Str "))"
-                    ]
 
         Return ->
             Str "return"

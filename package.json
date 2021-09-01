@@ -29,6 +29,8 @@
     "test:elm": "elm-test",
     "test:elm:watch": "elm-test --watch",
     "test:wasm": "elm make src/TestCompiler.elm --optimize --output wasm_tests/compiler.js && jest",
+    "code-review": "elm-review",
+    "code-review:fix": "elm-review --fix",
     "build": "elm make src/CLI.elm --optimize --output bin/compiler.js",
     "prepublishOnly": "npm run build && terser bin/compiler.js -c -m -o bin/compiler.js"
   },
