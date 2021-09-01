@@ -1,6 +1,7 @@
 module Stabel.Data.Type exposing
     ( FunctionType
     , Type(..)
+    , compareBaseType
     , compatibleFunctions
     , emptyFunctionType
     , equalBaseType
@@ -14,6 +15,10 @@ module Stabel.Data.Type exposing
 
 import Dict exposing (Dict)
 import Set exposing (Set)
+
+
+
+-- TODO: Are all these functions still needed?
 
 
 type Type
@@ -122,6 +127,37 @@ equalBaseType lhs rhs =
 
         _ ->
             lhs == rhs
+
+
+compareBaseType : Type -> Type -> Order
+compareBaseType lhs rhs =
+    compare
+        (baseTypeToComparable lhs)
+        (baseTypeToComparable rhs)
+
+
+baseTypeToComparable : Type -> String
+baseTypeToComparable t =
+    case t of
+        Int ->
+            "int"
+
+        Array _ ->
+            "array"
+
+        Generic val ->
+            "gen_" ++ val
+
+        Custom name ->
+            "custom_" ++ name
+
+        CustomGeneric name _ ->
+            "custom_" ++ name
+
+        _ ->
+            -- the remaining types cannot be used ina  union,
+            -- so the need for them to be sorted is 0
+            ""
 
 
 sameCategory : Type -> Type -> Bool

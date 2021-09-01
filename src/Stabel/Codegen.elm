@@ -434,7 +434,7 @@ memberSize def =
 
 
 unionBoxMap : List Type -> List ( Type, Int )
-unionBoxMap union =
+unionBoxMap unionMembers =
     let
         helper t ( nextId, mapping ) =
             if requiresBoxingInPatternMatch t then
@@ -445,7 +445,9 @@ unionBoxMap union =
             else
                 ( nextId, mapping )
     in
-    List.foldl helper ( -1, [] ) union
+    unionMembers
+        |> List.sortWith Type.compareBaseType
+        |> List.foldl helper ( -1, [] )
         |> Tuple.second
 
 
