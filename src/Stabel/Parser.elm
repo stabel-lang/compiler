@@ -86,6 +86,7 @@ type AstNode
     | GetMember String String
     | SetMember String String
     | ArrayLiteral SourceLocationRange (List AstNode)
+    | StringLiteral SourceLocationRange String
 
 
 run : String -> String -> Result (List (Parser.DeadEnd Context Problem)) AST
@@ -120,6 +121,8 @@ specialChars =
         , '.'
         , '#'
         , '/'
+        , '\''
+        , '"'
         ]
 
 
@@ -265,6 +268,23 @@ textParser : Parser String
 textParser =
     Parser.chompWhile (\c -> not <| Set.member c whitespaceChars)
         |> Parser.getChompedString
+
+
+stringParser : Parser String
+stringParser =
+    Parser.loop "" stringParserLoop
+
+
+stringParserLoop : String -> Parser (Parser.Step String String)
+stringParserLoop str =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done str)
+            |. Parser.symbol (Token "\"" UnknownError)
+        , Parser.succeed ()
+            |. Parser.chompIf (always True) UnknownError
+            |> Parser.getChompedString
+            |> Parser.map (\chompedStr -> Parser.Loop <| str ++ chompedStr)
+        ]
 
 
 genericParser : Parser String
@@ -1056,6 +1076,13 @@ implementationParserHelp nodes =
             |. noiseParser
             |= implementationParser
             |. Parser.symbol (Token "}" ExpectedRightCurly)
+            |= sourceLocationParser
+            |. noiseParser
+        , Parser.succeed (\startLoc strContent endLoc -> Parser.Loop (StringLiteral (SourceLocationRange startLoc endLoc) strContent :: nodes))
+            |= sourceLocationParser
+            |. Parser.symbol (Token "\"" UnknownError)
+            |= stringParser
+            -- stringParser chomps the final "
             |= sourceLocationParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))

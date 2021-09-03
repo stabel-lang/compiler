@@ -1179,4 +1179,35 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , describe "Strings"
+            [ test "Simple case" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: str
+                            : "This is a test"
+                            """
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types = Dict.empty
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "str"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.StringLiteral emptyRange "This is a test"
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    expectAst source expectedAst
+            ]
         ]
