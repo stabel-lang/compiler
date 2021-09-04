@@ -1179,15 +1179,14 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
-        , describe "Strings"
-            [ test "Simple case" <|
-                \_ ->
+        , describe "Strings" <|
+            let
+                expectParseString input output =
                     let
                         source =
                             """
                             def: str
-                            : "This is a test"
-                            """
+                            : """ ++ "\"" ++ input ++ "\""
 
                         expectedAst =
                             { sourceReference = ""
@@ -1202,12 +1201,38 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             SoloImpl
-                                                [ AST.StringLiteral emptyRange "This is a test"
+                                                [ AST.StringLiteral emptyRange output
                                                 ]
                                       }
                                     ]
                             }
                     in
                     expectAst source expectedAst
+            in
+            [ test "Simple case" <|
+                \_ ->
+                    expectParseString
+                        "This is a test"
+                        "This is a test"
+            , test "Newline escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\n a newline"
+                        "This is a test with\n a newline"
+            , test "Tab escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\t a tab"
+                        "This is a test with\t a tab"
+            , test "Backslash escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\\\ a backslash"
+                        "This is a test with\\ a backslash"
+            , test "Double-quote escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a \\\"test\\\" with a double quote"
+                        "This is a \"test\" with a double quote"
             ]
         ]

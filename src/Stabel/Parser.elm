@@ -280,6 +280,18 @@ stringParserLoop str =
     Parser.oneOf
         [ Parser.succeed (Parser.Done str)
             |. Parser.symbol (Token "\"" UnknownError)
+        , Parser.succeed (\char -> Parser.Loop <| str ++ String.fromChar char)
+            |. Parser.symbol (Token "\\" UnknownError)
+            |= Parser.oneOf
+                [ Parser.succeed '\n'
+                    |. Parser.symbol (Token "n" UnknownError)
+                , Parser.succeed '\t'
+                    |. Parser.symbol (Token "t" UnknownError)
+                , Parser.succeed '"'
+                    |. Parser.symbol (Token "\"" UnknownError)
+                , Parser.succeed '\\'
+                    |. Parser.symbol (Token "\\" UnknownError)
+                ]
         , Parser.succeed ()
             |. Parser.chompIf (always True) UnknownError
             |> Parser.getChompedString
