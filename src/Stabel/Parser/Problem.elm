@@ -52,6 +52,8 @@ type Problem
     | InvalidModulePath String
     | ModuleIsEmpty
     | BadDefinition String
+    | UnknownEscapeSequence String
+    | StringNotTerminated
 
 
 toString : String -> String -> DeadEnd Context Problem -> String
@@ -266,3 +268,11 @@ problemToString source problem =
             "'"
                 ++ name
                 ++ "' is not a valid definition. Expected either defmodule:, def:, defmulti:, defstruct: or defunion:"
+
+        UnknownEscapeSequence seq ->
+            "'"
+                ++ seq
+                ++ "' is not a valid escape sequence. Expected either \\n, \\t, \\\\ or \\\"."
+
+        StringNotTerminated ->
+            "This string never terminates. Expected to find a closing \"."

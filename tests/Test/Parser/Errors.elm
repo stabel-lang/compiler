@@ -267,6 +267,50 @@ suite =
                     in
                     checkForError (badDefinition "test") source
             ]
+        , describe "Strings" <|
+            let
+                unknownEscapeSequence expected problem =
+                    case problem of
+                        UnknownEscapeSequence actual ->
+                            actual == expected
+
+                        _ ->
+                            False
+
+                stringNotTerminated problem =
+                    problem == StringNotTerminated
+            in
+            [ test "Unknown escape sequence" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : "bad \\u"
+                            """
+                    in
+                    checkForError (unknownEscapeSequence "\\u") source
+            , test "Newline before terminating string" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : "bad 
+                              string"
+                            """
+                    in
+                    checkForError stringNotTerminated source
+            , test "String never terminates" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                           def: src
+                           : "bad string"""
+                    in
+                    checkForError stringNotTerminated source
+            ]
         ]
 
 

@@ -272,31 +272,48 @@ textParser =
 
 stringParser : Parser String
 stringParser =
-    Parser.loop "" stringParserLoop
+    Parser.loop (Just "") stringParserLoop
 
 
-stringParserLoop : String -> Parser (Parser.Step String String)
-stringParserLoop str =
-    Parser.oneOf
-        [ Parser.succeed (Parser.Done str)
-            |. Parser.symbol (Token "\"" UnknownError)
-        , Parser.succeed (\char -> Parser.Loop <| str ++ String.fromChar char)
-            |. Parser.symbol (Token "\\" UnknownError)
-            |= Parser.oneOf
-                [ Parser.succeed '\n'
-                    |. Parser.symbol (Token "n" UnknownError)
-                , Parser.succeed '\t'
-                    |. Parser.symbol (Token "t" UnknownError)
-                , Parser.succeed '"'
+stringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
+stringParserLoop maybeStr =
+    case maybeStr of
+        Nothing ->
+            -- Work around bug in elm/parser
+            Parser.problem StringNotTerminated
+
+        Just str ->
+            Parser.oneOf
+                [ Parser.succeed (Parser.Done str)
                     |. Parser.symbol (Token "\"" UnknownError)
-                , Parser.succeed '\\'
+                , Parser.succeed (\char -> Parser.Loop <| Just <| str ++ String.fromChar char)
                     |. Parser.symbol (Token "\\" UnknownError)
+                    |= Parser.oneOf
+                        [ Parser.succeed '\n'
+                            |. Parser.symbol (Token "n" UnknownError)
+                        , Parser.succeed '\t'
+                            |. Parser.symbol (Token "t" UnknownError)
+                        , Parser.succeed '"'
+                            |. Parser.symbol (Token "\"" UnknownError)
+                        , Parser.succeed '\\'
+                            |. Parser.symbol (Token "\\" UnknownError)
+                        , Parser.succeed ()
+                            |. Parser.chompIf (always True) UnknownError
+                            |> Parser.getChompedString
+                            |> Parser.andThen (\seq -> Parser.problem (UnknownEscapeSequence <| "\\" ++ seq))
+                        ]
+
+                -- Couldn't get the below to work in any other way :(
+                , Parser.succeed (Parser.Loop Nothing)
+                    |. Parser.end StringNotTerminated
+                , Parser.succeed (Parser.Done str)
+                    |. Parser.symbol (Token "\n" UnknownError)
+                    |> Parser.andThen (\_ -> Parser.problem StringNotTerminated)
+                , Parser.succeed ()
+                    |. Parser.chompWhile (\c -> c /= '\n' && c /= '"' && c /= '\\')
+                    |> Parser.getChompedString
+                    |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
                 ]
-        , Parser.succeed ()
-            |. Parser.chompIf (always True) UnknownError
-            |> Parser.getChompedString
-            |> Parser.map (\chompedStr -> Parser.Loop <| str ++ chompedStr)
-        ]
 
 
 genericParser : Parser String
