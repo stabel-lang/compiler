@@ -632,6 +632,11 @@ moduleDefinitionMetaParser def =
                 |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
                 |. noiseParser
             )
+        , Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+            |. Parser.keyword (Token "doc:" UnknownError)
+            |. noiseParser
+            |= stringParser
+            |. noiseParser
         , Parser.succeed UnknownMetadata
             |= metadataParser
             |> Parser.andThen Parser.problem
