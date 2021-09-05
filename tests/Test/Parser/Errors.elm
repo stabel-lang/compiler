@@ -310,6 +310,15 @@ suite =
                            : "bad string"""
                     in
                     checkForError stringNotTerminated source
+            , test "Multiline string never terminates" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                           def: src
+                           : \"\"\"bad string"""
+                    in
+                    checkForError stringNotTerminated source
             ]
         ]
 

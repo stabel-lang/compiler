@@ -1214,6 +1214,11 @@ suite =
                     expectParseString
                         "This is a test"
                         "This is a test"
+            , test "Empty string" <|
+                \_ ->
+                    expectParseString
+                        ""
+                        ""
             , test "Newline escape sequence" <|
                 \_ ->
                     expectParseString
@@ -1234,5 +1239,65 @@ suite =
                     expectParseString
                         "This is a \\\"test\\\" with a double quote"
                         "This is a \"test\" with a double quote"
+            ]
+        , describe "Multiline strings" <|
+            let
+                expectParseString input output =
+                    let
+                        source =
+                            """
+                            def: str
+                            : """ ++ "\"\"\"" ++ input ++ "\"\"\""
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types = Dict.empty
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "str"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.StringLiteral emptyRange output
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    expectAst source expectedAst
+            in
+            [ test "Simple case" <|
+                \_ ->
+                    expectParseString
+                        "This is a test"
+                        "This is a test"
+            , test "Empty multiline string" <|
+                \_ ->
+                    expectParseString
+                        ""
+                        ""
+            , test "There are no escape sequences" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\n a newline escape sequence"
+                        "This is a test with\\n a newline escape sequence"
+            , test "Actual multiline" <|
+                \_ ->
+                    expectParseString
+                        "\n    This is a test\n      with some indentation\n    Let's see how it turns out\n"
+                        "This is a test\n  with some indentation\nLet's see how it turns out"
+            , test "Above test using Elm's multiline" <|
+                \_ ->
+                    expectParseString
+                        """
+                        This is a test
+                          with some indentation
+                        Let's see how it turns out
+                        """
+                        "This is a test\n  with some indentation\nLet's see how it turns out"
             ]
         ]

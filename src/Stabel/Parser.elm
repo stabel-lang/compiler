@@ -272,7 +272,14 @@ textParser =
 
 stringParser : Parser String
 stringParser =
-    Parser.loop (Just "") stringParserLoop
+    Parser.oneOf
+        [ Parser.succeed identity
+            |. Parser.symbol (Token "\"\"\"" UnknownError)
+            |= Parser.loop (Just "") multilineStringParserLoop
+        , Parser.succeed identity
+            |. Parser.symbol (Token "\"" UnknownError)
+            |= Parser.loop (Just "") stringParserLoop
+        ]
 
 
 stringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
@@ -311,6 +318,28 @@ stringParserLoop maybeStr =
                     |> Parser.andThen (\_ -> Parser.problem StringNotTerminated)
                 , Parser.succeed ()
                     |. Parser.chompWhile (\c -> c /= '\n' && c /= '"' && c /= '\\')
+                    |> Parser.getChompedString
+                    |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
+                ]
+
+
+multilineStringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
+multilineStringParserLoop maybeStr =
+    case maybeStr of
+        Nothing ->
+            -- Work around bug in elm/parser
+            Parser.problem StringNotTerminated
+
+        Just str ->
+            Parser.oneOf
+                [ Parser.succeed (Parser.Done str)
+                    |. Parser.symbol (Token "\"\"\"" UnknownError)
+
+                -- Couldn't get the below to work in any other way :(
+                , Parser.succeed (Parser.Loop Nothing)
+                    |. Parser.end StringNotTerminated
+                , Parser.succeed ()
+                    |. Parser.chompWhile (\c -> c /= '"')
                     |> Parser.getChompedString
                     |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
                 ]
@@ -1109,7 +1138,6 @@ implementationParserHelp nodes =
             |. noiseParser
         , Parser.succeed (\startLoc strContent endLoc -> Parser.Loop (StringLiteral (SourceLocationRange startLoc endLoc) strContent :: nodes))
             |= sourceLocationParser
-            |. Parser.symbol (Token "\"" UnknownError)
             |= stringParser
             -- stringParser chomps the final "
             |= sourceLocationParser
