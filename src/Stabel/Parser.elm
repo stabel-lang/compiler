@@ -273,7 +273,7 @@ textParser =
 stringParser : Parser String
 stringParser =
     Parser.oneOf
-        [ Parser.succeed identity
+        [ Parser.succeed stripMultilineStringWhitespace
             |. Parser.symbol (Token "\"\"\"" UnknownError)
             |= Parser.loop (Just "") multilineStringParserLoop
         , Parser.succeed identity
@@ -343,6 +343,55 @@ multilineStringParserLoop maybeStr =
                     |> Parser.getChompedString
                     |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
                 ]
+
+
+stripMultilineStringWhitespace : String -> String
+stripMultilineStringWhitespace str =
+    let
+        noLeadingNewline =
+            if String.startsWith "\n" str then
+                String.dropLeft 1 str
+
+            else
+                str
+
+        noEndingNewline =
+            if String.endsWith "\n" noLeadingNewline then
+                String.dropRight 1 noLeadingNewline
+
+            else
+                noLeadingNewline
+
+        linesWithLeadingWhitespace =
+            String.lines noEndingNewline
+                |> List.map (\line -> ( countLeadingWhitespace line, line ))
+
+        linesWithStrippedWhitespace =
+            case linesWithLeadingWhitespace of
+                [] ->
+                    []
+
+                ( maxWhitespace, _ ) :: _ ->
+                    List.map
+                        (stripMaxWhitespace maxWhitespace)
+                        linesWithLeadingWhitespace
+    in
+    String.join "\n" linesWithStrippedWhitespace
+
+
+countLeadingWhitespace : String -> Int
+countLeadingWhitespace str =
+    case String.uncons str of
+        Just ( ' ', rest ) ->
+            1 + countLeadingWhitespace rest
+
+        _ ->
+            0
+
+
+stripMaxWhitespace : Int -> ( Int, String ) -> String
+stripMaxWhitespace max ( whitespaceCount, line ) =
+    String.dropLeft (min max whitespaceCount) line
 
 
 genericParser : Parser String
