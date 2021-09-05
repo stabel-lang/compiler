@@ -217,6 +217,7 @@ moduleDefinition config =
     { imports = Dict.union def.imports defaultImports
     , aliases = def.aliases
     , exposes = def.exposes
+    , documentation = def.documentation
     }
 
 

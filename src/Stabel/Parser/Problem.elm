@@ -23,6 +23,7 @@ type Context
     | ImportKeyword
     | ExposingKeyword
     | TypeKeyword
+    | DocKeyword
     | MemberKeyword
     | ImplementationKeyword
     | ElseKeyword
@@ -141,6 +142,9 @@ contextToString context =
 
         TypeKeyword ->
             "type keyword"
+
+        DocKeyword ->
+            "doc keyword"
 
         MemberKeyword ->
             "member"

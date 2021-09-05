@@ -57,11 +57,13 @@ suite =
                                         , ( "internal/mod", [] )
                                         ]
                                 , exposes = Set.fromList [ "inc" ]
+                                , documentation = ""
                                 }
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Pair"
                                   , sourceLocation = emptyRange
+                                  , documentation = ""
                                   , generics = [ "a", "b" ]
                                   , members =
                                         AST.StructMembers
@@ -75,6 +77,7 @@ suite =
                                 [ { name = "inc"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -111,6 +114,7 @@ suite =
                                 [ { name = "inc"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases =
                                         Dict.fromList
                                             [ ( "other", "/some/mod" )
@@ -159,6 +163,7 @@ suite =
                                 [ { name = "with-default"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases =
                                         Dict.fromList
                                             [ ( "other", "/some/mod" )
@@ -203,6 +208,7 @@ suite =
                                 [ { name = "test"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =

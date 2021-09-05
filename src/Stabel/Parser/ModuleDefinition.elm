@@ -18,6 +18,7 @@ type alias Definition =
     { aliases : Dict String String
     , imports : Dict String (List String)
     , exposes : Set String
+    , documentation : String
     }
 
 
@@ -26,6 +27,7 @@ emptyDefinition =
     { aliases = Dict.empty
     , imports = Dict.empty
     , exposes = Set.empty
+    , documentation = ""
     }
 
 

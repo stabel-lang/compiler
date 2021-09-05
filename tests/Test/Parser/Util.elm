@@ -151,6 +151,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = AST.SoloImpl [ AST.ConstructType name ]
@@ -167,6 +168,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation =
@@ -184,6 +186,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ NotStackRange type_ ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation =

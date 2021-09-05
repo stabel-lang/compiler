@@ -41,6 +41,7 @@ type alias AST =
 type alias TypeDefinition =
     { name : String
     , sourceLocation : SourceLocationRange
+    , documentation : String
     , generics : List String
     , members : TypeDefinitionMembers
     }
@@ -55,6 +56,7 @@ type alias FunctionDefinition =
     { name : String
     , typeSignature : AssociatedFunctionSignature
     , sourceLocationRange : Maybe SourceLocationRange
+    , documentation : String
     , aliases : Dict String String
     , imports : Dict String (List String)
     , implementation : FunctionImplementation
@@ -726,6 +728,7 @@ generateDefaultFunctionsForType typeDef =
                             , output = [ typeOfType ]
                             }
                     , sourceLocationRange = Nothing
+                    , documentation = ""
                     , aliases = Dict.empty
                     , imports = Dict.empty
                     , implementation =
@@ -740,6 +743,7 @@ generateDefaultFunctionsForType typeDef =
                                 , output = [ typeOfType ]
                                 }
                       , sourceLocationRange = Nothing
+                      , documentation = ""
                       , aliases = Dict.empty
                       , imports = Dict.empty
                       , implementation =
@@ -753,6 +757,7 @@ generateDefaultFunctionsForType typeDef =
                                 , output = [ NotStackRange memberType ]
                                 }
                       , sourceLocationRange = Nothing
+                      , documentation = ""
                       , aliases = Dict.empty
                       , imports = Dict.empty
                       , implementation =
@@ -782,6 +787,7 @@ functionDefinitionParser definedFunctions ( startLocation, name ) =
             { name = name
             , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = SoloImpl []
@@ -808,6 +814,12 @@ functionMetadataParser def =
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.inContext AliasKeyword <|
             Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
@@ -853,6 +865,7 @@ multiFunctionDefinitionParser definedFunctions ( startLocation, name ) =
             { name = name
             , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = SoloImpl []
@@ -904,6 +917,12 @@ multiFunctionMetadataParser def =
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.inContext ElseKeyword <|
             Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
                 |. Parser.keyword (Token "else:" UnknownError)
@@ -946,11 +965,12 @@ typeDefinitionParser :
     -> Parser TypeDefinition
 typeDefinitionParser definedTypes definedFunctions ( startLocation, typeName ) =
     let
-        ctor generics members endLocation =
+        ctor generics result endLocation =
             { name = typeName
             , sourceLocation = SourceLocationRange startLocation endLocation
+            , documentation = result.documentation
             , generics = generics
-            , members = StructMembers members
+            , members = StructMembers result.members
             }
     in
     Parser.inContext (Problem.StructDefinition startLocation typeName) <|
@@ -965,7 +985,11 @@ typeDefinitionParser definedTypes definedFunctions ( startLocation, typeName ) =
                 Parser.succeed ctor
                     |. noiseParser
                     |= Parser.loop [] typeGenericParser
-                    |= Parser.loop [] (typeMemberParser definedFunctions)
+                    |= Parser.loop
+                        { documentation = ""
+                        , members = []
+                        }
+                        (typeMemberParser definedFunctions)
                     |= sourceLocationParser
 
 
@@ -979,16 +1003,22 @@ typeGenericParser generics =
         ]
 
 
+type alias StructMembersParserResult =
+    { documentation : String
+    , members : List ( String, PossiblyQualifiedType )
+    }
+
+
 typeMemberParser :
     Dict String FunctionDefinition
-    -> List ( String, PossiblyQualifiedType )
+    -> StructMembersParserResult
     ->
         Parser
             (Parser.Step
-                (List ( String, PossiblyQualifiedType ))
-                (List ( String, PossiblyQualifiedType ))
+                StructMembersParserResult
+                StructMembersParserResult
             )
-typeMemberParser functions types =
+typeMemberParser functions result =
     let
         alreadyDefinedCheck name =
             let
@@ -1016,27 +1046,34 @@ typeMemberParser functions types =
     in
     Parser.oneOf
         [ Parser.inContext MemberKeyword <|
-            Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
+            Parser.succeed (\name type_ -> Parser.Loop { result | members = ( name, type_ ) :: result.members })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= Parser.andThen alreadyDefinedCheck symbolParser
                 |. noiseParser
                 |= typeRefParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { result | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
-        , Parser.succeed (Parser.Done (List.reverse types))
+        , Parser.succeed (Parser.Done { result | members = List.reverse result.members })
         ]
 
 
 unionTypeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) -> Parser TypeDefinition
 unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
-        ctor generics members endLocation =
+        ctor generics result endLocation =
             { name = typeName
             , sourceLocation = SourceLocationRange startLocation endLocation
+            , documentation = result.documentation
             , generics = generics
-            , members = UnionMembers members
+            , members = UnionMembers result.types
             }
     in
     Parser.inContext (Problem.UnionDefinition startLocation typeName) <|
@@ -1051,24 +1088,40 @@ unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
                 Parser.succeed ctor
                     |. noiseParser
                     |= Parser.loop [] typeGenericParser
-                    |= Parser.loop [] unionTypeMemberParser
+                    |= Parser.loop
+                        { documentation = ""
+                        , types = []
+                        }
+                        unionTypeMemberParser
                     |= sourceLocationParser
 
 
+type alias UnionMembersParserResult =
+    { documentation : String
+    , types : List PossiblyQualifiedType
+    }
+
+
 unionTypeMemberParser :
-    List PossiblyQualifiedType
-    -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
-unionTypeMemberParser types =
+    UnionMembersParserResult
+    -> Parser (Parser.Step UnionMembersParserResult UnionMembersParserResult)
+unionTypeMemberParser result =
     Parser.oneOf
         [ Parser.inContext MemberKeyword <|
-            Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
+            Parser.succeed (\type_ -> Parser.Loop { result | types = type_ :: result.types })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= typeRefParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { result | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
-        , Parser.succeed (Parser.Done (List.reverse types))
+        , Parser.succeed (Parser.Done { result | types = List.reverse result.types })
         ]
 
 
