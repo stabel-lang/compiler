@@ -1485,7 +1485,8 @@ qualifyNode config currentDefName node acc =
                         , Parser.ExternalFunction loc [ "string" ] "from-bytes"
                         ]
             in
-            qualifyNode config currentDefName stringNode acc
+            qualifyNode config currentDefName (Parser.Function loc "!") acc
+                |> qualifyNode config currentDefName stringNode
 
 
 isMultiFunction : Parser.FunctionDefinition -> Bool

@@ -191,7 +191,7 @@ compileProject opts =
         parseModuleSource mod =
             let
                 fullPath =
-                    mod.package ++ mod.modulePath
+                    "/" ++ mod.package ++ "/" ++ mod.modulePath
             in
             case Parser.run fullPath mod.source of
                 Err errs ->

@@ -790,7 +790,7 @@ nodeToInstruction context node =
             in
             Wasm.Batch
                 [ Wasm.Commented
-                    (name ++ "ref")
+                    ("ref: " ++ name)
                     (Wasm.I32_Const indexOfId)
                 , BaseModule.callStackPushFn
                 ]
