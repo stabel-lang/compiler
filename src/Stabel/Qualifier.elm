@@ -27,6 +27,7 @@ import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
 import Stabel.Parser.Type as Parser
 import Stabel.Qualifier.Problem exposing (Problem(..))
+import String.UTF8 as UTF8
 
 
 type alias AST =
@@ -1470,9 +1471,21 @@ qualifyNode config currentDefName node acc =
                 Err err ->
                     { acc | qualifiedNodes = Err err :: acc.qualifiedNodes }
 
-        Parser.StringLiteral _ _ ->
-            -- TODO
-            acc
+        Parser.StringLiteral loc value ->
+            let
+                stringBytes =
+                    UTF8.toBytes value
+
+                stringNode =
+                    -- locations are all wrong, but should always be correct
+                    -- therefore it should never be visible to the user
+                    Parser.InlineFunction loc
+                        [ Parser.ArrayLiteral loc <|
+                            List.map (Parser.Integer loc) stringBytes
+                        , Parser.ExternalFunction loc [ "string" ] "from-bytes"
+                        ]
+            in
+            qualifyNode config currentDefName stringNode acc
 
 
 isMultiFunction : Parser.FunctionDefinition -> Bool
