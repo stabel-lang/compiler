@@ -51,6 +51,7 @@ suite =
                                 [ { name = "inc"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -66,6 +67,7 @@ suite =
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -77,6 +79,7 @@ suite =
                                 , { name = "main"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -116,6 +119,46 @@ suite =
                                             , output = [ NotStackRange <| AST.LocalRef "Bool" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Function emptyRange "-"
+                                            , AST.Function emptyRange "zero?"
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst source expectedAst
+        , test "Functions can have documentation strings" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: int=
+                        type: Int Int -- Bool
+                        doc: \"\"\"
+                        A function that checks if two ints are the same
+                        \"\"\"
+                        : - zero?
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "int="
+                                  , typeSignature =
+                                        AssociatedFunctionSignature.UserProvided
+                                            { input = [ NotStackRange <| AST.LocalRef "Int" [], NotStackRange <| AST.LocalRef "Int" [] ]
+                                            , output = [ NotStackRange <| AST.LocalRef "Bool" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , documentation = "A function that checks if two ints are the same"
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -155,6 +198,7 @@ suite =
                                             , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -169,6 +213,7 @@ suite =
                                             , output = [ NotStackRange <| AST.LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -201,6 +246,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "True"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -214,6 +260,7 @@ suite =
                                                 , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -247,6 +294,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "Person"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members =
                                             AST.StructMembers
@@ -264,6 +312,7 @@ suite =
                                                 , output = [ NotStackRange <| LocalRef "Int" [] ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -292,6 +341,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "Box"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.StructMembers
@@ -308,6 +358,7 @@ suite =
                                                 , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -320,6 +371,7 @@ suite =
                                                 , output = [ NotStackRange <| LocalRef "Box" [ Generic "a" ] ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -332,6 +384,7 @@ suite =
                                                 , output = [ NotStackRange <| Generic "a" ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -339,6 +392,38 @@ suite =
                                       }
                                     ]
                             }
+                    in
+                    expectAst source expectedAst
+            , test "Documentation" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defstruct: Box a
+                            doc: \"\"\"
+                            Boxes a value
+                            \"\"\"
+                            : element a
+                            """
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types =
+                                Dict.fromListBy .name
+                                    [ { name = "Box"
+                                      , sourceLocation = emptyRange
+                                      , documentation = "Boxes a value"
+                                      , generics = [ "a" ]
+                                      , members =
+                                            AST.StructMembers
+                                                [ ( "element", Generic "a" )
+                                                ]
+                                      }
+                                    ]
+                            , functions = Dict.empty
+                            }
+                                |> addFunctionsForStructs
                     in
                     expectAst source expectedAst
             ]
@@ -365,6 +450,7 @@ suite =
                                             , output = [ NotStackRange <| Generic "a", NotStackRange <| Generic "b", NotStackRange <| Generic "a" ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -404,6 +490,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "Bool"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members =
                                             AST.UnionMembers
@@ -413,11 +500,13 @@ suite =
                                       }
                                     , { name = "True"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
                                     , { name = "False"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -427,6 +516,84 @@ suite =
                                     [ { name = "to-int"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            MultiImpl
+                                                [ ( TypeMatch emptyRange (LocalRef "True" []) []
+                                                  , [ AST.Function emptyRange "drop", AST.Integer emptyRange 1 ]
+                                                  )
+                                                , ( TypeMatch emptyRange (LocalRef "False" []) []
+                                                  , [ AST.Function emptyRange "drop", AST.Integer emptyRange 0 ]
+                                                  )
+                                                ]
+                                                []
+                                      }
+                                    ]
+                            }
+                                |> addFunctionsForStructs
+                    in
+                    expectAst source expectedAst
+            , test "Can have documentation strings" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            defunion: Bool
+                            doc: \"\"\"
+                            Short for boolean
+                            \"\"\"
+                            : True 
+                            : False 
+
+                            defstruct: True
+                            defstruct: False
+
+                            defmulti: to-int
+                            doc: \"\"\"
+                            Converts a boolean into an int
+                            \"\"\"
+                            : True
+                              drop 1
+                            : False
+                              drop 0
+                            """
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types =
+                                Dict.fromListBy .name
+                                    [ { name = "Bool"
+                                      , sourceLocation = emptyRange
+                                      , documentation = "Short for boolean"
+                                      , generics = []
+                                      , members =
+                                            AST.UnionMembers
+                                                [ LocalRef "True" []
+                                                , LocalRef "False" []
+                                                ]
+                                      }
+                                    , { name = "True"
+                                      , sourceLocation = emptyRange
+                                      , documentation = ""
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
+                                    , { name = "False"
+                                      , sourceLocation = emptyRange
+                                      , documentation = ""
+                                      , generics = []
+                                      , members = AST.StructMembers []
+                                      }
+                                    ]
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "to-int"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , documentation = "Converts a boolean into an int"
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -470,6 +637,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "Maybe"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.UnionMembers
@@ -479,6 +647,7 @@ suite =
                                       }
                                     , { name = "Nil"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -488,6 +657,7 @@ suite =
                                     [ { name = "if-present"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -534,6 +704,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "MaybeBox"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.UnionMembers
@@ -543,6 +714,7 @@ suite =
                                       }
                                     , { name = "Box"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.StructMembers
@@ -550,6 +722,7 @@ suite =
                                       }
                                     , { name = "Nil"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -559,6 +732,7 @@ suite =
                                     [ { name = "if-present"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -606,6 +780,7 @@ suite =
                                 Dict.fromListBy .name
                                     [ { name = "MaybeBox"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.UnionMembers
@@ -615,6 +790,7 @@ suite =
                                       }
                                     , { name = "Box"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = [ "a" ]
                                       , members =
                                             AST.StructMembers
@@ -622,6 +798,7 @@ suite =
                                       }
                                     , { name = "Nil"
                                       , sourceLocation = emptyRange
+                                      , documentation = ""
                                       , generics = []
                                       , members = AST.StructMembers []
                                       }
@@ -635,6 +812,7 @@ suite =
                                                 , output = [ NotStackRange <| Generic "a" ]
                                                 }
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -687,6 +865,7 @@ suite =
                                             , output = [ NotStackRange <| LocalRef "Int" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -697,6 +876,7 @@ suite =
                                 , { name = "main"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -747,6 +927,7 @@ suite =
                                             , output = [ StackRange "b" ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -757,6 +938,7 @@ suite =
                                 , { name = "main"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -794,6 +976,7 @@ suite =
                                     [ { name = "zero?"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -832,6 +1015,7 @@ suite =
                                     [ { name = "pair?"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -876,6 +1060,7 @@ suite =
                                     [ { name = "origo?"
                                       , typeSignature = AssociatedFunctionSignature.NotProvided
                                       , sourceLocationRange = Nothing
+                                      , documentation = ""
                                       , aliases = Dict.empty
                                       , imports = Dict.empty
                                       , implementation =
@@ -913,6 +1098,7 @@ suite =
                                 [ { name = "some-array"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -1005,6 +1191,7 @@ suite =
                                         SourceLocationRange
                                             (SourceLocation 2 1)
                                             (SourceLocation 6 1)
+                                  , documentation = ""
                                   , generics = []
                                   , members =
                                         AST.UnionMembers
@@ -1017,6 +1204,7 @@ suite =
                                         SourceLocationRange
                                             (SourceLocation 6 1)
                                             (SourceLocation 7 1)
+                                  , documentation = ""
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
@@ -1025,6 +1213,7 @@ suite =
                                         SourceLocationRange
                                             (SourceLocation 7 1)
                                             (SourceLocation 9 1)
+                                  , documentation = ""
                                   , generics = []
                                   , members = AST.StructMembers []
                                   }
@@ -1038,6 +1227,7 @@ suite =
                                             , output = [ NotStackRange <| LocalRef "True" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation = SoloImpl [ ConstructType "True" ]
@@ -1049,6 +1239,7 @@ suite =
                                             , output = [ NotStackRange <| LocalRef "False" [] ]
                                             }
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation = SoloImpl [ ConstructType "False" ]
@@ -1065,6 +1256,7 @@ suite =
                                                 (SourceLocation 9 1)
                                                 (SourceLocation 16 1)
                                             )
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -1110,6 +1302,7 @@ suite =
                                                 (SourceLocation 16 1)
                                                 (SourceLocation 19 1)
                                             )
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -1142,6 +1335,7 @@ suite =
                                                 (SourceLocation 19 1)
                                                 (SourceLocation 23 1)
                                             )
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -1179,4 +1373,127 @@ suite =
 
                     Ok ast ->
                         Expect.equal expectedAst ast
+        , describe "Strings" <|
+            let
+                expectParseString input output =
+                    let
+                        source =
+                            """
+                            def: str
+                            : """ ++ "\"" ++ input ++ "\""
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types = Dict.empty
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "str"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , documentation = ""
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.StringLiteral emptyRange output
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    expectAst source expectedAst
+            in
+            [ test "Simple case" <|
+                \_ ->
+                    expectParseString
+                        "This is a test"
+                        "This is a test"
+            , test "Empty string" <|
+                \_ ->
+                    expectParseString
+                        ""
+                        ""
+            , test "Newline escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\n a newline"
+                        "This is a test with\n a newline"
+            , test "Tab escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\t a tab"
+                        "This is a test with\t a tab"
+            , test "Backslash escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\\\ a backslash"
+                        "This is a test with\\ a backslash"
+            , test "Double-quote escape sequence" <|
+                \_ ->
+                    expectParseString
+                        "This is a \\\"test\\\" with a double quote"
+                        "This is a \"test\" with a double quote"
+            ]
+        , describe "Multiline strings" <|
+            let
+                expectParseString input output =
+                    let
+                        source =
+                            """
+                            def: str
+                            : """ ++ "\"\"\"" ++ input ++ "\"\"\""
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types = Dict.empty
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "str"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , documentation = ""
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.StringLiteral emptyRange output
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    expectAst source expectedAst
+            in
+            [ test "Simple case" <|
+                \_ ->
+                    expectParseString
+                        "This is a test"
+                        "This is a test"
+            , test "Empty multiline string" <|
+                \_ ->
+                    expectParseString
+                        ""
+                        ""
+            , test "There are no escape sequences" <|
+                \_ ->
+                    expectParseString
+                        "This is a test with\\n a newline escape sequence"
+                        "This is a test with\\n a newline escape sequence"
+            , test "Actual multiline" <|
+                \_ ->
+                    expectParseString
+                        "\n    This is a test\n      with some indentation\n    Let's see how it turns out\n"
+                        "This is a test\n  with some indentation\nLet's see how it turns out"
+            , test "Above test using Elm's multiline" <|
+                \_ ->
+                    expectParseString
+                        """
+                        This is a test
+                          with some indentation
+                        Let's see how it turns out
+                        """
+                        "This is a test\n  with some indentation\nLet's see how it turns out"
+            ]
         ]

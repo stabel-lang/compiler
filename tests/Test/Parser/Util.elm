@@ -85,6 +85,9 @@ stripNodeLocation node =
         AST.ArrayLiteral _ val ->
             AST.ArrayLiteral emptyRange (List.map stripNodeLocation val)
 
+        AST.StringLiteral _ val ->
+            AST.StringLiteral emptyRange val
+
         _ ->
             node
 
@@ -148,6 +151,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = AST.SoloImpl [ AST.ConstructType name ]
@@ -164,6 +168,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ selfType ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation =
@@ -181,6 +186,7 @@ addFunctionsForStructsHelper name generics members ast =
                     , output = [ NotStackRange type_ ]
                     }
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation =

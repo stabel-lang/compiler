@@ -26,7 +26,7 @@ exports.toWat = function toWat(entry, sourceCode) {
     });
 }
 
-exports.toProjectWat = function toWat(payload) {
+function toProjectWat(payload) {
     return new Promise((resolve, reject) => {
         const compiler = Compiler.Elm.TestCompiler.init({
             flags: {
@@ -50,6 +50,37 @@ exports.toProjectWat = function toWat(payload) {
                 reject(output);
             }
         });
+    });
+}
+
+exports.toProjectWat = toProjectWat;
+
+exports.toStringWat = function toStringWat(entry, sourceCode) {
+    return toProjectWat({
+        entryPoint: `/author/sample/core/${entry}`,
+        modules: [
+            {
+                package: 'stabel/standard_library',
+                module: 'string',
+                source: `
+                    defmodule:
+                    exposing: String from-bytes
+                    :
+
+                    defstruct: String
+                    : content Array Int
+
+                    def: from-bytes
+                    type: (Array Int) -- String
+                    : >String
+                `
+            },
+            {
+                package: 'author/sample',
+                module: 'core',
+                source: stripIndent(sourceCode)
+            }
+        ]
     });
 }
 
@@ -84,6 +115,27 @@ class ExecutionResult {
         // The first three I32 positions are used for stack and heap information
         // The fourth position is the first element of the stack
         return this.memoryView[3 + (index || 0)];
+    }
+
+    stringElement(index) {
+        // String structure => typeId | array 
+        const strPointer = this.stackElement(index || 0);
+        const strOffset = strPointer / 4;
+
+        const arrayPointer = this.memoryView[strOffset + 1];
+        const arrayOffset = arrayPointer / 4;
+
+        const strLen = this.memoryView[arrayOffset];
+
+        const content = [];
+        const strValueOffset = arrayOffset + 1;
+        for (let i = 0; i < strLen; i++) {
+            content.push(this.memoryView[strValueOffset + i]);
+        }
+
+        const decoder = new TextDecoder();
+        const strAsUtf8 = new Uint8Array(content);
+        return decoder.decode(strAsUtf8);
     }
 
     typeIdForPointer(index) {

@@ -41,6 +41,7 @@ type alias AST =
 type alias TypeDefinition =
     { name : String
     , sourceLocation : SourceLocationRange
+    , documentation : String
     , generics : List String
     , members : TypeDefinitionMembers
     }
@@ -55,6 +56,7 @@ type alias FunctionDefinition =
     { name : String
     , typeSignature : AssociatedFunctionSignature
     , sourceLocationRange : Maybe SourceLocationRange
+    , documentation : String
     , aliases : Dict String String
     , imports : Dict String (List String)
     , implementation : FunctionImplementation
@@ -86,6 +88,7 @@ type AstNode
     | GetMember String String
     | SetMember String String
     | ArrayLiteral SourceLocationRange (List AstNode)
+    | StringLiteral SourceLocationRange String
 
 
 run : String -> String -> Result (List (Parser.DeadEnd Context Problem)) AST
@@ -120,6 +123,8 @@ specialChars =
         , '.'
         , '#'
         , '/'
+        , '\''
+        , '"'
         ]
 
 
@@ -265,6 +270,130 @@ textParser : Parser String
 textParser =
     Parser.chompWhile (\c -> not <| Set.member c whitespaceChars)
         |> Parser.getChompedString
+
+
+stringParser : Parser String
+stringParser =
+    Parser.oneOf
+        [ Parser.succeed stripMultilineStringWhitespace
+            |. Parser.symbol (Token "\"\"\"" UnknownError)
+            |= Parser.loop (Just "") multilineStringParserLoop
+        , Parser.succeed identity
+            |. Parser.symbol (Token "\"" UnknownError)
+            |= Parser.loop (Just "") stringParserLoop
+        ]
+
+
+stringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
+stringParserLoop maybeStr =
+    case maybeStr of
+        Nothing ->
+            -- Work around bug in elm/parser
+            Parser.problem StringNotTerminated
+
+        Just str ->
+            Parser.oneOf
+                [ Parser.succeed (Parser.Done str)
+                    |. Parser.symbol (Token "\"" UnknownError)
+                , Parser.succeed (\char -> Parser.Loop <| Just <| str ++ String.fromChar char)
+                    |. Parser.symbol (Token "\\" UnknownError)
+                    |= Parser.oneOf
+                        [ Parser.succeed '\n'
+                            |. Parser.symbol (Token "n" UnknownError)
+                        , Parser.succeed '\t'
+                            |. Parser.symbol (Token "t" UnknownError)
+                        , Parser.succeed '"'
+                            |. Parser.symbol (Token "\"" UnknownError)
+                        , Parser.succeed '\\'
+                            |. Parser.symbol (Token "\\" UnknownError)
+                        , Parser.succeed ()
+                            |. Parser.chompIf (always True) UnknownError
+                            |> Parser.getChompedString
+                            |> Parser.andThen (\seq -> Parser.problem (UnknownEscapeSequence <| "\\" ++ seq))
+                        ]
+
+                -- Couldn't get the below to work in any other way :(
+                , Parser.succeed (Parser.Loop Nothing)
+                    |. Parser.end StringNotTerminated
+                , Parser.succeed (Parser.Done str)
+                    |. Parser.symbol (Token "\n" UnknownError)
+                    |> Parser.andThen (\_ -> Parser.problem StringNotTerminated)
+                , Parser.succeed ()
+                    |. Parser.chompWhile (\c -> c /= '\n' && c /= '"' && c /= '\\')
+                    |> Parser.getChompedString
+                    |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
+                ]
+
+
+multilineStringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
+multilineStringParserLoop maybeStr =
+    case maybeStr of
+        Nothing ->
+            -- Work around bug in elm/parser
+            Parser.problem StringNotTerminated
+
+        Just str ->
+            Parser.oneOf
+                [ Parser.succeed (Parser.Done str)
+                    |. Parser.symbol (Token "\"\"\"" UnknownError)
+
+                -- Couldn't get the below to work in any other way :(
+                , Parser.succeed (Parser.Loop Nothing)
+                    |. Parser.end StringNotTerminated
+                , Parser.succeed ()
+                    |. Parser.chompWhile (\c -> c /= '"')
+                    |> Parser.getChompedString
+                    |> Parser.map (\chompedStr -> Parser.Loop <| Just <| str ++ chompedStr)
+                ]
+
+
+stripMultilineStringWhitespace : String -> String
+stripMultilineStringWhitespace str =
+    let
+        noLeadingNewline =
+            if String.startsWith "\n" str then
+                String.dropLeft 1 str
+
+            else
+                str
+
+        noEndingNewline =
+            if String.endsWith "\n" noLeadingNewline then
+                String.dropRight 1 noLeadingNewline
+
+            else
+                noLeadingNewline
+
+        linesWithLeadingWhitespace =
+            String.lines noEndingNewline
+                |> List.map (\line -> ( countLeadingWhitespace line, line ))
+
+        linesWithStrippedWhitespace =
+            case linesWithLeadingWhitespace of
+                [] ->
+                    []
+
+                ( maxWhitespace, _ ) :: _ ->
+                    List.map
+                        (stripMaxWhitespace maxWhitespace)
+                        linesWithLeadingWhitespace
+    in
+    String.join "\n" linesWithStrippedWhitespace
+
+
+countLeadingWhitespace : String -> Int
+countLeadingWhitespace str =
+    case String.uncons str of
+        Just ( ' ', rest ) ->
+            1 + countLeadingWhitespace rest
+
+        _ ->
+            0
+
+
+stripMaxWhitespace : Int -> ( Int, String ) -> String
+stripMaxWhitespace max ( whitespaceCount, line ) =
+    String.dropLeft (min max whitespaceCount) line
 
 
 genericParser : Parser String
@@ -503,6 +632,11 @@ moduleDefinitionMetaParser def =
                 |= (Parser.loop [] symbolImplListParser |> Parser.map Set.fromList)
                 |. noiseParser
             )
+        , Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+            |. Parser.keyword (Token "doc:" UnknownError)
+            |. noiseParser
+            |= stringParser
+            |. noiseParser
         , Parser.succeed UnknownMetadata
             |= metadataParser
             |> Parser.andThen Parser.problem
@@ -599,6 +733,7 @@ generateDefaultFunctionsForType typeDef =
                             , output = [ typeOfType ]
                             }
                     , sourceLocationRange = Nothing
+                    , documentation = ""
                     , aliases = Dict.empty
                     , imports = Dict.empty
                     , implementation =
@@ -613,6 +748,7 @@ generateDefaultFunctionsForType typeDef =
                                 , output = [ typeOfType ]
                                 }
                       , sourceLocationRange = Nothing
+                      , documentation = ""
                       , aliases = Dict.empty
                       , imports = Dict.empty
                       , implementation =
@@ -626,6 +762,7 @@ generateDefaultFunctionsForType typeDef =
                                 , output = [ NotStackRange memberType ]
                                 }
                       , sourceLocationRange = Nothing
+                      , documentation = ""
                       , aliases = Dict.empty
                       , imports = Dict.empty
                       , implementation =
@@ -655,6 +792,7 @@ functionDefinitionParser definedFunctions ( startLocation, name ) =
             { name = name
             , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = SoloImpl []
@@ -681,6 +819,12 @@ functionMetadataParser def =
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.inContext AliasKeyword <|
             Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
@@ -726,6 +870,7 @@ multiFunctionDefinitionParser definedFunctions ( startLocation, name ) =
             { name = name
             , typeSignature = AssociatedFunctionSignature.NotProvided
             , sourceLocationRange = Nothing
+            , documentation = ""
             , aliases = Dict.empty
             , imports = Dict.empty
             , implementation = SoloImpl []
@@ -777,6 +922,12 @@ multiFunctionMetadataParser def =
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { def | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.inContext ElseKeyword <|
             Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
                 |. Parser.keyword (Token "else:" UnknownError)
@@ -819,11 +970,12 @@ typeDefinitionParser :
     -> Parser TypeDefinition
 typeDefinitionParser definedTypes definedFunctions ( startLocation, typeName ) =
     let
-        ctor generics members endLocation =
+        ctor generics result endLocation =
             { name = typeName
             , sourceLocation = SourceLocationRange startLocation endLocation
+            , documentation = result.documentation
             , generics = generics
-            , members = StructMembers members
+            , members = StructMembers result.members
             }
     in
     Parser.inContext (Problem.StructDefinition startLocation typeName) <|
@@ -838,7 +990,11 @@ typeDefinitionParser definedTypes definedFunctions ( startLocation, typeName ) =
                 Parser.succeed ctor
                     |. noiseParser
                     |= Parser.loop [] typeGenericParser
-                    |= Parser.loop [] (typeMemberParser definedFunctions)
+                    |= Parser.loop
+                        { documentation = ""
+                        , members = []
+                        }
+                        (typeMemberParser definedFunctions)
                     |= sourceLocationParser
 
 
@@ -852,16 +1008,22 @@ typeGenericParser generics =
         ]
 
 
+type alias StructMembersParserResult =
+    { documentation : String
+    , members : List ( String, PossiblyQualifiedType )
+    }
+
+
 typeMemberParser :
     Dict String FunctionDefinition
-    -> List ( String, PossiblyQualifiedType )
+    -> StructMembersParserResult
     ->
         Parser
             (Parser.Step
-                (List ( String, PossiblyQualifiedType ))
-                (List ( String, PossiblyQualifiedType ))
+                StructMembersParserResult
+                StructMembersParserResult
             )
-typeMemberParser functions types =
+typeMemberParser functions result =
     let
         alreadyDefinedCheck name =
             let
@@ -889,27 +1051,34 @@ typeMemberParser functions types =
     in
     Parser.oneOf
         [ Parser.inContext MemberKeyword <|
-            Parser.succeed (\name type_ -> Parser.Loop (( name, type_ ) :: types))
+            Parser.succeed (\name type_ -> Parser.Loop { result | members = ( name, type_ ) :: result.members })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= Parser.andThen alreadyDefinedCheck symbolParser
                 |. noiseParser
                 |= typeRefParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { result | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
-        , Parser.succeed (Parser.Done (List.reverse types))
+        , Parser.succeed (Parser.Done { result | members = List.reverse result.members })
         ]
 
 
 unionTypeDefinitionParser : Dict String TypeDefinition -> ( SourceLocation, String ) -> Parser TypeDefinition
 unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
     let
-        ctor generics members endLocation =
+        ctor generics result endLocation =
             { name = typeName
             , sourceLocation = SourceLocationRange startLocation endLocation
+            , documentation = result.documentation
             , generics = generics
-            , members = UnionMembers members
+            , members = UnionMembers result.types
             }
     in
     Parser.inContext (Problem.UnionDefinition startLocation typeName) <|
@@ -924,24 +1093,40 @@ unionTypeDefinitionParser definedTypes ( startLocation, typeName ) =
                 Parser.succeed ctor
                     |. noiseParser
                     |= Parser.loop [] typeGenericParser
-                    |= Parser.loop [] unionTypeMemberParser
+                    |= Parser.loop
+                        { documentation = ""
+                        , types = []
+                        }
+                        unionTypeMemberParser
                     |= sourceLocationParser
 
 
+type alias UnionMembersParserResult =
+    { documentation : String
+    , types : List PossiblyQualifiedType
+    }
+
+
 unionTypeMemberParser :
-    List PossiblyQualifiedType
-    -> Parser (Parser.Step (List PossiblyQualifiedType) (List PossiblyQualifiedType))
-unionTypeMemberParser types =
+    UnionMembersParserResult
+    -> Parser (Parser.Step UnionMembersParserResult UnionMembersParserResult)
+unionTypeMemberParser result =
     Parser.oneOf
         [ Parser.inContext MemberKeyword <|
-            Parser.succeed (\type_ -> Parser.Loop (type_ :: types))
+            Parser.succeed (\type_ -> Parser.Loop { result | types = type_ :: result.types })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= typeRefParser
+        , Parser.inContext DocKeyword <|
+            Parser.succeed (\str -> Parser.Loop { result | documentation = str })
+                |. Parser.keyword (Token "doc:" UnknownError)
+                |. noiseParser
+                |= stringParser
+                |. noiseParser
         , Parser.succeed UnknownMetadata
             |= definitionMetadataParser
             |> Parser.andThen Parser.problem
-        , Parser.succeed (Parser.Done (List.reverse types))
+        , Parser.succeed (Parser.Done { result | types = List.reverse result.types })
         ]
 
 
@@ -1056,6 +1241,12 @@ implementationParserHelp nodes =
             |. noiseParser
             |= implementationParser
             |. Parser.symbol (Token "}" ExpectedRightCurly)
+            |= sourceLocationParser
+            |. noiseParser
+        , Parser.succeed (\startLoc strContent endLoc -> Parser.Loop (StringLiteral (SourceLocationRange startLoc endLoc) strContent :: nodes))
+            |= sourceLocationParser
+            |= stringParser
+            -- stringParser chomps the final "
             |= sourceLocationParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))

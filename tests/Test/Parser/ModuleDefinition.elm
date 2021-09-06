@@ -1,4 +1,4 @@
-module Test.Parser.ModuleDefinition exposing (..)
+module Test.Parser.ModuleDefinition exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
@@ -57,11 +57,13 @@ suite =
                                         , ( "internal/mod", [] )
                                         ]
                                 , exposes = Set.fromList [ "inc" ]
+                                , documentation = ""
                                 }
                         , types =
                             Dict.fromListBy .name
                                 [ { name = "Pair"
                                   , sourceLocation = emptyRange
+                                  , documentation = ""
                                   , generics = [ "a", "b" ]
                                   , members =
                                         AST.StructMembers
@@ -75,6 +77,7 @@ suite =
                                 [ { name = "inc"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =
@@ -86,6 +89,53 @@ suite =
                                 ]
                         }
                             |> addFunctionsForStructs
+                in
+                expectAst source expectedAst
+        , test "Documentation string" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmodule:
+                        doc: \"\"\"
+                        A module for dealing with numbers
+                        \"\"\"
+                        exposing: inc
+                        :
+
+                        def: inc
+                        : 1 +
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition =
+                            ModuleDefinition.Defined
+                                { aliases =
+                                    Dict.fromList []
+                                , imports =
+                                    Dict.fromList
+                                        []
+                                , exposes = Set.fromList [ "inc" ]
+                                , documentation = "A module for dealing with numbers"
+                                }
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , documentation = ""
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Function emptyRange "+"
+                                            ]
+                                  }
+                                ]
+                        }
                 in
                 expectAst source expectedAst
         , test "Functions can have its own aliases and imports" <|
@@ -111,6 +161,7 @@ suite =
                                 [ { name = "inc"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases =
                                         Dict.fromList
                                             [ ( "other", "/some/mod" )
@@ -159,6 +210,7 @@ suite =
                                 [ { name = "with-default"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases =
                                         Dict.fromList
                                             [ ( "other", "/some/mod" )
@@ -203,6 +255,7 @@ suite =
                                 [ { name = "test"
                                   , typeSignature = AssociatedFunctionSignature.NotProvided
                                   , sourceLocationRange = Nothing
+                                  , documentation = ""
                                   , aliases = Dict.empty
                                   , imports = Dict.empty
                                   , implementation =

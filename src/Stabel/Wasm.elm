@@ -420,7 +420,7 @@ formatInstruction ins =
         Commented comment inst ->
             case formatInstruction inst of
                 Str val ->
-                    Str <| val ++ ";; " ++ comment
+                    Str <| val ++ " ;; " ++ comment
 
                 BatchFormat batch ->
                     BatchFormat <| (Str <| ";; " ++ comment) :: batch
