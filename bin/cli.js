@@ -29,6 +29,7 @@ function initProject() {
         name: subCmdFlags[0],
         version: "0.1.0",
         "language-version": "0.2.0",
+        "execute": `/${subCmdFlags[0]}/main/execute`,
         "exposed-modules": [
             "main"
         ],
@@ -42,17 +43,29 @@ function initProject() {
 
     fs.writeFileSync(path.join(cwd, "src", "main.stbl"), `
 def: execute
-: 0
+: "hello, world!"
 `.trim());
 }
 
 function runProject() {
-    if (subCmdFlags.length !== 1) {
+    let entryPoint = null;
+
+    if (subCmdFlags.length > 1) {
         console.error("'run' requires exactly one argument: the function to run.");
         return;
+    } else if (subCmdFlags.length !== 1) {
+        const stabelConfig = JSON.parse(fs.readFileSync(path.join(cwd, "stabel.json")));
+        if (typeof stabelConfig.execute === "undefined") {
+            console.error("what function should be run? Nothing found in 'execute' property in stabel.json, nor was any function provided on the command line.");
+            return;
+        }
+
+        entryPoint = stabelConfig.execute;
+    } else {
+        entryPoint = subCmdFlags[0];
     }
 
-    compileProject(subCmdFlags[0]);
+    compileProject(entryPoint);
 }
 
 function compileProject(entryPoint) {
@@ -159,6 +172,7 @@ Stabel v0.2.1-alpha
 Possible options are:
 * init <package_name>: initialize a new project in the current directory.
 * compile: compile the project.
+* run: compile the project and execute the default function.
 * run <function_name>: compile the project and execute the given function.
 * help: print this help message.
     `);
