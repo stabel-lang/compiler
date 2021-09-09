@@ -1801,5 +1801,8 @@ extractModuleReferenceFromNode topLevelAliases meta node =
         Parser.ExternalFunction _ path _ ->
             Just ("/" ++ String.join "/" path)
 
+        Parser.StringLiteral _ _ ->
+            Just "/string"
+
         _ ->
             Nothing

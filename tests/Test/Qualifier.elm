@@ -450,6 +450,9 @@ suite =
                           call-external
                           /some/ext/word
                           ali/word1
+
+                        def: string-hello
+                        : "hello"
                         """
 
                     expectedRequiredModules =
@@ -465,6 +468,7 @@ suite =
                             , "/package/test/internal/match"
                             , "/package/test/package/module"
                             , "/stabel/standard_library/core"
+                            , "/stabel/standard_library/string"
                             ]
                 in
                 case Parser.run "test" source of
@@ -486,6 +490,7 @@ suite =
                                             , ( "/external/types", "robheghan/html" )
                                             , ( "/external/double", "robheghan/html" )
                                             , ( "/core", "stabel/standard_library" )
+                                            , ( "/string", "stabel/standard_library" )
                                             ]
                                     }
                         in

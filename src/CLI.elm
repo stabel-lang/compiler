@@ -146,11 +146,17 @@ legalIntEntryPointType =
     }
 
 
-legalStringEntryPointType : Type.FunctionType
-legalStringEntryPointType =
-    { input = []
-    , output = [ Type.Custom "/stabel/standard_library/string/String" ]
-    }
+legalStringEntryPointType : Type.FunctionType -> Bool
+legalStringEntryPointType fnType =
+    case ( fnType.input, fnType.output ) of
+        ( [ Type.StackRange _ ], [ Type.Custom "/stabel/standard_library/string/String" ] ) ->
+            True
+
+        ( [], [ Type.Custom "/stabel/standard_library/string/String" ] ) ->
+            True
+
+        _ ->
+            False
 
 
 typeCheckAndRun :
@@ -188,7 +194,7 @@ typeCheckAndRun entryPoint qualifiedAst =
                             |> Wasm.toString
                             |> (\wat -> Ok ( wat, False ))
 
-                    else if fn.type_ == legalStringEntryPointType then
+                    else if legalStringEntryPointType fn.type_ then
                         typedAst
                             |> Codegen.run exportedFunctions
                             |> Wasm.toString
