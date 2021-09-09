@@ -119,7 +119,7 @@ class ExecutionResult {
 
     stringElement(index) {
         // String structure => typeId | array 
-        const strPointer = this.stackElement(index || 0);
+        const strPointer = this.stackElement(index);
         const strOffset = strPointer / 4;
 
         const arrayPointer = this.memoryView[strOffset + 1];

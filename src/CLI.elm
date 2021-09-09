@@ -98,9 +98,9 @@ cliUpdate msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
             case updatedModel of
                 PackageLoader.Done qualifiedAst ->
                     case typeCheckAndRun entryPoint qualifiedAst of
-                        Ok wast ->
+                        Ok ( wast, isStringReturn ) ->
                             ( ( entryPoint, updatedModel, typeErrors_ )
-                            , outgoingPort <| encodeCompilationDone wast
+                            , outgoingPort <| encodeCompilationDone wast isStringReturn
                             )
 
                         Err ( sourceFilesRequired, errors ) ->
@@ -139,17 +139,24 @@ cliUpdate msg (( entryPoint, packageLoaderModel, typeErrors_ ) as model) =
             )
 
 
-legalEntryPointType : Type.FunctionType
-legalEntryPointType =
+legalIntEntryPointType : Type.FunctionType
+legalIntEntryPointType =
     { input = []
     , output = [ Type.Int ]
+    }
+
+
+legalStringEntryPointType : Type.FunctionType
+legalStringEntryPointType =
+    { input = []
+    , output = [ Type.Custom "/stabel/standard_library/string/String" ]
     }
 
 
 typeCheckAndRun :
     Maybe String
     -> Qualifier.AST
-    -> Result ( List String, List TypeCheckerProblem.Problem ) String
+    -> Result ( List String, List TypeCheckerProblem.Problem ) ( String, Bool )
 typeCheckAndRun entryPoint qualifiedAst =
     case TypeChecker.run qualifiedAst of
         Err typeErrors ->
@@ -175,11 +182,17 @@ typeCheckAndRun entryPoint qualifiedAst =
             in
             case entryPointFunction of
                 Just fn ->
-                    if fn.type_ == legalEntryPointType then
+                    if fn.type_ == legalIntEntryPointType then
                         typedAst
                             |> Codegen.run exportedFunctions
                             |> Wasm.toString
-                            |> Ok
+                            |> (\wat -> Ok ( wat, False ))
+
+                    else if fn.type_ == legalStringEntryPointType then
+                        typedAst
+                            |> Codegen.run exportedFunctions
+                            |> Wasm.toString
+                            |> (\wat -> Ok ( wat, True ))
 
                     else
                         let
@@ -192,7 +205,7 @@ typeCheckAndRun entryPoint qualifiedAst =
                             , [ TypeCheckerProblem.BadEntryPoint
                                     sourceLoc
                                     fn.name
-                                    legalEntryPointType
+                                    legalIntEntryPointType
                                     fn.type_
                               ]
                             )
@@ -201,7 +214,7 @@ typeCheckAndRun entryPoint qualifiedAst =
                     typedAst
                         |> Codegen.run exportedFunctions
                         |> Wasm.toString
-                        |> Ok
+                        |> (\wat -> Ok ( wat, False ))
 
 
 
@@ -232,11 +245,12 @@ encodeSideEffectAsJson sf =
                 ]
 
 
-encodeCompilationDone : String -> Json.Value
-encodeCompilationDone wast =
+encodeCompilationDone : String -> Bool -> Json.Value
+encodeCompilationDone wast isStringReturn =
     Encode.object
         [ ( "type", Encode.string "compilationDone" )
         , ( "wast", Encode.string wast )
+        , ( "isStringReturned", Encode.bool isStringReturn )
         ]
 
 

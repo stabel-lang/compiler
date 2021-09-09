@@ -1,0 +1,12 @@
+defmodule:
+exposing: 
+  String
+  from-bytes
+:
+
+defstruct: String
+: content (Array Int)
+
+def: from-bytes
+type: (Array Int) -- String
+: >String

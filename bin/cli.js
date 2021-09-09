@@ -119,7 +119,7 @@ function compileProject(entryPoint) {
                 if (typeof entryPoint === "undefined") {
                     console.log("Compiled successfully");
                 } else {
-                    executeWat(msg.wast, entryPoint);
+                    executeWat(msg.wast, entryPoint, msg.isStringReturned);
                 }
                 break;
             case "compilationFailure":
@@ -164,9 +164,11 @@ Possible options are:
     `);
 }
 
-async function executeWat(wat, entryPointName) {
+async function executeWat(wat, entryPointName, isStringReturned) {
     const wabt = await wabtInit();
-    const wasmModule = wabt.parseWat('tmp', wat).toBinary({}).buffer;
+    const wasmModule = wabt.parseWat('tmp', wat, {
+        bulk_memory: true
+    }).toBinary({}).buffer;
 
     const memory = new WebAssembly.Memory({
         initial: 10
@@ -189,6 +191,32 @@ async function executeWat(wat, entryPointName) {
 
     const memView = new Int32Array(memory.buffer);
     // First three i32 elements are stack and heap information
-    const returnValue = memView[3].toString(); 
-    console.log(returnValue);
+    const returnValue = memView[3]; 
+
+    if (isStringReturned) {
+        const returnStr = fetchStringValue(memView, returnValue);
+        console.log(returnStr);
+    } else {
+        console.log(returnValue);
+    }
+}
+
+function fetchStringValue(memView, strPointer) {
+    // String structure => typeId | array 
+    const strOffset = strPointer / 4;
+
+    const arrayPointer = memView[strOffset + 1];
+    const arrayOffset = arrayPointer / 4;
+
+    const strLen = memView[arrayOffset];
+
+    const content = [];
+    const strValueOffset = arrayOffset + 1;
+    for (let i = 0; i < strLen; i++) {
+        content.push(memView[strValueOffset + i]);
+    }
+
+    const decoder = new TextDecoder();
+    const strAsUtf8 = new Uint8Array(content);
+    return decoder.decode(strAsUtf8);
 }

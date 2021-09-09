@@ -6,7 +6,8 @@
         "core",
         "maybe",
         "pair",
-        "list"
+        "list",
+        "string"
     ],
     "dependencies": {},
     "package-paths": []
