@@ -112,10 +112,9 @@ suite =
                         , moduleDefinition =
                             ModuleDefinition.Defined
                                 { aliases =
-                                    Dict.fromList []
+                                    Dict.empty
                                 , imports =
-                                    Dict.fromList
-                                        []
+                                    Dict.empty
                                 , exposes = Set.fromList [ "inc" ]
                                 , documentation = "A module for dealing with numbers"
                                 }
