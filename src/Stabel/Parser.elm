@@ -143,20 +143,31 @@ whitespaceChars =
 intParser : Parser Int
 intParser =
     let
-        helper text =
+        helper ( text, isNegative ) =
             case String.toInt text of
                 Just num ->
-                    Parser.succeed num
+                    Parser.succeed <|
+                        if isNegative then
+                            num * -1
+
+                        else
+                            num
 
                 Nothing ->
                     Parser.problem ExpectedInt
     in
-    Parser.variable
-        { start = Char.isDigit
-        , inner = Char.isDigit
-        , reserved = Set.empty
-        , expecting = ExpectedInt
-        }
+    Parser.succeed Tuple.pair
+        |= Parser.variable
+            { start = Char.isDigit
+            , inner = Char.isDigit
+            , reserved = Set.empty
+            , expecting = ExpectedInt
+            }
+        |= Parser.oneOf
+            [ Parser.succeed True
+                |. Parser.symbol (Token "-" UnknownError)
+            , Parser.succeed False
+            ]
         |> Parser.andThen helper
 
 
