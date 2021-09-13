@@ -27,6 +27,9 @@ type Context
     | MemberKeyword
     | ImplementationKeyword
     | ElseKeyword
+    | IntegerLiteral
+    | ArrayLiteral
+    | StringLiteral
 
 
 type Problem
@@ -61,7 +64,7 @@ toString : String -> String -> DeadEnd Context Problem -> String
 toString sourceRef source deadEnd =
     let
         contextExplination =
-            contextStackExplination deadEnd
+            contextStackExplination deadEnd.contextStack
 
         lineOfProblem =
             deadEnd.row
@@ -96,21 +99,25 @@ toString sourceRef source deadEnd =
         |> String.join "\n\n"
 
 
-contextStackExplination : DeadEnd Context Problem -> String
-contextStackExplination deadEnd =
-    case deadEnd.contextStack of
+contextStackExplination : List { row : Int, col : Int, context : Context } -> String
+contextStackExplination contextStack =
+    case contextStack of
+        [] ->
+            "I came across a problem"
+
         contextFrame :: [] ->
             "I came across a problem while parsing the "
                 ++ contextToString contextFrame.context
 
-        contextFrame1 :: contextFrame2 :: _ ->
-            "I came across a problem while parsing the "
-                ++ contextToString contextFrame1.context
-                ++ " of the "
-                ++ contextToString contextFrame2.context
-
         _ ->
-            "I came across a problem"
+            let
+                contextStrings =
+                    contextStack
+                        |> List.map (.context >> contextToString)
+                        |> String.join " of the "
+            in
+            "I came across a problem while parsing the "
+                ++ contextStrings
 
 
 contextToString : Context -> String
@@ -154,6 +161,15 @@ contextToString context =
 
         ElseKeyword ->
             "else branch"
+
+        IntegerLiteral ->
+            "integer"
+
+        ArrayLiteral ->
+            "array"
+
+        StringLiteral ->
+            "string"
 
 
 firstContextRow : DeadEnd Context Problem -> Maybe Int
