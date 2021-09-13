@@ -58,6 +58,8 @@ type Problem
     | BadDefinition String
     | UnknownEscapeSequence String
     | StringNotTerminated
+    | IntegerBadLeadingZero
+    | IntegerTrailingUnderscore
 
 
 toString : String -> String -> DeadEnd Context Problem -> String
@@ -296,3 +298,9 @@ problemToString source problem =
 
         StringNotTerminated ->
             "This string never terminates. Expected to find a closing \"."
+
+        IntegerBadLeadingZero ->
+            "Integers cannot start with 0."
+
+        IntegerTrailingUnderscore ->
+            "Integers cannot end with an underscore."

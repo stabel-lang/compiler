@@ -142,25 +142,11 @@ whitespaceChars =
 -}
 intParser : Parser Int
 intParser =
-    let
-        helper ( text, isNegative ) =
-            case String.toInt text of
-                Just num ->
-                    Parser.succeed <|
-                        if isNegative then
-                            num * -1
-
-                        else
-                            num
-
-                Nothing ->
-                    Parser.problem Problem.ExpectedInt
-    in
     Parser.inContext Problem.IntegerLiteral
         (Parser.succeed Tuple.pair
             |= Parser.variable
                 { start = Char.isDigit
-                , inner = Char.isDigit
+                , inner = \c -> Char.isDigit c || c == '_'
                 , reserved = Set.empty
                 , expecting = ExpectedInt
                 }
@@ -174,8 +160,34 @@ intParser =
                 , Parser.succeed ()
                     |. Parser.end ExpectedEndOfFile
                 ]
-            |> Parser.andThen helper
+            |> Parser.andThen intParserHelper
         )
+
+
+intParserHelper : ( String, Bool ) -> Parser Int
+intParserHelper ( text, isNegative ) =
+    let
+        digits =
+            String.replace "_" "" text
+    in
+    if String.endsWith "_" text then
+        Parser.problem IntegerTrailingUnderscore
+
+    else if String.length digits > 1 && String.startsWith "0" digits then
+        Parser.problem IntegerBadLeadingZero
+
+    else
+        case String.toInt digits of
+            Just num ->
+                Parser.succeed <|
+                    if isNegative then
+                        num * -1
+
+                    else
+                        num
+
+            Nothing ->
+                Parser.problem ExpectedInt
 
 
 sourceLocationParser : Parser SourceLocation

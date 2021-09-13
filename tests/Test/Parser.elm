@@ -1535,7 +1535,9 @@ suite =
             , fuzz negativeIntFuzzer "Negative ints" <|
                 \num ->
                     expectParseInt (String.fromInt (num * -1) ++ "-") num
-            , Test.todo "can contain underscores as seperators"
+            , test "can contain underscores as seperators" <|
+                \_ ->
+                    expectParseInt "10_000" 10000
             ]
         ]
 

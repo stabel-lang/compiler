@@ -331,9 +331,26 @@ suite =
                             """
                     in
                     checkForError ((==) ExpectedWhitespace) source
-            , Test.todo "cannot start with leading 0"
-            , Test.todo "numbers cannot begin with underscores"
-            , Test.todo "numbers cannot end with underscores"
+            , test "cannot start with leading 0" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 010
+                            """
+                    in
+                    checkForError ((==) IntegerBadLeadingZero) source
+            , test "numbers cannot end with underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 100_
+                            """
+                    in
+                    checkForError ((==) IntegerTrailingUnderscore) source
             , Test.todo "positive number constant must fit in signed 32-bit int"
             , Test.todo "negative number constant must fit in signed 32-bit int"
             ]
