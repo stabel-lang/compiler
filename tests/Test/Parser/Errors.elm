@@ -320,6 +320,23 @@ suite =
                     in
                     checkForError stringNotTerminated source
             ]
+        , describe "Integers"
+            [ test "something like 43x should fail as it is not a valid int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 43x
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , Test.todo "cannot start with leading 0"
+            , Test.todo "numbers cannot begin with underscores"
+            , Test.todo "numbers cannot end with underscores"
+            , Test.todo "positive number constant must fit in signed 32-bit int"
+            , Test.todo "negative number constant must fit in signed 32-bit int"
+            ]
         ]
 
 

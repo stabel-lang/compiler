@@ -1535,13 +1535,7 @@ suite =
             , fuzz negativeIntFuzzer "Negative ints" <|
                 \num ->
                     expectParseInt (String.fromInt (num * -1) ++ "-") num
-            , Test.todo "something like 43x should fail as it is not a valid int"
-            , Test.todo "positive number constant must fit in signed 32-bit int"
-            , Test.todo "negative number constant must fit in signed 32-bit int"
-            , Test.todo "cannot start with leading 0"
             , Test.todo "can contain underscores as seperators"
-            , Test.todo "numbers cannot begin with underscores"
-            , Test.todo "numbers cannot end with underscores"
             ]
         ]
 

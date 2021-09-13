@@ -168,6 +168,11 @@ intParser =
                 |. Parser.symbol (Token "-" UnknownError)
             , Parser.succeed False
             ]
+        |. Parser.oneOf
+            [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
+            , Parser.succeed ()
+                |. Parser.end ExpectedEndOfFile
+            ]
         |> Parser.andThen helper
 
 
