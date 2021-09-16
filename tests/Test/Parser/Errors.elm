@@ -411,6 +411,46 @@ suite =
                             """
                     in
                     checkForError ((==) IntegerHexOutOfBounds) source
+            , test "Bit numbers cannot be negative" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b0101-
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Bit numbers cannot use underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b11_00
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Bit numbers must contain at least one member" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b
+                            """
+                    in
+                    checkForError ((==) ExpectedBitInt) source
+            , test "Bit numbers cannot contain more than 32 characters (32 bits)" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b010101010101010101010101010101011
+                            """
+                    in
+                    checkForError ((==) IntegerBitOutOfBounds) source
             ]
         ]
 

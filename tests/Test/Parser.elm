@@ -1539,9 +1539,17 @@ suite =
                 \_ ->
                     expectParseInt "10_000" 10000
             , test "can be in Hex format" <|
-                \_ -> expectParseInt "0xFA0" 0x0FA0
+                \_ ->
+                    expectParseInt "0xFA0" 0x0FA0
             , test "can be in Hex format (second example)" <|
-                \_ -> expectParseInt "0xe3cc" 0xE3CC
+                \_ ->
+                    expectParseInt "0xe3cc" 0xE3CC
+            , test "can be in bit format" <|
+                \_ ->
+                    expectParseInt "0b101" 5
+            , test "can be in bit format (second example)" <|
+                \_ ->
+                    expectParseInt "0b111001" 57
             ]
         ]
 

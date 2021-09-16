@@ -152,6 +152,16 @@ intParser =
     Parser.inContext Problem.IntegerLiteral
         (Parser.oneOf
             [ Parser.succeed identity
+                |. Parser.symbol (Token "0b" UnknownError)
+                |= Parser.variable
+                    { start = isBit
+                    , inner = isBit
+                    , reserved = Set.empty
+                    , expecting = ExpectedBitInt
+                    }
+                |. whiteSpaceOrEnd
+                |> Parser.andThen intBitParserHelper
+            , Parser.succeed identity
                 |. Parser.symbol (Token "0x" UnknownError)
                 |= Parser.variable
                     { start = isHexDigit
@@ -159,11 +169,7 @@ intParser =
                     , reserved = Set.empty
                     , expecting = ExpectedHexInt
                     }
-                |. Parser.oneOf
-                    [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
-                    , Parser.succeed ()
-                        |. Parser.end ExpectedEndOfFile
-                    ]
+                |. whiteSpaceOrEnd
                 |> Parser.andThen intHexParserHelper
             , Parser.succeed Tuple.pair
                 |= Parser.variable
@@ -177,14 +183,58 @@ intParser =
                         |. Parser.symbol (Token "-" UnknownError)
                     , Parser.succeed False
                     ]
-                |. Parser.oneOf
-                    [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
-                    , Parser.succeed ()
-                        |. Parser.end ExpectedEndOfFile
-                    ]
+                |. whiteSpaceOrEnd
                 |> Parser.andThen intParserHelper
             ]
         )
+
+
+whiteSpaceOrEnd : Parser ()
+whiteSpaceOrEnd =
+    Parser.oneOf
+        [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
+        , Parser.succeed ()
+            |. Parser.end ExpectedEndOfFile
+        ]
+
+
+
+-- Bit integers
+
+
+isBit : Char -> Bool
+isBit char =
+    char == '0' || char == '1'
+
+
+intBitParserHelper : String -> Parser Int
+intBitParserHelper text =
+    if String.length text > 32 then
+        Parser.problem IntegerBitOutOfBounds
+
+    else
+        String.foldl bitCharFolder 0 text
+            |> Parser.succeed
+
+
+bitCharFolder : Char -> Int -> Int
+bitCharFolder char num =
+    num
+        |> Bitwise.shiftLeftBy 1
+        |> Bitwise.or (bitCharToNum char)
+
+
+bitCharToNum : Char -> Int
+bitCharToNum char =
+    case char of
+        '1' ->
+            1
+
+        '0' ->
+            0
+
+        _ ->
+            -1
 
 
 
