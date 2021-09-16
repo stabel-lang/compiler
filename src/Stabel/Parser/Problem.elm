@@ -60,6 +60,7 @@ type Problem
     | StringNotTerminated
     | IntegerBadLeadingZero
     | IntegerTrailingUnderscore
+    | IntegerOutOfBounds
 
 
 toString : String -> String -> DeadEnd Context Problem -> String
@@ -304,3 +305,6 @@ problemToString source problem =
 
         IntegerTrailingUnderscore ->
             "Integers cannot end with an underscore."
+
+        IntegerOutOfBounds ->
+            "Integers must fit within a signed 32-bit number."

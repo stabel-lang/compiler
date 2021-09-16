@@ -351,8 +351,26 @@ suite =
                             """
                     in
                     checkForError ((==) IntegerTrailingUnderscore) source
-            , Test.todo "positive number constant must fit in signed 32-bit int"
-            , Test.todo "negative number constant must fit in signed 32-bit int"
+            , test "positive number constant must fit in signed 32-bit int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 3_000_000_000
+                            """
+                    in
+                    checkForError ((==) IntegerOutOfBounds) source
+            , test "negative number constant must fit in signed 32-bit int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 3_000_000_000-
+                            """
+                    in
+                    checkForError ((==) IntegerOutOfBounds) source
             ]
         ]
 

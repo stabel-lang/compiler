@@ -13,6 +13,7 @@ module Stabel.Parser exposing
 import Dict exposing (Dict)
 import Dict.Extra as Dict
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
+import Random
 import Set exposing (Set)
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature exposing (AssociatedFunctionSignature)
 import Stabel.Parser.ModuleDefinition as ModuleDefinition exposing (ModuleDefinition)
@@ -179,12 +180,19 @@ intParserHelper ( text, isNegative ) =
     else
         case String.toInt digits of
             Just num ->
-                Parser.succeed <|
-                    if isNegative then
-                        num * -1
+                let
+                    actualNumber =
+                        if isNegative then
+                            num * -1
 
-                    else
-                        num
+                        else
+                            num
+                in
+                if actualNumber > Random.maxInt || actualNumber < Random.minInt then
+                    Parser.problem IntegerOutOfBounds
+
+                else
+                    Parser.succeed actualNumber
 
             Nothing ->
                 Parser.problem ExpectedInt
