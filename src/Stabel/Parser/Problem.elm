@@ -34,6 +34,7 @@ type Context
 
 type Problem
     = ExpectedInt
+    | ExpectedHexInt
     | ExpectedSymbol
     | ExpectedMetadata
     | ExpectedGeneric
@@ -61,6 +62,7 @@ type Problem
     | IntegerBadLeadingZero
     | IntegerTrailingUnderscore
     | IntegerOutOfBounds
+    | IntegerHexOutOfBounds
 
 
 toString : String -> String -> DeadEnd Context Problem -> String
@@ -205,6 +207,9 @@ problemToString source problem =
         ExpectedInt ->
             "Expected to find an integer"
 
+        ExpectedHexInt ->
+            "Expected to find an hex-encoded integer"
+
         ExpectedSymbol ->
             "Expected to find a symbol"
 
@@ -308,3 +313,6 @@ problemToString source problem =
 
         IntegerOutOfBounds ->
             "Integers must fit within a signed 32-bit number."
+
+        IntegerHexOutOfBounds ->
+            "Hex-encoded integers can contain at most 8 characters (4 bytes, 32-bits)."

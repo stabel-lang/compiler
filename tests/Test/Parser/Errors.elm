@@ -371,6 +371,46 @@ suite =
                             """
                     in
                     checkForError ((==) IntegerOutOfBounds) source
+            , test "Hex numbers cannot be negative" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAA00FF-
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Hex numbers cannot use underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAA_00FF
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Hex numbers must contain at least one member" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0x
+                            """
+                    in
+                    checkForError ((==) ExpectedHexInt) source
+            , test "Hex numbers cannot contain more than 8 characters (4 bytes, 32 bits)" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAABBCCDDE
+                            """
+                    in
+                    checkForError ((==) IntegerHexOutOfBounds) source
             ]
         ]
 

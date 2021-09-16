@@ -10,8 +10,10 @@ module Stabel.Parser exposing
     , run
     )
 
+import Bitwise
 import Dict exposing (Dict)
 import Dict.Extra as Dict
+import List.Extra as List
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
 import Random
 import Set exposing (Set)
@@ -139,30 +141,91 @@ whitespaceChars =
         ]
 
 
+
+-- Int parsing
+
+
 {-| The builtin int parser has a bug where it commits when it comes across an 'e'
 -}
 intParser : Parser Int
 intParser =
     Parser.inContext Problem.IntegerLiteral
-        (Parser.succeed Tuple.pair
-            |= Parser.variable
-                { start = Char.isDigit
-                , inner = \c -> Char.isDigit c || c == '_'
-                , reserved = Set.empty
-                , expecting = ExpectedInt
-                }
-            |= Parser.oneOf
-                [ Parser.succeed True
-                    |. Parser.symbol (Token "-" UnknownError)
-                , Parser.succeed False
-                ]
-            |. Parser.oneOf
-                [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
-                , Parser.succeed ()
-                    |. Parser.end ExpectedEndOfFile
-                ]
-            |> Parser.andThen intParserHelper
+        (Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token "0x" UnknownError)
+                |= Parser.variable
+                    { start = isHexDigit
+                    , inner = isHexDigit
+                    , reserved = Set.empty
+                    , expecting = ExpectedHexInt
+                    }
+                |. Parser.oneOf
+                    [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
+                    , Parser.succeed ()
+                        |. Parser.end ExpectedEndOfFile
+                    ]
+                |> Parser.andThen intHexParserHelper
+            , Parser.succeed Tuple.pair
+                |= Parser.variable
+                    { start = Char.isDigit
+                    , inner = \c -> Char.isDigit c || c == '_'
+                    , reserved = Set.empty
+                    , expecting = ExpectedInt
+                    }
+                |= Parser.oneOf
+                    [ Parser.succeed True
+                        |. Parser.symbol (Token "-" UnknownError)
+                    , Parser.succeed False
+                    ]
+                |. Parser.oneOf
+                    [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
+                    , Parser.succeed ()
+                        |. Parser.end ExpectedEndOfFile
+                    ]
+                |> Parser.andThen intParserHelper
+            ]
         )
+
+
+
+-- Hex integers
+
+
+isHexDigit : Char -> Bool
+isHexDigit char =
+    List.member (Char.toUpper char) hexDigits
+
+
+hexDigits : List Char
+hexDigits =
+    [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' ]
+
+
+intHexParserHelper : String -> Parser Int
+intHexParserHelper text =
+    if String.length text > 8 then
+        Parser.problem IntegerHexOutOfBounds
+
+    else
+        String.foldl hexCharFolder 0 text
+            |> Parser.succeed
+
+
+hexCharFolder : Char -> Int -> Int
+hexCharFolder char num =
+    num
+        |> Bitwise.shiftLeftBy 4
+        |> Bitwise.or (hexCharToNum char)
+
+
+hexCharToNum : Char -> Int
+hexCharToNum char =
+    List.elemIndex (Char.toUpper char) hexDigits
+        |> Maybe.withDefault -1
+
+
+
+-- Base 10 integers
 
 
 intParserHelper : ( String, Bool ) -> Parser Int

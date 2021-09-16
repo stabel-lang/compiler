@@ -1538,6 +1538,10 @@ suite =
             , test "can contain underscores as seperators" <|
                 \_ ->
                     expectParseInt "10_000" 10000
+            , test "can be in Hex format" <|
+                \_ -> expectParseInt "0xFA0" 0x0FA0
+            , test "can be in Hex format (second example)" <|
+                \_ -> expectParseInt "0xe3cc" 0xE3CC
             ]
         ]
 
