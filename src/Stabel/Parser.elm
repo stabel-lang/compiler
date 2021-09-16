@@ -10,13 +10,16 @@ module Stabel.Parser exposing
     , run
     )
 
+import Bitwise
 import Dict exposing (Dict)
 import Dict.Extra as Dict
+import List.Extra as List
 import Parser.Advanced as Parser exposing ((|.), (|=), Token(..))
+import Random
 import Set exposing (Set)
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature exposing (AssociatedFunctionSignature)
 import Stabel.Parser.ModuleDefinition as ModuleDefinition exposing (ModuleDefinition)
-import Stabel.Parser.Problem as Problem exposing (..)
+import Stabel.Parser.Problem as Problem exposing (Context, Problem(..))
 import Stabel.Parser.SourceLocation exposing (SourceLocation, SourceLocationRange)
 import Stabel.Parser.Type
     exposing
@@ -138,26 +141,174 @@ whitespaceChars =
         ]
 
 
+
+-- Int parsing
+
+
 {-| The builtin int parser has a bug where it commits when it comes across an 'e'
 -}
 intParser : Parser Int
 intParser =
-    let
-        helper text =
-            case String.toInt text of
-                Just num ->
-                    Parser.succeed num
+    Parser.inContext Problem.IntegerLiteral
+        (Parser.oneOf
+            [ Parser.succeed identity
+                |. Parser.symbol (Token "0b" UnknownError)
+                |= Parser.variable
+                    { start = isBit
+                    , inner = isBit
+                    , reserved = Set.empty
+                    , expecting = ExpectedBitInt
+                    }
+                |. whiteSpaceOrEnd
+                |> Parser.andThen intBitParserHelper
+            , Parser.succeed identity
+                |. Parser.symbol (Token "0x" UnknownError)
+                |= Parser.variable
+                    { start = isHexDigit
+                    , inner = isHexDigit
+                    , reserved = Set.empty
+                    , expecting = ExpectedHexInt
+                    }
+                |. whiteSpaceOrEnd
+                |> Parser.andThen intHexParserHelper
+            , Parser.succeed Tuple.pair
+                |= Parser.variable
+                    { start = Char.isDigit
+                    , inner = \c -> Char.isDigit c || c == '_'
+                    , reserved = Set.empty
+                    , expecting = ExpectedInt
+                    }
+                |= Parser.oneOf
+                    [ Parser.succeed True
+                        |. Parser.symbol (Token "-" UnknownError)
+                    , Parser.succeed False
+                    ]
+                |. whiteSpaceOrEnd
+                |> Parser.andThen intParserHelper
+            ]
+        )
 
-                Nothing ->
-                    Parser.problem ExpectedInt
+
+whiteSpaceOrEnd : Parser ()
+whiteSpaceOrEnd =
+    Parser.oneOf
+        [ Parser.chompIf (\c -> Set.member c whitespaceChars) ExpectedWhitespace
+        , Parser.succeed ()
+            |. Parser.end ExpectedEndOfFile
+        ]
+
+
+
+-- Bit integers
+
+
+isBit : Char -> Bool
+isBit char =
+    char == '0' || char == '1'
+
+
+intBitParserHelper : String -> Parser Int
+intBitParserHelper text =
+    if String.length text > 32 then
+        Parser.problem IntegerBitOutOfBounds
+
+    else
+        String.foldl bitCharFolder 0 text
+            |> Parser.succeed
+
+
+bitCharFolder : Char -> Int -> Int
+bitCharFolder char num =
+    num
+        |> Bitwise.shiftLeftBy 1
+        |> Bitwise.or (bitCharToNum char)
+
+
+bitCharToNum : Char -> Int
+bitCharToNum char =
+    case char of
+        '1' ->
+            1
+
+        '0' ->
+            0
+
+        _ ->
+            -1
+
+
+
+-- Hex integers
+
+
+isHexDigit : Char -> Bool
+isHexDigit char =
+    List.member (Char.toUpper char) hexDigits
+
+
+hexDigits : List Char
+hexDigits =
+    [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' ]
+
+
+intHexParserHelper : String -> Parser Int
+intHexParserHelper text =
+    if String.length text > 8 then
+        Parser.problem IntegerHexOutOfBounds
+
+    else
+        String.foldl hexCharFolder 0 text
+            |> Parser.succeed
+
+
+hexCharFolder : Char -> Int -> Int
+hexCharFolder char num =
+    num
+        |> Bitwise.shiftLeftBy 4
+        |> Bitwise.or (hexCharToNum char)
+
+
+hexCharToNum : Char -> Int
+hexCharToNum char =
+    List.elemIndex (Char.toUpper char) hexDigits
+        |> Maybe.withDefault -1
+
+
+
+-- Base 10 integers
+
+
+intParserHelper : ( String, Bool ) -> Parser Int
+intParserHelper ( text, isNegative ) =
+    let
+        digits =
+            String.replace "_" "" text
     in
-    Parser.variable
-        { start = Char.isDigit
-        , inner = Char.isDigit
-        , reserved = Set.empty
-        , expecting = ExpectedInt
-        }
-        |> Parser.andThen helper
+    if String.endsWith "_" text then
+        Parser.problem IntegerTrailingUnderscore
+
+    else if String.length digits > 1 && String.startsWith "0" digits then
+        Parser.problem IntegerBadLeadingZero
+
+    else
+        case String.toInt digits of
+            Just num ->
+                let
+                    actualNumber =
+                        if isNegative then
+                            num * -1
+
+                        else
+                            num
+                in
+                if actualNumber > Random.maxInt || actualNumber < Random.minInt then
+                    Parser.problem IntegerOutOfBounds
+
+                else
+                    Parser.succeed actualNumber
+
+            Nothing ->
+                Parser.problem ExpectedInt
 
 
 sourceLocationParser : Parser SourceLocation
@@ -274,14 +425,16 @@ textParser =
 
 stringParser : Parser String
 stringParser =
-    Parser.oneOf
-        [ Parser.succeed stripMultilineStringWhitespace
-            |. Parser.symbol (Token "\"\"\"" UnknownError)
-            |= Parser.loop (Just "") multilineStringParserLoop
-        , Parser.succeed identity
-            |. Parser.symbol (Token "\"" UnknownError)
-            |= Parser.loop (Just "") stringParserLoop
-        ]
+    Parser.inContext Problem.StringLiteral
+        (Parser.oneOf
+            [ Parser.succeed stripMultilineStringWhitespace
+                |. Parser.symbol (Token "\"\"\"" UnknownError)
+                |= Parser.loop (Just "") multilineStringParserLoop
+            , Parser.succeed identity
+                |. Parser.symbol (Token "\"" UnknownError)
+                |= Parser.loop (Just "") stringParserLoop
+            ]
+        )
 
 
 stringParserLoop : Maybe String -> Parser (Parser.Step (Maybe String) String)
@@ -593,7 +746,7 @@ parser ref =
 
 moduleDefinitionParser : Parser ModuleDefinition
 moduleDefinitionParser =
-    Parser.inContext ModuleDefinition
+    Parser.inContext Problem.ModuleDefinition
         (Parser.succeed identity
             |. Parser.keyword (Token "defmodule:" UnknownError)
             |. noiseParser
@@ -607,7 +760,7 @@ moduleDefinitionMetaParser :
     -> Parser (Parser.Step ModuleDefinition.Definition ModuleDefinition.Definition)
 moduleDefinitionMetaParser def =
     Parser.oneOf
-        [ Parser.inContext AliasKeyword
+        [ Parser.inContext Problem.AliasKeyword
             (Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
@@ -616,7 +769,7 @@ moduleDefinitionMetaParser def =
                 |= modulePathStringParser
                 |. noiseParser
             )
-        , Parser.inContext ImportKeyword
+        , Parser.inContext Problem.ImportKeyword
             (Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
                 |. Parser.keyword (Token "import:" UnknownError)
                 |. noiseParser
@@ -625,7 +778,7 @@ moduleDefinitionMetaParser def =
                 |= Parser.loop [] symbolImplListParser
                 |. noiseParser
             )
-        , Parser.inContext ExposingKeyword
+        , Parser.inContext Problem.ExposingKeyword
             (Parser.succeed (\exposings -> Parser.Loop { def | exposes = exposings })
                 |. Parser.keyword (Token "exposing:" UnknownError)
                 |. noiseParser
@@ -814,18 +967,18 @@ functionDefinitionParser definedFunctions ( startLocation, name ) =
 functionMetadataParser : FunctionDefinition -> Parser (Parser.Step FunctionDefinition FunctionDefinition)
 functionMetadataParser def =
     Parser.oneOf
-        [ Parser.inContext TypeKeyword <|
+        [ Parser.inContext Problem.TypeKeyword <|
             Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = AssociatedFunctionSignature.UserProvided typeSign })
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
-        , Parser.inContext DocKeyword <|
+        , Parser.inContext Problem.DocKeyword <|
             Parser.succeed (\str -> Parser.Loop { def | documentation = str })
                 |. Parser.keyword (Token "doc:" UnknownError)
                 |. noiseParser
                 |= stringParser
                 |. noiseParser
-        , Parser.inContext AliasKeyword <|
+        , Parser.inContext Problem.AliasKeyword <|
             Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
@@ -833,7 +986,7 @@ functionMetadataParser def =
                 |. noiseParser
                 |= modulePathStringParser
                 |. noiseParser
-        , Parser.inContext ImportKeyword <|
+        , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
                 |. Parser.keyword (Token "import:" UnknownError)
                 |. noiseParser
@@ -841,7 +994,7 @@ functionMetadataParser def =
                 |. noiseParser
                 |= Parser.loop [] symbolImplListParser
                 |. noiseParser
-        , Parser.inContext ImplementationKeyword <|
+        , Parser.inContext Problem.ImplementationKeyword <|
             Parser.succeed (\impl -> Parser.Loop { def | implementation = SoloImpl impl })
                 |. Parser.keyword (Token ":" UnknownError)
                 |. noiseParser
@@ -917,23 +1070,23 @@ multiFunctionMetadataParser def =
                     MultiImpl [] impl
     in
     Parser.oneOf
-        [ Parser.inContext TypeKeyword <|
+        [ Parser.inContext Problem.TypeKeyword <|
             Parser.succeed (\typeSign -> Parser.Loop { def | typeSignature = AssociatedFunctionSignature.UserProvided typeSign })
                 |. Parser.keyword (Token "type:" UnknownError)
                 |. noiseParser
                 |= typeSignatureParser
-        , Parser.inContext DocKeyword <|
+        , Parser.inContext Problem.DocKeyword <|
             Parser.succeed (\str -> Parser.Loop { def | documentation = str })
                 |. Parser.keyword (Token "doc:" UnknownError)
                 |. noiseParser
                 |= stringParser
                 |. noiseParser
-        , Parser.inContext ElseKeyword <|
+        , Parser.inContext Problem.ElseKeyword <|
             Parser.succeed (\impl -> Parser.Loop { def | implementation = setDefaultImpl impl })
                 |. Parser.keyword (Token "else:" UnknownError)
                 |. noiseParser
                 |= implementationParser
-        , Parser.inContext AliasKeyword <|
+        , Parser.inContext Problem.AliasKeyword <|
             Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
@@ -941,7 +1094,7 @@ multiFunctionMetadataParser def =
                 |. noiseParser
                 |= modulePathStringParser
                 |. noiseParser
-        , Parser.inContext ImportKeyword <|
+        , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
                 |. Parser.keyword (Token "import:" UnknownError)
                 |. noiseParser
@@ -949,7 +1102,7 @@ multiFunctionMetadataParser def =
                 |. noiseParser
                 |= Parser.loop [] symbolImplListParser
                 |. noiseParser
-        , Parser.inContext ImplementationKeyword <|
+        , Parser.inContext Problem.ImplementationKeyword <|
             Parser.succeed (\type_ impl -> Parser.Loop { def | implementation = addWhenImpl ( type_, impl ) })
                 |. Parser.keyword (Token ":" UnknownError)
                 |. noiseParser
@@ -1050,14 +1203,14 @@ typeMemberParser functions result =
                     Parser.succeed name
     in
     Parser.oneOf
-        [ Parser.inContext MemberKeyword <|
+        [ Parser.inContext Problem.MemberKeyword <|
             Parser.succeed (\name type_ -> Parser.Loop { result | members = ( name, type_ ) :: result.members })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= Parser.andThen alreadyDefinedCheck symbolParser
                 |. noiseParser
                 |= typeRefParser
-        , Parser.inContext DocKeyword <|
+        , Parser.inContext Problem.DocKeyword <|
             Parser.succeed (\str -> Parser.Loop { result | documentation = str })
                 |. Parser.keyword (Token "doc:" UnknownError)
                 |. noiseParser
@@ -1112,12 +1265,12 @@ unionTypeMemberParser :
     -> Parser (Parser.Step UnionMembersParserResult UnionMembersParserResult)
 unionTypeMemberParser result =
     Parser.oneOf
-        [ Parser.inContext MemberKeyword <|
+        [ Parser.inContext Problem.MemberKeyword <|
             Parser.succeed (\type_ -> Parser.Loop { result | types = type_ :: result.types })
                 |. Parser.symbol (Token ":" UnknownError)
                 |. noiseParser
                 |= typeRefParser
-        , Parser.inContext DocKeyword <|
+        , Parser.inContext Problem.DocKeyword <|
             Parser.succeed (\str -> Parser.Loop { result | documentation = str })
                 |. Parser.keyword (Token "doc:" UnknownError)
                 |. noiseParser
@@ -1235,14 +1388,16 @@ implementationParserHelp nodes =
             |. Parser.symbol (Token "]" ExpectedRightBracket)
             |= sourceLocationParser
             |. noiseParser
-        , Parser.succeed (\startLoc arrContent endLoc -> Parser.Loop (ArrayLiteral (SourceLocationRange startLoc endLoc) arrContent :: nodes))
-            |= sourceLocationParser
-            |. Parser.symbol (Token "{" ExpectedLeftCurly)
-            |. noiseParser
-            |= implementationParser
-            |. Parser.symbol (Token "}" ExpectedRightCurly)
-            |= sourceLocationParser
-            |. noiseParser
+        , Parser.inContext Problem.ArrayLiteral
+            (Parser.succeed (\startLoc arrContent endLoc -> Parser.Loop (ArrayLiteral (SourceLocationRange startLoc endLoc) arrContent :: nodes))
+                |= sourceLocationParser
+                |. Parser.symbol (Token "{" ExpectedLeftCurly)
+                |. noiseParser
+                |= implementationParser
+                |. Parser.symbol (Token "}" ExpectedRightCurly)
+                |= sourceLocationParser
+                |. noiseParser
+            )
         , Parser.succeed (\startLoc strContent endLoc -> Parser.Loop (StringLiteral (SourceLocationRange startLoc endLoc) strContent :: nodes))
             |= sourceLocationParser
             |= stringParser

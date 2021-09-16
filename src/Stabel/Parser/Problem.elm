@@ -27,10 +27,15 @@ type Context
     | MemberKeyword
     | ImplementationKeyword
     | ElseKeyword
+    | IntegerLiteral
+    | ArrayLiteral
+    | StringLiteral
 
 
 type Problem
     = ExpectedInt
+    | ExpectedHexInt
+    | ExpectedBitInt
     | ExpectedSymbol
     | ExpectedMetadata
     | ExpectedGeneric
@@ -55,13 +60,18 @@ type Problem
     | BadDefinition String
     | UnknownEscapeSequence String
     | StringNotTerminated
+    | IntegerBadLeadingZero
+    | IntegerTrailingUnderscore
+    | IntegerOutOfBounds
+    | IntegerHexOutOfBounds
+    | IntegerBitOutOfBounds
 
 
 toString : String -> String -> DeadEnd Context Problem -> String
 toString sourceRef source deadEnd =
     let
         contextExplination =
-            contextStackExplination deadEnd
+            contextStackExplination deadEnd.contextStack
 
         lineOfProblem =
             deadEnd.row
@@ -96,21 +106,25 @@ toString sourceRef source deadEnd =
         |> String.join "\n\n"
 
 
-contextStackExplination : DeadEnd Context Problem -> String
-contextStackExplination deadEnd =
-    case deadEnd.contextStack of
+contextStackExplination : List { row : Int, col : Int, context : Context } -> String
+contextStackExplination contextStack =
+    case contextStack of
+        [] ->
+            "I came across a problem"
+
         contextFrame :: [] ->
             "I came across a problem while parsing the "
                 ++ contextToString contextFrame.context
 
-        contextFrame1 :: contextFrame2 :: _ ->
-            "I came across a problem while parsing the "
-                ++ contextToString contextFrame1.context
-                ++ " of the "
-                ++ contextToString contextFrame2.context
-
         _ ->
-            "I came across a problem"
+            let
+                contextStrings =
+                    contextStack
+                        |> List.map (.context >> contextToString)
+                        |> String.join " of the "
+            in
+            "I came across a problem while parsing the "
+                ++ contextStrings
 
 
 contextToString : Context -> String
@@ -155,6 +169,15 @@ contextToString context =
         ElseKeyword ->
             "else branch"
 
+        IntegerLiteral ->
+            "integer"
+
+        ArrayLiteral ->
+            "array"
+
+        StringLiteral ->
+            "string"
+
 
 firstContextRow : DeadEnd Context Problem -> Maybe Int
 firstContextRow deadEnd =
@@ -185,6 +208,12 @@ problemToString source problem =
     case problem of
         ExpectedInt ->
             "Expected to find an integer"
+
+        ExpectedHexInt ->
+            "Expected to find an hex-encoded integer"
+
+        ExpectedBitInt ->
+            "Expected to find an bit-encoded integer"
 
         ExpectedSymbol ->
             "Expected to find a symbol"
@@ -280,3 +309,18 @@ problemToString source problem =
 
         StringNotTerminated ->
             "This string never terminates. Expected to find a closing \"."
+
+        IntegerBadLeadingZero ->
+            "Integers cannot start with 0."
+
+        IntegerTrailingUnderscore ->
+            "Integers cannot end with an underscore."
+
+        IntegerOutOfBounds ->
+            "Integers must fit within a signed 32-bit number."
+
+        IntegerHexOutOfBounds ->
+            "Hex-encoded integers can contain at most 8 characters (4 bytes, 32-bits)."
+
+        IntegerBitOutOfBounds ->
+            "Bit-encoded integers can contain at most 32 characters (32-bits)."

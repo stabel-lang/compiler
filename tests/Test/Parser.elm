@@ -3,6 +3,8 @@ module Test.Parser exposing (..)
 import Dict
 import Dict.Extra as Dict
 import Expect
+import Fuzz exposing (Fuzzer)
+import Random
 import Stabel.Parser as AST exposing (..)
 import Stabel.Parser.AssociatedFunctionSignature as AssociatedFunctionSignature
 import Stabel.Parser.ModuleDefinition as ModuleDefinition
@@ -13,7 +15,7 @@ import Stabel.Parser.SourceLocation
         , emptyRange
         )
 import Stabel.Parser.Type as AST exposing (..)
-import Test exposing (Test, describe, test)
+import Test exposing (Test, describe, fuzz, test)
 import Test.Parser.Util
     exposing
         ( addFunctionsForStructs
@@ -1496,4 +1498,67 @@ suite =
                         """
                         "This is a test\n  with some indentation\nLet's see how it turns out"
             ]
+        , describe "Integers" <|
+            let
+                expectParseInt input output =
+                    let
+                        source =
+                            """
+                            def: test
+                            : """ ++ input
+
+                        expectedAst =
+                            { sourceReference = ""
+                            , moduleDefinition = ModuleDefinition.Undefined
+                            , types = Dict.empty
+                            , functions =
+                                Dict.fromListBy .name
+                                    [ { name = "test"
+                                      , typeSignature = AssociatedFunctionSignature.NotProvided
+                                      , sourceLocationRange = Nothing
+                                      , documentation = ""
+                                      , aliases = Dict.empty
+                                      , imports = Dict.empty
+                                      , implementation =
+                                            SoloImpl
+                                                [ AST.Integer emptyRange output
+                                                ]
+                                      }
+                                    ]
+                            }
+                    in
+                    expectAst source expectedAst
+            in
+            [ fuzz positiveIntFuzzer "Positive int" <|
+                \num ->
+                    expectParseInt (String.fromInt num) num
+            , fuzz negativeIntFuzzer "Negative ints" <|
+                \num ->
+                    expectParseInt (String.fromInt (num * -1) ++ "-") num
+            , test "can contain underscores as seperators" <|
+                \_ ->
+                    expectParseInt "10_000" 10000
+            , test "can be in Hex format" <|
+                \_ ->
+                    expectParseInt "0xFA0" 0x0FA0
+            , test "can be in Hex format (second example)" <|
+                \_ ->
+                    expectParseInt "0xe3cc" 0xE3CC
+            , test "can be in bit format" <|
+                \_ ->
+                    expectParseInt "0b101" 5
+            , test "can be in bit format (second example)" <|
+                \_ ->
+                    expectParseInt "0b111001" 57
+            ]
         ]
+
+
+positiveIntFuzzer : Fuzzer Int
+positiveIntFuzzer =
+    Fuzz.intRange 0 Random.maxInt
+
+
+negativeIntFuzzer : Fuzzer Int
+negativeIntFuzzer =
+    Fuzz.intRange Random.minInt -1

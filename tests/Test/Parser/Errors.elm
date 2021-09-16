@@ -320,6 +320,138 @@ suite =
                     in
                     checkForError stringNotTerminated source
             ]
+        , describe "Integers"
+            [ test "something like 43x should fail as it is not a valid int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 43x
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "cannot start with leading 0" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 010
+                            """
+                    in
+                    checkForError ((==) IntegerBadLeadingZero) source
+            , test "numbers cannot end with underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 100_
+                            """
+                    in
+                    checkForError ((==) IntegerTrailingUnderscore) source
+            , test "positive number constant must fit in signed 32-bit int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 3_000_000_000
+                            """
+                    in
+                    checkForError ((==) IntegerOutOfBounds) source
+            , test "negative number constant must fit in signed 32-bit int" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 3_000_000_000-
+                            """
+                    in
+                    checkForError ((==) IntegerOutOfBounds) source
+            , test "Hex numbers cannot be negative" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAA00FF-
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Hex numbers cannot use underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAA_00FF
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Hex numbers must contain at least one member" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0x
+                            """
+                    in
+                    checkForError ((==) ExpectedHexInt) source
+            , test "Hex numbers cannot contain more than 8 characters (4 bytes, 32 bits)" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0xAABBCCDDE
+                            """
+                    in
+                    checkForError ((==) IntegerHexOutOfBounds) source
+            , test "Bit numbers cannot be negative" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b0101-
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Bit numbers cannot use underscores" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b11_00
+                            """
+                    in
+                    checkForError ((==) ExpectedWhitespace) source
+            , test "Bit numbers must contain at least one member" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b
+                            """
+                    in
+                    checkForError ((==) ExpectedBitInt) source
+            , test "Bit numbers cannot contain more than 32 characters (32 bits)" <|
+                \_ ->
+                    let
+                        source =
+                            """
+                            def: src
+                            : 0b010101010101010101010101010101011
+                            """
+                    in
+                    checkForError ((==) IntegerBitOutOfBounds) source
+            ]
         ]
 
 
