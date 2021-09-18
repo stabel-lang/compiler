@@ -118,7 +118,7 @@ suite =
 
                         def: main
                         type: -- Int
-                        : 1 2 3 Empty >NonEmpty >NonEmpty >NonEmpty
+                        : 1 2 3 Empty> >NonEmpty >NonEmpty >NonEmpty
                           0 [ + ] fold
 
                         defmulti: fold
@@ -247,7 +247,7 @@ suite =
                               drop
 
                             def: main
-                            : Nil [ 1 - ] map
+                            : Nil> [ 1 - ] map
                             """
                     in
                     expectTypeCheck input
@@ -281,7 +281,7 @@ suite =
                               swap drop
 
                             def: main
-                            : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+                            : 1 2 3 EmptyList> >NonEmptyList >NonEmptyList >NonEmptyList
                               sum
                             """
                     in

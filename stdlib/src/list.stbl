@@ -2,6 +2,7 @@ defmodule:
 exposing:
   List
   NonEmpty
+  NonEmpty>
   >first
   first>
   >rest
@@ -28,15 +29,15 @@ defstruct: Empty
 
 def: of-one
 type: a -- (NonEmpty a)
-: Empty >NonEmpty
+: Empty> >NonEmpty
 
 def: of-two
 type: a a -- (NonEmpty a)
-: Empty >NonEmpty >NonEmpty
+: Empty> >NonEmpty >NonEmpty
 
 def: of-three
 type: a a a -- (NonEmpty a)
-: Empty >NonEmpty >NonEmpty >NonEmpty
+: Empty> >NonEmpty >NonEmpty >NonEmpty
 
 def: ,
 type: (List a) a -- (NonEmpty a)
@@ -59,7 +60,7 @@ type: (List a) b [ a b -- b ] -- b
 
 def: reverse
 type: (List a) -- (List a)
-: Empty [ >NonEmpty ] fold
+: Empty> [ >NonEmpty ] fold
 
 def: fold-reverse
 type: (List a) b [ a b -- b ] -- b

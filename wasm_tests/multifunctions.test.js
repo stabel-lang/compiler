@@ -16,8 +16,8 @@ test('Simple case', async () => {
           drop 75
 
         def: main
-        : True to-int 
-          False to-int 
+        : True> to-int 
+          False> to-int 
           -
     `);
 
@@ -42,8 +42,8 @@ test('Default branch', async () => {
         else: drop 75
 
         def: main
-        : True to-int 
-          False to-int 
+        : True> to-int 
+          False> to-int 
           -
     `);
 
@@ -113,7 +113,7 @@ test('Generic arguments', async () => {
           swap drop
 
         def: main
-        : 1 EmptyList >NonEmptyList
+        : 1 EmptyList> >NonEmptyList
           0 first-or-default
     `);
 
@@ -145,7 +145,7 @@ test('Recursive word', async () => {
           swap drop
 
         def: main
-        : 1 2 3 EmptyList >NonEmptyList >NonEmptyList >NonEmptyList
+        : 1 2 3 EmptyList> >NonEmptyList >NonEmptyList >NonEmptyList
           sum
     `);
 
@@ -243,7 +243,7 @@ test('Correct Int boxing behaviour when mismatch between word input size and sta
         : Int
 
         def: main
-        : 0 Nil inc-zero
+        : 0 Nil> inc-zero
           drop 
     `);
 

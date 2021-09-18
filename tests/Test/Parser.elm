@@ -1168,17 +1168,17 @@ suite =
                         defmulti: from-int
                         type: Int -- Int
                         : Int( value 0 )
-                          False
+                          False>
                         : Int
-                          True
+                          True>
 
                         def: equal
                         : - from-int not
 
                         defmulti: not
                         : True
-                          False
-                        else: True
+                          False>
+                        else: True>
                         """
 
                     -- The ending source location for most definitions now ends where the next definition beings
@@ -1222,7 +1222,7 @@ suite =
                                 ]
                         , functions =
                             Dict.fromListBy .name
-                                [ { name = "True"
+                                [ { name = "True>"
                                   , typeSignature =
                                         AssociatedFunctionSignature.Verified
                                             { input = []
@@ -1234,7 +1234,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation = SoloImpl [ ConstructType "True" ]
                                   }
-                                , { name = "False"
+                                , { name = "False>"
                                   , typeSignature =
                                         AssociatedFunctionSignature.Verified
                                             { input = []
@@ -1273,9 +1273,9 @@ suite =
                                               , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 12 3)
-                                                        (SourceLocation 12 8)
+                                                        (SourceLocation 12 9)
                                                     )
-                                                    "False"
+                                                    "False>"
                                                 ]
                                               )
                                             , ( TypeMatch
@@ -1288,9 +1288,9 @@ suite =
                                               , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 14 3)
-                                                        (SourceLocation 14 7)
+                                                        (SourceLocation 14 8)
                                                     )
-                                                    "True"
+                                                    "True>"
                                                 ]
                                               )
                                             ]
@@ -1352,18 +1352,18 @@ suite =
                                               , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 21 3)
-                                                        (SourceLocation 21 8)
+                                                        (SourceLocation 21 9)
                                                     )
-                                                    "False"
+                                                    "False>"
                                                 ]
                                               )
                                             ]
                                             [ Function
                                                 (SourceLocationRange
                                                     (SourceLocation 22 7)
-                                                    (SourceLocation 22 11)
+                                                    (SourceLocation 22 12)
                                                 )
-                                                "True"
+                                                "True>"
                                             ]
                                   }
                                 ]

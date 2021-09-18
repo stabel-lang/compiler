@@ -126,16 +126,16 @@ suite =
 
                         defmulti: not
                         : True
-                          drop False
+                          drop False>
                         : False
-                          drop True
+                          drop True>
 
                         def: true-to-int
                         type: True -- Int
                         : drop 1
 
                         def: main
-                        : True not true-to-int
+                        : True> not true-to-int
                         """
                 in
                 expectTypeCheckFailure input
@@ -162,7 +162,7 @@ suite =
                           swap drop
 
                         def: main
-                        : 1 EmptyList >NonEmptyList
+                        : 1 EmptyList> >NonEmptyList
                           0 first-or-default
                           1 =
                         """
@@ -187,7 +187,7 @@ suite =
                           swap drop
 
                         def: main
-                        : Nil 1 with-default
+                        : Nil> 1 with-default
                         """
 
                     nilTypeDef =
@@ -199,7 +199,7 @@ suite =
                         }
 
                     nilCtorDef =
-                        { name = "Nil"
+                        { name = "Nil>"
                         , type_ = { input = [], output = [ Type.Custom "Nil" ] }
                         , sourceLocation = Nothing
                         , implementation =
@@ -293,7 +293,7 @@ template =
     defstruct: False
 
     def: main
-    : True to-int
-      False to-int
+    : True> to-int
+      False> to-int
       =
     """

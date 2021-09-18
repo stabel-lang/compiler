@@ -156,7 +156,7 @@ test('Generic case', async () => {
         : 5
           10 with-default
 
-          Nothing
+          Nothing>
           10 with-default
 
           +
@@ -186,7 +186,7 @@ test('Generic case with type annotations', async () => {
         : 5
           10 with-default
 
-          Nothing
+          Nothing>
           10 with-default
 
           +
@@ -216,7 +216,7 @@ test('Generic case with type annotations and else keyword', async () => {
         : 5
           15 with-default
 
-          Nothing
+          Nothing>
           2 with-default
 
           +
@@ -243,7 +243,7 @@ test('Unions as struct member', async () => {
         type: Box -- Bool
         : Box( value True )
           value>
-        else: drop False
+        else: drop False>
 
         defmulti: as-int
         type: Bool -- Int
@@ -253,7 +253,7 @@ test('Unions as struct member', async () => {
           drop 10
 
         def: main
-        : True >Box
+        : True> >Box
           true? as-int
     `);
 

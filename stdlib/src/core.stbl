@@ -2,7 +2,9 @@ defmodule:
 exposing:
   Bool
   True
+  True>
   False
+  False>
   not
   select
   if
@@ -32,9 +34,9 @@ defstruct: False
 defmulti: not
 type: Bool -- Bool
 : True
-  drop False
+  drop False>
 : False
-  drop True
+  drop True>
 
 defmulti: select
 type: Bool a a -- a
@@ -74,9 +76,9 @@ type: a [ a -- b ] [ a -- c ] -- b c
 defmulti: zero?
 type: Int -- Bool
 : Int( value 0 )
-  drop True
+  drop True>
 : Int
-  drop False 
+  drop False>
 
 def: int=
 type: Int Int -- Bool

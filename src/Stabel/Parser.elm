@@ -875,7 +875,7 @@ generateDefaultFunctionsForType typeDef =
                 ctorDef =
                     { name =
                         if List.isEmpty typeMembers then
-                            typeDef.name
+                            typeDef.name ++ ">"
 
                         else
                             ">" ++ typeDef.name

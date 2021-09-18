@@ -2,6 +2,7 @@ defmodule:
 exposing:
   Maybe
   Nothing
+  Nothing>
   map
   when-nothing
 :

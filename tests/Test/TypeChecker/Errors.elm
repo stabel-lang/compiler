@@ -216,9 +216,9 @@ suite =
                         defmulti: true-or-false
                         type: Int -- (Tmp a b)
                         : Int( value 0 )
-                          drop False
+                          drop False>
                         : Int
-                          drop True
+                          drop True>
                         """
                 in
                 Expect.equalLists
@@ -263,9 +263,9 @@ suite =
                         # should be Int -- Int (Maybe a)
                         type: Int -- Int
                         : Int( value 0 )
-                          False
+                          False>
                         : Int
-                          True
+                          True>
                         """
                 in
                 Expect.equalLists
@@ -402,7 +402,7 @@ suite =
                               swap drop
 
                             def: main
-                            : Nil 1 with-default
+                            : Nil> 1 with-default
                             """
 
                         inexhaustiveError problem =

@@ -64,9 +64,9 @@ test('Internal package type', async () => {
                     : marker mod/Tipe
 
                     def: main
-                    : mod/Tipe
+                    : mod/Tipe>
                       1 mod/>TipeGen
-                      mod/Tipe
+                      mod/Tipe>
                       2 mod/>TipeGen
                       drop-tipes
                       tipe-int
@@ -155,9 +155,9 @@ test('External package types', async () => {
                     : marker /mod/Tipe
 
                     def: main
-                    : /mod/Tipe
+                    : /mod/Tipe>
                       1 /mod/>TipeGen
-                      /mod/Tipe
+                      /mod/Tipe>
                       2 /mod/>TipeGen
                       drop-tipes
                       tipe-int

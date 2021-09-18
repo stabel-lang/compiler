@@ -141,7 +141,7 @@ addFunctionsForStructsHelper name generics members ast =
         ctor =
             { name =
                 if List.isEmpty members then
-                    name
+                    name ++ ">"
 
                 else
                     ">" ++ name

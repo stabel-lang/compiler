@@ -6,7 +6,7 @@ test('Enum type', async () => {
        defstruct: False
 
        def: main
-       : True
+       : True>
     `);
 
     const result = await compiler.run(wat, 'main');
@@ -20,7 +20,7 @@ test('Struct with annotations', async () => {
         defstruct: True
 
         def: main
-        : True as-int
+        : True> as-int
 
         def: as-int
         type: True -- Int
