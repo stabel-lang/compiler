@@ -25,8 +25,8 @@ suite =
                     source =
                         """
                         defmodule:
-                        alias: other /some/mod
-                        alias: moar local/mod
+                        alias: /some/mod other
+                        alias: local/mod moar
                         import: /some/other/mod test1 word2
                         import: internals foo
                         import: internal/mod
@@ -143,8 +143,8 @@ suite =
                     source =
                         """
                         def: inc
-                        alias: other /some/mod
-                        alias: moar local/mod
+                        alias: /some/mod other 
+                        alias: local/mod moar 
                         import: /some/other/mod test1 word2
                         import: internals foo
                         import: internal/mod
@@ -189,8 +189,8 @@ suite =
                     source =
                         """
                         defmulti: with-default
-                        alias: other /some/mod
-                        alias: moar local/mod
+                        alias: /some/mod other 
+                        alias: local/mod moar 
                         import: /some/other/mod test1 word2
                         import: internals foo
                         import: internal/mod

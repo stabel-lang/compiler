@@ -428,7 +428,7 @@ suite =
                     source =
                         """
                         defmodule:
-                        alias: html /external/html
+                        alias: /external/html html 
                         import: /external/module
                         :
 
@@ -444,7 +444,7 @@ suite =
                         else: package/module/when-other-one
 
                         def: main
-                        alias: ali internal/alias
+                        alias: internal/alias ali 
                         import: /list/of/names one
                         : html/div
                           call-external
@@ -501,7 +501,7 @@ suite =
                     source =
                         """
                         def: main
-                        alias: ali internal/alias
+                        alias: internal/alias ali 
                         : ali/word1
                         """
 

@@ -761,12 +761,12 @@ moduleDefinitionMetaParser :
 moduleDefinitionMetaParser def =
     Parser.oneOf
         [ Parser.inContext Problem.AliasKeyword
-            (Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            (Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
-                |= symbolParser
-                |. noiseParser
                 |= modulePathStringParser
+                |. noiseParser
+                |= symbolParser
                 |. noiseParser
             )
         , Parser.inContext Problem.ImportKeyword
@@ -979,12 +979,12 @@ functionMetadataParser def =
                 |= stringParser
                 |. noiseParser
         , Parser.inContext Problem.AliasKeyword <|
-            Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
-                |= symbolParser
-                |. noiseParser
                 |= modulePathStringParser
+                |. noiseParser
+                |= symbolParser
                 |. noiseParser
         , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
@@ -1087,12 +1087,12 @@ multiFunctionMetadataParser def =
                 |. noiseParser
                 |= implementationParser
         , Parser.inContext Problem.AliasKeyword <|
-            Parser.succeed (\alias value -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+            Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
                 |. Parser.keyword (Token "alias:" UnknownError)
                 |. noiseParser
-                |= symbolParser
-                |. noiseParser
                 |= modulePathStringParser
+                |. noiseParser
+                |= symbolParser
                 |. noiseParser
         , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })

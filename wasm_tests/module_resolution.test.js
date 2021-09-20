@@ -222,26 +222,26 @@ test('Module aliases', async () => {
                 module: 'core',
                 source: `
                     defmodule:
-                    alias: ext /mod
-                    alias: tope internal/tope
+                    alias: /mod ext 
+                    alias: internal/tope tope 
                     :
 
                     defstruct: TipeTope
                     : first tope/Tope
 
                     def: main
-                    alias: internal internal/mod
+                    alias: internal/mod internal 
                     : 6 
                       internal/value
                       ext/add
 
                     def: noop
-                    alias: tipe /tipe
+                    alias: /tipe tipe 
                     type: tipe/Tipe tope/Tope --
                     : drop drop
 
                     defmulti: as-int
-                    alias: tipe /tipe
+                    alias: /tipe tipe 
                     : tipe/Tipe
                       drop 1
                     : tope/Tope
