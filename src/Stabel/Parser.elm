@@ -761,12 +761,8 @@ moduleDefinitionMetaParser :
 moduleDefinitionMetaParser def =
     Parser.oneOf
         [ Parser.inContext Problem.AliasKeyword
-            (Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-                |. Parser.keyword (Token "alias:" UnknownError)
-                |. noiseParser
-                |= modulePathStringParser
-                |. noiseParser
-                |= symbolParser
+            (Parser.succeed (\( value, alias ) -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |= aliasParser
                 |. noiseParser
             )
         , Parser.inContext Problem.ImportKeyword
@@ -797,6 +793,36 @@ moduleDefinitionMetaParser def =
             |. Parser.keyword (Token ":" UnknownError)
             |. noiseParser
         ]
+
+
+aliasParser : Parser ( String, String )
+aliasParser =
+    Parser.succeed aliasParserHelp
+        |. Parser.keyword (Token "alias:" UnknownError)
+        |. noiseParser
+        |= modulePathStringParser
+        |. noiseParser
+        |= Parser.oneOf
+            [ Parser.succeed Just
+                |= symbolParser
+            , Parser.succeed Nothing
+            ]
+
+
+aliasParserHelp : String -> Maybe String -> ( String, String )
+aliasParserHelp modulePath maybeAlias =
+    case maybeAlias of
+        Just alias ->
+            ( modulePath, alias )
+
+        Nothing ->
+            ( modulePath
+            , modulePath
+                |> String.split "/"
+                |> List.last
+                -- will never happen
+                |> Maybe.withDefault ""
+            )
 
 
 definitionParser : AST -> Parser (Parser.Step AST AST)
@@ -979,12 +1005,8 @@ functionMetadataParser def =
                 |= stringParser
                 |. noiseParser
         , Parser.inContext Problem.AliasKeyword <|
-            Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-                |. Parser.keyword (Token "alias:" UnknownError)
-                |. noiseParser
-                |= modulePathStringParser
-                |. noiseParser
-                |= symbolParser
+            Parser.succeed (\( value, alias ) -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |= aliasParser
                 |. noiseParser
         , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })
@@ -1087,12 +1109,8 @@ multiFunctionMetadataParser def =
                 |. noiseParser
                 |= implementationParser
         , Parser.inContext Problem.AliasKeyword <|
-            Parser.succeed (\value alias -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
-                |. Parser.keyword (Token "alias:" UnknownError)
-                |. noiseParser
-                |= modulePathStringParser
-                |. noiseParser
-                |= symbolParser
+            Parser.succeed (\( value, alias ) -> Parser.Loop { def | aliases = Dict.insert alias value def.aliases })
+                |= aliasParser
                 |. noiseParser
         , Parser.inContext Problem.ImportKeyword <|
             Parser.succeed (\mod vals -> Parser.Loop { def | imports = Dict.insert mod vals def.imports })

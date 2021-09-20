@@ -223,7 +223,7 @@ test('Module aliases', async () => {
                 source: `
                     defmodule:
                     alias: /mod ext 
-                    alias: internal/tope tope 
+                    alias: internal/tope
                     :
 
                     defstruct: TipeTope

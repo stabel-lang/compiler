@@ -91,6 +91,52 @@ suite =
                             |> addFunctionsForStructs
                 in
                 expectAst source expectedAst
+        , test "Aliases can be implicit" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmodule:
+                        alias: /some/mod 
+                        exposing: inc
+                        :
+
+                        def: inc
+                        : 1 +
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition =
+                            ModuleDefinition.Defined
+                                { aliases =
+                                    Dict.fromList
+                                        [ ( "mod", "/some/mod" )
+                                        ]
+                                , imports = Dict.empty
+                                , exposes = Set.fromList [ "inc" ]
+                                , documentation = ""
+                                }
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "inc"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , documentation = ""
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.Integer emptyRange 1
+                                            , AST.Function emptyRange "+"
+                                            ]
+                                  }
+                                ]
+                        }
+                            |> addFunctionsForStructs
+                in
+                expectAst source expectedAst
         , test "Documentation string" <|
             \_ ->
                 let
