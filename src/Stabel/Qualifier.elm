@@ -900,27 +900,27 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                     Err <| UnknownTypeRef range name
     in
     case typeMatch of
-        Parser.TypeMatch range (Parser.LocalRef "Int" []) [] ->
-            Ok <| TypeMatch (qualifiedRange range) Type.Int []
-
-        Parser.TypeMatch range (Parser.LocalRef "Int" []) [ ( "value", Parser.LiteralInt val ) ] ->
+        Parser.TypeMatchInt range val ->
             Ok <|
                 TypeMatch
                     (qualifiedRange range)
                     Type.Int
                     [ TypeMatchCond "value" Type.Int (LiteralInt val) ]
 
-        Parser.TypeMatch range (Parser.LocalRef "Array" []) [] ->
+        Parser.TypeMatchType range (Parser.LocalRef "Int" []) [] ->
+            Ok <| TypeMatch (qualifiedRange range) Type.Int []
+
+        Parser.TypeMatchType range (Parser.LocalRef "Array" []) [] ->
             Ok <|
                 TypeMatch
                     (qualifiedRange range)
                     (Type.Array (Type.Generic "*a"))
                     []
 
-        Parser.TypeMatch range (Parser.Generic sym) [] ->
+        Parser.TypeMatchType range (Parser.Generic sym) [] ->
             Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
 
-        Parser.TypeMatch range (Parser.LocalRef name []) patterns ->
+        Parser.TypeMatchType range (Parser.LocalRef name []) patterns ->
             case qualifiedNameToMatch (qualifiedRange range) (qualifyName config name) patterns of
                 (Err (UnknownTypeRef _ _)) as errMsg ->
                     case resolveImportedType config modRefs name of
@@ -936,7 +936,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                 result ->
                     result
 
-        Parser.TypeMatch range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
+        Parser.TypeMatchType range (Parser.InternalRef [ possibleAlias ] name _) patterns ->
             case Dict.get possibleAlias modRefs.aliases of
                 Just actualPath ->
                     if representsExternalModule actualPath then
@@ -945,7 +945,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                 splitExternalPackagePath actualPath
                         in
                         qualifyMatch config qualifiedTypes modRefs <|
-                            Parser.TypeMatch range (Parser.ExternalRef extPath name []) patterns
+                            Parser.TypeMatchType range (Parser.ExternalRef extPath name []) patterns
 
                     else
                         let
@@ -967,7 +967,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                     in
                     qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
-        Parser.TypeMatch range (Parser.InternalRef path name _) patterns ->
+        Parser.TypeMatchType range (Parser.InternalRef path name _) patterns ->
             let
                 qualifiedName =
                     path
@@ -977,7 +977,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
             in
             qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
-        Parser.TypeMatch range (Parser.ExternalRef path name _) patterns ->
+        Parser.TypeMatchType range (Parser.ExternalRef path name _) patterns ->
             let
                 pathString =
                     "/" ++ String.join "/" path
@@ -989,7 +989,7 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
             in
             qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
 
-        Parser.TypeMatch range _ _ ->
+        Parser.TypeMatchType range _ _ ->
             Err <| InvalidTypeMatch (qualifiedRange range)
 
 
@@ -1006,9 +1006,6 @@ qualifyMatchValue config qualifiedTypes modRefs range typeName members ( fieldNa
     case List.find ((==) fieldName << Tuple.first) members of
         Just ( _, fieldType ) ->
             case matchValue of
-                Parser.LiteralInt val ->
-                    Ok <| TypeMatchCond fieldName fieldType (LiteralInt val)
-
                 Parser.LiteralType type_ ->
                     type_
                         |> qualifyMemberType config modRefs range
@@ -1730,8 +1727,13 @@ requiredModulesOfFunction topLevelAliases function =
                         |> List.filterMap extractModuleReferenceFromType
                         |> Set.fromList
 
-        extractMatchType (Parser.TypeMatch _ tipe _) =
-            tipe
+        extractMatchType match =
+            case match of
+                Parser.TypeMatchInt _ _ ->
+                    Parser.LocalRef "Int" []
+
+                Parser.TypeMatchType _ tipe _ ->
+                    tipe
 
         impls =
             case function.implementation of

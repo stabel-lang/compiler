@@ -180,7 +180,7 @@ test('Int case', async () => {
 test('Int match', async () => {
     const wat = await compiler.toWat('main', `
         defmulti: double
-        : Int( value 0 )
+        : 0
           drop 2
         : Int
           2 *
@@ -197,7 +197,7 @@ test('Int match', async () => {
 test('Int match (reverse)', async () => {
     const wat = await compiler.toWat('main', `
         defmulti: double
-        : Int( value 0 )
+        : 0
           drop 2
         : Int
           2 *
@@ -214,7 +214,7 @@ test('Int match (reverse)', async () => {
 test('Correct Int boxing behaviour', async () => {
     const wat = await compiler.toWat('main', `
         defmulti: add
-        : Int( value 0 )
+        : 0
           swap 
           drop 2
           swap
@@ -236,7 +236,7 @@ test('Correct Int boxing behaviour when mismatch between word input size and sta
         defstruct: Nil
 
         defmulti: inc-zero
-        : Int( value 0 )
+        : 0
           swap 
           drop 1
           swap
@@ -292,7 +292,7 @@ test('Cyclic case', async () => {
 
         defmulti: count-down
         type: Int -- Int
-        : Int( value 0 )
+        : 0
           drop 0
         : Int
           dec-count-down

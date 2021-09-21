@@ -72,12 +72,12 @@ type FunctionImplementation
 
 
 type TypeMatch
-    = TypeMatch SourceLocationRange PossiblyQualifiedType (List ( String, TypeMatchValue ))
+    = TypeMatchInt SourceLocationRange Int
+    | TypeMatchType SourceLocationRange PossiblyQualifiedType (List ( String, TypeMatchValue ))
 
 
 type TypeMatchValue
-    = LiteralInt Int
-    | LiteralType PossiblyQualifiedType
+    = LiteralType PossiblyQualifiedType
     | RecursiveMatch TypeMatch
 
 
@@ -1342,18 +1342,24 @@ typeLoopParser reverseTypes =
 
 typeMatchParser : Parser TypeMatch
 typeMatchParser =
-    Parser.succeed (\startLoc type_ conds endLoc -> TypeMatch (SourceLocationRange startLoc endLoc) type_ conds)
-        |= sourceLocationParser
-        |= typeMatchTypeParser
-        |= Parser.oneOf
-            [ Parser.succeed identity
-                |. Parser.symbol (Token "(" ExpectedLeftParen)
-                |. noiseParser
-                |= Parser.loop [] typeMatchConditionParser
-                |. Parser.symbol (Token ")" ExpectedRightParen)
-            , Parser.succeed []
-            ]
-        |= sourceLocationParser
+    Parser.oneOf
+        [ Parser.succeed (\startLoc int endLoc -> TypeMatchInt (SourceLocationRange startLoc endLoc) int)
+            |= sourceLocationParser
+            |= intParser
+            |= sourceLocationParser
+        , Parser.succeed (\startLoc type_ conds endLoc -> TypeMatchType (SourceLocationRange startLoc endLoc) type_ conds)
+            |= sourceLocationParser
+            |= typeMatchTypeParser
+            |= Parser.oneOf
+                [ Parser.succeed identity
+                    |. Parser.symbol (Token "(" ExpectedLeftParen)
+                    |. noiseParser
+                    |= Parser.loop [] typeMatchConditionParser
+                    |. Parser.symbol (Token ")" ExpectedRightParen)
+                , Parser.succeed []
+                ]
+            |= sourceLocationParser
+        ]
 
 
 typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))
@@ -1371,20 +1377,16 @@ typeMatchConditionParser nodes =
 typeMatchValueParser : Parser TypeMatchValue
 typeMatchValueParser =
     let
-        handleNewType ((TypeMatch _ type_ conditions) as match) =
-            case conditions of
-                [] ->
+        handleNewType match =
+            case match of
+                TypeMatchType _ type_ [] ->
                     LiteralType type_
 
                 _ ->
                     RecursiveMatch match
     in
-    Parser.oneOf
-        [ Parser.succeed LiteralInt
-            |= intParser
-        , Parser.succeed handleNewType
-            |= typeMatchParser
-        ]
+    Parser.succeed handleNewType
+        |= typeMatchParser
 
 
 implementationParser : Parser (List AstNode)

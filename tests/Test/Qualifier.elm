@@ -23,8 +23,8 @@ suite =
                     source =
                         """
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           1 - count-down
                         """
@@ -36,8 +36,8 @@ suite =
                     source =
                         """
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           [ count-down ] !
                         """
@@ -52,8 +52,8 @@ suite =
                         : 1 - count-down 
 
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           dec-down
                         """
@@ -68,8 +68,8 @@ suite =
                         : 1 - count-down 
 
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           [ dec-down ] !
                         """

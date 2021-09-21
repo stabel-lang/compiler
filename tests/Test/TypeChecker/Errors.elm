@@ -215,7 +215,7 @@ suite =
 
                         defmulti: true-or-false
                         type: Int -- (Tmp a b)
-                        : Int( value 0 )
+                        : 0
                           drop False>
                         : Int
                           drop True>
@@ -262,7 +262,7 @@ suite =
                         defmulti: true-or-false
                         # should be Int -- Int (Maybe a)
                         type: Int -- Int
-                        : Int( value 0 )
+                        : 0
                           False>
                         : Int
                           True>
@@ -293,7 +293,7 @@ suite =
                             : 2 mword
 
                             defmulti: mword
-                            : Int( value 1 )
+                            : 1
                               1 +
                             """
 
@@ -315,7 +315,7 @@ suite =
                             : 2 mword
 
                             defmulti: mword
-                            : Int( value 1 )
+                            : 1
                               1 +
                             else: 
                               0 +
@@ -335,7 +335,7 @@ suite =
                             : 1 >IntBox mword value>
 
                             defmulti: mword
-                            : IntBox( value Int( value 1 ) )
+                            : IntBox( value 1 )
                               value> 1 + >IntBox
                             """
 
@@ -357,7 +357,7 @@ suite =
                             : 2 mword
 
                             defmulti: mword
-                            : Int( value 1 )
+                            : 1
                               1 +
                             : Int
                               dup +
@@ -375,7 +375,7 @@ suite =
                             defmulti: mword
                             : Int
                               dup +
-                            : Int( value 1 )
+                            : 1
                               1 +
                             """
                     in
@@ -396,7 +396,7 @@ suite =
 
                             defmulti: with-default
                             type: (Maybe IntBox) Int -- Int
-                            : IntBox( value Int( value 0 ) )
+                            : IntBox( value 0 )
                               drop value>
                             : Nil
                               swap drop
