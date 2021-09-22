@@ -206,7 +206,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatchType emptyRange (ExternalRef [ "external" ] "Tipe" []) [ ( "value", RecursiveMatch <| TypeMatchInt emptyRange 1 ) ]
+                                            [ ( TypeMatchType emptyRange (ExternalRef [ "external" ] "Tipe" []) [ ( "value", TypeMatchInt emptyRange 1 ) ]
                                               , [ AST.Function emptyRange "drop"
                                                 , AST.Integer emptyRange 1
                                                 ]
@@ -251,7 +251,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatchType emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", RecursiveMatch <| TypeMatchInt emptyRange 1 ) ]
+                                            [ ( TypeMatchType emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", TypeMatchInt emptyRange 1 ) ]
                                               , [ AST.Function emptyRange "drop"
                                                 , AST.Integer emptyRange 1
                                                 ]

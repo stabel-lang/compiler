@@ -107,17 +107,7 @@ stripTypeMatchLocation match =
 
         TypeMatchType _ type_ otherConds ->
             TypeMatchType emptyRange type_ <|
-                List.map (Tuple.mapSecond stripRecursiveTypeMatchLocation) otherConds
-
-
-stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue
-stripRecursiveTypeMatchLocation typeMatchValue =
-    case typeMatchValue of
-        RecursiveMatch typeMatch ->
-            RecursiveMatch (stripTypeMatchLocation typeMatch)
-
-        _ ->
-            typeMatchValue
+                List.map (Tuple.mapSecond stripTypeMatchLocation) otherConds
 
 
 addFunctionsForStructs : AST -> AST

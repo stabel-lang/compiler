@@ -8,8 +8,6 @@ module Stabel.Qualifier exposing
     , TypeDefinition
     , TypeDefinitionMembers(..)
     , TypeMatch(..)
-    , TypeMatchCond(..)
-    , TypeMatchValue(..)
     , requiredModules
     , run
     )
@@ -75,17 +73,8 @@ type FunctionImplementation
 
 
 type TypeMatch
-    = TypeMatch SourceLocationRange Type (List TypeMatchCond)
-
-
-type TypeMatchCond
-    = TypeMatchCond String Type TypeMatchValue
-
-
-type TypeMatchValue
-    = LiteralInt Int
-    | LiteralType Type
-    | RecursiveMatch TypeMatch
+    = TypeMatchInt SourceLocationRange Int
+    | TypeMatchType SourceLocationRange Type (List ( String, TypeMatch ))
 
 
 type Node
@@ -848,84 +837,41 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                 config.ast.sourceReference
                 range.start
                 range.end
-
-        qualifiedNameToMatch range name patterns =
-            case Dict.get name qualifiedTypes of
-                Just typeDef ->
-                    if not typeDef.exposed then
-                        Err <| TypeNotExposed range name
-
-                    else
-                        case typeDef.members of
-                            StructMembers members ->
-                                let
-                                    qualifiedPatternsResult =
-                                        patterns
-                                            |> List.map
-                                                (qualifyMatchValue
-                                                    config
-                                                    qualifiedTypes
-                                                    modRefs
-                                                    range
-                                                    name
-                                                    members
-                                                )
-                                            |> Result.combine
-
-                                    actualType =
-                                        case typeDef.generics of
-                                            [] ->
-                                                Type.Custom name
-
-                                            _ ->
-                                                Type.CustomGeneric
-                                                    name
-                                                    (List.map Type.Generic typeDef.generics)
-                                in
-                                case qualifiedPatternsResult of
-                                    Ok qualifiedPatterns ->
-                                        Ok <| TypeMatch range actualType qualifiedPatterns
-
-                                    Err err ->
-                                        Err err
-
-                            UnionMembers types ->
-                                if List.isEmpty patterns then
-                                    Ok <| TypeMatch range (Type.Union (Just name) types) []
-
-                                else
-                                    Err <| UnionTypeMatchWithPatterns range
-
-                Nothing ->
-                    Err <| UnknownTypeRef range name
     in
     case typeMatch of
         Parser.TypeMatchInt range val ->
-            Ok <|
-                TypeMatch
-                    (qualifiedRange range)
-                    Type.Int
-                    [ TypeMatchCond "value" Type.Int (LiteralInt val) ]
+            Ok <| TypeMatchInt (qualifiedRange range) val
 
         Parser.TypeMatchType range (Parser.LocalRef "Int" []) [] ->
-            Ok <| TypeMatch (qualifiedRange range) Type.Int []
+            Ok <| TypeMatchType (qualifiedRange range) Type.Int []
 
         Parser.TypeMatchType range (Parser.LocalRef "Array" []) [] ->
             Ok <|
-                TypeMatch
+                TypeMatchType
                     (qualifiedRange range)
                     (Type.Array (Type.Generic "*a"))
                     []
 
         Parser.TypeMatchType range (Parser.Generic sym) [] ->
-            Ok <| TypeMatch (qualifiedRange range) (Type.Generic sym) []
+            Ok <| TypeMatchType (qualifiedRange range) (Type.Generic sym) []
 
         Parser.TypeMatchType range (Parser.LocalRef name []) patterns ->
-            case qualifiedNameToMatch (qualifiedRange range) (qualifyName config name) patterns of
+            case
+                qualifiedNameToMatch
+                    config
+                    qualifiedTypes
+                    modRefs
+                    (qualifiedRange range)
+                    (qualifyName config name)
+                    patterns
+            of
                 (Err (UnknownTypeRef _ _)) as errMsg ->
                     case resolveImportedType config modRefs name of
                         Just importedModule ->
                             qualifiedNameToMatch
+                                config
+                                qualifiedTypes
+                                modRefs
                                 (qualifiedRange range)
                                 (importedModule ++ "/" ++ name)
                                 patterns
@@ -955,7 +901,13 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                     ++ name
                                     |> qualifyPackageModule config.packageName
                         in
-                        qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
+                        qualifiedNameToMatch
+                            config
+                            qualifiedTypes
+                            modRefs
+                            (qualifiedRange range)
+                            qualifiedName
+                            patterns
 
                 Nothing ->
                     let
@@ -965,7 +917,13 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                                 ++ name
                                 |> qualifyPackageModule config.packageName
                     in
-                    qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
+                    qualifiedNameToMatch
+                        config
+                        qualifiedTypes
+                        modRefs
+                        (qualifiedRange range)
+                        qualifiedName
+                        patterns
 
         Parser.TypeMatchType range (Parser.InternalRef path name _) patterns ->
             let
@@ -975,7 +933,13 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> String.join "/"
                         |> qualifyPackageModule config.packageName
             in
-            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
+            qualifiedNameToMatch
+                config
+                qualifiedTypes
+                modRefs
+                (qualifiedRange range)
+                qualifiedName
+                patterns
 
         Parser.TypeMatchType range (Parser.ExternalRef path name _) patterns ->
             let
@@ -987,10 +951,76 @@ qualifyMatch config qualifiedTypes modRefs typeMatch =
                         |> Maybe.map (\prefix -> "/" ++ prefix ++ pathString ++ "/" ++ name)
                         |> Maybe.withDefault ""
             in
-            qualifiedNameToMatch (qualifiedRange range) qualifiedName patterns
+            qualifiedNameToMatch
+                config
+                qualifiedTypes
+                modRefs
+                (qualifiedRange range)
+                qualifiedName
+                patterns
 
         Parser.TypeMatchType range _ _ ->
             Err <| InvalidTypeMatch (qualifiedRange range)
+
+
+qualifiedNameToMatch :
+    RunConfig
+    -> Dict String TypeDefinition
+    -> ModuleReferences
+    -> SourceLocationRange
+    -> String
+    -> List ( String, Parser.TypeMatch )
+    -> Result Problem TypeMatch
+qualifiedNameToMatch config qualifiedTypes modRefs range name patterns =
+    case Dict.get name qualifiedTypes of
+        Just typeDef ->
+            if not typeDef.exposed then
+                Err <| TypeNotExposed range name
+
+            else
+                case typeDef.members of
+                    StructMembers members ->
+                        let
+                            qualifiedPatternsResult =
+                                patterns
+                                    |> List.map
+                                        (qualifyMatchValue
+                                            config
+                                            qualifiedTypes
+                                            modRefs
+                                            range
+                                            name
+                                            members
+                                        )
+                                    |> Result.combine
+
+                            actualType =
+                                case typeDef.generics of
+                                    [] ->
+                                        Type.Custom name
+
+                                    _ ->
+                                        Type.CustomGeneric
+                                            name
+                                            (List.map Type.Generic typeDef.generics)
+                        in
+                        case qualifiedPatternsResult of
+                            Ok qualifiedPatterns ->
+                                Ok <| TypeMatchType range actualType qualifiedPatterns
+
+                            Err err ->
+                                Err err
+
+                    UnionMembers types ->
+                        case patterns of
+                            [] ->
+                                Ok <| TypeMatchType range (Type.Union (Just name) types) []
+
+                            _ ->
+                                Err <| UnionTypeMatchWithPatterns range
+
+        Nothing ->
+            Err <| UnknownTypeRef range name
 
 
 qualifyMatchValue :
@@ -1000,33 +1030,19 @@ qualifyMatchValue :
     -> SourceLocationRange
     -> String
     -> List ( String, Type )
-    -> ( String, Parser.TypeMatchValue )
-    -> Result Problem TypeMatchCond
+    -> ( String, Parser.TypeMatch )
+    -> Result Problem ( String, TypeMatch )
 qualifyMatchValue config qualifiedTypes modRefs range typeName members ( fieldName, matchValue ) =
     case List.find ((==) fieldName << Tuple.first) members of
-        Just ( _, fieldType ) ->
-            case matchValue of
-                Parser.LiteralType type_ ->
-                    type_
-                        |> qualifyMemberType config modRefs range
-                        |> Result.map
-                            (\qualifiedType ->
-                                TypeMatchCond
-                                    fieldName
-                                    fieldType
-                                    (LiteralType qualifiedType)
-                            )
-
-                Parser.RecursiveMatch typeMatch ->
-                    typeMatch
-                        |> qualifyMatch config qualifiedTypes modRefs
-                        |> Result.map
-                            (\match ->
-                                TypeMatchCond
-                                    fieldName
-                                    fieldType
-                                    (RecursiveMatch match)
-                            )
+        Just _ ->
+            matchValue
+                |> qualifyMatch config qualifiedTypes modRefs
+                |> Result.map
+                    (\match ->
+                        ( fieldName
+                        , match
+                        )
+                    )
 
         _ ->
             Err <| NoSuchMemberOnType range typeName fieldName

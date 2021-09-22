@@ -1021,12 +1021,10 @@ suite =
                                                 [ ( TypeMatchType emptyRange
                                                         (LocalRef "List" [])
                                                         [ ( "tail"
-                                                          , AST.RecursiveMatch
-                                                                (TypeMatchType emptyRange
-                                                                    (LocalRef "List" [])
-                                                                    [ ( "tail", AST.LiteralType (LocalRef "Nil" []) )
-                                                                    ]
-                                                                )
+                                                          , TypeMatchType emptyRange
+                                                                (LocalRef "List" [])
+                                                                [ ( "tail", TypeMatchType emptyRange (LocalRef "Nil" []) [] )
+                                                                ]
                                                           )
                                                         ]
                                                   , [ AST.Function emptyRange "True" ]
@@ -1065,8 +1063,8 @@ suite =
                                             MultiImpl
                                                 [ ( TypeMatchType emptyRange
                                                         (LocalRef "Pair" [])
-                                                        [ ( "first", RecursiveMatch <| TypeMatchInt emptyRange 0 )
-                                                        , ( "second", RecursiveMatch <| TypeMatchInt emptyRange 0 )
+                                                        [ ( "first", TypeMatchInt emptyRange 0 )
+                                                        , ( "second", TypeMatchInt emptyRange 0 )
                                                         ]
                                                   , [ AST.Function emptyRange "True" ]
                                                   )

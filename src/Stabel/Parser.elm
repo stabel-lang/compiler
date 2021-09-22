@@ -6,7 +6,6 @@ module Stabel.Parser exposing
     , TypeDefinition
     , TypeDefinitionMembers(..)
     , TypeMatch(..)
-    , TypeMatchValue(..)
     , run
     )
 
@@ -73,12 +72,7 @@ type FunctionImplementation
 
 type TypeMatch
     = TypeMatchInt SourceLocationRange Int
-    | TypeMatchType SourceLocationRange PossiblyQualifiedType (List ( String, TypeMatchValue ))
-
-
-type TypeMatchValue
-    = LiteralType PossiblyQualifiedType
-    | RecursiveMatch TypeMatch
+    | TypeMatchType SourceLocationRange PossiblyQualifiedType (List ( String, TypeMatch ))
 
 
 type AstNode
@@ -1347,7 +1341,7 @@ typeMatchParser =
             |= sourceLocationParser
             |= intParser
             |= sourceLocationParser
-        , Parser.succeed (\startLoc type_ conds endLoc -> TypeMatchType (SourceLocationRange startLoc endLoc) type_ conds)
+        , Parser.succeed typeMatchTypeHelper
             |= sourceLocationParser
             |= typeMatchTypeParser
             |= Parser.oneOf
@@ -1362,31 +1356,21 @@ typeMatchParser =
         ]
 
 
-typeMatchConditionParser : List ( String, TypeMatchValue ) -> Parser (Parser.Step (List ( String, TypeMatchValue )) (List ( String, TypeMatchValue )))
+typeMatchTypeHelper : SourceLocation -> PossiblyQualifiedType -> List ( String, TypeMatch ) -> SourceLocation -> TypeMatch
+typeMatchTypeHelper startLoc type_ conds endLoc =
+    TypeMatchType (SourceLocationRange startLoc endLoc) type_ conds
+
+
+typeMatchConditionParser : List ( String, TypeMatch ) -> Parser (Parser.Step (List ( String, TypeMatch )) (List ( String, TypeMatch )))
 typeMatchConditionParser nodes =
     Parser.oneOf
         [ Parser.succeed (\name value -> Parser.Loop (( name, value ) :: nodes))
             |= symbolParser
             |. noiseParser
-            |= typeMatchValueParser
+            |= typeMatchParser
             |. noiseParser
         , Parser.succeed (Parser.Done (List.reverse nodes))
         ]
-
-
-typeMatchValueParser : Parser TypeMatchValue
-typeMatchValueParser =
-    let
-        handleNewType match =
-            case match of
-                TypeMatchType _ type_ [] ->
-                    LiteralType type_
-
-                _ ->
-                    RecursiveMatch match
-    in
-    Parser.succeed handleNewType
-        |= typeMatchParser
 
 
 implementationParser : Parser (List AstNode)
