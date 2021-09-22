@@ -9,6 +9,7 @@ import Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
+import Stabel.Data.Type as Type exposing (Type)
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
@@ -18,8 +19,6 @@ import Stabel.Qualifier as AST
         , Node
         , TypeDefinition
         , TypeMatch(..)
-        , TypeMatchCond(..)
-        , TypeMatchValue(..)
         )
 
 
@@ -162,21 +161,16 @@ stripMultiWordBranchLocation ( typeMatch, nodes ) =
 
 
 stripTypeMatchLocation : TypeMatch -> TypeMatch
-stripTypeMatchLocation (TypeMatch _ type_ otherConds) =
-    TypeMatch emptyRange type_ <|
-        List.map (mapTypeMatchCondValue stripRecursiveTypeMatchLocation) otherConds
+stripTypeMatchLocation typeMatch =
+    case typeMatch of
+        TypeMatchInt _ val ->
+            TypeMatchInt emptyRange val
+
+        TypeMatchType _ type_ otherConds ->
+            TypeMatchType emptyRange type_ <|
+                List.map stripTypeMatchCondLocation otherConds
 
 
-mapTypeMatchCondValue : (TypeMatchValue -> TypeMatchValue) -> TypeMatchCond -> TypeMatchCond
-mapTypeMatchCondValue fn (TypeMatchCond name tipe val) =
-    TypeMatchCond name tipe (fn val)
-
-
-stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue
-stripRecursiveTypeMatchLocation typeMatchValue =
-    case typeMatchValue of
-        RecursiveMatch typeMatch ->
-            RecursiveMatch (stripTypeMatchLocation typeMatch)
-
-        _ ->
-            typeMatchValue
+stripTypeMatchCondLocation : ( String, Type, TypeMatch ) -> ( String, Type, TypeMatch )
+stripTypeMatchCondLocation ( fieldName, fieldType, match ) =
+    ( fieldName, fieldType, stripTypeMatchLocation match )

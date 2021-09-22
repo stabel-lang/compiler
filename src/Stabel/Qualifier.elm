@@ -74,7 +74,7 @@ type FunctionImplementation
 
 type TypeMatch
     = TypeMatchInt SourceLocationRange Int
-    | TypeMatchType SourceLocationRange Type (List ( String, TypeMatch ))
+    | TypeMatchType SourceLocationRange Type (List ( String, Type, TypeMatch ))
 
 
 type Node
@@ -1031,15 +1031,16 @@ qualifyMatchValue :
     -> String
     -> List ( String, Type )
     -> ( String, Parser.TypeMatch )
-    -> Result Problem ( String, TypeMatch )
+    -> Result Problem ( String, Type, TypeMatch )
 qualifyMatchValue config qualifiedTypes modRefs range typeName members ( fieldName, matchValue ) =
     case List.find ((==) fieldName << Tuple.first) members of
-        Just _ ->
+        Just ( _, fieldType ) ->
             matchValue
                 |> qualifyMatch config qualifiedTypes modRefs
                 |> Result.map
                     (\match ->
                         ( fieldName
+                        , fieldType
                         , match
                         )
                     )

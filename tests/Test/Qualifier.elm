@@ -176,13 +176,13 @@ suite =
                                 }
                         , implementation =
                             MultiImpl
-                                [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
+                                [ ( TypeMatchType emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
                                   , [ Function emptyRange dollarValueGetFn
                                     , Integer emptyRange 100
                                     , Builtin emptyRange Builtin.Multiply
                                     ]
                                   )
-                                , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
+                                , ( TypeMatchType emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
                                   , [ Function emptyRange centValueGetFn
                                     ]
                                   )
