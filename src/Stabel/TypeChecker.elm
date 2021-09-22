@@ -1130,13 +1130,13 @@ inexhaustivenessCheck range patterns =
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
 inexhaustivenessCheckHelper typePrefix typeMatch acc =
     let
-        ( t, conds ) =
+        ( t, intLiteral, conds ) =
             case typeMatch of
                 Qualifier.TypeMatchInt _ _ ->
-                    ( Type.Int, [] )
+                    ( Type.Int, True, [] )
 
                 Qualifier.TypeMatchType _ t_ conds_ ->
-                    ( t_, conds_ )
+                    ( t_, False, conds_ )
 
         typeList =
             typePrefix ++ [ t ]
@@ -1148,23 +1148,18 @@ inexhaustivenessCheckHelper typePrefix typeMatch acc =
         let
             subcases =
                 conds
-                    |> List.filterMap isRecursiveMatch
+                    |> List.map isRecursiveMatch
                     |> List.foldl (inexhaustivenessCheckHelper typeList) acc
 
             isRecursiveMatch ( _, _, match ) =
-                case match of
-                    Qualifier.TypeMatchType _ _ (_ :: _) ->
-                        Just match
-
-                    _ ->
-                        Nothing
+                match
 
             toAdd =
-                case ( t, conds, subcases ) of
-                    ( _, [], _ ) ->
+                case ( t, intLiteral, conds ) of
+                    ( _, False, [] ) ->
                         [ ( typeList, Total ) ]
 
-                    ( Type.Int, _, _ ) ->
+                    ( Type.Int, True, [] ) ->
                         [ ( typeList, SeenInt ) ]
 
                     _ ->
