@@ -67,6 +67,7 @@ type alias FunctionDefinition =
 
 type FunctionImplementation
     = SoloImpl (List AstNode)
+      -- TODO: Default branch should be a (Maybe (List AstNode))
     | MultiImpl (List ( TypeMatch, List AstNode )) (List AstNode)
 
 

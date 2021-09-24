@@ -348,6 +348,25 @@ suite =
                                     False
                     in
                     checkForError inexhaustiveError input
+            , test "Default clause is exhaustive in case of nested match" <|
+                \_ ->
+                    let
+                        input =
+                            """
+                            defstruct: Box
+                            : value Int
+
+                            def: main
+                            : 2 >Box mword
+
+                            defmulti: mword
+                            : Box( value 1 )
+                              drop 1
+                            else: 
+                              drop 0
+                            """
+                    in
+                    Util.expectTypeCheck input
             , test "A total branch should remove any earlier seen branch" <|
                 \_ ->
                     let

@@ -417,6 +417,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                         firstType :: _ ->
                             ( Qualifier.TypeMatchType SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
 
+        hasDefaultBranch =
+            not <| List.isEmpty defaultImpl
+
         whens =
             List.map (Tuple.mapFirst (resolveWhenConditions untypedDef)) allBranches
 
@@ -459,7 +462,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 Just <| InconsistentWhens sourceLocation untypedDef.name
 
         maybeInexhaustiveError =
-            inexhaustivenessCheck sourceLocation whenPatterns
+            inexhaustivenessCheck sourceLocation hasDefaultBranch whenPatterns
 
         sourceLocation =
             Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation
@@ -1111,20 +1114,24 @@ type InexhaustiveState
     | SeenInt
 
 
-inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
-inexhaustivenessCheck range patterns =
-    let
-        inexhaustiveStates =
-            List.foldl (inexhaustivenessCheckHelper []) [] patterns
-                |> List.filter (\( _, state ) -> state /= Total)
-                |> List.map Tuple.first
-    in
-    case inexhaustiveStates of
-        [] ->
-            Nothing
+inexhaustivenessCheck : SourceLocationRange -> Bool -> List Qualifier.TypeMatch -> Maybe Problem
+inexhaustivenessCheck range hasDefaultBranch patterns =
+    if hasDefaultBranch then
+        Nothing
 
-        _ ->
-            Just (InexhaustiveMultiFunction range inexhaustiveStates)
+    else
+        let
+            inexhaustiveStates =
+                List.foldl (inexhaustivenessCheckHelper []) [] patterns
+                    |> List.filter (\( _, state ) -> state /= Total)
+                    |> List.map Tuple.first
+        in
+        case inexhaustiveStates of
+            [] ->
+                Nothing
+
+            _ ->
+                Just (InexhaustiveMultiFunction range inexhaustiveStates)
 
 
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
