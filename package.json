@@ -32,7 +32,7 @@
     "code-review": "elm-review",
     "code-review:fix": "elm-review --fix",
     "build": "elm make src/CLI.elm --optimize --output bin/compiler.js",
-    "prepublishOnly": "npm run build && terser bin/compiler.js -c -m -o bin/compiler.js"
+    "prepublishOnly": "npm run build && terser bin/compiler.js -c 'pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe' -m -o bin/compiler.js"
   },
   "bin": {
     "stabel": "bin/cli.js"
