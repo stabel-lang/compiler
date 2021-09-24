@@ -9,7 +9,7 @@ import Dict
 import Expect exposing (Expectation)
 import Set
 import Stabel.Data.SourceLocation exposing (emptyRange)
-import Stabel.Data.Type as Type exposing (Type)
+import Stabel.Data.Type exposing (Type)
 import Stabel.Parser as Parser
 import Stabel.Qualifier as AST
     exposing
