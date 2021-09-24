@@ -222,11 +222,11 @@ suite =
                         , sourceLocation = Nothing
                         , implementation =
                             MultiImpl
-                                [ ( TypeMatch emptyRange (Type.Generic "a") []
+                                [ ( TypeMatchType emptyRange (Type.Generic "a") []
                                   , [ Builtin emptyRange Builtin.StackDrop
                                     ]
                                   )
-                                , ( TypeMatch emptyRange (Type.Custom "Nil") []
+                                , ( TypeMatchType emptyRange (Type.Custom "Nil") []
                                   , [ Builtin emptyRange Builtin.StackSwap
                                     , Builtin emptyRange Builtin.StackDrop
                                     ]

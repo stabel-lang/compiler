@@ -14,7 +14,7 @@ test('Internal package functions', async () => {
 
                     defmulti: flip
                     type: Int -- Int
-                    : Int( value 1 )
+                    : 1
                       drop 0
                     else: drop 1
                 `
@@ -105,7 +105,7 @@ test('External package functions', async () => {
 
                     defmulti: flip
                     type: Int -- Int
-                    : Int( value 1 )
+                    : 1
                       drop 0
                     else: drop 1
                 `

@@ -269,7 +269,7 @@ suite =
                                             ]
                                   , implementation =
                                         MultiImpl
-                                            [ ( AST.TypeMatch emptyRange (Generic "a") []
+                                            [ ( AST.TypeMatchType emptyRange (Generic "a") []
                                               , [ AST.Function emptyRange "drop" ]
                                               )
                                             ]

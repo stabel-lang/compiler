@@ -549,31 +549,45 @@ makeInequalityTest :
     -> Int
     -> Context
     -> ( Wasm.Instruction, Context )
-makeInequalityTest boxMap selfIndex ((AST.TypeMatch _ typeFromTypeMatch _) as t_) localIdx context =
+makeInequalityTest boxMap selfIndex match localIdx context =
     let
+        typeFromTypeMatch =
+            case match of
+                AST.TypeMatchInt _ _ ->
+                    Type.Int
+
+                AST.TypeMatchType _ tipe _ ->
+                    tipe
+
         maybeBoxId =
             boxMap
                 |> List.find (\( boxedType, _ ) -> Type.equalBaseType boxedType typeFromTypeMatch)
                 |> Maybe.map Tuple.second
     in
-    case ( t_, maybeBoxId ) of
-        ( AST.TypeMatch _ Type.Int conditions, Just boxId ) ->
+    case ( match, maybeBoxId ) of
+        ( AST.TypeMatchInt _ value, Just boxId ) ->
             ( Wasm.Batch
                 [ Wasm.Local_Get localIdx
                 , Wasm.I32_Load -- Load instance id
                 , Wasm.I32_Const boxId
                 , Wasm.I32_NotEq -- Types doesn't match?
                 , Wasm.BreakIf 0 -- Move to next branch if above test is true
-                , conditions
-                    |> List.concatMap (matchingIntTest localIdx)
-                    |> Wasm.Batch
+                , Wasm.Batch
+                    [ Wasm.Local_Get localIdx
+                    , Wasm.I32_Const BaseModule.wasmPtrSize
+                    , Wasm.I32_Add
+                    , Wasm.I32_Load -- int value
+                    , Wasm.I32_Const value
+                    , Wasm.I32_NotEq -- not same number?
+                    , Wasm.BreakIf 0 -- move to next branch
+                    ]
                 , Wasm.I32_Const selfIndex
                 , BaseModule.callUnboxFn
                 ]
             , context
             )
 
-        ( AST.TypeMatch _ _ [], Just boxId ) ->
+        ( AST.TypeMatchType _ _ [], Just boxId ) ->
             ( Wasm.Batch
                 [ Wasm.Local_Get localIdx
                 , Wasm.I32_Load -- Load instance id
@@ -586,10 +600,10 @@ makeInequalityTest boxMap selfIndex ((AST.TypeMatch _ typeFromTypeMatch _) as t_
             , context
             )
 
-        ( AST.TypeMatch _ (Type.Custom name) conditions, Nothing ) ->
+        ( AST.TypeMatchType _ (Type.Custom name) conditions, Nothing ) ->
             matchingStructTest boxMap selfIndex context localIdx name conditions
 
-        ( AST.TypeMatch _ (Type.CustomGeneric name _) conditions, Nothing ) ->
+        ( AST.TypeMatchType _ (Type.CustomGeneric name _) conditions, Nothing ) ->
             matchingStructTest boxMap selfIndex context localIdx name conditions
 
         _ ->
@@ -599,34 +613,13 @@ makeInequalityTest boxMap selfIndex ((AST.TypeMatch _ typeFromTypeMatch _) as t_
             ( Wasm.Unreachable, context )
 
 
-matchingIntTest : Int -> ( String, AST.TypeMatchValue ) -> List Wasm.Instruction
-matchingIntTest localIdx ( _, astValue ) =
-    let
-        value =
-            case astValue of
-                AST.LiteralInt num ->
-                    num
-
-                _ ->
-                    0
-    in
-    [ Wasm.Local_Get localIdx
-    , Wasm.I32_Const BaseModule.wasmPtrSize
-    , Wasm.I32_Add
-    , Wasm.I32_Load -- int value
-    , Wasm.I32_Const value
-    , Wasm.I32_NotEq -- not same number?
-    , Wasm.BreakIf 0 -- move to next branch
-    ]
-
-
 matchingStructTest :
     List ( Type, Int )
     -> Int
     -> Context
     -> Int
     -> String
-    -> List ( String, AST.TypeMatchValue )
+    -> List ( String, AST.TypeMatch )
     -> ( Wasm.Instruction, Context )
 matchingStructTest boxMap selfIndex context localIdx typeName conditions =
     let
@@ -657,7 +650,7 @@ matchingConditionTest :
     List ( Type, Int )
     -> Int
     -> Int
-    -> ( String, AST.TypeMatchValue )
+    -> ( String, AST.TypeMatch )
     -> ( List (List Wasm.Instruction), Context )
     -> ( List (List Wasm.Instruction), Context )
 matchingConditionTest boxMap selfIndex localIdx ( fieldName, value ) ( result, context ) =
@@ -672,7 +665,7 @@ matchingConditionTest boxMap selfIndex localIdx ( fieldName, value ) ( result, c
             Wasm.Call getterId getterName
     in
     case value of
-        AST.LiteralInt num ->
+        AST.TypeMatchInt _ num ->
             ( [ Wasm.Local_Get localIdx
               , BaseModule.callStackPushFn
               , callGetter
@@ -685,32 +678,25 @@ matchingConditionTest boxMap selfIndex localIdx ( fieldName, value ) ( result, c
             , idContext
             )
 
-        AST.LiteralType typ_ ->
-            case typ_ of
-                Type.Custom typeName ->
-                    let
-                        ( typeId, updatedContext ) =
-                            idForType typeName idContext
-                    in
-                    ( [ Wasm.Local_Get localIdx
-                      , BaseModule.callStackPushFn
-                      , callGetter
-                      , BaseModule.callStackPopFn
-                      , Wasm.I32_Load -- get type id
-                      , Wasm.I32_Const typeId
-                      , Wasm.I32_NotEq -- not same type?
-                      , Wasm.BreakIf 0 -- move to next branch
-                      ]
-                        :: result
-                    , updatedContext
-                    )
+        AST.TypeMatchType _ (Type.Custom typeName) [] ->
+            let
+                ( typeId, updatedContext ) =
+                    idForType typeName idContext
+            in
+            ( [ Wasm.Local_Get localIdx
+              , BaseModule.callStackPushFn
+              , callGetter
+              , BaseModule.callStackPopFn
+              , Wasm.I32_Load -- get type id
+              , Wasm.I32_Const typeId
+              , Wasm.I32_NotEq -- not same type?
+              , Wasm.BreakIf 0 -- move to next branch
+              ]
+                :: result
+            , updatedContext
+            )
 
-                _ ->
-                    ( [ Wasm.Unreachable ] :: result
-                    , context
-                    )
-
-        AST.RecursiveMatch match ->
+        match ->
             let
                 nextLocalIdx =
                     localIdx + 1

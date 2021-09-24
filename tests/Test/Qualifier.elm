@@ -23,8 +23,8 @@ suite =
                     source =
                         """
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           1 - count-down
                         """
@@ -36,8 +36,8 @@ suite =
                     source =
                         """
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           [ count-down ] !
                         """
@@ -52,8 +52,8 @@ suite =
                         : 1 - count-down 
 
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           dec-down
                         """
@@ -68,8 +68,8 @@ suite =
                         : 1 - count-down 
 
                         defmulti: count-down
-                        : Int( value 0 )
-                          0
+                        : 0
+                          drop 0
                         : Int
                           [ dec-down ] !
                         """
@@ -176,13 +176,13 @@ suite =
                                 }
                         , implementation =
                             MultiImpl
-                                [ ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
+                                [ ( TypeMatchType emptyRange (Type.Custom "/stabel/test/some/module/Dollar") []
                                   , [ Function emptyRange dollarValueGetFn
                                     , Integer emptyRange 100
                                     , Builtin emptyRange Builtin.Multiply
                                     ]
                                   )
-                                , ( TypeMatch emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
+                                , ( TypeMatchType emptyRange (Type.Custom "/stabel/test/some/module/Cent") []
                                   , [ Function emptyRange centValueGetFn
                                     ]
                                   )

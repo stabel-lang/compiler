@@ -523,10 +523,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (LocalRef "True" []) []
+                                                [ ( TypeMatchType emptyRange (LocalRef "True" []) []
                                                   , [ AST.Function emptyRange "drop", AST.Integer emptyRange 1 ]
                                                   )
-                                                , ( TypeMatch emptyRange (LocalRef "False" []) []
+                                                , ( TypeMatchType emptyRange (LocalRef "False" []) []
                                                   , [ AST.Function emptyRange "drop", AST.Integer emptyRange 0 ]
                                                   )
                                                 ]
@@ -600,10 +600,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (LocalRef "True" []) []
+                                                [ ( TypeMatchType emptyRange (LocalRef "True" []) []
                                                   , [ AST.Function emptyRange "drop", AST.Integer emptyRange 1 ]
                                                   )
-                                                , ( TypeMatch emptyRange (LocalRef "False" []) []
+                                                , ( TypeMatchType emptyRange (LocalRef "False" []) []
                                                   , [ AST.Function emptyRange "drop", AST.Integer emptyRange 0 ]
                                                   )
                                                 ]
@@ -664,10 +664,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (Generic "a") []
+                                                [ ( TypeMatchType emptyRange (Generic "a") []
                                                   , [ AST.Function emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
+                                                , ( TypeMatchType emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
@@ -739,10 +739,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
+                                                [ ( TypeMatchType emptyRange (LocalRef "Box" [ Generic "a" ]) []
                                                   , [ AST.Function emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
+                                                , ( TypeMatchType emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
@@ -819,10 +819,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange (LocalRef "Box" [ Generic "a" ]) []
+                                                [ ( TypeMatchType emptyRange (LocalRef "Box" [ Generic "a" ]) []
                                                   , [ AST.Function emptyRange "!" ]
                                                   )
-                                                , ( TypeMatch emptyRange (LocalRef "Nil" []) []
+                                                , ( TypeMatchType emptyRange (LocalRef "Nil" []) []
                                                   , [ AST.Function emptyRange "drop" ]
                                                   )
                                                 ]
@@ -964,7 +964,7 @@ suite =
                         source =
                             """
                             defmulti: zero?
-                            : Int( value 0 )
+                            : 0
                               True
                             else: False
                             """
@@ -983,11 +983,7 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch
-                                                        emptyRange
-                                                        (LocalRef "Int" [])
-                                                        [ ( "value", AST.LiteralInt 0 )
-                                                        ]
+                                                [ ( TypeMatchInt emptyRange 0
                                                   , [ AST.Function emptyRange "True" ]
                                                   )
                                                 ]
@@ -1022,15 +1018,13 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange
+                                                [ ( TypeMatchType emptyRange
                                                         (LocalRef "List" [])
                                                         [ ( "tail"
-                                                          , AST.RecursiveMatch
-                                                                (TypeMatch emptyRange
-                                                                    (LocalRef "List" [])
-                                                                    [ ( "tail", AST.LiteralType (LocalRef "Nil" []) )
-                                                                    ]
-                                                                )
+                                                          , TypeMatchType emptyRange
+                                                                (LocalRef "List" [])
+                                                                [ ( "tail", TypeMatchType emptyRange (LocalRef "Nil" []) [] )
+                                                                ]
                                                           )
                                                         ]
                                                   , [ AST.Function emptyRange "True" ]
@@ -1067,10 +1061,10 @@ suite =
                                       , imports = Dict.empty
                                       , implementation =
                                             MultiImpl
-                                                [ ( TypeMatch emptyRange
+                                                [ ( TypeMatchType emptyRange
                                                         (LocalRef "Pair" [])
-                                                        [ ( "first", AST.LiteralInt 0 )
-                                                        , ( "second", AST.LiteralInt 0 )
+                                                        [ ( "first", TypeMatchInt emptyRange 0 )
+                                                        , ( "second", TypeMatchInt emptyRange 0 )
                                                         ]
                                                   , [ AST.Function emptyRange "True" ]
                                                   )
@@ -1167,7 +1161,7 @@ suite =
 
                         defmulti: from-int
                         type: Int -- Int
-                        : Int( value 0 )
+                        : 0
                           False>
                         : Int
                           True>
@@ -1263,13 +1257,12 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatch
+                                            [ ( TypeMatchInt
                                                     (SourceLocationRange
                                                         (SourceLocation 11 3)
-                                                        (SourceLocation 11 17)
+                                                        (SourceLocation 12 1)
                                                     )
-                                                    (LocalRef "Int" [])
-                                                    [ ( "value", LiteralInt 0 ) ]
+                                                    0
                                               , [ Function
                                                     (SourceLocationRange
                                                         (SourceLocation 12 3)
@@ -1278,7 +1271,7 @@ suite =
                                                     "False>"
                                                 ]
                                               )
-                                            , ( TypeMatch
+                                            , ( TypeMatchType
                                                     (SourceLocationRange
                                                         (SourceLocation 13 3)
                                                         (SourceLocation 13 6)
@@ -1342,7 +1335,7 @@ suite =
                                   , imports = Dict.empty
                                   , implementation =
                                         MultiImpl
-                                            [ ( TypeMatch
+                                            [ ( TypeMatchType
                                                     (SourceLocationRange
                                                         (SourceLocation 20 3)
                                                         (SourceLocation 20 7)

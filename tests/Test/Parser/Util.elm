@@ -100,19 +100,14 @@ stripMultiWordBranchLocation ( typeMatch, nodes ) =
 
 
 stripTypeMatchLocation : TypeMatch -> TypeMatch
-stripTypeMatchLocation (TypeMatch _ type_ otherConds) =
-    TypeMatch emptyRange type_ <|
-        List.map (Tuple.mapSecond stripRecursiveTypeMatchLocation) otherConds
+stripTypeMatchLocation match =
+    case match of
+        TypeMatchInt _ int ->
+            TypeMatchInt emptyRange int
 
-
-stripRecursiveTypeMatchLocation : TypeMatchValue -> TypeMatchValue
-stripRecursiveTypeMatchLocation typeMatchValue =
-    case typeMatchValue of
-        RecursiveMatch typeMatch ->
-            RecursiveMatch (stripTypeMatchLocation typeMatch)
-
-        _ ->
-            typeMatchValue
+        TypeMatchType _ type_ otherConds ->
+            TypeMatchType emptyRange type_ <|
+                List.map (Tuple.mapSecond stripTypeMatchLocation) otherConds
 
 
 addFunctionsForStructs : AST -> AST

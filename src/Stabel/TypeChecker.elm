@@ -6,7 +6,6 @@ module Stabel.TypeChecker exposing
     , FunctionImplementation(..)
     , TypeDefinition
     , TypeMatch(..)
-    , TypeMatchValue(..)
     , run
     )
 
@@ -47,13 +46,8 @@ type FunctionImplementation
 
 
 type TypeMatch
-    = TypeMatch SourceLocationRange Type (List ( String, TypeMatchValue ))
-
-
-type TypeMatchValue
-    = LiteralInt Int
-    | LiteralType Type
-    | RecursiveMatch TypeMatch
+    = TypeMatchInt SourceLocationRange Int
+    | TypeMatchType SourceLocationRange Type (List ( String, TypeMatch ))
 
 
 type AstNode
@@ -418,10 +412,13 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                     in
                     case inferredDefaultType.input of
                         [] ->
-                            ( Qualifier.TypeMatch SourceLocation.emptyRange (Type.Generic "*") [], defaultImpl ) :: initialWhens
+                            ( Qualifier.TypeMatchType SourceLocation.emptyRange (Type.Generic "*") [], defaultImpl ) :: initialWhens
 
                         firstType :: _ ->
-                            ( Qualifier.TypeMatch SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
+                            ( Qualifier.TypeMatchType SourceLocation.emptyRange firstType [], defaultImpl ) :: initialWhens
+
+        hasDefaultBranch =
+            not <| List.isEmpty defaultImpl
 
         whens =
             List.map (Tuple.mapFirst (resolveWhenConditions untypedDef)) allBranches
@@ -465,7 +462,7 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
                 Just <| InconsistentWhens sourceLocation untypedDef.name
 
         maybeInexhaustiveError =
-            inexhaustivenessCheck sourceLocation whenPatterns
+            inexhaustivenessCheck sourceLocation hasDefaultBranch whenPatterns
 
         sourceLocation =
             Maybe.withDefault SourceLocation.emptyRange untypedDef.sourceLocation
@@ -506,9 +503,9 @@ typeCheckMultiImplementation context untypedDef initialWhens defaultImpl =
 
 
 resolveWhenConditions : Qualifier.FunctionDefinition -> Qualifier.TypeMatch -> Qualifier.TypeMatch
-resolveWhenConditions untypedDef ((Qualifier.TypeMatch loc typeMatch conds) as match) =
-    case typeMatch of
-        Type.CustomGeneric _ structGenerics ->
+resolveWhenConditions untypedDef match =
+    case match of
+        Qualifier.TypeMatchType loc ((Type.CustomGeneric _ structGenerics) as t) conds ->
             let
                 bindings =
                     List.foldl
@@ -516,9 +513,9 @@ resolveWhenConditions untypedDef ((Qualifier.TypeMatch loc typeMatch conds) as m
                         (initialBindingsFromFunctionDef untypedDef structGenerics)
                         conds
             in
-            Qualifier.TypeMatch
+            Qualifier.TypeMatchType
                 loc
-                (bindGenericsInType bindings typeMatch)
+                (bindGenericsInType bindings t)
                 (List.map (whenConditionsBindGenerics bindings) conds)
 
         _ ->
@@ -547,44 +544,40 @@ initialBindingsFromFunctionDef def structGenerics =
             Dict.empty
 
 
-whenConditionsGenericBindings : Qualifier.TypeMatchCond -> Dict String Type -> Dict String Type
-whenConditionsGenericBindings (Qualifier.TypeMatchCond _ fieldType value) bindings =
+whenConditionsGenericBindings : ( String, Type, Qualifier.TypeMatch ) -> Dict String Type -> Dict String Type
+whenConditionsGenericBindings ( _, fieldType, value ) bindings =
     case ( fieldType, value ) of
-        ( Type.Generic genericName, Qualifier.LiteralInt _ ) ->
+        ( Type.Generic genericName, Qualifier.TypeMatchInt _ _ ) ->
             Dict.insert genericName Type.Int bindings
 
-        ( Type.Generic genericName, Qualifier.LiteralType t ) ->
+        ( Type.Generic genericName, Qualifier.TypeMatchType _ t [] ) ->
             Dict.insert genericName t bindings
 
-        ( _, Qualifier.RecursiveMatch (Qualifier.TypeMatch _ _ subConds) ) ->
+        ( _, Qualifier.TypeMatchType _ _ subConds ) ->
             List.foldl whenConditionsGenericBindings bindings subConds
 
         _ ->
             bindings
 
 
-whenConditionsBindGenerics : Dict String Type -> Qualifier.TypeMatchCond -> Qualifier.TypeMatchCond
-whenConditionsBindGenerics bindings (Qualifier.TypeMatchCond fieldName fieldType value) =
+whenConditionsBindGenerics : Dict String Type -> ( String, Type, Qualifier.TypeMatch ) -> ( String, Type, Qualifier.TypeMatch )
+whenConditionsBindGenerics bindings ( fieldName, fieldType, value ) =
     let
         boundValue =
             case value of
-                Qualifier.LiteralType t ->
-                    Qualifier.LiteralType <| bindGenericsInType bindings t
-
-                Qualifier.RecursiveMatch (Qualifier.TypeMatch subLoc subType subConds) ->
-                    Qualifier.RecursiveMatch <|
-                        Qualifier.TypeMatch
-                            subLoc
-                            (bindGenericsInType bindings subType)
-                            (List.map (whenConditionsBindGenerics bindings) subConds)
+                Qualifier.TypeMatchType subLoc subType subConds ->
+                    Qualifier.TypeMatchType
+                        subLoc
+                        (bindGenericsInType bindings subType)
+                        (List.map (whenConditionsBindGenerics bindings) subConds)
 
                 _ ->
                     value
     in
-    Qualifier.TypeMatchCond
-        fieldName
-        (bindGenericsInType bindings fieldType)
-        boundValue
+    ( fieldName
+    , bindGenericsInType bindings fieldType
+    , boundValue
+    )
 
 
 bindGenericsInType : Dict String Type -> Type -> Type
@@ -611,8 +604,11 @@ inferWhenTypes :
     -> ( Qualifier.TypeMatch, List Qualifier.Node )
     -> ( List FunctionType, Context )
     -> ( List FunctionType, Context )
-inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
+inferWhenTypes untypedDef ( typeMatch, im ) ( infs, ctx ) =
     let
+        t =
+            typeOfTypeMatch typeMatch
+
         alteredTypeSignature =
             case untypedDef.typeSignature of
                 TypeSignature.UserProvided wt ->
@@ -627,36 +623,48 @@ inferWhenTypes untypedDef ( Qualifier.TypeMatch _ t _, im ) ( infs, ctx ) =
                 x ->
                     x
 
-        resolveFirstType : Type -> Type -> Type
-        resolveFirstType annotatedType typeMatchType =
-            case ( annotatedType, typeMatchType ) of
-                ( Type.Union _ unionMembers, Type.CustomGeneric name _ ) ->
-                    List.find (matchingCustomGenericType name) unionMembers
-                        |> Maybe.withDefault typeMatchType
-
-                ( Type.CustomGeneric annName _, Type.CustomGeneric matchName _ ) ->
-                    if annName == matchName then
-                        annotatedType
-
-                    else
-                        typeMatchType
-
-                _ ->
-                    typeMatchType
-
-        matchingCustomGenericType : String -> Type -> Bool
-        matchingCustomGenericType nameToMatch tipe =
-            case tipe of
-                Type.CustomGeneric name _ ->
-                    name == nameToMatch
-
-                _ ->
-                    False
-
         ( inf, newCtx ) =
             typeCheckImplementation untypedDef alteredTypeSignature im (cleanContext ctx)
     in
     ( inf :: infs, newCtx )
+
+
+typeOfTypeMatch : Qualifier.TypeMatch -> Type
+typeOfTypeMatch typeMatch =
+    case typeMatch of
+        Qualifier.TypeMatchInt _ _ ->
+            Type.Int
+
+        Qualifier.TypeMatchType _ t _ ->
+            t
+
+
+resolveFirstType : Type -> Type -> Type
+resolveFirstType annotatedType typeMatchType =
+    case ( annotatedType, typeMatchType ) of
+        ( Type.Union _ unionMembers, Type.CustomGeneric name _ ) ->
+            List.find (matchingCustomGenericType name) unionMembers
+                |> Maybe.withDefault typeMatchType
+
+        ( Type.CustomGeneric annName _, Type.CustomGeneric matchName _ ) ->
+            if annName == matchName then
+                annotatedType
+
+            else
+                typeMatchType
+
+        _ ->
+            typeMatchType
+
+
+matchingCustomGenericType : String -> Type -> Bool
+matchingCustomGenericType nameToMatch tipe =
+    case tipe of
+        Type.CustomGeneric name _ ->
+            name == nameToMatch
+
+        _ ->
+            False
 
 
 normalizeWhenTypes : List FunctionType -> List FunctionType
@@ -711,7 +719,11 @@ simplifyWhenFunctionTypes ( functionTypes, context ) =
 
 
 replaceFirstTypeWithPatternMatch : ( Qualifier.TypeMatch, FunctionType ) -> FunctionType
-replaceFirstTypeWithPatternMatch ( Qualifier.TypeMatch _ matchType _, typeSignature ) =
+replaceFirstTypeWithPatternMatch ( typeMatch, typeSignature ) =
+    let
+        matchType =
+            typeOfTypeMatch typeMatch
+    in
     case typeSignature.input of
         ((Type.Generic _) as toReplace) :: _ ->
             { input = List.map (replaceType toReplace matchType) typeSignature.input
@@ -828,7 +840,7 @@ unionOfTypeMatches whenBranches =
     let
         uniqueTypes =
             whenBranches
-                |> List.map (Tuple.first >> extractTypeFromTypeMatch)
+                |> List.map (Tuple.first >> typeOfTypeMatch)
                 |> List.concatMap flattenUnions
                 |> List.gatherEquals
                 |> List.map Tuple.first
@@ -1003,10 +1015,10 @@ constrainGenericsHelper remappedGenerics annotated inferred acc =
 
 
 patternMatchIsCompatibleWithInferredType : ( Qualifier.TypeMatch, FunctionType ) -> Bool
-patternMatchIsCompatibleWithInferredType ( Qualifier.TypeMatch _ typeMatchType _, inf ) =
+patternMatchIsCompatibleWithInferredType ( typeMatch, inf ) =
     case inf.input of
         inferredType :: _ ->
-            Type.genericlyCompatible typeMatchType inferredType
+            Type.genericlyCompatible (typeOfTypeMatch typeMatch) inferredType
 
         [] ->
             False
@@ -1082,27 +1094,19 @@ typeCheckImplementation untypedDef typeSignatureToUse impl context =
         |> simplifyFunctionType
 
 
-extractTypeFromTypeMatch : Qualifier.TypeMatch -> Type
-extractTypeFromTypeMatch (Qualifier.TypeMatch _ t_ _) =
-    t_
-
-
 mapTypeMatch : Qualifier.TypeMatch -> TypeMatch
-mapTypeMatch (Qualifier.TypeMatch range type_ cond) =
-    TypeMatch range type_ (List.map mapTypeMatchCond cond)
+mapTypeMatch typeMatch =
+    case typeMatch of
+        Qualifier.TypeMatchInt range val ->
+            TypeMatchInt range val
+
+        Qualifier.TypeMatchType range type_ cond ->
+            TypeMatchType range type_ (List.map (mapQualifiedMatch mapTypeMatch) cond)
 
 
-mapTypeMatchCond : Qualifier.TypeMatchCond -> ( String, TypeMatchValue )
-mapTypeMatchCond (Qualifier.TypeMatchCond fieldName _ value) =
-    case value of
-        Qualifier.LiteralInt val ->
-            ( fieldName, LiteralInt val )
-
-        Qualifier.LiteralType val ->
-            ( fieldName, LiteralType val )
-
-        Qualifier.RecursiveMatch val ->
-            ( fieldName, RecursiveMatch (mapTypeMatch val) )
+mapQualifiedMatch : (Qualifier.TypeMatch -> TypeMatch) -> ( String, Type, Qualifier.TypeMatch ) -> ( String, TypeMatch )
+mapQualifiedMatch fn ( fieldName, _, match ) =
+    ( fieldName, fn match )
 
 
 type InexhaustiveState
@@ -1110,25 +1114,37 @@ type InexhaustiveState
     | SeenInt
 
 
-inexhaustivenessCheck : SourceLocationRange -> List Qualifier.TypeMatch -> Maybe Problem
-inexhaustivenessCheck range patterns =
-    let
-        inexhaustiveStates =
-            List.foldl (inexhaustivenessCheckHelper []) [] patterns
-                |> List.filter (\( _, state ) -> state /= Total)
-                |> List.map Tuple.first
-    in
-    case inexhaustiveStates of
-        [] ->
-            Nothing
+inexhaustivenessCheck : SourceLocationRange -> Bool -> List Qualifier.TypeMatch -> Maybe Problem
+inexhaustivenessCheck range hasDefaultBranch patterns =
+    if hasDefaultBranch then
+        Nothing
 
-        _ ->
-            Just (InexhaustiveMultiFunction range inexhaustiveStates)
+    else
+        let
+            inexhaustiveStates =
+                List.foldl (inexhaustivenessCheckHelper []) [] patterns
+                    |> List.filter (\( _, state ) -> state /= Total)
+                    |> List.map Tuple.first
+        in
+        case inexhaustiveStates of
+            [] ->
+                Nothing
+
+            _ ->
+                Just (InexhaustiveMultiFunction range inexhaustiveStates)
 
 
 inexhaustivenessCheckHelper : List Type -> Qualifier.TypeMatch -> List ( List Type, InexhaustiveState ) -> List ( List Type, InexhaustiveState )
-inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
+inexhaustivenessCheckHelper typePrefix typeMatch acc =
     let
+        ( t, intLiteral, conds ) =
+            case typeMatch of
+                Qualifier.TypeMatchInt _ _ ->
+                    ( Type.Int, True, [] )
+
+                Qualifier.TypeMatchType _ t_ conds_ ->
+                    ( t_, False, conds_ )
+
         typeList =
             typePrefix ++ [ t ]
     in
@@ -1139,23 +1155,18 @@ inexhaustivenessCheckHelper typePrefix (Qualifier.TypeMatch _ t conds) acc =
         let
             subcases =
                 conds
-                    |> List.filterMap isRecursiveMatch
+                    |> List.map isRecursiveMatch
                     |> List.foldl (inexhaustivenessCheckHelper typeList) acc
 
-            isRecursiveMatch cond =
-                case cond of
-                    Qualifier.TypeMatchCond _ _ (Qualifier.RecursiveMatch val) ->
-                        Just val
-
-                    _ ->
-                        Nothing
+            isRecursiveMatch ( _, _, match ) =
+                match
 
             toAdd =
-                case ( t, conds, subcases ) of
-                    ( _, [], _ ) ->
+                case ( t, intLiteral, conds ) of
+                    ( _, False, [] ) ->
                         [ ( typeList, Total ) ]
 
-                    ( Type.Int, _, _ ) ->
+                    ( Type.Int, True, [] ) ->
                         [ ( typeList, SeenInt ) ]
 
                     _ ->
