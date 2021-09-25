@@ -128,6 +128,48 @@ test('External package functions', async () => {
     expect(result.stackElement()).toBe(2);
 });
 
+test('Fully qualified functions', async () => {
+    const entryPoint = '/author/sample/core/main'
+    const wat = await compiler.toProjectWat({
+        entryPoint: entryPoint, 
+        modules: [
+            {
+                package: 'external/sample',
+                module: 'external',
+                source: `
+                    def: inc
+                    : 1 +
+                `
+            },
+            {
+                package: 'internal/sample',
+                module: 'external',
+                source: `
+                    defmulti: flip
+                    type: Int -- Int
+                    : 1
+                      drop 0
+                    else: drop 1
+                `
+            },
+            {
+                package: 'author/sample',
+                module: 'core',
+                source: `
+                    def: main
+                    : 1 
+                      //internal/sample/external/flip
+                      //external/sample/external/inc
+                `
+            },
+        ]
+    });
+
+    const result = await compiler.run(wat, entryPoint);
+
+    expect(result.stackElement()).toBe(1);
+});
+
 test('External package types', async () => {
     const entryPoint = '/author/sample/core/main'
     const wat = await compiler.toProjectWat({
