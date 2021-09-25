@@ -81,6 +81,7 @@ type AstNode
     | Function SourceLocationRange String
     | PackageFunction SourceLocationRange (List String) String
     | ExternalFunction SourceLocationRange (List String) String
+    | FullyQualifiedFunction SourceLocationRange String
     | InlineFunction SourceLocationRange (List AstNode)
     | ConstructType String
     | GetMember String String

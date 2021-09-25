@@ -9,6 +9,7 @@ type PossiblyQualifiedType
     = LocalRef String (List PossiblyQualifiedType)
     | InternalRef (List String) String (List PossiblyQualifiedType)
     | ExternalRef (List String) String (List PossiblyQualifiedType)
+    | FullyQualifiedRef String (List PossiblyQualifiedType)
     | Generic String
     | FunctionType FunctionSignature
 

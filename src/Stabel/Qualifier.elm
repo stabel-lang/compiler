@@ -528,6 +528,9 @@ qualifyMemberType config modRefs range type_ =
             in
             refLookup qualifiedName binds
 
+        Parser.FullyQualifiedRef ref binds ->
+            refLookup ref binds
+
         Parser.Generic sym ->
             Ok (Type.Generic sym)
 
@@ -1309,6 +1312,22 @@ qualifyNode config currentDefName node acc =
 
                             else
                                 { acc | qualifiedNodes = Err (FunctionNotExposed qLoc fullReference) :: acc.qualifiedNodes }
+
+        Parser.FullyQualifiedFunction loc ref ->
+            let
+                qLoc =
+                    mapLoc loc
+            in
+            case Dict.get ref config.inProgressAST.functions of
+                Nothing ->
+                    { acc | qualifiedNodes = Err (UnknownFunctionRef qLoc ref) :: acc.qualifiedNodes }
+
+                Just def ->
+                    if def.exposed then
+                        { acc | qualifiedNodes = Ok (Function qLoc def) :: acc.qualifiedNodes }
+
+                    else
+                        { acc | qualifiedNodes = Err (FunctionNotExposed qLoc ref) :: acc.qualifiedNodes }
 
         Parser.ConstructType typeName ->
             let
