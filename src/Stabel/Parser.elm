@@ -585,6 +585,9 @@ typeSignatureRefParser =
     Parser.oneOf
         [ Parser.succeed (\name -> LocalRef name [])
             |= typeNameParser
+        , Parser.succeed (\( path, name ) -> FullyQualifiedRef ("/" ++ String.join "/" path ++ "/" ++ name) [])
+            |. Parser.symbol (Token "//" ExpectedForwardSlash)
+            |= Parser.loop [] modularizedTypeRefParser
         , Parser.succeed (\( path, name ) -> ExternalRef path name [])
             |. Parser.symbol (Token "/" ExpectedForwardSlash)
             |= Parser.loop [] modularizedTypeRefParser
@@ -605,6 +608,11 @@ typeRefParser =
     Parser.oneOf
         [ Parser.succeed LocalRef
             |= typeNameParser
+            |. noiseParser
+            |= Parser.loop [] typeOrGenericParser
+        , Parser.succeed (\( path, name ) binds -> FullyQualifiedRef ("/" ++ String.join "/" path ++ "/" ++ name) binds)
+            |. Parser.symbol (Token "//" ExpectedForwardSlash)
+            |= Parser.loop [] modularizedTypeRefParser
             |. noiseParser
             |= Parser.loop [] typeOrGenericParser
         , Parser.succeed (\( path, name ) binds -> ExternalRef path name binds)
@@ -633,6 +641,9 @@ typeMatchTypeParser =
     Parser.oneOf
         [ Parser.succeed (\name -> LocalRef name [])
             |= typeNameParser
+        , Parser.succeed (\( path, name ) -> FullyQualifiedRef ("/" ++ String.join "/" path ++ "/" ++ name) [])
+            |. Parser.symbol (Token "//" ExpectedForwardSlash)
+            |= Parser.loop [] modularizedTypeRefParser
         , Parser.succeed (\( path, name ) -> ExternalRef path name [])
             |. Parser.symbol (Token "/" ExpectedForwardSlash)
             |= Parser.loop [] modularizedTypeRefParser
@@ -1431,6 +1442,25 @@ nodeParser =
 qualifiedSymbolImplParser : Parser (SourceLocationRange -> AstNode)
 qualifiedSymbolImplParser =
     let
+        fullyQualifiedBuilder firstPath ( restPath, functionName ) =
+            let
+                path =
+                    firstPath :: restPath
+
+                ref =
+                    "/" ++ String.join "/" path ++ "/" ++ functionName
+            in
+            if checkForUpperCaseLetterInPath path then
+                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
+
+            else if List.length path == 0 then
+                Parser.problem <| InvalidModulePath <| ref
+
+            else
+                Parser.succeed <|
+                    \loc ->
+                        FullyQualifiedFunction loc ref
+
         externalBuilder ( path, reference ) =
             if checkForUpperCaseLetterInPath path then
                 Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
@@ -1465,6 +1495,11 @@ qualifiedSymbolImplParser =
     in
     Parser.oneOf
         [ Parser.succeed internalBuilder
+            |= symbolImplParser
+            |= Parser.loop [] modulePathParser
+            |> Parser.andThen identity
+        , Parser.succeed fullyQualifiedBuilder
+            |. Parser.token (Token "//" ExpectedForwardSlash)
             |= symbolImplParser
             |= Parser.loop [] modulePathParser
             |> Parser.andThen identity

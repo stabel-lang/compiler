@@ -79,6 +79,9 @@ stripNodeLocation node =
         AST.ExternalFunction _ path val ->
             AST.ExternalFunction emptyRange path val
 
+        AST.FullyQualifiedFunction _ ref ->
+            AST.FullyQualifiedFunction emptyRange ref
+
         AST.InlineFunction _ val ->
             AST.InlineFunction emptyRange (List.map stripNodeLocation val)
 

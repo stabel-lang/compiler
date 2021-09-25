@@ -1,4 +1,4 @@
-module Test.Parser.QualifiedRefs exposing (..)
+module Test.Parser.QualifiedRefs exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
@@ -175,6 +175,35 @@ suite =
                         }
                 in
                 expectAst source expectedAst
+        , test "Fully qualified function reference" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        def: test
+                        : //author/package/some/module/sample
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "test"
+                                  , typeSignature = AssociatedFunctionSignature.NotProvided
+                                  , sourceLocationRange = Nothing
+                                  , documentation = ""
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        SoloImpl
+                                            [ AST.FullyQualifiedFunction emptyRange "/author/package/some/module/sample" ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst source expectedAst
         , test "External type in multifn" <|
             \_ ->
                 let
@@ -252,6 +281,51 @@ suite =
                                   , implementation =
                                         MultiImpl
                                             [ ( TypeMatchType emptyRange (InternalRef [ "internal" ] "Tipe" []) [ ( "value", TypeMatchInt emptyRange 1 ) ]
+                                              , [ AST.Function emptyRange "drop"
+                                                , AST.Integer emptyRange 1
+                                                ]
+                                              )
+                                            ]
+                                            [ AST.Function emptyRange "drop"
+                                            , AST.Integer emptyRange 0
+                                            ]
+                                  }
+                                ]
+                        }
+                in
+                expectAst source expectedAst
+        , test "Fully qualified type in multifn" <|
+            \_ ->
+                let
+                    source =
+                        """
+                        defmulti: test
+                        type: //author/package/internal/Tipe -- Int
+                        : //author/package/internal/Tipe( value 1 )
+                          drop 1
+                        else:
+                          drop 0
+                        """
+
+                    expectedAst =
+                        { sourceReference = ""
+                        , moduleDefinition = ModuleDefinition.Undefined
+                        , types = Dict.empty
+                        , functions =
+                            Dict.fromListBy .name
+                                [ { name = "test"
+                                  , typeSignature =
+                                        AssociatedFunctionSignature.UserProvided
+                                            { input = [ NotStackRange <| FullyQualifiedRef "/author/package/internal/Tipe" [] ]
+                                            , output = [ NotStackRange <| LocalRef "Int" [] ]
+                                            }
+                                  , sourceLocationRange = Nothing
+                                  , documentation = ""
+                                  , aliases = Dict.empty
+                                  , imports = Dict.empty
+                                  , implementation =
+                                        MultiImpl
+                                            [ ( TypeMatchType emptyRange (FullyQualifiedRef "/author/package/internal/Tipe" []) [ ( "value", TypeMatchInt emptyRange 1 ) ]
                                               , [ AST.Function emptyRange "drop"
                                                 , AST.Integer emptyRange 1
                                                 ]

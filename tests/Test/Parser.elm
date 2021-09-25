@@ -1,4 +1,4 @@
-module Test.Parser exposing (..)
+module Test.Parser exposing (suite)
 
 import Dict
 import Dict.Extra as Dict
