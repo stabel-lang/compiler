@@ -1441,69 +1441,76 @@ nodeParser =
 
 qualifiedSymbolImplParser : Parser (SourceLocationRange -> AstNode)
 qualifiedSymbolImplParser =
-    let
-        fullyQualifiedBuilder firstPath ( restPath, functionName ) =
-            let
-                path =
-                    firstPath :: restPath
-
-                ref =
-                    "/" ++ String.join "/" path ++ "/" ++ functionName
-            in
-            if checkForUpperCaseLetterInPath path then
-                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
-
-            else if List.length path == 0 then
-                Parser.problem <| InvalidModulePath <| ref
-
-            else
-                Parser.succeed <|
-                    \loc ->
-                        FullyQualifiedFunction loc ref
-
-        externalBuilder ( path, reference ) =
-            if checkForUpperCaseLetterInPath path then
-                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
-
-            else if List.length path == 0 then
-                Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path ++ "/" ++ reference
-
-            else
-                Parser.succeed <|
-                    \loc ->
-                        ExternalFunction loc path reference
-
-        internalBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
-            let
-                path =
-                    firstSymbol :: partialPath
-            in
-            if checkForUpperCaseLetterInPath path && partialPath /= [] then
-                Parser.problem <| InvalidModulePath <| String.join "/" path
-
-            else
-                Parser.succeed <|
-                    \loc ->
-                        if modulePathResult == ( [], "" ) then
-                            Function loc firstSymbol
-
-                        else
-                            PackageFunction loc path reference
-
-        checkForUpperCaseLetterInPath path =
-            List.any (String.any Char.isUpper) path
-    in
     Parser.oneOf
-        [ Parser.succeed internalBuilder
+        [ Parser.succeed internalRefBuilder
             |= symbolImplParser
             |= Parser.loop [] modulePathParser
             |> Parser.andThen identity
-        , Parser.succeed fullyQualifiedBuilder
+        , Parser.succeed fullyQualifiedRefBuilder
             |. Parser.token (Token "//" ExpectedForwardSlash)
             |= symbolImplParser
             |= Parser.loop [] modulePathParser
             |> Parser.andThen identity
         , Parser.succeed identity
             |= Parser.loop [] modulePathParser
-            |> Parser.andThen externalBuilder
+            |> Parser.andThen externalRefBuilder
         ]
+
+
+fullyQualifiedRefBuilder : String -> ( List String, String ) -> Parser (SourceLocationRange -> AstNode)
+fullyQualifiedRefBuilder firstPath ( restPath, functionName ) =
+    let
+        path =
+            firstPath :: restPath
+
+        ref =
+            "/" ++ String.join "/" path ++ "/" ++ functionName
+    in
+    if checkForUpperCaseLetterInPath path then
+        Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
+
+    else if List.length path < 3 then
+        Parser.problem <| InvalidModulePath <| ref
+
+    else
+        Parser.succeed <|
+            \loc ->
+                FullyQualifiedFunction loc ref
+
+
+externalRefBuilder : ( List String, String ) -> Parser (SourceLocationRange -> AstNode)
+externalRefBuilder ( path, reference ) =
+    if checkForUpperCaseLetterInPath path then
+        Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path
+
+    else if List.length path == 0 then
+        Parser.problem <| InvalidModulePath <| "/" ++ String.join "/" path ++ "/" ++ reference
+
+    else
+        Parser.succeed <|
+            \loc ->
+                ExternalFunction loc path reference
+
+
+internalRefBuilder : String -> ( List String, String ) -> Parser (SourceLocationRange -> AstNode)
+internalRefBuilder firstSymbol (( partialPath, reference ) as modulePathResult) =
+    let
+        path =
+            firstSymbol :: partialPath
+    in
+    if checkForUpperCaseLetterInPath path && partialPath /= [] then
+        Parser.problem <| InvalidModulePath <| String.join "/" path
+
+    else
+        Parser.succeed <|
+            \loc ->
+                if modulePathResult == ( [], "" ) then
+                    Function loc firstSymbol
+
+                else
+                    PackageFunction loc path reference
+
+
+checkForUpperCaseLetterInPath : List String -> Bool
+checkForUpperCaseLetterInPath path =
+    List.any (String.any Char.isUpper) path

@@ -182,6 +182,34 @@ suite =
                         def: sample
                         : /some
                         """
+            , test "Fully qualified reference cannot be empty" <|
+                \_ ->
+                    checkForError ((==) ExpectedSymbol) <|
+                        """
+                        def: sample
+                        : //
+                        """
+            , test "Fully qualified reference cannot contain one part" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : //some
+                        """
+            , test "Fully qualified reference cannot contain two parts" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : //some/other
+                        """
+            , test "Fully qualified cannot containt three parts" <|
+                \_ ->
+                    checkForError invalidModulePathError <|
+                        """
+                        def: sample
+                        : //some/other/module
+                        """
             ]
         , describe "ModuleIsEmpty" <|
             let
